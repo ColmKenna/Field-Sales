@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -124,6 +125,17 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
+if (app.Environment.IsEnvironment("Testing"))
+{
+    // A representative write for role-boundary tests until WI-004 adds catalogue actions.
+    // It persists a subject-keyed area preference, so denied requests leave visible evidence.
+    app.MapPost("/__test/head-office-save", async (
+            ClaimsPrincipal user, StaffAreaService areas, HttpContext context) =>
+            await areas.RememberAreaAsync(user, StaffAreas.HeadOffice, context.RequestAborted)
+                ? Results.NoContent()
+                : Results.Forbid())
+        .RequireAuthorization(StaffRoles.HeadOfficeUser);
+}
 app.MapDefaultEndpoints();
 app.Run();
 

@@ -158,6 +158,23 @@ public sealed class StaffWebsiteScenarioTests
     }
 
     [Fact]
+    public async Task Should_SaveAuthorizedForm_When_HeadOfficeRoleIsHeld()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
+
+        using HttpResponseMessage save = await browser.PostAsync("/__test/head-office-save", new StringContent(""));
+        Assert.Equal(HttpStatusCode.NoContent, save.StatusCode);
+
+        await using AsyncServiceScope scope = website.Services.CreateAsyncScope();
+        StaffWebDbContext db = scope.ServiceProvider.GetRequiredService<StaffWebDbContext>();
+        StaffAreaPreference preference = await db.StaffAreaPreferences.SingleAsync();
+        Assert.Equal("niamh", preference.SubjectId);
+        Assert.Equal(StaffAreas.HeadOffice, preference.Area);
+    }
+
+    [Fact]
     public async Task Should_DenyUnheldArea_When_AStaffMemberUsesADirectLink()
     {
         await using StaffWebsiteFactory website = new();
@@ -169,9 +186,15 @@ public sealed class StaffWebsiteScenarioTests
         Assert.Equal("/AccessDenied", read.Headers.Location?.AbsolutePath);
         Assert.DoesNotContain("head-office catalogue workspace", await read.Content.ReadAsStringAsync());
 
-        using HttpResponseMessage action = await browser.PostAsync("/HeadOffice", new StringContent(""));
+        using HttpResponseMessage action = await browser.PostAsync("/__test/head-office-save", new StringContent(""));
         Assert.Equal(HttpStatusCode.Redirect, action.StatusCode);
         Assert.Equal("/AccessDenied", action.Headers.Location?.AbsolutePath);
+
+        await using (AsyncServiceScope scope = website.Services.CreateAsyncScope())
+        {
+            StaffWebDbContext db = scope.ServiceProvider.GetRequiredService<StaffWebDbContext>();
+            Assert.Empty(await db.StaffAreaPreferences.ToListAsync());
+        }
 
         using HttpResponseMessage denied = await browser.GetAsync("/AccessDenied");
         string html = await denied.Content.ReadAsStringAsync();
