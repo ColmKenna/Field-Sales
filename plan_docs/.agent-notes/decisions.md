@@ -79,3 +79,23 @@ The reserved ports are proposals until the item that adds the project confirms t
 - Still open for WI-002: project names for the web/BFF and API, whether `roles` and
   `offline_access` are requested, the AppHost secret parameter name, and the business-role mapping.
 - The full contract is in `docs/template-adoption.md` § Client boundary for WI-002.
+
+## WI-002 staff access contract (2026-09-28, developer, Increment 1)
+
+- One staff website hosts the rep, manager and head-office areas. The new .NET 10 / Aspire projects
+  are `FieldSales.Web` (Razor Pages BFF, HTTPS 7203) and `FieldSales.Api` (HTTPS 7204). The
+  proposed I-01 sign-in and I-02 area-choice layouts are approved for this item.
+- Staff authenticate with the adopted identity host's username/password page. I-01 redirects to
+  that page; it does not collect a password in the BFF. A staff member needing recovery contacts a
+  `SysAdmin`, who uses the existing identity-admin password-reset page. Customer invitations and
+  recovery remain separate.
+- The business roles are the exact ASP.NET Identity role names `Field Salesperson`, `Sales Manager`
+  and `Head Office User`. `SysAdmin` remains a distinct security-administration role and grants no
+  staff area by itself. The BFF requests the `roles` identity scope to receive role claims.
+- The BFF requests `offline_access` for server-held refresh tokens. The browser holds only the
+  protected BFF session cookie. The AppHost secret parameter is `staff-web-client-secret`. The
+  WI-001 client id, API resource, scope and redirect/logout URIs remain as recorded in
+  `docs/template-adoption.md`.
+- The developer approved the Human-Led scenario gate: IAM-US-001 S1–S8 and IAM-US-002 S1–S2,
+  including direct-link denial of protected content and actions. Role removal during an open
+  website session is WI-003. The named scenario matrix is in `WI-002.md`.
