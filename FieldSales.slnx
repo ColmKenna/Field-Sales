@@ -5,6 +5,7 @@
     <Project Path="FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj"/>
     <Project Path="FieldSales.AppHost/FieldSales.AppHost.csproj"/>
     <Project Path="FieldSales.ServiceDefaults/FieldSales.ServiceDefaults.csproj"/>
+    <Project Path="FieldSales.StaffAccess/FieldSales.StaffAccess.csproj"/>
     <Project Path="FieldSales.Web/FieldSales.Web.csproj"/>
     <Project Path="FieldSales.Web.Tests/FieldSales.Web.Tests.csproj"/>
     <Project Path="FieldSales.Api/FieldSales.Api.csproj"/>

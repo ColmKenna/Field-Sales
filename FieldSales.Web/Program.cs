@@ -1,5 +1,6 @@
 using FieldSales.Web.Data;
 using FieldSales.Web.Security;
+using FieldSales.StaffAccess;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -36,6 +37,7 @@ builder.Services.AddSingleton<SqlTicketStore>();
 builder.Services.AddScoped<StaffAreaService>();
 builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, TicketStoreCookieOptions>();
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
 builder.Services.AddScoped<StaffCookieEvents>();
 builder.Services.AddHostedService<ExpiredTicketsCleanupService>();
 
@@ -123,6 +125,16 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.Items.ContainsKey(StaffCookieEvents.LookupUnavailableKey))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await context.Response.WriteAsync("The staff workspace is temporarily unavailable.");
+        return;
+    }
+    await next();
+});
 app.UseAuthorization();
 app.MapRazorPages();
 if (app.Environment.IsEnvironment("Testing"))

@@ -37,6 +37,21 @@ public static class StaffAreas
 
 public sealed class StaffAreaService(IServiceProvider services, TimeProvider clock)
 {
+    public async Task ClearUnpermittedAreaAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
+    {
+        string? subject = user.FindFirst("sub")?.Value;
+        if (string.IsNullOrWhiteSpace(subject)) return;
+
+        StaffWebDbContext db = services.GetRequiredService<StaffWebDbContext>();
+        StaffAreaPreference? preference = await db.StaffAreaPreferences.FindAsync([subject], cancellationToken);
+        if (preference is null) return;
+        StaffArea? area = StaffAreas.Find(preference.Area);
+        if (area is not null && user.IsInRole(area.Role)) return;
+
+        db.StaffAreaPreferences.Remove(preference);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<string?> GetLastPermittedAreaAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
     {
         string? subject = user.FindFirst("sub")?.Value;

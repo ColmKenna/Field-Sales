@@ -175,6 +175,57 @@ public sealed class StaffWebsiteScenarioTests
     }
 
     [Fact]
+    public async Task Should_DenyTheNextRead_When_AWebsiteRoleWasRemoved()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "aoife", StaffRoles.SalesManager, StaffRoles.HeadOfficeUser);
+        Assert.Contains("head-office catalogue workspace is ready", await OpenAreaAsync(browser, "/HeadOffice"));
+
+        website.Roles.SetRoles("aoife", StaffRoles.SalesManager);
+        using HttpResponseMessage denied = await browser.GetAsync("/HeadOffice");
+        Assert.Equal(HttpStatusCode.Redirect, denied.StatusCode);
+        Assert.Equal("/AccessDenied", denied.Headers.Location?.AbsolutePath);
+        Assert.DoesNotContain("head-office catalogue workspace", await denied.Content.ReadAsStringAsync());
+
+        await using (AsyncServiceScope scope = website.Services.CreateAsyncScope())
+            Assert.Empty(await scope.ServiceProvider.GetRequiredService<StaffWebDbContext>()
+                .StaffAreaPreferences.ToListAsync());
+        Assert.Equal("/Manager", await HomeDestinationAsync(browser));
+        Assert.DoesNotContain("/HeadOffice", await OpenAreaAsync(browser, "/Manager"));
+    }
+
+    [Fact]
+    public async Task Should_RejectAnOpenFormSave_When_TheRequiredRoleWasRemoved()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "aoife", StaffRoles.SalesManager, StaffRoles.HeadOfficeUser);
+        Assert.Contains("head-office catalogue workspace is ready", await OpenAreaAsync(browser, "/HeadOffice"));
+
+        website.Roles.SetRoles("aoife", StaffRoles.SalesManager);
+        using HttpResponseMessage denied = await browser.PostAsync("/__test/head-office-save", new StringContent(""));
+        Assert.Equal(HttpStatusCode.Redirect, denied.StatusCode);
+        Assert.Equal("/AccessDenied", denied.Headers.Location?.AbsolutePath);
+        await using AsyncServiceScope scope = website.Services.CreateAsyncScope();
+        Assert.Empty(await scope.ServiceProvider.GetRequiredService<StaffWebDbContext>()
+            .StaffAreaPreferences.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ProtectedContentIsUnavailableWhileCurrentRolesCannotBeChecked()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
+        website.Roles.Unavailable = true;
+
+        using HttpResponseMessage response = await browser.GetAsync("/HeadOffice");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.DoesNotContain("head-office catalogue workspace", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Should_DenyUnheldArea_When_AStaffMemberUsesADirectLink()
     {
         await using StaffWebsiteFactory website = new();

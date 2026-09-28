@@ -1,11 +1,14 @@
 using System.Net;
 using System.Security.Claims;
 using System.Text;
+using FieldSales.StaffAccess;
 using FieldSales.Web.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FieldSales.Web.Tests;
 
@@ -24,12 +27,15 @@ public sealed class StaffCookieEventsTests
                 Content = new StringContent("{\"access_token\":\"new-access\",\"refresh_token\":\"new-refresh\",\"expires_in\":3600}")
             };
         }));
+        RecordingRoleLookup lookup = new();
         StaffCookieEvents events = new(new OneClientFactory(client), new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Authentication:Authority"] = "https://localhost:7201",
                 ["Authentication:ClientSecret"] = "server-secret"
-            }).Build(), TimeProvider.System);
+            }).Build(), TimeProvider.System, lookup,
+            new StaffAreaService(new ServiceCollection().BuildServiceProvider(), TimeProvider.System),
+            NullLogger<StaffCookieEvents>.Instance);
         AuthenticationProperties properties = new();
         properties.StoreTokens(
         [
@@ -53,11 +59,25 @@ public sealed class StaffCookieEventsTests
         Assert.Contains("grant_type=refresh_token", posted);
         Assert.Contains("refresh_token=old-refresh", posted);
         Assert.Contains("client_secret=server-secret", posted);
+        Assert.Equal("new-access", lookup.AccessToken);
     }
 
     private sealed class OneClientFactory(HttpClient client) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class RecordingRoleLookup : IStaffRoleLookup
+    {
+        public string? AccessToken { get; private set; }
+
+        public Task<StaffRoleLookupResult> GetRolesAsync(
+            string accessToken, string subject, CancellationToken cancellationToken)
+        {
+            AccessToken = accessToken;
+            Assert.Equal("staff-1", subject);
+            return Task.FromResult(StaffRoleLookupResult.Found([]));
+        }
     }
 
     private sealed class ReplyHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> reply) : HttpMessageHandler

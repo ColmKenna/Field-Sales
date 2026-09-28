@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
+using FieldSales.StaffAccess;
 using FieldSales.Web.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -15,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
@@ -25,6 +28,7 @@ namespace FieldSales.Web.Tests;
 public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    public TestStaffRoleLookup Roles { get; } = new();
 
     public StaffWebsiteFactory() => _connection.Open();
 
@@ -37,11 +41,13 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.ConfigureLogging(logging => logging.ClearProviders());
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
                 ["Authentication:Authority"] = "https://localhost:7201",
                 ["Authentication:ClientSecret"] = "test-secret",
+                ["StaffApi:BaseUrl"] = "https://staff-api.test",
                 ["ConnectionStrings:StaffWebDb"] = "Server=localhost;Database=unused;User Id=sa;Password=unused;TrustServerCertificate=True"
             }));
         builder.ConfigureTestServices(services =>
@@ -50,6 +56,11 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
             services.AddScoped(_ => new StaffWebDbContext(
                 new DbContextOptionsBuilder<StaffWebDbContext>().UseSqlite(_connection).Options));
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
+            services.AddHttpClient(string.Empty)
+                .ConfigurePrimaryHttpMessageHandler(() => new TestStaffApiHandler());
+            services.RemoveAll<IStaffRoleLookup>();
+            services.AddSingleton(Roles);
+            services.AddSingleton<IStaffRoleLookup>(Roles);
             services.AddSingleton<IStartupFilter, TestSignInStartupFilter>();
             services.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
             {
@@ -99,6 +110,8 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
                     return;
                 }
 
+                context.RequestServices.GetRequiredService<TestStaffRoleLookup>().SetRoles(subject, roles);
+
                 Claim[] claims =
                 [
                     new("sub", subject),
@@ -115,6 +128,11 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
                 [
                     new AuthenticationToken
                     {
+                        Name = "access_token",
+                        Value = "test-access-token"
+                    },
+                    new AuthenticationToken
+                    {
                         Name = "expires_at",
                         Value = DateTimeOffset.UtcNow.AddHours(1).ToString("o")
                     }
@@ -124,5 +142,30 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
             });
             next(app);
         };
+    }
+}
+
+internal sealed class TestStaffApiHandler : HttpMessageHandler
+{
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken) =>
+        Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+}
+
+public sealed class TestStaffRoleLookup : IStaffRoleLookup
+{
+    private readonly ConcurrentDictionary<string, string[]> _roles = new(StringComparer.Ordinal);
+
+    public bool Unavailable { get; set; }
+
+    public void SetRoles(string subject, params string[] roles) => _roles[subject] = roles;
+
+    public Task<StaffRoleLookupResult> GetRolesAsync(
+        string accessToken, string subject, CancellationToken cancellationToken)
+    {
+        if (Unavailable) throw new HttpRequestException("Test identity host is unavailable.");
+        return Task.FromResult(_roles.TryGetValue(subject, out string[]? roles)
+            ? StaffRoleLookupResult.Found(roles)
+            : StaffRoleLookupResult.Rejected);
     }
 }
