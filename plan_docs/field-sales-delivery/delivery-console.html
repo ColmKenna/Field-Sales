@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delivery Console</title>
+<link rel="stylesheet" href="console.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <div class="brand" id="brand">Delivery Console</div>
+    <div class="toolbar">
+      <button type="button" class="btn btn-mono" id="btn-load-plan">Load plan file</button>
+      <button type="button" class="btn btn-mono" id="btn-export">Export progress</button>
+      <button type="button" class="btn btn-mono" id="btn-import">Import progress</button>
+      <button type="button" class="btn btn-mono" id="btn-print">Print</button>
+    </div>
+    <input type="file" id="input-plan" accept=".js,.json,application/json,text/javascript" hidden>
+    <input type="file" id="input-progress" accept=".json,application/json" hidden>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="wrap" role="tablist" aria-label="Console sections">
+    <button type="button" class="tab" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="true" data-tab="plan">Plan</button>
+    <button type="button" class="tab" role="tab" id="tab-stories" aria-controls="panel-stories" aria-selected="false" tabindex="-1" data-tab="stories">Stories</button>
+    <button type="button" class="tab" role="tab" id="tab-contexts" aria-controls="panel-contexts" aria-selected="false" tabindex="-1" data-tab="contexts">Bounded Contexts</button>
+    <button type="button" class="tab" role="tab" id="tab-decisions" aria-controls="panel-decisions" aria-selected="false" tabindex="-1" data-tab="decisions">Decisions</button>
+    <button type="button" class="tab" role="tab" id="tab-architecture" aria-controls="panel-architecture" aria-selected="false" tabindex="-1" data-tab="architecture">Architecture</button>
+  </div>
+</nav>
+
+<div class="wrap" id="banners" role="status" aria-live="polite"></div>
+
+<main class="wrap">
+  <section role="tabpanel" id="panel-plan" aria-labelledby="tab-plan" tabindex="-1">
+    <div id="plan-header"></div>
+    <div id="plan-body"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-stories" aria-labelledby="tab-stories" tabindex="-1" hidden>
+    <div id="stories-body"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-contexts" aria-labelledby="tab-contexts" tabindex="-1" hidden>
+    <div id="contexts-body"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-decisions" aria-labelledby="tab-decisions" tabindex="-1" hidden>
+    <div id="decisions-body"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-architecture" aria-labelledby="tab-architecture" tabindex="-1" hidden>
+    <div id="architecture-body"></div>
+  </section>
+</main>
+
+<footer class="site wrap" id="site-footer"></footer>
+
+<script src="plan-data.js"></script>
+<script src="status-store.js"></script>
+<script src="console.js"></script>
+</body>
+</html>
