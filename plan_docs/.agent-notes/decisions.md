@@ -67,3 +67,15 @@ The reserved ports are proposals until the item that adds the project confirms t
 - The template's one-shot rename tooling (`scripts/rename-template.ps1`, `scripts/tests/test-rename.ps1`,
   and the `rename-smoke-test` CI job) is removed once the rename is applied, because it only works
   on an un-renamed tree (developer confirmed, 2026-09-28).
+
+## Identity client boundary (2026-09-28, developer, WI-001 Increment 3)
+
+- WI-001 records the contract, and **WI-002 implements it**, replacing the sample
+  `razorclient`/`blazorclient` development seeds.
+- Staff web/BFF client id `fieldsales-staff-web`: confidential, authorization code with PKCE, and a
+  secret from an AppHost parameter. URIs on `https://localhost:7203`: `/signin-oidc`,
+  `/signout-callback-oidc`, `/signout-oidc` (front-channel).
+- API resource `fieldsales-api`, scope `fieldsales.api`, served on `https://localhost:7204`.
+- Still open for WI-002: project names for the web/BFF and API, whether `roles` and
+  `offline_access` are requested, the AppHost secret parameter name, and the business-role mapping.
+- The full contract is in `docs/template-adoption.md` § Client boundary for WI-002.
