@@ -28,6 +28,7 @@ IResourceBuilder<SqlServerServerResource> sqlServer = builder.AddSqlServer("sqls
 IResourceBuilder<SqlServerDatabaseResource> identityDb = sqlServer.AddDatabase("IdentityDb");
 IResourceBuilder<SqlServerDatabaseResource> identityConfigDb = sqlServer.AddDatabase("IdentityConfigDb");
 IResourceBuilder<SqlServerDatabaseResource> identityOperationalDb = sqlServer.AddDatabase("IdentityOperationalDb");
+IResourceBuilder<SqlServerDatabaseResource> staffWebDb = sqlServer.AddDatabase("StaffWebDb");
 
 IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales_Identity>("identityserver")
     .WithReference(identityDb)
@@ -39,5 +40,20 @@ IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales
     .WithEnvironment("Clients__StaffWebSecret", staffWebClientSecret)
     .WithEnvironment("Seed__SysAdminPassword", sysAdminPassword)
     .WithEnvironment("Seed__TestUserPassword", testUserPassword);
+
+IResourceBuilder<ProjectResource> staffApi = builder.AddProject<FieldSales_Api>("staff-api")
+    .WithHttpsEndpoint(7204, name: "https")
+    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
+    .WaitFor(identityServer);
+
+builder.AddProject<FieldSales_Web>("staff-web")
+    .WithReference(staffWebDb)
+    .WithHttpsEndpoint(7203, name: "https")
+    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
+    .WithEnvironment("Authentication__ClientSecret", staffWebClientSecret)
+    .WithEnvironment("StaffApi__BaseUrl", "https://localhost:7204")
+    .WaitFor(identityServer)
+    .WaitFor(staffApi)
+    .WaitFor(sqlServer);
 
 builder.Build().Run();

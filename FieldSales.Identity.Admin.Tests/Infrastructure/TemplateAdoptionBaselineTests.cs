@@ -86,6 +86,27 @@ public sealed class TemplateAdoptionBaselineTests
     }
 
     [Fact]
+    public async Task Should_EmitTheRequestedRoleClaim_When_AStaffRoleIsAssigned()
+    {
+        await using var databases = new FreshDatabases();
+        await using WebApplicationFactory<Program> host = CreateHost(databases, "Development");
+        using HttpClient client = host.CreateClient();
+        await using AsyncServiceScope scope = host.Services.CreateAsyncScope();
+        RoleManager<IdentityRole> roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        UserManager<ApplicationUser> users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        IUserClaimsPrincipalFactory<ApplicationUser> claims =
+            scope.ServiceProvider.GetRequiredService<IUserClaimsPrincipalFactory<ApplicationUser>>();
+
+        Assert.True((await roles.CreateAsync(new IdentityRole("Field Salesperson"))).Succeeded);
+        ApplicationUser staff = new() { UserName = "staff@sales.local", Email = "staff@sales.local" };
+        Assert.True((await users.CreateAsync(staff, "Password123!")).Succeeded);
+        Assert.True((await users.AddToRoleAsync(staff, "Field Salesperson")).Succeeded);
+
+        var principal = await claims.CreateAsync(staff);
+        Assert.Contains(principal.Claims, claim => claim.Type == "role" && claim.Value == "Field Salesperson");
+    }
+
+    [Fact]
     public async Task Should_KeepRevokedAdministrationRevoked_When_TheHostRestarts()
     {
         await using var databases = new FreshDatabases();

@@ -68,6 +68,8 @@ builder.Services
     {
         options.Password.RequiredLength = 8;
         options.User.RequireUniqueEmail = true;
+        // The staff OIDC identity resource and API both request the literal "role" claim.
+        options.ClaimsIdentity.RoleClaimType = "role";
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();

@@ -110,3 +110,15 @@ The reserved ports are proposals until the item that adds the project confirms t
   instead of the template sample clients and API. The seeder remains additive: existing sample
   registrations in a persistent Development database require SysAdmin review and removal through
   `/Admin`, rather than automatic deletion of potentially edited records.
+
+### Increment 3 (2026-09-28, developer)
+
+- The BFF persists encrypted OIDC tickets and Data Protection keys in dedicated SQL Server
+  `StaffWebDb`; the browser receives an opaque, secure, HttpOnly cookie. Production requires a
+  certificate for the website key ring and the `staff-web` migration bundle.
+- The first API surface is authenticated `GET /staff/session`. It checks the signed bearer token,
+  `fieldsales-api` audience, `fieldsales.api` scope and at least one business role. The BFF calls
+  it with a server-held access token and refreshes that token using its server-held refresh token.
+- I-01 returns rejected staff credentials to a retry state. Protected landings exist for rep,
+  manager and head office; the sign-out POST ends the BFF and identity-host sessions. The
+  last-used destination, I-02 and area switching remain in Increment 4.

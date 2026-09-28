@@ -1,4 +1,4 @@
-# Staff website access contract (WI-002, Increment 1)
+# Staff website access contract (WI-002)
 
 Agreed on 2026-09-28 for T-1.0.1 / IAM-US-001 and IAM-US-002. This is the contract for the first
 staff identity slice. The human reviews each later implementation increment before it begins.
@@ -42,6 +42,27 @@ and removed through `/Admin`; the seeder does not delete existing client records
 Development, client administration continues through `/Admin`. Staff accounts and roles are
 provisioned through the existing Admin Users/Roles pages; indefinite suspension represents an
 inactive account for rejected sign-in. Storage of the last-used area is reviewed with its increment.
+
+## Increment 3 implementation
+
+`FieldSales.Web` stores each OIDC authentication ticket in its own SQL Server database. The
+ticket contains the access and refresh tokens; it is encrypted with the website's Data Protection
+key before storage. The `__Host-FieldSalesStaff` cookie contains only an opaque ticket key. The
+website keeps its Data Protection key ring in `StaffWebDb` and requires a certificate to protect
+that key ring outside Development. The `staff-web` migration bundle prepares the database there.
+
+I-01 starts a single OIDC attempt per submit and redirects to the identity host's existing
+password page. An invalid staff password returns to I-01 with a retry message; other clients'
+login failures remain on the identity host. One BFF cookie covers the three business areas,
+with exact role policies on their Razor Pages. Sign out uses a protected POST, removes the stored
+BFF ticket, and starts OIDC sign-out at the identity host. After the front-channel notification,
+the staff client returns to I-01 automatically, with the identity page's return link as fallback.
+The first API surface, `/staff/session`, validates a bearer token for `fieldsales-api`, the
+`fieldsales.api` scope and a business role. The BFF calls it with a server-held access token and
+refreshes that token through the identity host as it nears expiration.
+
+The current `/Staff` page lists held areas. Last-used routing, I-02 choice and switching are the
+next increment; this page is a temporary entry for the protected landings.
 
 ## Scenario gate and boundary
 

@@ -1,0 +1,35 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Staff sign-in";
+}
+
+<section class="entry">
+    <h1>Sign in to the staff workspace</h1>
+    <p>Use your staff account to continue.</p>
+    @if (Model.SignInFailed)
+    {
+        <p role="alert">Couldn't sign in. Try again or contact your administrator for help.</p>
+    }
+    @if (Model.SignedOut)
+    {
+        <p role="status">Signed out.</p>
+    }
+    <form method="post" asp-page="/SignIn" id="staff-sign-in">
+        <button type="submit" class="button">@(Model.SignInFailed ? "Try again" : "Continue to staff sign-in")</button>
+        <span id="sign-in-progress" role="status" hidden>Signing in...</span>
+    </form>
+    <p>Need help signing in? Contact your administrator.</p>
+</section>
+<script>
+    const signInForm = document.getElementById('staff-sign-in');
+    signInForm.addEventListener('submit', event => {
+        if (signInForm.dataset.submitting === 'true') {
+            event.preventDefault();
+            return;
+        }
+        signInForm.dataset.submitting = 'true';
+        signInForm.querySelector('button').disabled = true;
+        document.getElementById('sign-in-progress').hidden = false;
+    });
+</script>

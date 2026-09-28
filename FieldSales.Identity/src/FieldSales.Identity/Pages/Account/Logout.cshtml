@@ -21,7 +21,19 @@ else
 {
     @if (!string.IsNullOrEmpty(Model.SignOutIFrameUrl))
     {
-        <iframe class="signout-iframe" src="@Model.SignOutIFrameUrl" width="0" height="0" style="display:none;" aria-hidden="true"></iframe>
+        @if (Model.ReturnToStaff && !string.IsNullOrEmpty(Model.PostLogoutRedirectUri))
+        {
+            <script>
+                function returnToStaff() {
+                    window.location.replace(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.PostLogoutRedirectUri)));
+                }
+            </script>
+            <iframe class="signout-iframe" src="@Model.SignOutIFrameUrl" onload="returnToStaff()" width="0" height="0" style="display:none;" aria-hidden="true"></iframe>
+        }
+        else
+        {
+            <iframe class="signout-iframe" src="@Model.SignOutIFrameUrl" width="0" height="0" style="display:none;" aria-hidden="true"></iframe>
+        }
     }
 
     <div class="auth-card-actions">

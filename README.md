@@ -1,11 +1,11 @@
-# Duende IdentityServer with Admin Console Template
+# Field Sales
 
 [![CI](https://github.com/ColmKenna/IdentityServerWithAdminTemplate/actions/workflows/ci.yml/badge.svg)](https://github.com/ColmKenna/IdentityServerWithAdminTemplate/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern, production-ready **Duende IdentityServer** and **ASP.NET Core Identity** starter template for .NET 10, featuring a comprehensive, built-in **Admin Console UI** (`/Admin`), decoupled service architecture, and enterprise security defaults.
+The Field Sales .NET 10 solution uses **Duende IdentityServer**, **ASP.NET Core Identity**, a staff Razor Pages website and a protected API. The identity host includes the `/Admin` console for users, roles and OIDC configuration.
 
-The template ships only the identity host and its admin console. Downstream sample applications are deliberately not included, so what you clone is the part you keep.
+The first staff website and business API are now part of this solution. The identity host still owns credentials and the `/Admin` console.
 
 ---
 
@@ -35,7 +35,7 @@ The template ships only the identity host and its admin console. Downstream samp
 
 ## Overview & Architecture
 
-This solution provides a foundation for central authentication and authorization services:
+The identity host signs staff into one Razor Pages website, which calls the protected API on their behalf:
 
 ```text
                       +----------------------------------------+
@@ -57,20 +57,28 @@ This solution provides a foundation for central authentication and authorization
               [IdentityDb]        [IdentityConfigDb]  [IdentityOperationalDb]
                users, roles          clients, scopes    grants, tokens, keys
                audit, DP keys        API resources      consents, sessions
+
+       Staff browser --> [FieldSales.Web :7203] --> [FieldSales.Api :7204]
+                              |
+                         [StaffWebDb]
+                    encrypted tickets, DP keys
 ```
 
-Your own applications sit outside this template. They authenticate against the host over
-standard OIDC and OAuth 2.0, and are registered as clients through the Admin Console.
+`FieldSales.Web` uses authorization code with PKCE. Its browser cookie holds an opaque session key;
+encrypted OIDC tickets and tokens live in `StaffWebDb`. `FieldSales.Api` validates the bearer token,
+audience, scope and a business role at `/staff/session`.
 
 - **FieldSales.Identity**: The primary authentication host running Duende IdentityServer with ASP.NET Core Identity. Houses the Razor Pages UI for account workflows (Login, Logout, Access Denied) and the `/Admin` management console.
 - **FieldSales.Identity.Admin.Services**: A decoupled domain services library containing the business logic, validation, audit generation, and management operations for the admin console. It has no reference to the host's `DbContext` or user type; the host supplies adapters for the persistence ports it defines.
 - **AppHost / ServiceDefaults**: .NET Aspire orchestration and shared service defaults (OpenTelemetry, health checks, resilience).
+- **FieldSales.Web**: One staff Razor Pages BFF with I-01 entry, protected rep/manager/head-office landings, server-side token refresh and sign-out.
+- **FieldSales.Api**: Protected staff API endpoint used by the BFF to check its delegated session.
 
 > [!NOTE]
-> **SQL Server is a deliberate, load-bearing choice, not a default you can flip.** All three
+> **SQL Server is a deliberate, load-bearing choice, not a default you can flip.** All four
 > `DbContext` registrations use `UseSqlServer`, the committed migrations are SQL Server-specific,
 > and the AppHost provisions a SQL Server container. Moving to PostgreSQL or another provider means
-> changing those registrations *and* regenerating all three migration histories — the one
+> changing those registrations *and* regenerating all four migration histories — the one
 > substitution this template does not make cheap. Decide before you build on it.
 
 ---
@@ -120,6 +128,10 @@ The `/Admin` section is restricted to users in the `SysAdmin` role and provides 
 │   └── src/FieldSales.Identity/         # Duende IdentityServer host & /Admin Razor Pages UI
 ├── FieldSales.Identity.Admin.Services/  # Domain services, validation & audit logic for Admin UI
 ├── FieldSales.Identity.Admin.Tests/     # Unit, integration, characterization & audit coverage tests
+├── FieldSales.Web/                      # Staff Razor Pages BFF and server-side sessions
+├── FieldSales.Web.Tests/                # Staff request-boundary and session security tests
+├── FieldSales.Api/                      # Protected business API
+├── FieldSales.Api.Tests/                # Bearer authorization tests
 ├── FieldSales.AppHost/                  # .NET Aspire AppHost orchestrator
 ├── FieldSales.ServiceDefaults/          # Aspire service defaults (OTel, health checks, resilience)
 ├── docs/                                # Template adoption record and reviews
@@ -135,7 +147,7 @@ The `/Admin` section is restricted to users in the `SysAdmin` role and provides 
 
 ## Database Contexts
 
-The solution separates operational, configuration, and identity data across three distinct Entity Framework Core `DbContext` instances:
+The solution separates identity, API configuration, grants, and staff sessions across four Entity Framework Core `DbContext` instances:
 
 1. **`ApplicationDbContext`** (Database: `IdentityDb`):
    - ASP.NET Core Identity (Users, Roles, UserClaims, UserRoles, Logins, Tokens).
@@ -146,6 +158,8 @@ The solution separates operational, configuration, and identity data across thre
    - Duende IdentityServer configuration store (Clients, Identity Resources, API Resources, API Scopes).
 3. **`PersistedGrantDbContext`** (Database: `IdentityOperationalDb`):
    - Duende IdentityServer operational store (Authorization codes, refresh tokens, reference tokens, user consent, signing keys).
+4. **`StaffWebDbContext`** (Database: `StaffWebDb`):
+   - Protected server-side staff tickets and the website's Data Protection keys.
 
 ---
 
@@ -204,6 +218,8 @@ serving, so a fresh clone needs no migration-bundle step and no manual port disc
 | Service | Port / URL | Description |
 |---|---|---|
 | **IdentityServer Host** | `https://localhost:7201` | OIDC discovery endpoint (`/.well-known/openid-configuration`) & Admin Console (`/Admin`) |
+| **Staff website** | `https://localhost:7203` | I-01 staff entry and permitted areas |
+| **Staff API** | `https://localhost:7204` | Protected `/staff/session` endpoint |
 | **Aspire Dashboard** | Dynamic (see console output) | Telemetry, logs, and distributed application management |
 
 ### 4. Development Seed Data
@@ -213,8 +229,9 @@ the console is usable immediately. No seeding of any kind occurs in other enviro
 
 The `fieldsales-staff-web` confidential OIDC client is registered for `https://localhost:7203`,
 with the `fieldsales.api` scope and `fieldsales-api` resource. The registration permits `roles`
-and `offline_access` for server-held refresh tokens. The staff website and API are added in later
-WI-002 increments, so those endpoints are not yet listening after this increment.
+and `offline_access` for server-held refresh tokens. The website and API start with AppHost.
+The three business-area pages currently contain protected landing content; area choice,
+last-used routing and switching are WI-002 Increment 4.
 
 The former `razorclient` and `blazorclient` registrations are no longer seeded. They can remain
 in a persistent Development database created before WI-002; a SysAdmin can review and remove
@@ -274,15 +291,16 @@ are not set.
 
 ## Database Migrations
 
-Each `DbContext` has dedicated migrations under `FieldSales.Identity/src/FieldSales.Identity/Migrations`:
+Each `DbContext` has dedicated migrations:
 - `Migrations/Application` (`ApplicationDbContext`)
 - `Migrations/Configuration` (`ConfigurationDbContext`)
 - `Migrations/Operational` (`PersistedGrantDbContext`)
+- `FieldSales.Web/Data/Migrations` (`StaffWebDbContext`)
 
 ### First Run with .NET Aspire
 
-**In Development, nothing here is required.** The host applies pending migrations for all three
-contexts itself on startup, so a fresh clone reaches a running application with a single
+**In Development, nothing here is required.** The hosts apply pending migrations for all four
+contexts on startup, so a fresh clone reaches a running application with a single
 `dotnet run --project FieldSales.AppHost`. Re-running is a no-op once the schema is current.
 
 **Outside Development the host never creates or migrates schemas.** It verifies migration state and
@@ -328,9 +346,10 @@ function Invoke-MigrationBundle([string] $bundle, [string] $database) {
 Invoke-MigrationBundle identity IdentityDb
 Invoke-MigrationBundle configuration IdentityConfigDb
 Invoke-MigrationBundle operational IdentityOperationalDb
+Invoke-MigrationBundle 'staff-web' StaffWebDb
 ```
 
-After all three commands report `Done.`, restart the `identityserver` resource in the Aspire
+After all four commands report `Done.`, restart the `identityserver` and `staff-web` resources in the Aspire
 Dashboard (or restart AppHost). The bundles are idempotent, so it is safe to run them again when
 deploying a new migration.
 
@@ -411,8 +430,8 @@ environment except Development and Testing.
 ## Production Checklist
 
 - [ ] `IdentityServer:SigningCertificatePath` and password configured — the host will not start without them.
-- [ ] `DataProtection:CertificatePath` and password configured, so the key ring is encrypted at rest.
-- [ ] All three migration bundles applied to their databases.
+- [ ] `DataProtection:CertificatePath` and password configured for the identity host and staff website, so both key rings are encrypted at rest.
+- [ ] All four migration bundles applied to their databases.
 - [ ] First administrator created with `--bootstrap-admin`, and the bootstrap credentials removed from configuration afterwards.
 - [ ] `fieldsales-staff-web` client, `fieldsales.api` scope and `fieldsales-api` resource registered through **Admin → Clients / API Scopes / APIs**. Development seeding does not run in production.
 - [ ] The three staff business roles created and staff accounts assigned through **Admin → Roles / Users**.

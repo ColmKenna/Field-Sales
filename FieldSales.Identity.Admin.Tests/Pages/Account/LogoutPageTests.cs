@@ -14,6 +14,35 @@ namespace FieldSales.Identity.Admin.Tests.Pages.Account;
 public class LogoutPageTests
 {
     [Fact]
+    public async Task OnPostAsync_WhenStaffFrontChannelCompletes_ReturnsToStaffEntry()
+    {
+        var mockSignInManager = new Mock<SignInManager<ApplicationUser>>(
+            new Mock<UserManager<ApplicationUser>>(
+                new Mock<IUserStore<ApplicationUser>>().Object, null!, null!, null!, null!, null!, null!, null!, null!).Object,
+            new Mock<IHttpContextAccessor>().Object,
+            new Mock<IUserClaimsPrincipalFactory<ApplicationUser>>().Object,
+            null!, null!, null!, null!);
+        var interaction = new Mock<IIdentityServerInteractionService>();
+        string logoutId = "staff-logout";
+        interaction.Setup(i => i.GetLogoutContextAsync(logoutId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new LogoutRequest("https://localhost:7203/signout-oidc",
+                new LogoutMessage
+                {
+                    ClientId = "fieldsales-staff-web",
+                    PostLogoutRedirectUri = "https://localhost:7203/signout-callback-oidc"
+                }));
+        LogoutModel page = new(mockSignInManager.Object, interaction.Object, new Mock<IEventService>().Object)
+        {
+            LogoutId = logoutId,
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        Assert.IsType<PageResult>(await page.OnPostAsync());
+        Assert.True(page.ReturnToStaff);
+        Assert.Equal("https://localhost:7203/signout-callback-oidc", page.PostLogoutRedirectUri);
+    }
+
+    [Fact]
     public async Task OnPostAsync_WhenSignOutIFrameUrlExists_ReturnsPageResultWithIFrameUrl()
     {
         var mockSignInManager = new Mock<SignInManager<ApplicationUser>>(
