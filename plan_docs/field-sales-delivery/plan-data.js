@@ -48,7 +48,7 @@ window.DELIVERY_PLAN = {
     "blocked"
   ],
   "workItemStatus": {
-    "WI-001": "active"
+    "WI-001": "done"
   },
   "complexities": [
     "Simple",
