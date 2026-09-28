@@ -71,6 +71,7 @@ boundary.
 ## Scenario gate and boundary
 
 The developer approved IAM-US-001 S1–S8 and IAM-US-002 S1–S2 as the Human-Led website scenario
-matrix, including a direct protected read and action denial. The named tests and one-line intents
-are recorded in [`WI-002.md`](../plan_docs/.agent-notes/WI-002.md). IAM-US-002 S3, current-role
-enforcement on the next request after an in-session role removal, is WI-003.
+matrix, including a direct protected read and POST denial. All ten named scenarios pass; their
+outcomes and test evidence are recorded in [`WI-002.md`](../plan_docs/.agent-notes/WI-002.md).
+IAM-US-002 S3, current-role enforcement on the next request after an in-session role removal,
+is WI-003.

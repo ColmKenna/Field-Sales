@@ -61,7 +61,7 @@ The identity host signs staff into one Razor Pages website, which calls the prot
        Staff browser --> [FieldSales.Web :7203] --> [FieldSales.Api :7204]
                               |
                          [StaffWebDb]
-                    encrypted tickets, DP keys
+                    encrypted tickets, DP keys, last area
 ```
 
 `FieldSales.Web` uses authorization code with PKCE. Its browser cookie holds an opaque session key;
@@ -71,7 +71,7 @@ audience, scope and a business role at `/staff/session`.
 - **FieldSales.Identity**: The primary authentication host running Duende IdentityServer with ASP.NET Core Identity. Houses the Razor Pages UI for account workflows (Login, Logout, Access Denied) and the `/Admin` management console.
 - **FieldSales.Identity.Admin.Services**: A decoupled domain services library containing the business logic, validation, audit generation, and management operations for the admin console. It has no reference to the host's `DbContext` or user type; the host supplies adapters for the persistence ports it defines.
 - **AppHost / ServiceDefaults**: .NET Aspire orchestration and shared service defaults (OpenTelemetry, health checks, resilience).
-- **FieldSales.Web**: One staff Razor Pages BFF with I-01 entry, protected rep/manager/head-office landings, server-side token refresh and sign-out.
+- **FieldSales.Web**: One staff Razor Pages BFF with I-01 entry, I-02 area choice, last-used permitted routing, protected rep/manager/head-office landings, server-side token refresh and sign-out.
 - **FieldSales.Api**: Protected staff API endpoint used by the BFF to check its delegated session.
 
 > [!NOTE]
