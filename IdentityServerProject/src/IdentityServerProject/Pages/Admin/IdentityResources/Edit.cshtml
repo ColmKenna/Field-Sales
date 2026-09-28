@@ -1,0 +1,100 @@
+@page
+@model EditModel
+@{
+    ViewData["Title"] = Model.Editor.Name;
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin", "/Admin/Index"),
+        new("Identity Resources", "/Admin/IdentityResources/Index"),
+        new(Model.Editor.Name)
+    };
+    var isProtected = Model.Editor.IsProtected;
+}
+
+<page-header title="@Model.Editor.Name" sub="Manage display name, description, flags, and user claims for this identity resource." variant="editor">
+    <partial name="_BackLink" />
+</page-header>
+
+<div class="panel editor-panel">
+    @if (isProtected)
+    {
+        <div class="validation-summary" id="protected-resource-notice" role="status">
+            <strong>Protected resource.</strong>
+            This identity resource is required by the OpenID Connect protocol, or has been marked
+            non-editable. Its settings and claims are read-only, and it cannot be deleted.
+        </div>
+    }
+
+    <form method="post" asp-page-handler="Save" asp-route-name="@Model.Editor.Name" class="editor-form">
+        <div asp-validation-summary="All" role="alert" class="validation-summary"></div>
+
+        <fieldset class="fieldset-plain" disabled="@isProtected">
+
+            <div class="form-field">
+                <label class="form-label" for="resource-name">Name</label>
+                <input class="form-control" id="resource-name" value="@Model.Editor.Name" disabled/>
+                <small class="form-text">The unique identifier for this resource. This cannot be changed.</small>
+            </div>
+
+            <div class="form-field">
+                <label class="form-label" for="resource-display-name">Display Name</label>
+                <input class="form-control" id="resource-display-name" asp-for="Input.DisplayName" aria-describedby="resource-display-name-error"/>
+                <span asp-validation-for="Input.DisplayName" id="resource-display-name-error" class="field-validation-error"></span>
+            </div>
+
+            <div class="form-field">
+                <label class="form-label" for="resource-description">Description</label>
+                <textarea class="form-control" id="resource-description" rows="3"
+                          asp-for="Input.Description" aria-describedby="resource-description-error"></textarea>
+                <span asp-validation-for="Input.Description" id="resource-description-error" class="field-validation-error"></span>
+            </div>
+
+            <div class="form-group checkbox-grid">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" asp-for="Input.Enabled"/>
+                    <label class="form-check-label" asp-for="Input.Enabled"></label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" asp-for="Input.Required"/>
+                    <label class="form-check-label" asp-for="Input.Required"></label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" asp-for="Input.Emphasize"/>
+                    <label class="form-check-label" asp-for="Input.Emphasize"></label>
+                </div>
+
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" asp-for="Input.ShowInDiscoveryDocument"/>
+                    <label class="form-check-label" asp-for="Input.ShowInDiscoveryDocument"></label>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+            </div>
+
+        </fieldset>
+    </form>
+
+    <h2 class="section-title">User Claims</h2>
+
+    <partial name="_ScopeChipsRow" model='new ScopeChipsRowModel(Model.ClaimChips, "No claims configured.", "RemoveClaim", Model.Editor.Name, "claimType")' />
+
+    <form method="post" asp-page-handler="AddClaim" asp-route-name="@Model.Editor.Name"
+          class="editor-form editor-subform">
+        <fieldset class="fieldset-plain" disabled="@isProtected">
+            <h3 class="section-title">Add a claim type</h3>
+            <div class="form-field">
+                <label class="form-label" for="new-claim-type">Claim type</label>
+                <input class="form-control" id="new-claim-type" name="claimType" required/>
+                <small class="form-text">Examples: email, phone_number, address, name, given_name, family_name, website,
+                    etc.</small>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-secondary">Add claim</button>
+            </div>
+        </fieldset>
+    </form>
+</div>

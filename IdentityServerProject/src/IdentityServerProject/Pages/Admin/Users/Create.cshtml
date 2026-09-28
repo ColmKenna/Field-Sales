@@ -1,0 +1,60 @@
+@page
+@model CreateModel
+@{
+    ViewData["Title"] = "New User";
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin", "/Admin/Index"),
+        new("Users", "/Admin/Users/Index"),
+        new("New User")
+    };
+}
+
+<page-header title="New User" sub="Provision a new user account with validated credentials.">
+    <partial name="_BackLink" model='new BackLinkModel("./Index", "Back to Users")' />
+</page-header>
+
+<form method="post" id="create-user-form">
+    <div asp-validation-summary="All" role="alert" class="validation-summary alert-panel alert-danger"></div>
+
+    <div class="panel panel-padded">
+        <h2 class="panel-title">Account Details</h2>
+
+        <div class="form-field">
+            <label asp-for="Input.UserName" class="form-label">Username <span class="required">*</span></label>
+            <input asp-for="Input.UserName" class="form-control" placeholder="e.g. jane.doe" required aria-describedby="user-name-error"/>
+            <span asp-validation-for="Input.UserName" id="user-name-error" class="text-danger field-validation-error"></span>
+        </div>
+
+        <div class="form-field">
+            <label asp-for="Input.Email" class="form-label">Email <span class="required">*</span></label>
+            <input asp-for="Input.Email" type="email" class="form-control" placeholder="e.g. jane.doe@example.com"
+                   required aria-describedby="email-error"/>
+            <span asp-validation-for="Input.Email" id="email-error" class="text-danger field-validation-error"></span>
+        </div>
+
+        <div class="form-field">
+            <label asp-for="Input.FullName" class="form-label">Full Name</label>
+            <input asp-for="Input.FullName" class="form-control" placeholder="Optional display name" aria-describedby="full-name-error"/>
+            <span asp-validation-for="Input.FullName" id="full-name-error" class="text-danger field-validation-error"></span>
+        </div>
+
+        <div class="form-field">
+            <label asp-for="Input.Password" class="form-label">Password <span class="required">*</span></label>
+            <input asp-for="Input.Password" type="password" class="form-control" required aria-describedby="password-error"/>
+            <span asp-validation-for="Input.Password" id="password-error" class="text-danger field-validation-error"></span>
+        </div>
+
+        <div class="form-field">
+            <label asp-for="Input.ConfirmPassword" class="form-label">Confirm Password <span
+                    class="required">*</span></label>
+            <input asp-for="Input.ConfirmPassword" type="password" class="form-control" required aria-describedby="confirm-password-error"/>
+            <span asp-validation-for="Input.ConfirmPassword" id="confirm-password-error" class="text-danger field-validation-error"></span>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn-primary">Create User</button>
+        <a asp-page="./Index" class="btn-secondary">Cancel</a>
+    </div>
+</form>

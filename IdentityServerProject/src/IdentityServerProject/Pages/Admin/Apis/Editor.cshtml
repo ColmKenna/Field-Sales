@@ -1,0 +1,256 @@
+@page
+@model EditorModel
+@{
+    ViewData["Title"] = Model.Editor.IsNew ? "New API Resource" : Model.Editor.Name;
+    ViewData[AdminComponents.ViewDataKey] = AdminComponent.ResponsiveTable | AdminComponent.Tabs;
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin", "/Admin/Index"),
+        new("API Resources", "/Admin/Apis/Index"),
+        new(Model.Editor.IsNew ? "New API Resource" : Model.Editor.Name)
+    };
+    var tab = Model.Tab;
+}
+
+@*
+    Deliberately not the <page-header> TagHelper. This is the one header whose title is a
+    group rather than a string — the resource name sits beside a live enabled/disabled
+    badge in .title-with-badge. Giving the component a title slot for a single call site
+    would cost more than the duplication does.
+*@
+<div class="editor-header">
+    <div>
+        <div class="title-with-badge">
+            <h1 class="hero-title">@(Model.Editor.IsNew ? "New API resource" : Model.Editor.Name)</h1>
+            @if (!Model.Editor.IsNew)
+            {
+                <span
+                    class="status-badge @(Model.Editor.Enabled ? "enabled" : "disabled")">@(Model.Editor.Enabled ? "Enabled" : "Disabled")</span>
+            }
+        </div>
+        <p class="page-sub">@(Model.Editor.IsNew ? "Register a new secured web API." : "Manage basics, secrets, scopes, and claims for this API resource.")</p>
+    </div>
+    <partial name="_BackLink" />
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-error" role="alert">@Model.ErrorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.GeneratedSecret))
+{
+    <div class="alert alert-success" role="alert" id="generated-secret-banner">
+        <div class="alert-success-title">New secret generated — copy it now, it will not be shown again.</div>
+        <div class="alert-success-row">
+            <code id="generated-secret-value">@Model.GeneratedSecret</code>
+            <button type="button" class="btn-secondary" id="copy-secret-btn" data-copy-target="generated-secret-value">
+                Copy
+            </button>
+        </div>
+    </div>
+}
+
+<ck-tabs id="api-resource-editor-tabs" class="api-resource-editor-tabs" aria-label="API resource editor tabs">
+    <ck-tab label="Basics" data-tab="basics" active="@(tab == "basics" ? "active" : null)">
+        <form method="post" asp-page-handler="SaveBasics" class="editor-form">
+            <input type="hidden" name="Name" value="@Model.Editor.Name"/>
+            <div asp-validation-summary="ModelOnly" role="alert" class="validation-summary"></div>
+
+            <div class="form-field">
+                <label class="form-label" for="basics-name">Name</label>
+                <input class="form-control" id="basics-name" asp-for="Basics.Name" aria-describedby="basics-name-error"/>
+                <span asp-validation-for="Basics.Name" id="basics-name-error" class="field-validation-error"></span>
+            </div>
+
+            <div class="form-field">
+                <label class="form-label" for="basics-display-name">Display name</label>
+                <input class="form-control" id="basics-display-name" asp-for="Basics.DisplayName"/>
+            </div>
+
+            <div class="form-field">
+                <label class="form-label" for="basics-description">Description</label>
+                <textarea class="form-control" id="basics-description" rows="3" asp-for="Basics.Description"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Save</button>
+            </div>
+        </form>
+
+        @if (!Model.Editor.IsNew)
+        {
+            <div class="danger-zone">
+                <h2 class="section-title">Danger zone</h2>
+
+                @if (Model.Editor.Enabled)
+                {
+                    <div class="danger-row">
+                        <div>
+                            <div class="danger-row-title">Disable this API resource</div>
+                            <div class="danger-row-desc">Tokens can no longer be issued for this resource until it is
+                                re-enabled.
+                            </div>
+                        </div>
+                        <button type="button" class="btn-danger-outline" data-action="open-modal"
+                                data-modal="disable-modal">Disable
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="Enable" asp-route-name="@Model.Editor.Name"
+                          class="danger-row">
+                        <div>
+                            <div class="danger-row-title">Enable this API resource</div>
+                            <div class="danger-row-desc">Resume issuing tokens for this resource.</div>
+                        </div>
+                        <button type="submit" class="btn-secondary">Enable</button>
+                    </form>
+                }
+
+                <div class="danger-row">
+                    <div>
+                        <div class="danger-row-title">Delete this API resource</div>
+                        <div class="danger-row-desc">Permanently removes the resource, its secrets, scopes, and claims.
+                            This cannot be undone.
+                        </div>
+                    </div>
+                    <button type="button" class="btn-danger" data-action="open-modal" data-modal="delete-modal">Delete
+                    </button>
+                </div>
+            </div>
+        }
+    </ck-tab>
+
+    @if (!Model.Editor.IsNew)
+    {
+        <ck-tab label="Secrets" data-tab="secrets" active="@(tab == "secrets" ? "active" : null)">
+            <ck-responsive-table class="editor-secrets-table" mobile-breakpoint="768px">
+                <ck-responsive-thead>
+                    <ck-responsive-col-head>Description</ck-responsive-col-head>
+                    <ck-responsive-col-head>Type</ck-responsive-col-head>
+                    <ck-responsive-col-head>Created</ck-responsive-col-head>
+                    <ck-responsive-col-head>Expiration</ck-responsive-col-head>
+                    <ck-responsive-col-head class="actions-cell">Actions</ck-responsive-col-head>
+                </ck-responsive-thead>
+                <ck-responsive-tbody>
+                    @foreach (var secret in Model.Editor.Secrets)
+                    {
+                        <ck-responsive-row>
+                            <ck-responsive-col>@(string.IsNullOrWhiteSpace(secret.Description) ? "—" : secret.Description)</ck-responsive-col>
+                            <ck-responsive-col>@secret.Type</ck-responsive-col>
+                            <ck-responsive-col>@secret.Created.ToString("yyyy-MM-dd")</ck-responsive-col>
+                            <ck-responsive-col>@(secret.Expiration?.ToString("yyyy-MM-dd") ?? "Never")</ck-responsive-col>
+                            <ck-responsive-col class="actions-cell">
+                                <button
+                                    type="button"
+                                    class="action-link action-link-danger"
+                                    data-action="open-modal"
+                                    data-modal="revoke-secret-modal"
+                                    data-secret-id="@secret.Id">
+                                    Revoke
+                                </button>
+                            </ck-responsive-col>
+                        </ck-responsive-row>
+                    }
+                </ck-responsive-tbody>
+            </ck-responsive-table>
+
+            @if (Model.Editor.Secrets.Count == 0)
+            {
+                <div class="empty-state">No secrets registered.</div>
+            }
+
+            <form method="post" asp-page-handler="AddSecret" asp-route-name="@Model.Editor.Name"
+                  class="editor-form editor-subform">
+                <h3 class="section-title">Generate a new secret</h3>
+                <div class="form-field">
+                    <label class="form-label" for="secret-description">Description (optional)</label>
+                    <input class="form-control" id="secret-description" asp-for="Secret.Description" aria-describedby="secret-description-error"/>
+                    <span asp-validation-for="Secret.Description" id="secret-description-error" class="field-validation-error"></span>
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="secret-expiration">Expiration (optional)</label>
+                    <input class="form-control" id="secret-expiration" type="date" asp-for="Secret.Expiration" aria-describedby="secret-expiration-error"/>
+                    <span asp-validation-for="Secret.Expiration" id="secret-expiration-error" class="field-validation-error"></span>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Generate secret</button>
+                </div>
+            </form>
+        </ck-tab>
+
+        <ck-tab label="Scopes" data-tab="scopes" active="@(tab == "scopes" ? "active" : null)">
+            <partial name="_ScopeChipsRow" model='ScopeChipsRowModel.ForSimpleList(Model.Editor.Scopes, "No scopes attached.", "DetachScope", Model.Editor.Name, "scopeName")' />
+
+            @if (Model.AttachableScopeNames.Count > 0)
+            {
+                <form method="post" asp-page-handler="AttachScope" asp-route-name="@Model.Editor.Name"
+                      class="editor-form editor-subform">
+                    <h3 class="section-title">Attach an existing scope</h3>
+                    <div class="form-field">
+                        <label class="form-label" for="attach-scope-name">Scope</label>
+                        <select class="form-control" id="attach-scope-name" asp-for="AttachScope.ScopeName" aria-describedby="attach-scope-name-error">
+                            @foreach (var scope in Model.AttachableScopeNames)
+                            {
+                                <option value="@scope">@scope</option>
+                            }
+                        </select>
+                        <span asp-validation-for="AttachScope.ScopeName" id="attach-scope-name-error" class="field-validation-error"></span>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-secondary">Attach</button>
+                    </div>
+                </form>
+            }
+
+            <form method="post" asp-page-handler="CreateScope" asp-route-name="@Model.Editor.Name"
+                  class="editor-form editor-subform">
+                <h3 class="section-title">Create a new scope</h3>
+                <div class="form-field">
+                    <label class="form-label" for="new-scope-name">Scope name</label>
+                    <input class="form-control" id="new-scope-name" asp-for="CreateScope.ScopeName" required aria-describedby="new-scope-name-error"/>
+                    <span asp-validation-for="CreateScope.ScopeName" id="new-scope-name-error" class="field-validation-error"></span>
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="new-scope-display-name">Display name (optional)</label>
+                    <input class="form-control" id="new-scope-display-name" asp-for="CreateScope.ScopeDisplayName" aria-describedby="new-scope-display-name-error"/>
+                    <span asp-validation-for="CreateScope.ScopeDisplayName" id="new-scope-display-name-error" class="field-validation-error"></span>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-secondary">Create &amp; attach</button>
+                </div>
+            </form>
+        </ck-tab>
+
+        <ck-tab label="Claims" data-tab="claims" active="@(tab == "claims" ? "active" : null)">
+            <partial name="_ScopeChipsRow" model='ScopeChipsRowModel.ForSimpleList(Model.Editor.Claims, "No claims configured.", "RemoveClaim", Model.Editor.Name, "claimType")' />
+
+            <form method="post" asp-page-handler="AddClaim" asp-route-name="@Model.Editor.Name"
+                  class="editor-form editor-subform">
+                <h3 class="section-title">Add a claim type</h3>
+                <div class="form-field">
+                    <label class="form-label" for="new-claim-type">Claim type</label>
+                    <input class="form-control" id="new-claim-type" asp-for="Claim.ClaimType" required aria-describedby="new-claim-type-error"/>
+                    <span asp-validation-for="Claim.ClaimType" id="new-claim-type-error" class="field-validation-error"></span>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-secondary">Add claim</button>
+                </div>
+            </form>
+        </ck-tab>
+    }
+</ck-tabs>
+
+@if (!Model.Editor.IsNew)
+{
+    <partial name="_ConfirmationModal" model='new ConfirmationModalModel("disable-modal", "Disable API resource", "Disable", "Type <strong>DISABLE</strong> to confirm. Existing tokens already issued for this resource remain valid until they expire.", confirmWord: "DISABLE", submitText: "Disable", routeName: Model.Editor.Name, bodyId: "disable-modal-desc")' />
+    <partial name="_ConfirmationModal" model='new ConfirmationModalModel("delete-modal", "Delete API resource", "Delete", "Type <strong>DELETE</strong> to permanently remove <strong>{0}</strong>, its secrets, scopes, and claims. This cannot be undone.", confirmWord: "DELETE", submitText: "Delete", routeName: Model.Editor.Name, bodyId: "delete-modal-desc", bodyArgs: new[] { Model.Editor.Name })' />
+    <partial name="_ConfirmationModal" model='new ConfirmationModalModel("revoke-secret-modal", "Revoke secret", "RevokeSecret", "Type <strong>REVOKE</strong> to confirm. Any client using this secret will immediately fail to authenticate.", confirmWord: "REVOKE", submitText: "Revoke", routeName: Model.Editor.Name, hiddenInputName: "secretId", hiddenInputId: "revoke-secret-id-input", bodyId: "revoke-modal-desc")' />
+}
+
+@section Scripts {
+    <script src="~/js/tab-query-sync.js" asp-append-version="true"></script>
+    <script src="~/js/api-resource-editor.js" asp-append-version="true"></script>
+}

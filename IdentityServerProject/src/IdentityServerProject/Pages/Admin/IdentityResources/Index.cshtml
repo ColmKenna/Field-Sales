@@ -1,0 +1,97 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Identity Resources";
+    ViewData[AdminComponents.ViewDataKey] = AdminComponent.ResponsiveTable;
+}
+
+<page-header title="Identity Resources" sub="Standard OpenID Connect and custom user claim definitions">
+    <a asp-page="./Create" class="btn-primary">
+        <partial name="_AdminIcon" model='("plus", "btn-icon")' />
+        New identity resource
+    </a>
+</page-header>
+
+@if (!string.IsNullOrWhiteSpace(Model.DeleteErrorMessage))
+{
+    <div class="alert alert-error" role="alert">@Model.DeleteErrorMessage</div>
+}
+
+<div class="panel">
+    <partial name="_ListFilter" model='new ListFilterModel("identity-resource-filter", "Filter identity resources", "Filter by name or display name", Model.Filter)' />
+
+    <ck-responsive-table mobile-breakpoint="768px">
+        <ck-responsive-thead>
+            <ck-responsive-col-head>Name</ck-responsive-col-head>
+            <ck-responsive-col-head>Display Name</ck-responsive-col-head>
+            <ck-responsive-col-head>User Claims</ck-responsive-col-head>
+            <ck-responsive-col-head>Referenced By</ck-responsive-col-head>
+            <ck-responsive-col-head>Status</ck-responsive-col-head>
+            <ck-responsive-col-head class="actions-cell">Actions</ck-responsive-col-head>
+        </ck-responsive-thead>
+        <ck-responsive-tbody>
+            @foreach (var resource in Model.IdentityResources.Items)
+            {
+                <ck-responsive-row>
+                    <ck-responsive-col>
+                        <a asp-page="./Edit" asp-route-name="@resource.Name"
+                           class="resource-title-link"><code>@resource.Name</code></a>
+                    </ck-responsive-col>
+                    <ck-responsive-col>@(string.IsNullOrWhiteSpace(resource.DisplayName) ? "—" : resource.DisplayName)</ck-responsive-col>
+                    <ck-responsive-col><span
+                            class="badge">@resource.UserClaimsCount claim@(resource.UserClaimsCount == 1 ? "" : "s")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col><span
+                            class="badge">@resource.ClientReferenceCount client@(resource.ClientReferenceCount == 1 ? "" : "s")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col>
+                        <span
+                            class="status-badge @(resource.Enabled ? "enabled" : "disabled")">@(resource.Enabled ? "Enabled" : "Disabled")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col class="actions-cell">
+                        <button
+                            type="button"
+                            class="action-link action-link-danger"
+                            data-action="delete-resource"
+                            data-delete-name="@resource.Name"
+                            data-reference-count="@resource.ClientReferenceCount"
+                            data-non-editable="@(resource.NonEditable || string.Equals(resource.Name, "openid", StringComparison.OrdinalIgnoreCase) ? "true" : "false")">
+                            Delete
+                        </button>
+                    </ck-responsive-col>
+                </ck-responsive-row>
+            }
+        </ck-responsive-tbody>
+    </ck-responsive-table>
+
+    @if (Model.IdentityResources.Items.Count == 0)
+    {
+        <div class="empty-state">No identity resources found.</div>
+    }
+
+    <partial name="_PaginationFooter" model='Model.IdentityResources.ToPagination("identity resources", Model.Filter)' />
+</div>
+
+<partial name="_ConfirmationModal" model='new ConfirmationModalModel(
+    "delete-resource-modal",
+    "Delete identity resource",
+    "Delete",
+    "Are you sure you want to delete <strong id=\"delete-resource-modal-name-text\"></strong>? This cannot be undone.",
+    submitText: "Delete",
+    submitId: "delete-resource-modal-confirm",
+    hiddenInputName: "name",
+    hiddenInputId: "delete-resource-modal-name-input",
+    hiddenInputValue: "",
+    bodyId: "delete-resource-modal-message",
+    bodyState: "confirm",
+    hiddenFields: new[]
+    {
+        new ModalHiddenField("PageNumber", Value: Model.IdentityResources.PageNumber.ToString()),
+        new ModalHiddenField("Filter", Value: Model.Filter)
+    },
+    blockedBodyHtml: "<strong id=\"delete-resource-modal-blocked-name-text\"></strong> is currently assigned to <span id=\"delete-resource-modal-blocked-count\"></span> client(s) or is a protected identity resource and cannot be deleted.",
+    blockedBodyId: "delete-resource-modal-blocked-message")' />
+
+@section Scripts {
+    <script src="~/js/identity-resource-list.js" asp-append-version="true"></script>
+}

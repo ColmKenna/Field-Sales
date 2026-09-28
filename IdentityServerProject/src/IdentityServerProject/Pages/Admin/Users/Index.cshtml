@@ -1,0 +1,71 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Users";
+    ViewData[AdminComponents.ViewDataKey] = AdminComponent.ResponsiveTable;
+}
+
+<page-header title="Users" sub="Provisioned user accounts and access controls">
+    <a id="new-user-link" class="btn-primary" asp-page="./Create">
+        <partial name="_AdminIcon" model='("plus", "btn-icon")' />
+        New user
+    </a>
+</page-header>
+
+<div class="panel">
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-success alert-dismissible" role="alert">
+            @Model.StatusMessage
+        </div>
+    }
+
+    <partial name="_ListFilter" model='new ListFilterModel("user-filter", "Filter users", "Filter by name, username, or email", Model.Filter)' />
+
+    <ck-responsive-table mobile-breakpoint="768px">
+        <ck-responsive-thead>
+            <ck-responsive-col-head>User</ck-responsive-col-head>
+            <ck-responsive-col-head>Email</ck-responsive-col-head>
+            <ck-responsive-col-head>Status</ck-responsive-col-head>
+            <ck-responsive-col-head class="actions-cell">Actions</ck-responsive-col-head>
+        </ck-responsive-thead>
+        <ck-responsive-tbody>
+            @foreach (var userItem in Model.Users.Items)
+            {
+                <ck-responsive-row>
+                    <ck-responsive-col>
+                        <a asp-page="./Details" asp-route-id="@userItem.Id" class="user-title-link">
+                            @(string.IsNullOrWhiteSpace(userItem.FullName) ? userItem.UserName : userItem.FullName)
+                        </a>
+                        @if (!string.IsNullOrWhiteSpace(userItem.FullName))
+                        {
+                            <span class="user-username"><code>@userItem.UserName</code></span>
+                        }
+                    </ck-responsive-col>
+                    <ck-responsive-col>@(string.IsNullOrWhiteSpace(userItem.Email) ? "—" : userItem.Email)</ck-responsive-col>
+                    <ck-responsive-col>
+                        <span
+                            class="status-badge @(userItem.IsLockedOut ? "disabled" : "enabled")">@(userItem.IsLockedOut ? "Locked Out" : "Active")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col class="actions-cell">
+                        @if (userItem.IsLockedOut)
+                        {
+                            <form method="post" asp-page-handler="Unlock" asp-route-id="@userItem.Id"
+                                  class="inline-action-form">
+                                <button type="submit" class="btn-sm btn-secondary unlock-btn">Unlock</button>
+                            </form>
+                        }
+                        <a asp-page="./Details" asp-route-id="@userItem.Id" class="action-link">Manage &rarr;</a>
+                    </ck-responsive-col>
+                </ck-responsive-row>
+            }
+        </ck-responsive-tbody>
+    </ck-responsive-table>
+
+    @if (Model.Users.Items.Count == 0)
+    {
+        <div class="empty-state">No users found.</div>
+    }
+
+    <partial name="_PaginationFooter" model='Model.Users.ToPagination("users", Model.Filter)' />
+</div>

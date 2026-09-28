@@ -1,0 +1,194 @@
+@page "{id}"
+@model DetailsModel
+@{
+    ViewData["Title"] = Model.Client.ClientName;
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin", "/Admin/Index"),
+        new("Clients", "/Admin/Clients/Index"),
+        new(Model.Client.ClientName)
+    };
+}
+
+<div class="client-details-page">
+    <!-- Hero Header Card -->
+    <div class="panel hero-card">
+        <div class="hero-header-row">
+            <div class="hero-title-group">
+                <div class="title-with-badge">
+                    <h1 class="hero-title">@Model.Client.ClientName</h1>
+                    <code class="client-id-badge">@Model.Client.ClientId</code>
+                </div>
+                <div class="hero-tags-row">
+                    <span class="app-type-badge">@Model.Client.ClientType</span>
+                    <span class="status-badge @(Model.Client.Enabled ? "enabled" : "disabled")">
+                        @(Model.Client.Enabled ? "• Active" : "• Disabled")
+                    </span>
+                </div>
+            </div>
+            <div class="hero-actions-row">
+                <a asp-page="./Clone" asp-route-sourceClientId="@Model.Client.ClientId" class="btn-secondary btn-sm">
+                    <partial name="_AdminIcon" model='("clone", "btn-icon")' />
+                    Clone Client
+                </a>
+                <partial name="_BackLink" />
+            </div>
+        </div>
+    </div>
+
+    <!-- 2-Column Grid of Configuration Cards -->
+    <div class="details-grid">
+        <detail-card id="card-basics" icon="card-basics" title="Basics">
+            <div class="field-group">
+                <span class="field-label">Name:</span>
+                <span class="field-value">@Model.Client.ClientName</span>
+            </div>
+            <div class="field-group">
+                <span class="field-label">Description:</span>
+                <span
+                    class="field-value text-muted">@(string.IsNullOrWhiteSpace(Model.Client.Description) ? "No description seeded or configured." : Model.Client.Description)</span>
+            </div>
+            <card-action>
+                <a asp-page="./Basics" asp-route-id="@Model.Client.ClientId" class="card-action-link">Configure details
+                    &rarr;</a>
+            </card-action>
+        </detail-card>
+
+        <detail-card id="card-auth-redirects" icon="card-auth" title="Authentication & Redirects">
+            <div class="field-group">
+                <span class="field-label">PKCE:</span>
+                <span class="field-value">@(Model.Client.RequirePkce ? "Required" : "Optional")</span>
+            </div>
+            <div class="field-group">
+                <span class="field-label">Grant Types:</span>
+                <span class="field-value">@Model.Client.AllowedGrantTypes</span>
+            </div>
+            <div class="field-group">
+                <span class="field-label">Redirect URIs:</span>
+                <span class="field-value">@Model.Client.RedirectUrisCount defined</span>
+            </div>
+            <div class="field-group">
+                <span class="field-label">CORS Origins:</span>
+                <span class="field-value">@Model.Client.CorsOriginsCount allowed</span>
+            </div>
+            <card-action>
+                <a asp-page="./Authentication" asp-route-id="@Model.Client.ClientId" class="card-action-link">Manage
+                    flows &amp; URIs &rarr;</a>
+            </card-action>
+        </detail-card>
+
+        <detail-card id="card-secrets" icon="card-secrets" title="Secrets">
+            <div class="field-group">
+                <span class="field-label">Active Secrets:</span>
+                <span class="field-value">@Model.Client.SecretsCount secrets registered</span>
+            </div>
+            <div class="field-group text-muted">
+                @(Model.Client.RequireClientSecret ? "Requires secrets to authenticate token requests." : "Does not require secrets to authenticate token requests.")
+            </div>
+            <card-action>
+                <a asp-page="./Secrets" asp-route-id="@Model.Client.ClientId" class="card-action-link">Credentials
+                    lifecycle &rarr;</a>
+            </card-action>
+        </detail-card>
+
+        <detail-card id="card-scopes" icon="card-scopes" title="Permissions (Scopes)">
+            <div class="field-group">
+                <span class="field-label">Allowed Scopes:</span>
+                <span class="field-value">@Model.Client.AllowedScopesCount scopes authorized</span>
+            </div>
+            @if (Model.Client.AllowedScopes.Count > 0)
+            {
+                <div class="scope-chips-row">
+                    @foreach (var scope in Model.Client.AllowedScopes)
+                    {
+                        <code class="scope-chip">@scope</code>
+                    }
+                </div>
+            }
+            <card-action>
+                <a asp-page="./Permissions" asp-route-id="@Model.Client.ClientId" class="card-action-link">Configure
+                    allowed scopes &rarr;</a>
+            </card-action>
+        </detail-card>
+
+        <detail-card id="card-token-settings" icon="card-tokens" title="Token Settings">
+            <div class="field-group">
+                <span class="field-label">Access Token Lifetime:</span>
+                <span class="field-value">@Model.Client.AccessTokenLifetime s</span>
+            </div>
+            <div class="field-group">
+                <span class="field-label">Require Consent:</span>
+                <span class="field-value">@(Model.Client.RequireConsent ? "Yes" : "No")</span>
+            </div>
+            <div class="field-group">
+                <span class="field-label">Offline Access:</span>
+                <span class="field-value">@(Model.Client.AllowOfflineAccess ? "Allowed" : "Not Allowed")</span>
+            </div>
+            <card-action>
+                <a asp-page="./TokenSettings" asp-route-id="@Model.Client.ClientId" class="card-action-link">Configure
+                    token lifetimes &rarr;</a>
+            </card-action>
+        </detail-card>
+    </div>
+
+    <!-- Bottom Danger/Warning Zone: Deactivate Client Application -->
+    <div class="panel deactivate-card" id="card-deactivate">
+        <div class="deactivate-header">
+            <partial name="_AdminIcon" model='("shield-alert", "deactivate-icon")' />
+            <h2>@(Model.Client.Enabled ? "Deactivate Client Application" : "Activate Client Application")</h2>
+        </div>
+        <div class="deactivate-content">
+            <p class="deactivate-description">
+                @if (Model.Client.Enabled)
+                {
+                    @:Temporarily disable authentication for this client. All requests for authorization codes, tokens,
+                    @:and client authentication will immediately fail. This action is fully reversible.
+                }
+                else
+                {
+                    @:Enable authentication for this client. Authorization requests, token issuance, and client
+                    @:authentication will resume normal operation.
+                }
+            </p>
+            <form asp-page-handler="ToggleStatus" asp-route-id="@Model.Client.ClientId" method="post"
+                  class="deactivate-form">
+                <button type="submit" class="btn-danger-outline">
+                    @(Model.Client.Enabled ? "Disable client" : "Enable client")
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bottom Danger Zone: Delete Client Application -->
+    <div class="panel deactivate-card" id="card-delete">
+        <div class="deactivate-header">
+            <partial name="_AdminIcon" model='("trash", "deactivate-icon")' />
+            <h2>Delete Client Application</h2>
+        </div>
+        <div class="deactivate-content">
+            @if (!string.IsNullOrEmpty(Model.DeleteBlockedMessage))
+            {
+                <p class="text-danger deactivate-blocked-message">@Model.DeleteBlockedMessage</p>
+            }
+            <p class="deactivate-description">
+                Permanently removes this client and all of its configuration. This action cannot be undone.
+                @if (!Model.Client.CanDelete)
+                {
+                    @:@Model.Client.DeleteBlockReason
+                }
+            </p>
+            <form asp-page-handler="Delete" asp-route-id="@Model.Client.ClientId" method="post" class="deactivate-form">
+                <label for="delete-confirmation" class="field-label">Type <code>DELETE</code> to confirm</label>
+                <input id="delete-confirmation" asp-for="DeleteConfirmation" class="form-control" autocomplete="off"
+                       disabled="@(!Model.Client.CanDelete)"/>
+                <button type="submit" class="btn-danger-outline" disabled="@(!Model.Client.CanDelete)">
+                    Delete client
+                </button>
+                @if (!Model.Client.CanDelete)
+                {
+                    <p class="danger-row-desc">@Model.Client.DeleteBlockReason</p>
+                }
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,30 @@
+@model IdentityServerProject.Pages.Shared.PaginationModel
+@{
+    // The links are built by the pagination model; the partial only picks the markup.
+    var currentQuery = ViewContext?.HttpContext?.Request?.Query;
+    var previousPageRoute = Model.PreviousPageRoute(currentQuery);
+    var nextPageRoute = Model.NextPageRoute(currentQuery);
+}
+
+<div class="pagination-footer">
+    <span class="pagination-summary">Showing @Model.CurrentCount of @Model.TotalCount @Model.Noun</span>
+    <div class="pagination-controls">
+        @if (!Model.HasPreviousPage)
+        {
+            <span data-pagination="previous" class="pagination-btn disabled" aria-disabled="true" aria-label="Previous page">&lsaquo;</span>
+        }
+        else
+        {
+            <a data-pagination="previous" class="pagination-btn" aria-label="Previous page" asp-page="@Model.Page" asp-all-route-data="previousPageRoute">&lsaquo;</a>
+        }
+        <span class="pagination-page">Page @Model.PageNumber of @Model.TotalPages</span>
+        @if (!Model.HasNextPage)
+        {
+            <span data-pagination="next" class="pagination-btn disabled" aria-disabled="true" aria-label="Next page">&rsaquo;</span>
+        }
+        else
+        {
+            <a data-pagination="next" class="pagination-btn" aria-label="Next page" asp-page="@Model.Page" asp-all-route-data="nextPageRoute">&rsaquo;</a>
+        }
+    </div>
+</div>

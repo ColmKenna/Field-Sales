@@ -1,0 +1,41 @@
+@page
+@model LogoutModel
+@{
+    ViewData["Title"] = Model.ShowLogoutPrompt ? "Logout" : "Logged out";
+    var authCardHeader = new AuthCardHeaderModel(
+        "AUTHENTICATION",
+        Model.ShowLogoutPrompt ? "Sign out" : "You have been signed out",
+        Model.ShowLogoutPrompt ? "Would you like to log out of your account?" : "You have successfully signed out of your account.");
+}
+
+<partial name="_AuthCardHeader" model="authCardHeader"/>
+
+@if (Model.ShowLogoutPrompt)
+{
+    <form method="post" class="auth-form">
+        <input type="hidden" asp-for="LogoutId"/>
+        <button type="submit" class="btn-primary auth-submit-btn">Yes, Sign out</button>
+    </form>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(Model.SignOutIFrameUrl))
+    {
+        <iframe class="signout-iframe" src="@Model.SignOutIFrameUrl" width="0" height="0" style="display:none;" aria-hidden="true"></iframe>
+    }
+
+    <div class="auth-card-actions">
+        @if (!string.IsNullOrEmpty(Model.PostLogoutRedirectUri))
+        {
+            <a href="@Model.PostLogoutRedirectUri" class="btn-primary auth-submit-btn">Return to application</a>
+        }
+        else
+        {
+            <a asp-page="/Account/Login" class="btn-primary auth-submit-btn">Sign in again</a>
+        }
+    </div>
+}
+
+<div class="auth-card-footer">
+    <span class="auth-footer-text">Protected by IdentityServer authentication</span>
+</div>

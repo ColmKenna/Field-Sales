@@ -1,0 +1,61 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "API Resources";
+    ViewData[AdminComponents.ViewDataKey] = AdminComponent.ResponsiveTable;
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin", "/Admin/Index"),
+        new("API Resources")
+    };
+}
+
+<page-header title="API Resources" sub="Secured web APIs registered with IdentityServer">
+    <a id="new-api-resource-link" class="btn-primary" asp-page="./Editor">
+        <partial name="_AdminIcon" model='("plus", "btn-icon")' />
+        New API resource
+    </a>
+</page-header>
+
+<div class="panel">
+    <partial name="_ListFilter" model='new ListFilterModel("apis-filter", "Filter API resources", "Filter by name or display name", Model.Filter)' />
+
+    <ck-responsive-table mobile-breakpoint="768px">
+        <ck-responsive-thead>
+            <ck-responsive-col-head>Name</ck-responsive-col-head>
+            <ck-responsive-col-head>Display Name</ck-responsive-col-head>
+            <ck-responsive-col-head>Scopes</ck-responsive-col-head>
+            <ck-responsive-col-head>Status</ck-responsive-col-head>
+            <ck-responsive-col-head class="actions-cell">Actions</ck-responsive-col-head>
+        </ck-responsive-thead>
+        <ck-responsive-tbody>
+            @foreach (var apiResource in Model.ApiResources.Items)
+            {
+                <ck-responsive-row>
+                    <ck-responsive-col>
+                        <a asp-page="./Editor" asp-route-name="@apiResource.Name"
+                           class="resource-title-link"><code>@apiResource.Name</code></a>
+                    </ck-responsive-col>
+                    <ck-responsive-col>@(string.IsNullOrWhiteSpace(apiResource.DisplayName) ? "—" : apiResource.DisplayName)</ck-responsive-col>
+                    <ck-responsive-col><span
+                            class="badge">@apiResource.ScopeCount scope@(apiResource.ScopeCount == 1 ? "" : "s")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col>
+                        <span
+                            class="status-badge @(apiResource.Enabled ? "enabled" : "disabled")">@(apiResource.Enabled ? "Enabled" : "Disabled")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col class="actions-cell">
+                        <a asp-page="./Editor" asp-route-name="@apiResource.Name" class="action-link">Manage &rarr;</a>
+                    </ck-responsive-col>
+                </ck-responsive-row>
+            }
+        </ck-responsive-tbody>
+    </ck-responsive-table>
+
+    @if (Model.ApiResources.Items.Count == 0)
+    {
+        <div class="empty-state">No API resources found.</div>
+    }
+
+    <partial name="_PaginationFooter" model='Model.ApiResources.ToPagination("resources", Model.Filter)' />
+</div>

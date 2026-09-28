@@ -1,0 +1,29 @@
+@page
+@model AccessDeniedModel
+@{
+    ViewData["Title"] = "Access denied";
+}
+
+<partial name="_AuthCardHeader" model='new AuthCardHeaderModel("ADMIN CONSOLE", "Access denied")'/>
+
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <p>
+        You are currently signed in as <strong>@(User.Identity.Name ?? "an authenticated user")</strong>,
+        but your account does not have permission to access the administration console.
+    </p>
+
+    <div class="access-denied-actions access-denied-actions-inline">
+        <form method="post" asp-page="/Account/Logout" class="inline-action-form">
+            <button type="submit" class="btn-primary">Log out</button>
+        </form>
+        <a asp-page="/Account/Login" asp-route-returnUrl="@Model.LoginReturnUrl" class="btn-secondary">Log in as different user</a>
+    </div>
+}
+else
+{
+    <p>Your account does not have permission to access the administration console.</p>
+    <div class="access-denied-actions">
+        <a asp-page="/Account/Login" asp-route-returnUrl="@Model.LoginReturnUrl" class="btn-primary">Log in</a>
+    </div>
+}

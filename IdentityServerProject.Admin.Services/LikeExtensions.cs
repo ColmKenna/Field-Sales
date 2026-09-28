@@ -1,0 +1,43 @@
+using System.Text;
+
+namespace IdentityServerProject.Services;
+
+public static class LikeExtensions
+{
+    /// <summary>
+    ///     Escapes characters used as wildcards in SQL LIKE statements (%, _, [, ])
+    ///     so they can be searched as literal characters.
+    /// </summary>
+    /// <param name="input">The string to escape.</param>
+    /// <returns>The escaped string.</returns>
+    public static string? EscapeLikePattern(string? input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        var escaped = new StringBuilder(input.Length);
+        foreach (char character in input)
+        {
+            switch (character)
+            {
+                case '[':
+                    escaped.Append("[[]");
+                    break;
+                case ']':
+                    escaped.Append("[]]");
+                    break;
+                case '%':
+                    escaped.Append("[%]");
+                    break;
+                case '_':
+                    escaped.Append("[_]");
+                    break;
+                default:
+                    escaped.Append(character);
+                    break;
+            }
+        }
+
+        return escaped.ToString();
+    }
+}

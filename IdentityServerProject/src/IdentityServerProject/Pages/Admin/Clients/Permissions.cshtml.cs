@@ -1,0 +1,82 @@
+using IdentityServerProject.Services.Clients;
+using IdentityServerProject.Services.Scopes;
+using IdentityServerProject.Services.Validation;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace IdentityServerProject.Pages.Admin.Clients;
+
+public class PermissionsInputModel
+{
+    public List<string> AllowedScopes { get; set; } = new();
+}
+
+public class PermissionsModel(IClientPermissionsService clientPermissionsService) : PageModel
+{
+    private readonly IClientPermissionsService _clientPermissionsService = clientPermissionsService;
+
+    [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
+
+    [BindProperty] public PermissionsInputModel Input { get; set; } = new();
+
+    public string ClientNameDisplay { get; private set; } = string.Empty;
+    public bool IsInteractive { get; private set; }
+    public List<string> AvailableIdentityScopes { get; private set; } = new();
+    public List<string> AvailableApiScopes { get; private set; } = new();
+
+    public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+            return NotFound();
+
+        ClientPermissionsModel? permissions =
+            await _clientPermissionsService.GetClientPermissionsAsync(ClientId.Create(Id), cancellationToken);
+        if (permissions is null)
+            return NotFound();
+
+        LoadFromModel(permissions);
+
+        return Page();
+    }
+
+    public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+            return NotFound();
+
+        AdminMutationResult result = await _clientPermissionsService.UpdateClientPermissionsAsync(
+            ClientId.Create(Id), ScopeSet.FromStrings(Input.AllowedScopes), cancellationToken);
+        if (result.Status == AdminMutationStatus.NotFound)
+            return NotFound();
+
+        if (!result.Succeeded)
+        {
+            foreach ((string key, string[] messages) in result.Errors)
+                foreach (string message in messages)
+                    ModelState.AddModelError(key, message);
+
+            ClientPermissionsModel? permissions =
+                await _clientPermissionsService.GetClientPermissionsAsync(ClientId.Create(Id), cancellationToken);
+            if (permissions is null)
+                return NotFound();
+
+            ClientNameDisplay = permissions.ClientName;
+            IsInteractive = permissions.IsInteractive;
+            AvailableIdentityScopes = permissions.AvailableIdentityScopes;
+            AvailableApiScopes = permissions.AvailableApiScopes;
+            return Page();
+        }
+
+        return RedirectToPage("./Details", new { id = Id });
+    }
+
+    private void LoadFromModel(ClientPermissionsModel permissions)
+    {
+        ClientNameDisplay = permissions.ClientName;
+        IsInteractive = permissions.IsInteractive;
+        AvailableIdentityScopes = permissions.AvailableIdentityScopes;
+        AvailableApiScopes = permissions.AvailableApiScopes;
+
+        Input.AllowedScopes = permissions.AllowedScopes;
+    }
+}

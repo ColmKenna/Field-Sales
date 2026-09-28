@@ -1,0 +1,63 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin")
+    };
+}
+
+<page-header title="Admin Dashboard" sub="IdentityServer management, configuration, and security operations.">
+</page-header>
+
+@if (Model.HasIssues)
+{
+    <div class="dashboard-alert" id="dashboard-alert" role="alert">
+        <div class="dashboard-alert-header">
+            <svg aria-hidden="true" class="dashboard-alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <strong>System attention required</strong>
+        </div>
+        <ul class="dashboard-alert-list">
+            @foreach (var issue in Model.Issues)
+            {
+                <li>@issue</li>
+            }
+        </ul>
+        <a asp-page="/Admin/Diagnostics/Index" class="dashboard-alert-link">Resolve in Diagnostics &rarr;</a>
+    </div>
+}
+
+@foreach (var cardGroup in Model.CardGroups)
+{
+    <h2 class="dashboard-section-label">@cardGroup.Label</h2>
+
+    <div class="dashboard-grid">
+        @foreach (var card in cardGroup.Cards)
+        {
+            <a asp-page="@card.Page" class="dashboard-card @(card.IsWarning ? "dashboard-card--warning" : "")" id="@card.Id">
+                <div class="dashboard-card-icon-wrap @(card.IsWarning ? "dashboard-card-icon-wrap--warning" : "")">
+                    <partial name="_AdminIcon" model='(card.Icon, "dashboard-card-icon")' />
+                </div>
+                <div class="dashboard-card-body">
+                    <span class="dashboard-card-title">
+                        @card.Title
+                        @if (card.Badge.HasValue)
+                        {
+                            <span class="card-badge">@card.Badge.Value</span>
+                        }
+                    </span>
+                    <span class="dashboard-card-desc">@card.Description</span>
+                </div>
+                <svg aria-hidden="true" class="dashboard-card-arrow" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"/>
+                </svg>
+            </a>
+        }
+    </div>
+}

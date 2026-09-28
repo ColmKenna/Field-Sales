@@ -1,0 +1,2300 @@
+/* =============================================================================
+   Admin console stylesheet — plain CSS, no preprocessor and no build step.
+   Loaded by _AdminLayout after shared.css, which supplies the tokens, the reset
+   and the button/form rules the public pages share with the console.
+
+   Sections, in file order. No line numbers on purpose: they go stale silently.
+   Search for the banner text instead.
+
+     Sidebar ........................... the collapsible nav rail
+     Header ............................ top bar, breadcrumbs, user menu
+     Main .............................. page frame, tooltips, page titles
+     Clients list ...................... list pages, tables, pagination, badges
+     Client Details Page ............... the detail-card grid and its hero
+     Responsive Table Web Component Overrides
+     Alerts ............................ alert-success / -error / -warning
+     Danger actions .................... destructive buttons and rows
+     Data-* driven modal ............... <dialog class="modal">
+     API resource editor ............... editor pages, chips, forms, tabs
+     Presets and Form Grids ............ preset cards, form-control family
+     Admin Dashboard Hub ............... dashboard cards and section labels
+     Shared form, alert and button components
+     Page styles — client token settings and user detail
+     Page styles — diagnostics
+     Shared layout and text utilities
+
+   Where to add a rule: if a public page could ever render the class, it belongs
+   in shared.css instead. Otherwise shared components go in one of the two
+   "Shared" sections; anything only one page uses belongs in that page's section.
+   ============================================================================= */
+
+/* ============ Sidebar ============ */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-w);
+    background: var(--sidebar-bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    transition: width .25s ease;
+    z-index: var(--z-sidebar);
+    overflow: hidden;
+}
+
+body.collapsed .sidebar {
+    width: var(--sidebar-w-collapsed);
+}
+
+.sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: #33373c transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+    background: #33373c;
+    border-radius: 3px;
+}
+
+/* brand */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 26px 18px 30px 18px;
+    white-space: nowrap;
+    transition: padding .25s ease, gap .25s ease;
+}
+
+/* The whole brand block is one link; it should read as the sidebar's own heading
+   rather than as link text. */
+.brand {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* Collapsed, the expanded 18px inset leaves the 46px icon 7px right of centre in the
+   68px rail, out of line with the nav icons below it. 11px + 46px + 11px centres it. */
+body.collapsed .brand {
+    gap: 0;
+    padding-left: 11px;
+    padding-right: 11px;
+}
+
+.brand-text .brand-name {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #fff;
+    line-height: 1.2;
+}
+
+.brand-text .brand-sub {
+    font-size: .68rem;
+    letter-spacing: .28em;
+    color: var(--text-dim);
+    font-weight: 600;
+    margin-top: 3px;
+}
+
+/* section labels */
+.section-label {
+    padding: 22px 22px 10px;
+    font-size: .72rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: #6a6f76;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* nav items */
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 15px 18px 15px 21px; /* 21px + 3px border → icon centred in 68px rail */
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1.02rem;
+    font-weight: 500;
+    white-space: nowrap;
+    border-left: 3px solid transparent;
+    transition: background .15s;
+    text-align: left;
+}
+
+.nav-item:hover,
+.nav-item:focus-visible {
+    background: var(--panel-hover);
+}
+
+.nav-item.active {
+    background: var(--panel-active);
+    border-left-color: var(--accent);
+    color: #fff;
+}
+
+/* item icons */
+.item-icon {
+    flex: 0 0 21px;
+    width: 21px;
+    height: 21px;
+    stroke: #9aa0a7;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke .15s;
+}
+
+.nav-item:hover .item-icon {
+    stroke: #d7dbe0;
+}
+
+.nav-item.active .item-icon {
+    stroke: var(--accent);
+}
+
+.label {
+    opacity: 1;
+    max-width: 190px;
+    overflow: hidden;
+    transition: opacity .15s ease, max-width .25s ease;
+}
+
+body.collapsed .label {
+    opacity: 0;
+    max-width: 0;
+}
+
+/* bottom user card */
+.side-user {
+    border-top: 1px solid #26292d;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 18px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.side-user:hover {
+    background: var(--panel-hover);
+}
+
+.side-avatar {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #2c2f33;
+    color: #fff;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+}
+
+.side-user .name {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: #fff;
+    font-size: 1rem;
+}
+
+/* ============ Header ============ */
+.header {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: var(--sidebar-w);
+    height: var(--header-h);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 28px;
+    z-index: var(--z-header);
+    transition: left .25s ease;
+}
+
+body.collapsed .header {
+    left: var(--sidebar-w-collapsed);
+}
+
+.burger {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    color: #3c4248;
+    margin-right: 6px;
+}
+
+.burger:hover,
+.burger:focus-visible {
+    background: #f1f3f5;
+}
+
+/* breadcrumbs */
+.crumbs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.35rem;
+}
+
+.crumbs a {
+    color: var(--ink);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.crumbs a:hover,
+.crumbs a:focus-visible {
+    text-decoration: underline;
+}
+
+.crumbs .sep {
+    color: #c3c8cd;
+    font-weight: 400;
+}
+
+.crumbs .current {
+    color: var(--ink);
+    font-weight: 400;
+}
+
+.spacer {
+    flex: 1;
+}
+
+/* user menu */
+.user-menu {
+    position: relative;
+    margin-left: 6px;
+}
+
+.user-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 5px 6px;
+    border-radius: 24px;
+}
+
+.user-btn:hover,
+.user-btn:focus-visible {
+    background: #f1f3f5;
+}
+
+.avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #173a8c);
+    color: #fff;
+    font-weight: 600;
+    font-size: .9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chev {
+    transition: transform .2s;
+    color: #6b7178;
+}
+
+.user-menu.open .chev {
+    transform: rotate(180deg);
+}
+
+.dropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 10px);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    min-width: 215px;
+    padding: 6px;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    /* visibility, not just opacity: a transparent menu still holds its Sign Out
+       button in the tab sequence and in the accessibility tree. Transitioning it
+       keeps the closing fade, because visibility stays visible until the end. */
+    visibility: hidden;
+    transition: opacity .18s, transform .18s, visibility .18s;
+    z-index: var(--z-dropdown);
+}
+
+.user-menu.open .dropdown {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    visibility: visible;
+}
+
+.dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #2c333b;
+    font-size: .92rem;
+}
+
+.dropdown a:hover,
+.dropdown a:focus-visible {
+    background: #f2f4f7;
+}
+
+.dropdown hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 6px 4px;
+}
+
+.dropdown .logout {
+    color: var(--danger);
+}
+
+/* The sign-out control has to be a submit button so the POST carries its
+   antiforgery token, but it sits in the menu as one more row. */
+.dropdown .logout {
+    width: 100%;
+    background: none;
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* Forms that sit inside a line of content rather than owning a block of their own. */
+.logout-form,
+.inline-form {
+    display: inline;
+}
+
+.dropdown .logout:hover,
+.dropdown .logout:focus-visible {
+    background: #fdf0ef;
+}
+
+/* ============ Main ============ */
+.main {
+    margin-left: var(--sidebar-w);
+    margin-top: var(--header-h);
+    padding: 56px 60px;
+    transition: margin-left .25s ease;
+    min-height: calc(100vh - var(--header-h));
+}
+
+body.collapsed .main {
+    margin-left: var(--sidebar-w-collapsed);
+}
+
+.page-title {
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+.page-sub {
+    margin-top: 14px;
+    font-size: 1.35rem;
+    color: #3a4149;
+    font-weight: 400;
+    max-width: 900px;
+}
+
+/* Note: .placeholder removed (superseded by .empty-state) */
+
+/* tooltip element (positioned by JS when collapsed) */
+.tip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    background: var(--ink);
+    color: #fff;
+    padding: 6px 11px;
+    border-radius: 6px;
+    font-size: .82rem;
+    white-space: nowrap;
+    box-shadow: var(--shadow);
+    border: 1px solid #2c3036;
+    pointer-events: none;
+    z-index: var(--z-tooltip);
+    opacity: 0;
+    transition: opacity .12s ease;
+}
+
+.tip.show {
+    opacity: 1;
+}
+
+.tip::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 50%;
+    margin-top: -5px;
+    border: 5px solid transparent;
+    border-left: 0;
+    border-right-color: var(--ink);
+}
+
+/* mobile: sidebar overlays */
+/* 768px is the console's mobile breakpoint. Custom properties cannot be used in a media
+   condition and there is no build step, so it stays a literal — but it is a literal in
+   several places at once. Changing it means all of:
+     - the three @media (max-width: 768px) blocks in this file
+     - MOBILE_BREAKPOINT in wwwroot/js/admin.js
+     - mobile-breakpoint="768px" on eleven <ck-responsive-table> elements, which is not
+       droppable: the vendored component defaults to 600px, so each attribute is load-bearing. */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform .25s;
+        width: var(--sidebar-w);
+    }
+
+    body.collapsed .sidebar {
+        transform: translateX(0);
+        width: var(--sidebar-w);
+    }
+
+    .header {
+        left: 0;
+    }
+
+    body.collapsed .header {
+        left: 0;
+    }
+
+    .main {
+        margin-left: 0;
+        padding: 32px 22px;
+    }
+
+    body.collapsed .main {
+        margin-left: 0;
+    }
+
+    body.collapsed .label {
+        opacity: 1;
+        max-width: 190px;
+    }
+
+    body.collapsed .brand {
+        gap: 14px;
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    .page-title {
+        font-size: 2rem;
+    }
+
+    .page-sub {
+        font-size: 1.05rem;
+    }
+}
+
+/* ============ Clients list ============ */
+/* One wrapper treatment for both page shapes. The visible difference between a list
+   page and an editor page comes from the heading class inside (.page-title vs
+   .hero-title), not from the wrapper. */
+.page-header,
+.editor-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.panel {
+    margin-top: 44px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+.panel-padded {
+    padding: 28px;
+}
+
+/* A panel holding a single short form, kept to a readable measure. */
+.panel-narrow {
+    max-width: 600px;
+}
+
+/* Shared styling for every admin table. The ck-responsive-table web component
+   replaces itself with a real <table class="… responsive-table …">, so keying
+   off .responsive-table (plus the pre-hydration ck-responsive-* custom elements)
+   gives all admin tables the same look the Clients list already had. */
+.responsive-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.responsive-table th,
+.responsive-table td,
+ck-responsive-col-head,
+ck-responsive-col {
+    padding: 12px 16px;
+    text-align: left;
+    vertical-align: middle;
+    box-sizing: border-box;
+}
+
+.responsive-table th,
+ck-responsive-col-head {
+    text-transform: uppercase;
+    font-size: .85rem;
+    letter-spacing: .05em;
+    font-weight: 600;
+    color: var(--text-dim);
+    background: #fafbfc;
+    border-bottom: 1px solid var(--border);
+}
+
+.responsive-table td,
+ck-responsive-col {
+    border-bottom: 1px solid var(--border);
+    color: var(--ink);
+    font-size: .95rem;
+}
+
+.responsive-table td:first-child {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.client-title-link,
+.resource-title-link,
+.user-title-link {
+    color: var(--ink);
+    text-decoration: none;
+}
+
+.client-title-link:hover,
+.client-title-link:focus-visible,
+.resource-title-link:hover,
+.resource-title-link:focus-visible,
+.user-title-link:hover,
+.user-title-link:focus-visible {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+.action-link {
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+
+.action-link:hover,
+.action-link:focus-visible {
+    text-decoration: underline;
+}
+
+.responsive-table tr:last-child td {
+    border-bottom: none;
+}
+
+.responsive-table th.actions-cell,
+.responsive-table td.actions-cell,
+ck-responsive-col-head.actions-cell,
+ck-responsive-col.actions-cell {
+    text-align: right;
+}
+
+.responsive-table code {
+    background: #f1f3f5;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: .88rem;
+}
+
+/* Neutral count pill used in table cells (e.g. "3 clients", "2 scopes"). */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #f1f3f5;
+    color: #5a6169;
+    font-size: .82rem;
+    font-weight: 600;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: .84rem;
+    font-weight: 600;
+}
+
+.status-badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+/* The two positive states share one tint, so an edit to it cannot reach only half
+   of them. Both class names stay: they mean different things to the pages. */
+.status-badge.enabled,
+.status-badge.success {
+    background: #e7f6ec;
+    color: #1c7a3d;
+}
+
+.status-badge.enabled::before,
+.status-badge.success::before {
+    background: #2ba84a;
+}
+
+.status-badge.disabled {
+    background: #f3f4f6;
+    color: #5a6169;
+}
+
+.status-badge.disabled::before {
+    background: #9aa1a9;
+}
+
+/* Part of the status-badge palette (paired with its own tint, alongside .enabled and
+   .disabled), not the danger-action scale — which is why it stays a literal here. */
+.status-badge.failure {
+    background: #fdeceb;
+    color: #b3261e;
+}
+
+.status-badge.failure::before {
+    background: #d93025;
+}
+
+.status-badge.warning {
+    background: #fff4e5;
+    color: #8a5a00;
+}
+
+.status-badge.warning::before {
+    background: #e8a400;
+}
+
+.empty-state {
+    padding: 60px;
+    text-align: center;
+    color: #9aa1a9;
+    font-size: 1rem;
+}
+
+.pagination-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+    font-size: .92rem;
+    color: #3a4149;
+}
+
+.pagination-summary,
+.pagination-page {
+    color: #3a4149;
+    font-size: .92rem;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: #3a4149;
+    text-decoration: none;
+    font-size: 1rem;
+}
+
+.pagination-btn:hover,
+.pagination-btn:focus-visible {
+    background: #f5f6f8;
+}
+
+.pagination-btn.disabled {
+    color: #c3c8cd;
+    cursor: not-allowed;
+}
+
+/* ============ Client Details Page ============ */
+.client-details-page {
+    display: flex;
+    flex-direction: column;
+}
+
+.hero-card {
+    padding: 30px 32px;
+    margin-top: 0;
+    margin-bottom: 28px;
+    background: var(--bg);
+}
+
+.hero-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.title-with-badge {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.hero-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+
+.client-id-badge {
+    background: #f1f5f9;
+    color: #475569;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.hero-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.hero-tags-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.app-type-badge {
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 8px;
+    border: 1px solid #e0e7ff;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #4f46e5;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-top: 4px;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+    text-decoration: underline;
+}
+
+.back-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+@media (max-width: 900px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.detail-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: var(--bg);
+    padding: 24px 28px;
+    margin-top: 0;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.card-icon {
+    width: 22px;
+    height: 22px;
+    stroke: #0f172a;
+    flex-shrink: 0;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.card-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+    color: #334155;
+}
+
+/* One class, two roles: the Client Details card rows and the Diagnostics / Users
+   definition rows. Both sets of declarations already applied to every .field-group —
+   CSS merges same-selector rules — so this states what they computed together.
+   Note the earlier rule's intent for .field-label (700 weight, #1e293b) has been dead
+   since the second copy arrived: font-weight and color are the two properties both
+   declared, so the later values won. Restoring them is a design decision, not a
+   reconciliation, and is deliberately not made here. */
+.field-group {
+    line-height: 1.5;
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.field-label {
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-right: 6px;
+    min-width: 120px;
+}
+
+.field-value {
+    color: #334155;
+}
+
+.text-muted {
+    color: #64748b;
+}
+
+.scope-chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.scope-chip {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.card-footer {
+    padding-top: 16px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.card-action-link {
+    color: #0f172a;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.card-action-link:hover,
+.card-action-link:focus-visible {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+.deactivate-card {
+    border: 1px solid #fecaca;
+    background: var(--bg);
+    padding: 24px 28px;
+    margin-top: 0;
+}
+
+.deactivate-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.deactivate-icon {
+    width: 22px;
+    height: 22px;
+    stroke: var(--danger-strong);
+    flex-shrink: 0;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.deactivate-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--danger-strong);
+    margin: 0;
+}
+
+.deactivate-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+/* Why the destructive action is unavailable, above the description that explains it. */
+.deactivate-blocked-message {
+    font-weight: 500;
+}
+
+.deactivate-description {
+    color: #4b5563;
+    font-size: 0.95rem;
+    max-width: 720px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.deactivate-form {
+    margin: 0;
+}
+
+.btn-danger-outline {
+    background: var(--bg);
+    color: var(--danger-strong);
+    border: 1px solid #fca5a5;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+    white-space: nowrap;
+}
+
+.btn-danger-outline:hover,
+.btn-danger-outline:focus-visible {
+    background: #fef2f2;
+    border-color: #dc2626;
+    color: #991b1b;
+}
+
+@media (max-width: 768px) {
+    .responsive-table tr {
+        padding: 12px;
+        border-radius: 8px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border) !important;
+        margin-bottom: 12px;
+    }
+}
+
+/* ============ Danger actions ============ */
+.action-link-danger {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--danger-solid);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+}
+
+.action-link-danger:hover,
+.action-link-danger:focus-visible {
+    text-decoration: underline;
+}
+
+.btn-danger {
+    background: var(--danger-solid);
+    color: #fff;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+    font-size: .92rem;
+    cursor: pointer;
+}
+
+.btn-danger:hover,
+.btn-danger:focus-visible {
+    background: #a5321f;
+}
+
+.btn-danger:disabled {
+    background: #e3a89f;
+    cursor: not-allowed;
+}
+
+/* ============ Data-* driven modal ============ */
+.modal {
+    border: 0;
+    border-radius: 14px;
+    padding: 0;
+    width: min(460px, calc(100vw - 40px));
+    box-shadow: var(--shadow);
+}
+
+.modal::backdrop {
+    background: rgba(15, 20, 28, .5);
+}
+
+.modal form {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.modal-body {
+    color: #3a4149;
+    font-size: .95rem;
+    line-height: 1.5;
+}
+
+.modal-body-blocked {
+    color: var(--danger-deep);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.confirm-input {
+    width: 100%;
+}
+
+/* ============ API resource editor ============ */
+/* .editor-header is declared with .page-header in the Clients list section above. */
+
+/* .title-with-badge is defined in the Client Details section above. */
+
+.alert-success {
+    background: #eafaf1;
+    color: #1e7b45;
+    border: 1px solid #a7e3c1;
+}
+
+.alert-success-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.alert-success-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.alert-success-row code {
+    background: var(--bg);
+    border: 1px solid #a7e3c1;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    word-break: break-all;
+}
+
+/* .editor-tabs & .editor-tab removed (migrated to ck-tabs) */
+
+.editor-panel {
+    margin-top: 0;
+    border-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    padding: 28px;
+}
+
+/* ck-tabs used as an in-page tab strip on Client editor pages (WI-07).
+   The component's shadow :host defaults to a centered, bordered, fixed-width
+   box (see vendored index.esm.js); reset it to a plain full-width block so
+   it doesn't double-box the existing .panel cards rendered inside each tab. */
+.client-editor-tabs,
+.api-resource-editor-tabs,
+.user-details-tabs {
+    display: block !important;
+    width: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+}
+
+.api-resource-editor-tabs,
+.user-details-tabs {
+    margin: 32px 0 0 !important;
+}
+
+.client-editor-tabs {
+    margin: 0 !important;
+}
+
+.editor-form {
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.editor-subform {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.form-control-sm {
+    max-width: 250px;
+}
+
+.form-control-xs {
+    max-width: 200px;
+}
+
+.form-control-md {
+    max-width: 450px;
+}
+
+/* <fieldset> used only to group and name related controls. The UA border, padding
+   and margin would read as a second panel nested inside the form's own .panel, so
+   they are cleared; min-width:0 stops the fieldset refusing to shrink in a flex or
+   grid parent, which is a UA quirk specific to this element. Distinct from
+   .editor-fieldset, which is a deliberately bordered box. */
+.fieldset-plain {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+}
+
+.fieldset-plain > legend {
+    padding: 0;
+}
+
+.form-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+.required {
+    color: var(--danger);
+    font-weight: 700;
+    margin-left: 2px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.92rem;
+    color: var(--ink);
+    cursor: pointer;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 0.82rem;
+    border-radius: 6px;
+}
+
+.uri-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    max-width: 600px;
+}
+
+.uri-input-row .btn-danger {
+    padding: 0;
+    width: 38px;
+    height: 38px;
+    font-size: 1.25rem;
+    line-height: 1;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.uri-add-btn {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* A badge that follows inline text rather than starting its own line. */
+.badge-inline {
+    margin-left: 8px;
+}
+
+.badge-reserved {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 4px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid rgba(200, 67, 59, 0.25);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.badge-success {
+    background: #e6f4ea;
+    color: #1e8e3e;
+    border: 1px solid #1e8e3e;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.badge-primary {
+    background: #e8f0fe;
+    color: #1a73e8;
+    border: 1px solid #1a73e8;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.alert-warning-drift {
+    border-left: 5px solid #b8860b;
+    background: #fdf6e3;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.drift-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 6px;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.drift-details {
+    font-size: 13px;
+    color: #6b5106;
+}
+
+.audit-metadata {
+    margin-top: 0.4rem;
+}
+
+.audit-metadata summary {
+    cursor: pointer;
+}
+
+.audit-metadata dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.25rem 0.75rem;
+    margin: 0.5rem 0;
+}
+
+.audit-metadata dt {
+    font-weight: 600;
+}
+
+.audit-metadata dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.audit-metadata h3 {
+    font-size: 0.9rem;
+    margin: 0.75rem 0 0.25rem;
+}
+
+.audit-metadata pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.editor-scope-list {
+    margin-bottom: 24px;
+}
+
+.scope-chip-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f5f6f8;
+    border-radius: 999px;
+    padding: 4px 6px 4px 12px;
+}
+
+.scope-chip-container .scope-chip {
+    background: transparent;
+    border: 0;
+    padding: 0;
+}
+
+/* The container already publishes the lock state for the chip to read. */
+.scope-chip-container[data-claim-locked="true"] .scope-chip {
+    opacity: .6;
+}
+
+/* The form is a flex child of the pill, not the pill itself — the container carries
+   the background, radius and padding. */
+.scope-chip-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.scope-chip-form .action-link-danger,
+.scope-chip-container .action-link-danger {
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 2px 6px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.danger-zone {
+    max-width: 640px;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.danger-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.danger-row:last-child {
+    border-bottom: 0;
+}
+
+.danger-row-title {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.danger-row-desc {
+    display: block;
+    color: var(--muted);
+    font-size: .88rem;
+    margin-top: 2px;
+}
+
+/* ============ Presets and Form Grids ============ */
+.preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+/* Hidden until a template supplies claims. identity-resource-create.js swaps this
+   and #no-claims-message by setting an inline display, which overrides this default. */
+.claims-list {
+    display: none;
+}
+
+.claims-container {
+    background: #f8fafc;
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 12px;
+    margin-bottom: 16px;
+    min-height: 40px;
+}
+
+.claims-list-flex {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.list-filter {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    flex: 1 1 640px;
+    gap: 12px;
+}
+
+.filter-grid > div {
+    min-width: 0;
+}
+
+.filter-grid label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Accessible screen-reader-only utility */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Preset Cards */
+.preset-card {
+    border: 2px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 14px;
+    cursor: pointer;
+    background: var(--bg);
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.preset-card:hover {
+    border-color: var(--navy);
+    background: #f8fafc;
+}
+
+.preset-card.active {
+    border-color: var(--navy);
+    background: #eef2f5;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.preset-icon {
+    font-size: 24px;
+    margin-bottom: 6px;
+}
+
+.preset-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: var(--navy);
+}
+
+.preset-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+}
+
+/* ============ Admin Dashboard Hub ============ */
+
+/* --- Exception Alert Banner --- */
+.dashboard-alert {
+    margin-top: 36px;
+    padding: 20px 24px;
+    border: 1px solid #e8a735;
+    border-left: 4px solid #d9920b;
+    border-radius: 12px;
+    background: #fef9ee;
+}
+
+.dashboard-alert-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.05rem;
+    color: #92640a;
+    margin-bottom: 10px;
+}
+
+.dashboard-alert-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    stroke: #b37a0d;
+}
+
+.dashboard-alert-list {
+    margin: 0 0 14px 28px;
+    padding: 0;
+    font-size: .93rem;
+    color: #6b4e09;
+    line-height: 1.7;
+}
+
+.dashboard-alert-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    font-size: .92rem;
+    color: #92640a;
+    text-decoration: none;
+}
+
+.dashboard-alert-link:hover,
+.dashboard-alert-link:focus-visible {
+    text-decoration: underline;
+    color: #6b4e09;
+}
+
+/* --- Section Labels --- */
+.dashboard-section-label {
+    margin-top: 40px;
+    margin-bottom: 16px;
+    padding: 0;
+    font-size: .76rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: #6a6f76;
+    font-weight: 600;
+}
+
+/* --- Card Grid --- */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+/* --- Card Tile --- */
+.dashboard-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 20px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--bg);
+    text-decoration: none;
+    color: var(--ink);
+    transition: border-color .18s, box-shadow .18s;
+    cursor: pointer;
+}
+
+.dashboard-card:hover,
+.dashboard-card:focus-visible {
+    border-color: #c8cdd3;
+    box-shadow: 0 4px 16px rgba(10, 15, 25, .08);
+}
+
+.dashboard-card:active {
+    box-shadow: 0 2px 8px rgba(10, 15, 25, .06);
+}
+
+/* Card icon wrapper */
+.dashboard-card-icon-wrap {
+    flex: 0 0 46px;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: #f3f5f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .18s;
+}
+
+.dashboard-card:hover .dashboard-card-icon-wrap {
+    background: #ebeef1;
+}
+
+.dashboard-card-icon-wrap--warning {
+    background: #fef3d6;
+}
+
+.dashboard-card:hover .dashboard-card-icon-wrap--warning {
+    background: #fdeab8;
+}
+
+.dashboard-card-icon {
+    width: 22px;
+    height: 22px;
+    stroke: #5a6169;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke .18s;
+}
+
+.dashboard-card:hover .dashboard-card-icon {
+    stroke: var(--accent);
+}
+
+/* Card body */
+.dashboard-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.dashboard-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--ink);
+    line-height: 1.3;
+}
+
+.dashboard-card-desc {
+    display: block;
+    margin-top: 4px;
+    font-size: .88rem;
+    color: #5a6169;
+    line-height: 1.45;
+}
+
+/* Card arrow */
+.dashboard-card-arrow {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    stroke: #c3c8cd;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke .18s;
+}
+
+.dashboard-card:hover .dashboard-card-arrow {
+    stroke: var(--accent);
+}
+
+/* Warning card variant */
+.dashboard-card--warning {
+    border-color: #e8a735;
+}
+
+.dashboard-card--warning:hover {
+    border-color: #d9920b;
+}
+
+/* Issue count badge */
+.card-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #d9920b;
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Responsive: smaller cards on mobile */
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-section-label {
+        margin-top: 28px;
+    }
+}
+
+/* ============ Shared form, alert and button components ============ */
+.validation-summary {
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    margin-bottom: 20px;
+}
+
+/* A bare model-level error list that carries none of the summary panel's chrome. */
+.form-error-summary {
+    margin-bottom: 20px;
+}
+
+.validation-summary-valid {
+    display: none;
+}
+
+.validation-summary ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.alert-panel {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.92rem;
+}
+
+.alert-danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid rgba(200, 67, 59, 0.25);
+}
+
+.alert-warning {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.alert-dismissible {
+    position: relative;
+}
+
+/* One-time client secret reveal. Its own tint and spacing, stronger than the plain
+   success alert it sits on, because the value is shown once and must be copied now. */
+.secret-reveal-banner {
+    border-left: 5px solid #278070;
+    background: #e8f8f5;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.secret-reveal-title {
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: #16324f;
+}
+
+.secret-reveal-description {
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.secret-reveal-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.secret-reveal-value {
+    max-width: 450px;
+    background: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.secret-reveal-warning {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #a94442;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-login {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 16px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+
+.btn-login:hover {
+    background: #2557d6;
+    color: #fff;
+}
+
+.btn-tertiary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.btn-tertiary:hover {
+    color: var(--ink);
+    background: #f1f3f5;
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.form-check-input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.form-check-label {
+    font-size: 0.92rem;
+    cursor: pointer;
+}
+
+.d-block {
+    display: block !important;
+}
+
+.panel-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 14px;
+}
+
+.panel-title-danger {
+    color: var(--danger);
+}
+
+/* Heading and lead paragraph that introduce a panel, separated from its content. */
+.panel-intro {
+    margin-bottom: 20px;
+}
+
+/* A lead paragraph opening a tab panel. */
+.tab-intro {
+    margin-bottom: 14px;
+}
+
+.form-option-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.form-option-row-spaced {
+    margin-bottom: 16px;
+}
+
+.checkbox-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.checkbox-label-compact {
+    gap: 6px;
+}
+
+.form-indent {
+    margin-top: 8px;
+}
+
+.section-divider {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 24px 0;
+}
+
+.subsection-heading {
+    font-size: 1.1rem;
+    margin: 0 0 16px;
+}
+
+.preset-grid-wide {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.fieldset-spaced {
+    margin-bottom: 16px;
+}
+
+.scope-checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.scope-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.scope-checkbox-disabled {
+    cursor: not-allowed;
+}
+
+.form-actions-spaced {
+    margin-top: 24px;
+}
+
+.form-actions-wide {
+    gap: 12px;
+}
+/* ============ Page styles — client token settings and user detail ============ */
+
+.refresh-token-settings {
+    display: none;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.user-detail-actions {
+    align-items: center;
+    margin-top: 20px;
+}
+
+.claim-list.user-detail-list,
+.role-list.user-detail-list {
+    margin-bottom: 20px;
+}
+
+.role-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.role-name {
+    font-weight: 500;
+}
+
+.user-detail-subheading {
+    margin: 24px 0 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.role-assignment-form {
+    display: flex;
+    gap: 10px;
+    max-width: 400px;
+}
+
+.form-control-grow {
+    flex: 1;
+}
+
+.claim-row.user-claim-row {
+    gap: 12px;
+    padding: 8px 0;
+}
+
+.claim-row-action {
+    margin-left: auto;
+}
+
+.claim-entry-form {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.user-detail-help {
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+
+.user-detail-description {
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
+
+.panel-danger {
+    border-top: 3px solid var(--danger);
+}
+
+.danger-section {
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.danger-action-heading {
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.delete-confirmation-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 400px;
+    margin-bottom: 12px;
+}
+/* ============ Page styles — diagnostics ============ */
+
+.diagnostics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.diagnostic-card {
+    padding: 16px;
+    border: 1px solid var(--line-soft);
+}
+
+.diagnostic-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.text-caption {
+    font-size: 0.85rem;
+}
+
+.diagnostics-intro {
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+}
+
+.plain-list {
+    list-style: none;
+    padding: 0;
+}
+
+.diagnostic-list-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.field-label-wide {
+    min-width: 140px;
+}
+
+.diagnostics-subheading {
+    margin: 20px 0 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+/* ============ Shared layout and text utilities ============ */
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 12px;
+}
+
+.hero-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.panel-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.unlock-btn {
+    cursor: pointer;
+}
+
+.mono {
+    font-family: var(--font-mono);
+}
+
+.claim-list, .role-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.claim-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.editor-fieldset {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+
+.user-username {
+    font-weight: 600;
+}

@@ -1,0 +1,123 @@
+@page "{id}"
+@model AuthenticationModel
+@{
+    ViewData["Title"] = "Configure Client Authentication";
+    ViewData[AdminComponents.ViewDataKey] = AdminComponent.Tabs;
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin", "/Admin/Index"),
+        new("Clients", "/Admin/Clients/Index"),
+        new(Model.ClientNameDisplay, "/Admin/Clients/Details", new Dictionary<string, string> { { "id", Model.Id } }),
+        new("Authentication")
+    };
+}
+
+<page-header title="Configure Client Authentication" sub="Manage grant types, PKCE, client secret requirement, and redirect/CORS URIs.">
+    <partial name="_BackLink" model='new BackLinkModel("./Details", "Back to Client", new Dictionary<string, string> { { "id", Model.Id } })' />
+</page-header>
+
+@if (Model.HasDrifted)
+{
+    <div class="panel alert-panel alert-warning alert-warning-drift">
+        <span class="drift-badge">Drifted from preset</span>
+        <span class="drift-details">@Model.DriftDetails</span>
+    </div>
+}
+
+<form method="post" id="edit-client-authentication-form">
+    <div asp-validation-summary="All" class="validation-summary alert-panel alert-danger" role="alert"></div>
+
+    <ck-tabs id="client-authentication-tabs" class="client-editor-tabs">
+        <ck-tab label="Authentication &amp; Grant Types" active="@(Model.ActiveTabIndex == 0 ? "active" : null)">
+            <div class="form-option-row form-option-row-spaced">
+                <label class="checkbox-label">
+                    <input type="checkbox" asp-for="Input.RequirePkce"/>
+                    <span>Require PKCE (Proof Key for Code Exchange)</span>
+                </label>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" asp-for="Input.RequireClientSecret"/>
+                    <span>Require Client Secret</span>
+                </label>
+            </div>
+
+            <fieldset class="fieldset-plain" aria-describedby="grant-types-requirement">
+                <legend class="form-label">Allowed Grant Types <span class="required">*</span></legend>
+                <p class="form-text" id="grant-types-requirement">Select at least one grant type. Any one of these
+                    satisfies the requirement.</p>
+                <div class="checkbox-options">
+                    <label class="checkbox-label checkbox-label-compact">
+                        <input type="checkbox" name="Input.GrantTypes" value="authorization_code"
+                               @(Model.Input.GrantTypes.Contains("authorization_code") ? "checked" : "")/>
+                        <code>authorization_code</code>
+                    </label>
+                    <label class="checkbox-label checkbox-label-compact">
+                        <input type="checkbox" name="Input.GrantTypes" value="client_credentials"
+                               @(Model.Input.GrantTypes.Contains("client_credentials") ? "checked" : "")/>
+                        <code>client_credentials</code>
+                    </label>
+                    <label class="checkbox-label checkbox-label-compact">
+                        <input type="checkbox" name="Input.GrantTypes" value="hybrid"
+                               @(Model.Input.GrantTypes.Contains("hybrid") ? "checked" : "")/>
+                        <code>hybrid</code>
+                    </label>
+                    <label class="checkbox-label checkbox-label-compact">
+                        <input type="checkbox" name="Input.GrantTypes" value="implicit"
+                               @(Model.Input.GrantTypes.Contains("implicit") ? "checked" : "")/>
+                        <code>implicit</code>
+                    </label>
+                    <label class="checkbox-label checkbox-label-compact">
+                        <input type="checkbox" name="Input.GrantTypes"
+                               value="urn:ietf:params:oauth:grant-type:device_code"
+                               @(Model.Input.GrantTypes.Contains("urn:ietf:params:oauth:grant-type:device_code") ? "checked" : "")/>
+                        <code>device_code</code>
+                    </label>
+                </div>
+            </fieldset>
+        </ck-tab>
+        <ck-tab label="Redirect &amp; CORS URIs" active="@(Model.ActiveTabIndex == 1 ? "active" : null)">
+            <partial name="_UriInputSection" model='new UriInputSectionModel("Redirect URIs", "Input.RedirectUris", "redirect-uris-container", "https://localhost:5001/signin-oidc", "Redirect URI", "+ Add Redirect URI", Model.Input.RedirectUris)' />
+            <partial name="_UriInputSection" model='new UriInputSectionModel("Post-Logout Redirect URIs", "Input.PostLogoutRedirectUris", "post-logout-uris-container", "https://localhost:5001/signout-callback-oidc", "Post-logout redirect URI", "+ Add Post-Logout URI", Model.Input.PostLogoutRedirectUris)' />
+            <partial name="_UriInputSection" model='new UriInputSectionModel("Allowed CORS Origins", "Input.CorsOrigins", "cors-origins-container", "https://localhost:5001", "Allowed CORS origin", "+ Add CORS Origin", Model.Input.CorsOrigins)' />
+
+            <hr class="section-divider"/>
+            <h3 class="subsection-heading">Logout Channels</h3>
+
+            <div class="form-group">
+                <label asp-for="Input.FrontChannelLogoutUri" class="form-label">Front-channel Logout URI</label>
+                <input asp-for="Input.FrontChannelLogoutUri" type="url" class="form-control"
+                       placeholder="https://localhost:5001/signout-frontchannel" aria-describedby="front-channel-logout-uri-error"/>
+                <span asp-validation-for="Input.FrontChannelLogoutUri" id="front-channel-logout-uri-error"
+                      class="text-danger field-validation-error"></span>
+                <div class="form-indent">
+                    <label class="checkbox-label">
+                        <input type="checkbox" asp-for="Input.FrontChannelLogoutSessionRequired"/>
+                        <span>Front-channel Logout Session Required</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.BackChannelLogoutUri" class="form-label">Back-channel Logout URI</label>
+                <input asp-for="Input.BackChannelLogoutUri" type="url" class="form-control"
+                       placeholder="https://localhost:5001/signout-backchannel" aria-describedby="back-channel-logout-uri-error"/>
+                <span asp-validation-for="Input.BackChannelLogoutUri" id="back-channel-logout-uri-error" class="text-danger field-validation-error"></span>
+                <div class="form-indent">
+                    <label class="checkbox-label">
+                        <input type="checkbox" asp-for="Input.BackChannelLogoutSessionRequired"/>
+                        <span>Back-channel Logout Session Required</span>
+                    </label>
+                </div>
+            </div>
+        </ck-tab>
+    </ck-tabs>
+
+    <div class="form-actions">
+        <button type="submit" class="btn-primary">Save Changes</button>
+        <a asp-page="./Details" asp-route-id="@Model.Id" class="btn-secondary">Cancel</a>
+    </div>
+</form>
+
+@section Scripts {
+    <script src="~/js/client-uri-rows.js" asp-append-version="true"></script>
+}

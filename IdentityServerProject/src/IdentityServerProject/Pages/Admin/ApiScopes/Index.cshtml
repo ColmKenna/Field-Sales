@@ -1,0 +1,88 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "API Scopes";
+    ViewData[AdminComponents.ViewDataKey] = AdminComponent.ResponsiveTable;
+}
+
+<page-header title="API Scopes" sub="Access-control scopes clients can request from IdentityServer">
+    <a asp-page="./Create" class="btn-primary">
+        <partial name="_AdminIcon" model='("plus", "btn-icon")' />
+        New API scope
+    </a>
+</page-header>
+
+@if (!string.IsNullOrWhiteSpace(Model.DeleteErrorMessage))
+{
+    <div class="alert alert-error" role="alert">@Model.DeleteErrorMessage</div>
+}
+
+<div class="panel">
+    <partial name="_ListFilter" model='new ListFilterModel("api-scope-filter", "Filter API scopes", "Filter by name or display name", Model.Filter)' />
+
+    <ck-responsive-table mobile-breakpoint="768px">
+        <ck-responsive-thead>
+            <ck-responsive-col-head>Name</ck-responsive-col-head>
+            <ck-responsive-col-head>Display Name</ck-responsive-col-head>
+            <ck-responsive-col-head>Referenced By</ck-responsive-col-head>
+            <ck-responsive-col-head>Status</ck-responsive-col-head>
+            <ck-responsive-col-head class="actions-cell">Actions</ck-responsive-col-head>
+        </ck-responsive-thead>
+        <ck-responsive-tbody>
+            @foreach (var apiScope in Model.ApiScopes.Items)
+            {
+                <ck-responsive-row>
+                    <ck-responsive-col>
+                        <a asp-page="./Edit" asp-route-name="@apiScope.Name"
+                           class="resource-title-link"><code>@apiScope.Name</code></a>
+                    </ck-responsive-col>
+                    <ck-responsive-col>@(string.IsNullOrWhiteSpace(apiScope.DisplayName) ? "—" : apiScope.DisplayName)</ck-responsive-col>
+                    <ck-responsive-col><span
+                            class="badge">@apiScope.ClientReferenceCount client@(apiScope.ClientReferenceCount == 1 ? "" : "s")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col>
+                        <span
+                            class="status-badge @(apiScope.Enabled ? "enabled" : "disabled")">@(apiScope.Enabled ? "Enabled" : "Disabled")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col class="actions-cell">
+                        <button
+                            type="button"
+                            class="action-link action-link-danger"
+                            data-action="delete-scope"
+                            data-delete-name="@apiScope.Name"
+                            data-reference-count="@apiScope.ClientReferenceCount">
+                            Delete
+                        </button>
+                    </ck-responsive-col>
+                </ck-responsive-row>
+            }
+        </ck-responsive-tbody>
+    </ck-responsive-table>
+
+    @if (Model.ApiScopes.Items.Count == 0)
+    {
+        <div class="empty-state">No API scopes found.</div>
+    }
+
+    <partial name="_PaginationFooter" model='Model.ApiScopes.ToPagination("scopes", Model.Filter)' />
+</div>
+
+<partial name="_ConfirmationModal" model='new ConfirmationModalModel(
+    "delete-scope-modal",
+    "Delete API scope",
+    "Delete",
+    "Are you sure you want to delete <strong id=\"delete-scope-modal-name-text\"></strong>? This cannot be undone.",
+    submitText: "Delete",
+    submitId: "delete-scope-modal-confirm",
+    hiddenInputName: "name",
+    hiddenInputId: "delete-scope-modal-name-input",
+    hiddenInputValue: "",
+    bodyId: "delete-scope-modal-message",
+    bodyState: "confirm",
+    hiddenFields: new[]
+    {
+        new ModalHiddenField("PageNumber", Value: Model.ApiScopes.PageNumber.ToString()),
+        new ModalHiddenField("Filter", Value: Model.Filter)
+    },
+    blockedBodyHtml: "<strong id=\"delete-scope-modal-blocked-name-text\"></strong> is currently assigned to <span id=\"delete-scope-modal-blocked-count\"></span> client(s) and cannot be deleted until those clients no longer reference it.",
+    blockedBodyId: "delete-scope-modal-blocked-message")' />

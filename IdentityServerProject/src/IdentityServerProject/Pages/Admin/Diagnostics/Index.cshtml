@@ -1,0 +1,88 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Diagnostics";
+}
+
+<page-header title="Diagnostics" sub="Read-only view of IdentityServer store health, active signing credentials, and reserved-claim exposure.">
+</page-header>
+
+<div class="panel panel-padded">
+    <h2 class="panel-title">Store Health</h2>
+
+    <div class="diagnostics-grid">
+        @foreach (var store in Model.Diagnostics.StoreHealth)
+        {
+            <div class="panel diagnostic-card" id="store-health-@store.Name.Replace(" ", "-").ToLowerInvariant()">
+                <div class="diagnostic-card-header">
+                    <strong>@store.Name</strong>
+                    <span
+                        class="status-badge @(store.IsHealthy ? "enabled" : "disabled")">@(store.IsHealthy ? "Healthy" : "Degraded")</span>
+                </div>
+                <div class="text-muted text-caption">@store.Detail</div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="panel panel-padded">
+    <h2 class="panel-title">Reserved User Claims</h2>
+    <p class="text-muted diagnostics-intro">
+        User claims whose type the framework owns. These are copied onto the sign-in principal verbatim,
+        so a role-typed one grants privilege that the Roles tab and the last-administrator check cannot see.
+        Remove them from the user's Claims tab.
+    </p>
+
+    @if (Model.Diagnostics.ReservedClaimHolders.Count == 0)
+    {
+        <div class="empty-state" id="reserved-claims-empty">No users hold a reserved claim type.</div>
+    }
+    else
+    {
+        <ul class="plain-list" id="reserved-claim-holders">
+            @foreach (var holder in Model.Diagnostics.ReservedClaimHolders)
+            {
+                <li class="diagnostic-list-row">
+                    <a asp-page="/Admin/Users/Details" asp-route-id="@holder.UserId"
+                       asp-route-tab="claims">@holder.UserName</a>
+                    <code>@holder.ClaimType</code> = <code>@holder.ClaimValue</code>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+<div class="panel panel-padded">
+    <h2 class="panel-title">Signing Credentials</h2>
+
+    <div class="field-group">
+        <span class="field-label field-label-wide">Active Key ID:</span>
+        <code id="active-signing-key-id">@(Model.Diagnostics.SigningKeyId ?? "—")</code>
+    </div>
+    <div class="field-group">
+        <span class="field-label field-label-wide">Algorithm:</span>
+        <code>@(Model.Diagnostics.SigningAlgorithm ?? "—")</code>
+    </div>
+
+    <h3 class="diagnostics-subheading">Active Validation Keys</h3>
+    @if (Model.Diagnostics.ActiveValidationKeys.Count == 0)
+    {
+        <div class="empty-state">No active validation keys found.</div>
+    }
+    else
+    {
+        <ul class="plain-list" id="active-validation-keys">
+            @foreach (var key in Model.Diagnostics.ActiveValidationKeys)
+            {
+                <li class="diagnostic-list-row">
+                    <code>@key.KeyId</code>
+                    <span class="text-muted">@key.Algorithm</span>
+                    @if (key.IsX509Certificate)
+                    {
+                        <span class="badge">X.509</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</div>

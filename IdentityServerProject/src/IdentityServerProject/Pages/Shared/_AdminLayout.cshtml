@@ -1,0 +1,187 @@
+@{
+    var nav = new AdminNavigationState(ViewContext.RouteData.Values["page"]?.ToString());
+    var components = AdminComponents.Required(ViewData);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@(ViewData["Title"] ?? "Admin Console") - IdentityServer</title>
+    <link rel="stylesheet" href="~/css/shared.css" asp-append-version="true"/>
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true"/>
+    @await RenderSectionAsync("Styles", false)
+</head>
+<body>
+<script>
+    (function () {
+        try {
+            if (localStorage.getItem('admin_sidebar_collapsed') === 'true') {
+                document.body.classList.add('collapsed');
+            }
+        } catch (e) {
+        }
+    })();
+</script>
+
+<!-- ===== Sidebar ===== -->
+@if (User.IsInRole(Config.SysAdminRole))
+{
+    <aside class="sidebar" id="sidebar">
+        <a asp-page="/Admin/Index" class="brand">
+            <div class="brand-icon">id</div>
+            <div class="brand-text label">
+                <div class="brand-name">IdentityServer</div>
+                <div class="brand-sub">ADMIN CONSOLE</div>
+            </div>
+        </a>
+
+        <nav class="sidebar-scroll" aria-label="Main">
+            <div class="section-label"><span class="label">Configure</span></div>
+
+            <a asp-page="/Admin/Clients/Index" class="@nav.ItemClass("/Admin/Clients")" data-tip="Clients">
+                <partial name="_AdminIcon" model='("clients", "item-icon")' />
+                <span class="label">Clients</span></a>
+            <a asp-page="/Admin/Apis/Index" class="@nav.ItemClass("/Admin/Apis")" data-tip="API Resources">
+                <partial name="_AdminIcon" model='("apis", "item-icon")' />
+                <span class="label">API Resources</span></a>
+            <a asp-page="/Admin/ApiScopes/Index" class="@nav.ItemClass("/Admin/ApiScopes")" data-tip="API Scopes">
+                <partial name="_AdminIcon" model='("apiscopes", "item-icon")' />
+                <span class="label">API Scopes</span></a>
+            <a asp-page="/Admin/IdentityResources/Index" class="@nav.ItemClass("/Admin/IdentityResources")"
+               data-tip="Identity Resources">
+                <partial name="_AdminIcon" model='("identityresources", "item-icon")' />
+                <span class="label">Identity Resources</span></a>
+            <a asp-page="/Admin/Keys/Index" class="@nav.ItemClass("/Admin/Keys")" data-tip="Signing Keys">
+                <partial name="_AdminIcon" model='("keys", "item-icon")' />
+                <span class="label">Signing Keys</span></a>
+
+            <div class="section-label"><span class="label">Administer</span></div>
+
+            <a asp-page="/Admin/Users/Index" class="@nav.ItemClass("/Admin/Users")" data-tip="Users">
+                <partial name="_AdminIcon" model='("users", "item-icon")' />
+                <span class="label">Users</span></a>
+            <a asp-page="/Admin/Roles/Index" class="@nav.ItemClass("/Admin/Roles")" data-tip="Roles">
+                <partial name="_AdminIcon" model='("roles", "item-icon")' />
+                <span class="label">Roles</span></a>
+            <a asp-page="/Admin/Grants/Index" class="@nav.ItemClass("/Admin/Grants")" data-tip="Persisted Grants">
+                <partial name="_AdminIcon" model='("grants", "item-icon")' />
+                <span class="label">Persisted Grants</span></a>
+            <a asp-page="/Admin/AuditLogs/Index" class="@nav.ItemClass("/Admin/AuditLogs")" data-tip="Audit Log">
+                <partial name="_AdminIcon" model='("auditlogs", "item-icon")' />
+                <span class="label">Audit Log</span></a>
+            <a asp-page="/Admin/Diagnostics/Index" class="@nav.ItemClass("/Admin/Diagnostics")"
+               data-tip="Diagnostics">
+                <partial name="_AdminIcon" model='("diagnostics", "item-icon")' />
+                <span class="label">Diagnostics</span></a>
+        </nav>
+
+        <div class="side-user" data-tip="@(User.Identity?.Name ?? "sysadmin")">
+            <div
+                class="side-avatar">@(string.IsNullOrWhiteSpace(User.Identity?.Name) ? "S" : User.Identity.Name.Substring(0, 1).ToUpper())</div>
+            <span class="name label">@(User.Identity?.Name ?? "sysadmin")</span>
+        </div>
+    </aside>
+}
+
+<!-- ===== Header ===== -->
+<header class="header">
+    <button class="burger" id="burger" aria-label="Toggle sidebar">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+    </button>
+
+    <nav class="crumbs" id="crumbs" aria-label="Breadcrumb">
+        @if (IsSectionDefined("Breadcrumbs"))
+        {
+            @await RenderSectionAsync("Breadcrumbs", false)
+        }
+        else if (ViewData["Breadcrumbs"] is IEnumerable<Breadcrumb> crumbsList)
+        {
+            @foreach (var item in BreadcrumbTrail.Resolve(crumbsList))
+            {
+                if (item.NeedsSeparator)
+                {
+                    <span class="sep">/</span>
+                }
+
+                @* Generated through asp-page, not a literal href, so a crumb follows the
+                   target page's real route rather than the shape someone typed. *@
+                if (!item.IsLink)
+                {
+                    <span class="current">@item.Text</span>
+                }
+                else if (item.RouteValues is not null)
+                {
+                    <a asp-page="@item.Page" asp-all-route-data="@item.RouteValues">@item.Text</a>
+                }
+                else
+                {
+                    <a asp-page="@item.Page">@item.Text</a>
+                }
+            }
+        }
+        else
+        {
+            <a asp-page="/Admin/Index">Admin</a>
+            <span class="sep">/</span>
+            <span class="current">@(ViewData["Title"] ?? "Clients")</span>
+        }
+    </nav>
+
+    <div class="spacer"></div>
+
+    <div class="user-menu" id="userMenu">
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <button class="user-btn" id="userBtn" aria-label="Account menu"
+                    aria-expanded="false" aria-controls="userMenuDropdown">
+                <span
+                    class="avatar">@(User.Identity.Name?.Substring(0, Math.Min(2, User.Identity.Name.Length)).ToUpper() ?? "AD")</span>
+                <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+            <div class="dropdown" id="userMenuDropdown">
+                <form method="post" asp-page="/Account/Logout" class="logout-form">
+                    <button type="submit" class="logout">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                        </svg>
+                        Sign Out
+                    </button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <a asp-page="/Account/Login" class="btn-login">Sign In</a>
+        }
+    </div>
+</header>
+
+<!-- ===== Main ===== -->
+<main class="main">
+    @RenderBody()
+</main>
+
+@if (components.HasFlag(AdminComponent.ResponsiveTable))
+{
+    <script type="module" src="~/lib/ck-responsive-table-webcomponent/index.esm.js" asp-append-version="true"></script>
+}
+@if (components.HasFlag(AdminComponent.Tabs))
+{
+    <script type="module" src="~/lib/ck-tabs-webcomponent/index.esm.js" asp-append-version="true"></script>
+}
+<script src="~/js/admin.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", false)
+</body>
+</html>

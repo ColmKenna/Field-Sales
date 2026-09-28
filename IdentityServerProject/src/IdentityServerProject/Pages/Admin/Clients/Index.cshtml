@@ -1,0 +1,55 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Clients";
+    ViewData[AdminComponents.ViewDataKey] = AdminComponent.ResponsiveTable;
+}
+
+<page-header title="Clients" sub="OAuth/OIDC client applications registered with IdentityServer">
+    <a id="new-client-link" class="btn-primary" asp-page="./Create">
+        <partial name="_AdminIcon" model='("plus", "btn-icon")' />
+        New client
+    </a>
+</page-header>
+
+<div class="panel">
+    <partial name="_ListFilter" model='new ListFilterModel("client-filter", "Filter clients", "Filter by name or client ID", Model.Filter)' />
+
+    <ck-responsive-table mobile-breakpoint="768px">
+        <ck-responsive-thead>
+            <ck-responsive-col-head>Name</ck-responsive-col-head>
+            <ck-responsive-col-head>Client ID</ck-responsive-col-head>
+            <ck-responsive-col-head>Type</ck-responsive-col-head>
+            <ck-responsive-col-head>Status</ck-responsive-col-head>
+            <ck-responsive-col-head class="actions-cell">Actions</ck-responsive-col-head>
+        </ck-responsive-thead>
+        <ck-responsive-tbody>
+            @foreach (var clientItem in Model.Clients.Items)
+            {
+                <ck-responsive-row>
+                    <ck-responsive-col>
+                        <a asp-page="./Details" asp-route-id="@clientItem.ClientId"
+                           class="client-title-link">@clientItem.ClientName</a>
+                    </ck-responsive-col>
+                    <ck-responsive-col><code>@clientItem.ClientId</code></ck-responsive-col>
+                    <ck-responsive-col>@clientItem.ClientType</ck-responsive-col>
+                    <ck-responsive-col>
+                        <span
+                            class="status-badge @(clientItem.Enabled ? "enabled" : "disabled")">@(clientItem.Enabled ? "Enabled" : "Disabled")</span>
+                    </ck-responsive-col>
+                    <ck-responsive-col class="actions-cell">
+                        <a asp-page="./Details" asp-route-id="@clientItem.ClientId" class="action-link">Manage
+                            &rarr;</a>
+                    </ck-responsive-col>
+                </ck-responsive-row>
+            }
+        </ck-responsive-tbody>
+    </ck-responsive-table>
+
+    @if (Model.Clients.Items.Count == 0)
+    {
+        <div class="empty-state">No clients found.</div>
+    }
+
+    <partial name="_PaginationFooter" model='Model.Clients.ToPagination("clients", Model.Filter)' />
+</div>

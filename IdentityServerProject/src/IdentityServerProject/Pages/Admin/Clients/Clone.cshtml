@@ -1,0 +1,53 @@
+@page "{sourceClientId}"
+@model CloneModel
+@{
+    ViewData["Title"] = "Clone Client";
+    ViewData["Breadcrumbs"] = new List<Breadcrumb>
+    {
+        new("Admin", "/Admin/Index"),
+        new("Clients", "/Admin/Clients/Index"),
+        new(Model.SourceClientName, "/Admin/Clients/Details", new Dictionary<string, string> { { "id", Model.SourceClientId } }),
+        new("Clone")
+    };
+}
+
+<page-header title="Clone Client">
+    <page-sub>Create a new client based on <strong>@Model.SourceClientName</strong>. The new client will
+            inherit all settings and scopes, except for the client secrets.</page-sub>
+    <partial name="_BackLink" model='new BackLinkModel("./Details", "Back to Client", new Dictionary<string, string> { { "id", Model.SourceClientId } })' />
+</page-header>
+
+<form method="post" id="clone-client-form">
+    <div asp-validation-summary="All" role="alert" class="validation-summary alert-panel alert-danger"></div>
+
+    <input type="hidden" asp-for="SourceClientId"/>
+
+    <div class="panel panel-padded">
+        <div class="form-group">
+            <label asp-for="Input.ClientId" class="form-label">New Client ID <span class="required">*</span></label>
+            <input asp-for="Input.ClientId" class="form-control" placeholder="e.g. my-web-app-clone" required aria-describedby="client-id-error"/>
+            <span asp-validation-for="Input.ClientId" id="client-id-error" class="text-danger field-validation-error"></span>
+            <small class="form-text text-muted">Unique
+                alphanumeric identifier used in OAuth requests.</small>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="Input.ClientName" class="form-label">New Client Display Name <span class="required">*</span></label>
+            <input asp-for="Input.ClientName" class="form-control" placeholder="e.g. Customer Portal Web Clone"
+                   required aria-describedby="client-name-error"/>
+            <span asp-validation-for="Input.ClientName" id="client-name-error" class="text-danger field-validation-error"></span>
+        </div>
+
+        <div class="form-group">
+            <label asp-for="Input.Description" class="form-label">Description</label>
+            <textarea asp-for="Input.Description" class="form-control" rows="2"
+                      placeholder="Optional notes about this client application" aria-describedby="client-description-error"></textarea>
+            <span asp-validation-for="Input.Description" id="client-description-error" class="text-danger field-validation-error"></span>
+        </div>
+
+        <div class="form-actions form-actions-spaced">
+            <button type="submit" class="btn-primary">Clone Client</button>
+            <a asp-page="./Details" asp-route-id="@Model.SourceClientId" class="btn-secondary">Cancel</a>
+        </div>
+    </div>
+</form>

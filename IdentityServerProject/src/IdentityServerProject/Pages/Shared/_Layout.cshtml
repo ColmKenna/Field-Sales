@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>@(ViewData["Title"] != null ? $"{ViewData["Title"]} - IdentityServer" : "IdentityServer")</title>
+    <link rel="stylesheet" href="~/css/shared.css" asp-append-version="true"/>
+    <link rel="stylesheet" href="~/css/public.css" asp-append-version="true"/>
+    @await RenderSectionAsync("Styles", false)
+</head>
+<body class="public-page">
+<main class="public-container">
+    @RenderBody()
+</main>
+@await RenderSectionAsync("Scripts", false)
+</body>
+</html>
