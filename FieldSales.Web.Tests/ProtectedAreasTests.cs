@@ -57,6 +57,38 @@ public sealed class ProtectedAreasTests
         Assert.Contains("workspace is ready", await allowed.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task MultipleRoleUserSeesOnlyPermittedAreaChoices()
+    {
+        await using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
+        });
+        client.DefaultRequestHeaders.Add("X-Test-Roles", "Field Salesperson,Sales Manager");
+
+        HttpResponseMessage home = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Redirect, home.StatusCode);
+        Assert.Equal("/Staff", home.Headers.Location?.OriginalString);
+
+        HttpResponseMessage choice = await client.GetAsync("/Staff");
+        string html = await choice.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, choice.StatusCode);
+        Assert.Contains("Choose your staff area", html);
+        Assert.Contains("Field sales", html);
+        Assert.Contains("Sales manager", html);
+        Assert.DoesNotContain("Head office", html);
+
+        HttpResponseMessage direct = await client.GetAsync("/?returnUrl=%2FManager");
+        Assert.Equal(HttpStatusCode.Redirect, direct.StatusCode);
+        Assert.Equal("/Manager", direct.Headers.Location?.OriginalString);
+
+        HttpResponseMessage denied = await client.GetAsync("/?returnUrl=%2FHeadOffice");
+        Assert.Equal(HttpStatusCode.Redirect, denied.StatusCode);
+        Assert.Equal("/AccessDenied", denied.Headers.Location?.OriginalString);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

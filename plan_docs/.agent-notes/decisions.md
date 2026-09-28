@@ -122,3 +122,15 @@ The reserved ports are proposals until the item that adds the project confirms t
 - I-01 returns rejected staff credentials to a retry state. Protected landings exist for rep,
   manager and head office; the sign-out POST ends the BFF and identity-host sessions. The
   last-used destination, I-02 and area switching remain in Increment 4.
+
+### Increment 4 (2026-09-28, developer)
+
+- Persist each staff member's last-used area in `StaffWebDb`, keyed by their identity `sub` claim.
+  Resolve stored keys only through the known area map and select them only while the principal
+  still has the mapped business role. Never take a destination or role from browser state.
+- Use I-02 for first use when more than one area is permitted and no usable last-used area exists.
+  Show only areas held by the current principal. Single-area users go directly to their area.
+  Area navigation switches destinations inside the existing staff session. A valid permitted
+  direct link has priority over the saved default; protected request endpoints deny an unheld
+  area before protected page content or actions are reached.
+- IAM-US-002 S3, immediate role removal during an open session, remains WI-003.

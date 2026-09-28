@@ -16,6 +16,10 @@
         <p role="status">Signed out.</p>
     }
     <form method="post" asp-page="/SignIn" id="staff-sign-in">
+        @if (Url.IsLocalUrl(Request.Query["returnUrl"]))
+        {
+            <input type="hidden" name="returnUrl" value="@Request.Query["returnUrl"]" />
+        }
         <button type="submit" class="button">@(Model.SignInFailed ? "Try again" : "Continue to staff sign-in")</button>
         <span id="sign-in-progress" role="status" hidden>Signing in...</span>
     </form>

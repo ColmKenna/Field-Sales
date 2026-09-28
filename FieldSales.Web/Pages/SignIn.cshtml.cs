@@ -9,14 +9,15 @@ namespace FieldSales.Web.Pages;
 [AllowAnonymous]
 public sealed class SignInModel : PageModel
 {
-    public IActionResult OnGet() => BeginSignIn();
+    public IActionResult OnGet(string? returnUrl = null) => BeginSignIn(returnUrl);
 
-    public IActionResult OnPost() => BeginSignIn();
+    public IActionResult OnPost(string? returnUrl = null) => BeginSignIn(returnUrl);
 
-    private IActionResult BeginSignIn()
+    private IActionResult BeginSignIn(string? returnUrl)
     {
-        if (User.Identity?.IsAuthenticated == true) return RedirectToPage("/Staff/Index");
-        return Challenge(new AuthenticationProperties { RedirectUri = "/Staff" },
+        string destination = Url.IsLocalUrl(returnUrl) ? returnUrl! : "/";
+        if (User.Identity?.IsAuthenticated == true) return LocalRedirect(destination);
+        return Challenge(new AuthenticationProperties { RedirectUri = destination },
             OpenIdConnectDefaults.AuthenticationScheme);
     }
 }

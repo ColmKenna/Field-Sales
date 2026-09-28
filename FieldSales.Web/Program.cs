@@ -32,6 +32,7 @@ if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("
 }
 
 builder.Services.AddSingleton<SqlTicketStore>();
+builder.Services.AddScoped<StaffAreaService>();
 builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, TicketStoreCookieOptions>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<StaffCookieEvents>();

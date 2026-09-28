@@ -3,18 +3,19 @@
 @{
     ViewData["Title"] = "Staff workspace";
 }
-<h1>Staff workspace</h1>
-<p>Signed in as @User.Identity?.Name.</p>
+<h1>Choose your staff area</h1>
+<p>Signed in as @User.Identity?.Name. Choose an area to continue.</p>
 @if (Model.ApiAvailable)
 {
-    <p role="status">Your staff API session is active.</p>
+    <p role="status">Your staff account is ready.</p>
 }
 else
 {
-    <p role="alert">The staff API session could not be checked. Try signing in again.</p>
+    <p role="alert">Your staff account could not be checked right now. Try again shortly.</p>
 }
-<ul>
-    @if (User.IsInRole("Field Salesperson")) { <li><a asp-page="/Rep/Index">Field sales</a></li> }
-    @if (User.IsInRole("Sales Manager")) { <li><a asp-page="/Manager/Index">Sales manager</a></li> }
-    @if (User.IsInRole("Head Office User")) { <li><a asp-page="/HeadOffice/Index">Head office</a></li> }
+<ul class="area-choices">
+    @foreach (var area in Model.PermittedAreas)
+    {
+        <li><a href="@area.Route"><strong>@area.Label</strong><span>@area.Description</span></a></li>
+    }
 </ul>

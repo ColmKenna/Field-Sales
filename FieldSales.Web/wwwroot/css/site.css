@@ -15,6 +15,11 @@ p { line-height: 1.6; }
 .button { display: inline-block; padding: .7rem 1rem; border: 1px solid #155b84; border-radius: .4rem; background: #155b84; color: #fff; font: inherit; text-decoration: none; cursor: pointer; }
 .button.secondary { background: #fff; color: #155b84; }
 .button:disabled { opacity: .65; cursor: wait; }
+.area-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; padding: 0; list-style: none; }
+.area-choices a { display: grid; gap: .5rem; min-height: 8rem; padding: 1.25rem; border: 1px solid #b9c8d6; border-radius: .75rem; background: #fff; text-decoration: none; }
+.area-choices a:hover { border-color: #155b84; }
+.area-choices strong { font-size: 1.15rem; }
+.area-choices span { color: #35485c; }
 #sign-in-progress { display: inline-block; margin-left: 1rem; }
 #sign-in-progress[hidden] { display: none; }
 [role="alert"] { border-left: 4px solid #ae3d2d; padding: .6rem 1rem; background: #fff2f0; }

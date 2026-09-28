@@ -22,6 +22,25 @@ namespace FieldSales.Web.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("FieldSales.Web.Data.StaffAreaPreference", b =>
+                {
+                    b.Property<string>("SubjectId")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Area")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("SubjectId");
+
+                    b.ToTable("StaffAreaPreferences");
+                });
+
             modelBuilder.Entity("FieldSales.Web.Data.StoredTicket", b =>
                 {
                     b.Property<string>("Key")

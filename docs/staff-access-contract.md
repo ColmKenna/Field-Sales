@@ -61,8 +61,12 @@ The first API surface, `/staff/session`, validates a bearer token for `fieldsale
 `fieldsales.api` scope and a business role. The BFF calls it with a server-held access token and
 refreshes that token through the identity host as it nears expiration.
 
-The current `/Staff` page lists held areas. Last-used routing, I-02 choice and switching are the
-next increment; this page is a temporary entry for the protected landings.
+`/Staff` now acts as I-02 when more than one area is permitted and there is no usable saved
+destination. `StaffWebDb` stores the last-used area by identity subject. A known destination is
+selected only if the current role claim still permits it. A single permitted area opens directly;
+navigation links expose only areas currently held by the signed-in principal. Local direct area
+links take priority over the saved default, and each area remains protected at its request
+boundary.
 
 ## Scenario gate and boundary
 
