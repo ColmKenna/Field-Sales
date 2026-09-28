@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "generatedUtc": "2026-08-31T12:29:25Z",
-  "solution": "Sales.slnx",
+  "solution": "FieldSales.slnx",
   "machineId": "Colms-Mac-mini",
   "entries": [
     {
       "id": "CS-001",
       "axis": "core-csharp",
-      "location": "IdentityServerProject.Admin.Services/LikeExtensions.cs:18",
+      "location": "FieldSales.Identity.Admin.Services/LikeExtensions.cs:18",
       "instrument": "benchmarkdotnet",
       "metric": "allocated-bytes-85char",
       "value": 744,
@@ -20,7 +20,7 @@
     {
       "id": "ASP-001",
       "axis": "aspnet-core",
-      "location": "IdentityServerProject/src/IdentityServerProject/Pages/Admin/Clients/Create.cshtml:205",
+      "location": "FieldSales.Identity/src/FieldSales.Identity/Pages/Admin/Clients/Create.cshtml:205",
       "instrument": "benchmarkdotnet",
       "metric": "allocated-bytes-render",
       "value": 928,
@@ -33,7 +33,7 @@
     {
       "id": "EF-001",
       "axis": "ef-core",
-      "location": "IdentityServerProject.Admin.Services/Clients/ClientCreateService.cs:95",
+      "location": "FieldSales.Identity.Admin.Services/Clients/ClientCreateService.cs:95",
       "instrument": "query-count",
       "metric": "clone-operation-read-commands",
       "value": 8,
@@ -46,7 +46,7 @@
     {
       "id": "EF-002",
       "axis": "ef-core",
-      "location": "IdentityServerProject.Admin.Services/Apis/ApiResourceEditorService.cs:770",
+      "location": "FieldSales.Identity.Admin.Services/Apis/ApiResourceEditorService.cs:770",
       "instrument": "query-count",
       "metric": "resource-load-read-commands",
       "value": 4,
@@ -59,7 +59,7 @@
     {
       "id": "EF-003",
       "axis": "ef-core",
-      "location": "IdentityServerProject.Admin.Services/Clients/ClientDetailsService.cs:579",
+      "location": "FieldSales.Identity.Admin.Services/Clients/ClientDetailsService.cs:579",
       "instrument": "query-count",
       "metric": "permissions-operation-read-commands",
       "value": 5,
@@ -72,7 +72,7 @@
     {
       "id": "EF-004",
       "axis": "ef-core",
-      "location": "IdentityServerProject.Admin.Services/Grants/GrantListService.cs:64",
+      "location": "FieldSales.Identity.Admin.Services/Grants/GrantListService.cs:64",
       "instrument": "sql-capture",
       "metric": "selected-data-characters",
       "value": 0,
@@ -85,7 +85,7 @@
     {
       "id": "EF-005",
       "axis": "ef-core",
-      "location": "IdentityServerProject.Admin.Services/Clients/ClientListService.cs:36",
+      "location": "FieldSales.Identity.Admin.Services/Clients/ClientListService.cs:36",
       "instrument": "query-count",
       "metric": "list-operation-read-commands",
       "value": 2,
@@ -98,7 +98,7 @@
     {
       "id": "EF-006",
       "axis": "ef-core",
-      "location": "IdentityServerProject.Admin.Services/Grants/GrantListService.cs:197",
+      "location": "FieldSales.Identity.Admin.Services/Grants/GrantListService.cs:197",
       "instrument": "sql-command-capture",
       "metric": "subject-revoke-delete-commands",
       "value": 1,

@@ -45,7 +45,7 @@ This solution provides a foundation for central authentication and authorization
                                           |
                                           v
                           +---------------------------------+
-                          |       IdentityServerProject     |
+                          |       FieldSales.Identity     |
                           |   Duende IdentityServer 8       |
                           |   + ASP.NET Core Identity       |
                           |   + /Admin Console UI           |
@@ -62,8 +62,8 @@ This solution provides a foundation for central authentication and authorization
 Your own applications sit outside this template. They authenticate against the host over
 standard OIDC and OAuth 2.0, and are registered as clients through the Admin Console.
 
-- **IdentityServerProject**: The primary authentication host running Duende IdentityServer with ASP.NET Core Identity. Houses the Razor Pages UI for account workflows (Login, Logout, Access Denied) and the `/Admin` management console.
-- **IdentityServerProject.Admin.Services**: A decoupled domain services library containing the business logic, validation, audit generation, and management operations for the admin console. It has no reference to the host's `DbContext` or user type; the host supplies adapters for the persistence ports it defines.
+- **FieldSales.Identity**: The primary authentication host running Duende IdentityServer with ASP.NET Core Identity. Houses the Razor Pages UI for account workflows (Login, Logout, Access Denied) and the `/Admin` management console.
+- **FieldSales.Identity.Admin.Services**: A decoupled domain services library containing the business logic, validation, audit generation, and management operations for the admin console. It has no reference to the host's `DbContext` or user type; the host supplies adapters for the persistence ports it defines.
 - **AppHost / ServiceDefaults**: .NET Aspire orchestration and shared service defaults (OpenTelemetry, health checks, resilience).
 
 > [!NOTE]
@@ -116,17 +116,19 @@ The `/Admin` section is restricted to users in the `SysAdmin` role and provides 
 
 ```text
 .
-├── IdentityServerProject/
-│   └── src/IdentityServerProject/       # Duende IdentityServer host & /Admin Razor Pages UI
-├── IdentityServerProject.Admin.Services # Domain services, validation & audit logic for Admin UI
-├── IdentityServerProject.Admin.Tests    # Unit, integration, characterization & audit coverage tests
-├── AppHost/                             # .NET Aspire AppHost orchestrator
-├── ServiceDefaults/                     # Aspire service defaults (OTel, health checks, resilience)
+├── FieldSales.Identity/
+│   └── src/FieldSales.Identity/         # Duende IdentityServer host & /Admin Razor Pages UI
+├── FieldSales.Identity.Admin.Services/  # Domain services, validation & audit logic for Admin UI
+├── FieldSales.Identity.Admin.Tests/     # Unit, integration, characterization & audit coverage tests
+├── FieldSales.AppHost/                  # .NET Aspire AppHost orchestrator
+├── FieldSales.ServiceDefaults/          # Aspire service defaults (OTel, health checks, resilience)
+├── docs/                                # Template adoption record and reviews
+├── plan_docs/                           # Field Sales stories, UX docs and delivery console
 ├── scripts/                             # Utility scripts (e.g. migration bundle generation)
 ├── aspire.config.json                   # Aspire tooling entry point (names the AppHost project)
 ├── Directory.Packages.props             # Central Package Management (CPM)
 ├── global.json                          # .NET SDK configuration
-└── Sales.slnx                           # Solution definition
+└── FieldSales.slnx                      # Solution definition
 ```
 
 ---
@@ -151,39 +153,17 @@ The solution separates operational, configuration, and identity data across thre
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (feature band `10.0.100` or later, per `global.json`)
 - [Docker Desktop](https://www.docker.com/) or a compatible container runtime — required both for the .NET Aspire SQL Server container and for the SQL Server integration tests
-- [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell) (`pwsh`) — required to run `scripts/rename-template.ps1` and `scripts/Create-MigrationBundles.ps1`. Pre-installed on GitHub Actions' `ubuntu-latest` runners; install locally with `dotnet tool install --global PowerShell` if `pwsh` is not already on your `PATH`.
-- Node.js (v18+) *optional, only needed for the front-end component tests in `IdentityServerProject`*
+- [PowerShell 7](https://learn.microsoft.com/powershell/scripting/install/installing-powershell) (`pwsh`) — required to run `scripts/Create-MigrationBundles.ps1`. Pre-installed on GitHub Actions' `ubuntu-latest` runners; install locally with `dotnet tool install --global PowerShell` if `pwsh` is not already on your `PATH`.
+- Node.js (v18+) *optional, only needed for the front-end component tests in `FieldSales.Identity`*
 
 ---
 
 ## Creating a New Instance from This Template
 
-This repository is a **GitHub template**: use *Use this template* on GitHub, or clone it directly, then
-re-brand the clone before writing any application code of your own.
-
-```pwsh
-git clone <your-new-repo-url> MyCompany.Identity
-cd MyCompany.Identity
-
-# Preview first — reports every change, writes nothing:
-pwsh -File ./scripts/rename-template.ps1 -NewPrefix "MyCompany.Identity" -Preview
-
-# Then apply it:
-pwsh -File ./scripts/rename-template.ps1 -NewPrefix "MyCompany.Identity"
-```
-
-The script renames every project, namespace, folder, and the solution file from
-`IdentityServerProject` to your prefix, and gives the new instance its own identity — a fresh
-`UserSecretsId` in every project and its own named SQL Server data volume — so it can run
-side by side with another instance generated from the same template without sharing secrets or
-data. EF Core migration history is preserved rather than regenerated. See the script's own
-`Get-Help ./scripts/rename-template.ps1 -Full` for the complete parameter reference, including
-`-HttpsPort` for running two instances concurrently.
-
-After renaming: review the diff, then follow [Getting Started](#getting-started) below, substituting
-your new prefix everywhere this README says `IdentityServerProject` — including the project paths
-and the `.slnx` filename. `AppHost` and `ServiceDefaults` keep their names; they carry no
-project-specific identity, so the rename script leaves them alone.
+This repository was created from the IdentityServerWithAdminTemplate GitHub template and has
+already been re-branded to `FieldSales`, so the template's one-shot rename script has been
+removed. The adopted upstream revision and its verification are recorded in
+[docs/template-adoption.md](docs/template-adoption.md).
 
 ---
 
@@ -194,7 +174,7 @@ project-specific identity, so the rename script leaves them alone.
 Before launching via Aspire, configure the required development secrets for `AppHost`:
 
 ```pwsh
-cd AppHost
+cd FieldSales.AppHost
 
 dotnet user-secrets set "Parameters:sql-password"            "YourStrong@SA!Password"
 dotnet user-secrets set "Parameters:razor-client-secret"     "dev-secret-for-razor-client"
@@ -211,7 +191,7 @@ falling back to a committed credential.
 Run the AppHost project to spin up SQL Server and all dependencies:
 
 ```pwsh
-dotnet run --project AppHost
+dotnet run --project FieldSales.AppHost
 ```
 
 Aspire will output the URL for the **Aspire Dashboard**, from which you can monitor logs, traces, metrics, and inspect running endpoints.
@@ -224,7 +204,7 @@ serving, so a fresh clone needs no migration-bundle step and no manual port disc
 
 | Service | Port / URL | Description |
 |---|---|---|
-| **IdentityServer Host** | `https://localhost:5001` | OIDC discovery endpoint (`/.well-known/openid-configuration`) & Admin Console (`/Admin`) |
+| **IdentityServer Host** | `https://localhost:7201` | OIDC discovery endpoint (`/.well-known/openid-configuration`) & Admin Console (`/Admin`) |
 | **Aspire Dashboard** | Dynamic (see console output) | Telemetry, logs, and distributed application management |
 
 ### 4. Development Seed Data
@@ -261,7 +241,7 @@ dotnet user-secrets set "AdminBootstrap:Email"    "admin@your-company.example"
 dotnet user-secrets set "AdminBootstrap:Password" "<a strong password>"
 
 $env:ConnectionStrings__IdentityDb = "Server=...;Database=IdentityDb;User ID=...;Password=...;TrustServerCertificate=True"
-dotnet run --project IdentityServerProject/src/IdentityServerProject -- --bootstrap-admin
+dotnet run --project FieldSales.Identity/src/FieldSales.Identity -- --bootstrap-admin
 ```
 
 Credentials come from configuration — user secrets, environment variables, or your platform's
@@ -283,7 +263,7 @@ are not set.
 
 ## Database Migrations
 
-Each `DbContext` has dedicated migrations under `IdentityServerProject/src/IdentityServerProject/Migrations`:
+Each `DbContext` has dedicated migrations under `FieldSales.Identity/src/FieldSales.Identity/Migrations`:
 - `Migrations/Application` (`ApplicationDbContext`)
 - `Migrations/Configuration` (`ConfigurationDbContext`)
 - `Migrations/Operational` (`PersistedGrantDbContext`)
@@ -292,7 +272,7 @@ Each `DbContext` has dedicated migrations under `IdentityServerProject/src/Ident
 
 **In Development, nothing here is required.** The host applies pending migrations for all three
 contexts itself on startup, so a fresh clone reaches a running application with a single
-`dotnet run --project AppHost`. Re-running is a no-op once the schema is current.
+`dotnet run --project FieldSales.AppHost`. Re-running is a no-op once the schema is current.
 
 **Outside Development the host never creates or migrates schemas.** It verifies migration state and
 refuses to start when anything is pending, naming the bundle to run. Schema changes stay a
@@ -317,7 +297,7 @@ $sqlContainer = docker ps --filter "name=sqlserver" --format "{{.Names}}" | Sele
 if (-not $sqlContainer) { throw "No running AppHost SQL Server container was found." }
 
 $sqlPort = (docker port $sqlContainer 1433/tcp | Select-Object -First 1) -replace '^.*:', ''
-$secretLine = dotnet user-secrets list --project AppHost/AppHost.csproj |
+$secretLine = dotnet user-secrets list --project FieldSales.AppHost/FieldSales.AppHost.csproj |
     Where-Object { $_ -match '^Parameters:sql-password\s*=\s*(.+)$' } |
     Select-Object -First 1
 if (-not $secretLine) { throw "The AppHost SQL password is not configured." }
@@ -357,10 +337,10 @@ Use the provided PowerShell script to build self-contained EF Core migration exe
 
 ```pwsh
 # Whole solution
-dotnet test Sales.slnx
+dotnet test FieldSales.slnx
 
 # The admin services, page models, and integration suites
-dotnet test IdentityServerProject.Admin.Tests/IdentityServerProject.Admin.Tests.csproj
+dotnet test FieldSales.Identity.Admin.Tests/FieldSales.Identity.Admin.Tests.csproj
 ```
 
 **Docker must be running.** A portion of the suite provisions real SQL Server containers via
@@ -371,7 +351,7 @@ rather than skipping.
 Front-end component tests for the admin console pages are run separately with Node:
 
 ```pwsh
-cd IdentityServerProject/src/IdentityServerProject
+cd FieldSales.Identity/src/FieldSales.Identity
 npm install
 npm run test:admin-ui
 ```
@@ -380,7 +360,7 @@ npm run test:admin-ui
 
 ## Configuration Reference
 
-Key configuration sections in `IdentityServerProject`:
+Key configuration sections in `FieldSales.Identity`:
 
 ```json
 {

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>FieldSales.Identity</RootNamespace>
+        <UserSecretsId>d5c2deb1-d68c-45f5-8441-089f7263f13c</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer"/>
+        <PackageReference Include="Duende.IdentityServer.AspNetIdentity"/>
+        <PackageReference Include="Duende.IdentityServer.EntityFramework"/>
+        <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore"/>
+        <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\FieldSales.ServiceDefaults\FieldSales.ServiceDefaults.csproj"/>
+        <ProjectReference Include="..\..\..\FieldSales.Identity.Admin.Services\FieldSales.Identity.Admin.Services.csproj"/>
+    </ItemGroup>
+
+</Project>

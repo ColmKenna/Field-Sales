@@ -55,7 +55,10 @@ that starts cold finds it there.
 - **VS Code locks project folders.** While this workspace is open, the C# Dev Kit, ReSharper and
   Roslyn processes hold handles that block *renaming a folder*; renaming files still works. Do
   folder-level restructuring in a detached `git worktree` outside the workspace, or have the
-  developer release the lock. Never kill the IDE's processes.
+  developer release the lock. Never kill the IDE's processes. What worked (2026-09-28): the developer set
+  **C# Dev Kit**, **C#** and **ReSharper** to Disable (Workspace), then ran Developer: Reload Window
+  (Ctrl+Shift+P). A plain reload is not enough, because it restarts them. Check with a
+  rename-and-back test on each folder before restructuring.
 - `plan-data.js` is about 10 MB. Don't Read it whole. Query it with Node
   (`global.window={}; require('./plan-data.js'); window.DELIVERY_PLAN`), and edit it with exact,
   count-checked string replacement.

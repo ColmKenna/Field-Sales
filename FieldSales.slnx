@@ -1,0 +1,8 @@
+<Solution>
+    <Folder Name="/src/"/>
+    <Project Path="FieldSales.Identity.Admin.Services/FieldSales.Identity.Admin.Services.csproj"/>
+    <Project Path="FieldSales.Identity.Admin.Tests/FieldSales.Identity.Admin.Tests.csproj"/>
+    <Project Path="FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj"/>
+    <Project Path="FieldSales.AppHost/FieldSales.AppHost.csproj"/>
+    <Project Path="FieldSales.ServiceDefaults/FieldSales.ServiceDefaults.csproj"/>
+</Solution>

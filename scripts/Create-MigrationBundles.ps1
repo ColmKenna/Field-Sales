@@ -6,7 +6,7 @@ param (
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$projectPath = Join-Path $repositoryRoot "IdentityServerProject/src/IdentityServerProject/IdentityServerProject.csproj"
+$projectPath = Join-Path $repositoryRoot "FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj"
 $resolvedOutputDir = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDir))
 
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
