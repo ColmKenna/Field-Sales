@@ -36,10 +36,12 @@ content nor its actions. One sign-in covers every held business role; switching 
 prompt again. The last-used area is chosen only if it is still held. An account with one remaining
 area goes there; a multi-role account with no usable last-used area sees I-02.
 
-The development identity seed will replace the template's sample clients with this client and
-API resource/scope in a later increment. Outside Development, client administration continues
-through the template's existing `/Admin` console. Staff account provisioning and the storage of
-last-used area are implementation details to review with the increments that add them.
+Increment 2 replaces the template's Development sample-client seed with this client and API
+resource/scope. Existing sample registrations in a persistent Development database are reviewed
+and removed through `/Admin`; the seeder does not delete existing client records. Outside
+Development, client administration continues through `/Admin`. Staff accounts and roles are
+provisioned through the existing Admin Users/Roles pages; indefinite suspension represents an
+inactive account for rejected sign-in. Storage of the last-used area is reviewed with its increment.
 
 ## Scenario gate and boundary
 

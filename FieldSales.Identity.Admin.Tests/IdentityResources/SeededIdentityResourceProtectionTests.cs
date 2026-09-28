@@ -25,8 +25,8 @@ public class SeededIdentityResourceProtectionTests
         {
             var clients = new List<SeedClientSpec>
             {
-                new("razorclient", "Sales Razor Client", AbsoluteHttpUri.Create("https://localhost:5001"), "secret"),
-                new("blazorclient", "Sales Blazor Client", AbsoluteHttpUri.Create("https://localhost:5002"), "secret")
+                new(Config.StaffWebClientId, "Field Sales Staff Website",
+                    AbsoluteHttpUri.Create("https://localhost:7203"), "secret")
             };
 
             await SeedData.SeedAsync(

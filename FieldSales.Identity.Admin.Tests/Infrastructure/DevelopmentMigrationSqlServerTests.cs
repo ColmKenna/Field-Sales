@@ -56,10 +56,8 @@ public sealed class DevelopmentMigrationSqlServerTests
             builder.UseSetting("ConnectionStrings:IdentityDb", databases.IdentityConnectionString);
             builder.UseSetting("ConnectionStrings:IdentityConfigDb", databases.ConfigurationConnectionString);
             builder.UseSetting("ConnectionStrings:IdentityOperationalDb", databases.OperationalConnectionString);
-            builder.UseSetting("Clients:RazorClientUri", "https://localhost:5001");
-            builder.UseSetting("Clients:BlazorClientUri", "https://localhost:5002");
-            builder.UseSetting("Clients:RazorSecret", "dev-secret-razor");
-            builder.UseSetting("Clients:BlazorSecret", "dev-secret-blazor");
+            builder.UseSetting("Clients:StaffWebUri", "https://localhost:7203");
+            builder.UseSetting("Clients:StaffWebSecret", "dev-secret-staff-web");
             builder.UseSetting("Seed:SysAdminEmail", "fresh-host-admin@example.test");
             builder.UseSetting("Seed:SysAdminPassword", "Password123!");
             builder.UseSetting("Seed:TestUserPassword", "Password123!");

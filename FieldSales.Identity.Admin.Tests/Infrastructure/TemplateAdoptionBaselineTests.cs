@@ -40,6 +40,52 @@ public sealed class TemplateAdoptionBaselineTests
     }
 
     [Fact]
+    public async Task Should_SeedTheStaffClientAndApi_When_AFreshDevelopmentHostStarts()
+    {
+        await using var databases = new FreshDatabases();
+        await using WebApplicationFactory<Program> host = CreateHost(databases, "Development");
+        using HttpClient client = host.CreateClient();
+        await using AsyncServiceScope scope = host.Services.CreateAsyncScope();
+        ConfigurationDbContext configuration = scope.ServiceProvider.GetRequiredService<ConfigurationDbContext>();
+
+        Duende.IdentityServer.EntityFramework.Entities.Client staffClient = await configuration.Clients
+            .AsNoTracking()
+            .Include(c => c.AllowedGrantTypes)
+            .Include(c => c.AllowedScopes)
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutRedirectUris)
+            .Include(c => c.ClientSecrets)
+            .SingleAsync();
+
+        Assert.Equal(Config.StaffWebClientId, staffClient.ClientId);
+        Assert.True(staffClient.RequirePkce);
+        Assert.True(staffClient.RequireClientSecret);
+        Assert.True(staffClient.AllowOfflineAccess);
+        Assert.Equal("authorization_code", Assert.Single(staffClient.AllowedGrantTypes).GrantType);
+        Assert.Equal("https://localhost:7203/signin-oidc", Assert.Single(staffClient.RedirectUris).RedirectUri);
+        Assert.Equal("https://localhost:7203/signout-callback-oidc",
+            Assert.Single(staffClient.PostLogoutRedirectUris).PostLogoutRedirectUri);
+        Assert.Equal("https://localhost:7203/signout-oidc", staffClient.FrontChannelLogoutUri);
+        Assert.Equal(new[] { "fieldsales.api", "openid", "profile", "roles" },
+            staffClient.AllowedScopes.Select(s => s.Scope).OrderBy(s => s));
+        Assert.NotEqual("dev-secret-staff-web", Assert.Single(staffClient.ClientSecrets).Value);
+
+        Assert.Equal(Config.ApiScopeName, (await configuration.ApiScopes.SingleAsync()).Name);
+        Duende.IdentityServer.EntityFramework.Entities.ApiResource api = await configuration.ApiResources
+            .Include(r => r.Scopes)
+            .Include(r => r.UserClaims)
+            .SingleAsync();
+        Assert.Equal(Config.ApiResourceName, api.Name);
+        Assert.Equal(Config.ApiScopeName, Assert.Single(api.Scopes).Scope);
+        Assert.Contains(api.UserClaims, claim => claim.Type == "role");
+
+        Duende.IdentityServer.EntityFramework.Entities.IdentityResource roles = await configuration.IdentityResources
+            .Include(r => r.UserClaims)
+            .SingleAsync(r => r.Name == "roles");
+        Assert.Contains(roles.UserClaims, claim => claim.Type == "role");
+    }
+
+    [Fact]
     public async Task Should_KeepRevokedAdministrationRevoked_When_TheHostRestarts()
     {
         await using var databases = new FreshDatabases();
@@ -112,10 +158,8 @@ public sealed class TemplateAdoptionBaselineTests
             builder.UseSetting("ConnectionStrings:IdentityDb", databases.IdentityConnectionString);
             builder.UseSetting("ConnectionStrings:IdentityConfigDb", databases.ConfigurationConnectionString);
             builder.UseSetting("ConnectionStrings:IdentityOperationalDb", databases.OperationalConnectionString);
-            builder.UseSetting("Clients:RazorClientUri", "https://localhost:5001");
-            builder.UseSetting("Clients:BlazorClientUri", "https://localhost:5002");
-            builder.UseSetting("Clients:RazorSecret", "dev-secret-razor");
-            builder.UseSetting("Clients:BlazorSecret", "dev-secret-blazor");
+            builder.UseSetting("Clients:StaffWebUri", "https://localhost:7203");
+            builder.UseSetting("Clients:StaffWebSecret", "dev-secret-staff-web");
             builder.UseSetting("Seed:SysAdminEmail", FreshDatabases.AdminEmail);
             builder.UseSetting("Seed:SysAdminPassword", "Password123!");
             builder.UseSetting("Seed:TestUserPassword", "Password123!");

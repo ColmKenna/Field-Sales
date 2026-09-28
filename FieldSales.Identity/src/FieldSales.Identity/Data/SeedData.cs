@@ -10,9 +10,9 @@ using IdentityResource = Duende.IdentityServer.EntityFramework.Entities.Identity
 namespace FieldSales.Identity.Data;
 
 /// <summary>
-///     Seeds the configured system administrator in every environment, and the sample
-///     clients, resources, and test user when development seeding is requested. Every
-///     step is idempotent, so re-running against an already-seeded database is a no-op.
+///     Seeds the configured system administrator, staff website client, API resources, and test
+///     user in Development. Every step is idempotent, so re-running against an already-seeded
+///     database is a no-op.
 /// </summary>
 public static class SeedData
 {

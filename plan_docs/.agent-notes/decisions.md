@@ -99,3 +99,14 @@ The reserved ports are proposals until the item that adds the project confirms t
 - The developer approved the Human-Led scenario gate: IAM-US-001 S1–S8 and IAM-US-002 S1–S2,
   including direct-link denial of protected content and actions. Role removal during an open
   website session is WI-003. The named scenario matrix is in `WI-002.md`.
+
+### Increment 2 (2026-09-28, developer)
+
+- Reuse **Admin → Roles** and **Admin → Users** to provision the three business roles and staff
+  accounts; no new provisioning UI or automatic staff-account seed is added.
+- An inactive staff account is represented by the existing **Suspend** action, which sets an
+  indefinite Identity lockout. The existing **Unlock** action reverses it.
+- Development seeding registers `fieldsales-staff-web`, `fieldsales.api` and `fieldsales-api`
+  instead of the template sample clients and API. The seeder remains additive: existing sample
+  registrations in a persistent Development database require SysAdmin review and removal through
+  `/Admin`, rather than automatic deletion of potentially edited records.

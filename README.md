@@ -177,8 +177,7 @@ Before launching via Aspire, configure the required development secrets for `App
 cd FieldSales.AppHost
 
 dotnet user-secrets set "Parameters:sql-password"            "YourStrong@SA!Password"
-dotnet user-secrets set "Parameters:razor-client-secret"     "dev-secret-for-razor-client"
-dotnet user-secrets set "Parameters:blazor-client-secret"    "dev-secret-for-blazor-client"
+dotnet user-secrets set "Parameters:staff-web-client-secret" "a-random-secret-for-the-staff-web-client"
 dotnet user-secrets set "Parameters:seed-sysadmin-password"  "SysAdminPass123!"
 dotnet user-secrets set "Parameters:seed-test-user-password" "TestUserPass123!"
 ```
@@ -209,13 +208,17 @@ serving, so a fresh clone needs no migration-bundle step and no manual port disc
 
 ### 4. Development Seed Data
 
-In **Development only**, the host seeds a small amount of example data so the console is usable
-immediately. No seeding of any kind occurs in other environments.
+In **Development only**, the host seeds its initial identity configuration and test accounts so
+the console is usable immediately. No seeding of any kind occurs in other environments.
 
-Two example client registrations are created, `razorclient` and `blazorclient`, pointing at
-`https://localhost:5001` and `https://localhost:5002`. These are placeholders illustrating the
-shape of a client record — no application listens on those URLs in this template. Edit or delete
-them from **Admin → Clients**.
+The `fieldsales-staff-web` confidential OIDC client is registered for `https://localhost:7203`,
+with the `fieldsales.api` scope and `fieldsales-api` resource. The registration permits `roles`
+and `offline_access` for server-held refresh tokens. The staff website and API are added in later
+WI-002 increments, so those endpoints are not yet listening after this increment.
+
+The former `razorclient` and `blazorclient` registrations are no longer seeded. They can remain
+in a persistent Development database created before WI-002; a SysAdmin can review and remove
+those unused records through **Admin → Clients**. Existing registrations are not deleted at startup.
 
 A development administrator and a standard test user are also seeded:
 
@@ -223,6 +226,14 @@ A development administrator and a standard test user are also seeded:
 |---|---|---|---|
 | System Administrator | `Seed:SysAdminEmail` (`admin@sales.local` in `appsettings.Development.json`) | `Seed:SysAdminPassword`, from `Parameters:seed-sysadmin-password` | `SysAdmin` |
 | Standard Test User | `testuser@sales.local` | `Seed:TestUserPassword`, from `Parameters:seed-test-user-password` | *(none)* |
+
+To provision staff, a SysAdmin creates the `Field Salesperson`, `Sales Manager` and
+`Head Office User` roles through **Admin → Roles**, then creates staff accounts through
+**Admin → Users** and assigns their held roles. `SysAdmin` is only for identity administration;
+it does not grant a staff website area. **Suspend** on a user account sets an indefinite lockout,
+which rejects its next password sign-in. A SysAdmin can unlock the account or reset its password
+through the existing user administration pages. Staff accounts and business roles are not
+automatically seeded in any environment.
 
 ---
 
@@ -368,10 +379,8 @@ Key configuration sections in `FieldSales.Identity`:
     "DefaultPageSize": 10
   },
   "Clients": {
-    "RazorClientUri": "https://localhost:5001",
-    "BlazorClientUri": "https://localhost:5002",
-    "RazorSecret": "<secret>",
-    "BlazorSecret": "<secret>"
+    "StaffWebUri": "https://localhost:7203",
+    "StaffWebSecret": "<secret>"
   },
   "Seed": {
     "SysAdminEmail": "admin@sales.local",
@@ -405,7 +414,8 @@ environment except Development and Testing.
 - [ ] `DataProtection:CertificatePath` and password configured, so the key ring is encrypted at rest.
 - [ ] All three migration bundles applied to their databases.
 - [ ] First administrator created with `--bootstrap-admin`, and the bootstrap credentials removed from configuration afterwards.
-- [ ] Real client registrations created through **Admin → Clients**, and the `razorclient` / `blazorclient` development placeholders deleted.
+- [ ] `fieldsales-staff-web` client, `fieldsales.api` scope and `fieldsales-api` resource registered through **Admin → Clients / API Scopes / APIs**. Development seeding does not run in production.
+- [ ] The three staff business roles created and staff accounts assigned through **Admin → Roles / Users**.
 - [ ] A Duende IdentityServer license configured if you exceed the free tier — see below.
 
 ---

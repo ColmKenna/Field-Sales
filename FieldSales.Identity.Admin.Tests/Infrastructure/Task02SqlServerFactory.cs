@@ -78,8 +78,7 @@ public sealed class Task02SqlServerFactory : WebApplicationFactory<Program>, IAs
         builder.UseSetting("ConnectionStrings:IdentityDb", IdentityConnectionString);
         builder.UseSetting("ConnectionStrings:IdentityConfigDb", ConfigurationConnectionString);
         builder.UseSetting("ConnectionStrings:IdentityOperationalDb", OperationalConnectionString);
-        builder.UseSetting("Clients:RazorClientUri", "https://localhost:5001");
-        builder.UseSetting("Clients:BlazorClientUri", "https://localhost:5002");
+        builder.UseSetting("Clients:StaffWebUri", "https://localhost:7203");
         builder.UseSetting("Seed:SysAdminEmail", "admin@sales.local");
         builder.UseSetting("Seed:SysAdminPassword", "Password123!");
         builder.ConfigureLogging(logging => logging.ClearProviders());
