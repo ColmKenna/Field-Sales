@@ -1,0 +1,21 @@
+@page "/Staff"
+@model FieldSales.Web.Pages.Staff.IndexModel
+@{
+    ViewData["Title"] = "Staff workspace";
+}
+<h1>Choose your staff area</h1>
+<p>Signed in as @User.Identity?.Name. Choose an area to continue.</p>
+@if (Model.ApiAvailable)
+{
+    <p role="status">Your staff account is ready.</p>
+}
+else
+{
+    <p role="alert">Your staff account could not be checked right now. Try again shortly.</p>
+}
+<ul class="area-choices">
+    @foreach (var area in Model.PermittedAreas)
+    {
+        <li><a href="@area.Route"><strong>@area.Label</strong><span>@area.Description</span></a></li>
+    }
+</ul>

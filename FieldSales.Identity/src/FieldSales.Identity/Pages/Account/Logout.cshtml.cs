@@ -2,6 +2,7 @@ using Duende.IdentityServer.Events;
 using Duende.IdentityServer.Extensions;
 using Duende.IdentityServer.Models;
 using Duende.IdentityServer.Services;
+using FieldSales.Identity;
 using FieldSales.Identity.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,7 @@ public class LogoutModel(
     public string? SignOutIFrameUrl { get; set; }
 
     public bool ShowLogoutPrompt { get; set; } = true;
+    public bool ReturnToStaff { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(string? logoutId)
     {
@@ -66,6 +68,7 @@ public class LogoutModel(
                 await _interaction.GetLogoutContextAsync(LogoutId, HttpContext.RequestAborted);
             PostLogoutRedirectUri = logoutContext?.PostLogoutRedirectUri;
             SignOutIFrameUrl = logoutContext?.SignOutIFrameUrl;
+            ReturnToStaff = logoutContext?.ClientId == Config.StaffWebClientId;
         }
 
         // If client applications have front-channel logout URLs registered, we must render

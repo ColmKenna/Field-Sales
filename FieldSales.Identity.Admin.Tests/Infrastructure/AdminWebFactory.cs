@@ -30,10 +30,8 @@ public class AdminWebFactory : WebApplicationFactory<Program>
 
     static AdminWebFactory()
     {
-        Environment.SetEnvironmentVariable("Clients__RazorClientUri", "https://localhost:5001");
-        Environment.SetEnvironmentVariable("Clients__BlazorClientUri", "https://localhost:5002");
-        Environment.SetEnvironmentVariable("Clients__RazorSecret", "secret");
-        Environment.SetEnvironmentVariable("Clients__BlazorSecret", "secret");
+        Environment.SetEnvironmentVariable("Clients__StaffWebUri", "https://localhost:7203");
+        Environment.SetEnvironmentVariable("Clients__StaffWebSecret", "secret");
         Environment.SetEnvironmentVariable("Seed__SysAdminPassword", "Password123!");
         Environment.SetEnvironmentVariable("Seed__SysAdminEmail", "admin@sales.local");
         Environment.SetEnvironmentVariable("Seed__TestUserPassword", "Password123!");

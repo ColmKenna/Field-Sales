@@ -68,6 +68,8 @@ builder.Services
     {
         options.Password.RequiredLength = 8;
         options.User.RequireUniqueEmail = true;
+        // The staff OIDC identity resource and API both request the literal "role" claim.
+        options.ClaimsIdentity.RoleClaimType = "role";
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -106,11 +108,6 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.ExpireTimeSpan = TimeSpan.FromDays(14);
     options.SlidingExpiration = true;
 });
-
-var razorClientUri = AbsoluteHttpUri.Create(builder.Configuration["Clients:RazorClientUri"]
-                                            ?? "https://localhost"); // Fallback for design-time tools
-var blazorClientUri = AbsoluteHttpUri.Create(builder.Configuration["Clients:BlazorClientUri"]
-                                             ?? "https://localhost"); // Fallback for design-time tools
 
 IIdentityServerBuilder isBuilder = builder.Services
     .AddIdentityServer(options =>
@@ -248,14 +245,13 @@ await DevelopmentSeeder.SeedIfDevelopmentAsync(app.Environment, async () =>
     // is decoupled into --bootstrap-admin. They are demanded when this seed runs, not on every start.
     string sysAdminEmail = app.Configuration.Required("Seed:SysAdminEmail");
     string sysAdminPassword = app.Configuration.Required("Seed:SysAdminPassword");
-    string razorClientSecret = app.Configuration.Required("Clients:RazorSecret");
-    string blazorClientSecret = app.Configuration.Required("Clients:BlazorSecret");
+    var staffWebUri = AbsoluteHttpUri.Create(app.Configuration.Required("Clients:StaffWebUri"));
+    string staffWebSecret = app.Configuration.Required("Clients:StaffWebSecret");
     string testUserPassword = app.Configuration.Required("Seed:TestUserPassword");
 
     var seedClients = new List<SeedClientSpec>
     {
-        new("razorclient", "Example Razor Client", razorClientUri, razorClientSecret),
-        new("blazorclient", "Example Blazor Client", blazorClientUri, blazorClientSecret)
+        new(Config.StaffWebClientId, "Field Sales Staff Website", staffWebUri, staffWebSecret)
     };
 
     // Duende's own Client defaults are these same three values, so leaving the section unset

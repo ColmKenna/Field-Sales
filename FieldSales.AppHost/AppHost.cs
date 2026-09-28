@@ -1,8 +1,7 @@
 // Secrets required before `dotnet run` will succeed. Run these from the FieldSales.AppHost directory:
 //
 //   dotnet user-secrets set "Parameters:sql-password"            "<a strong SQL Server SA password>"
-//   dotnet user-secrets set "Parameters:razor-client-secret"     "<a random secret string>"
-//   dotnet user-secrets set "Parameters:blazor-client-secret"    "<a random secret string>"
+//   dotnet user-secrets set "Parameters:staff-web-client-secret" "<a random secret string>"
 //   dotnet user-secrets set "Parameters:seed-sysadmin-password"  "<a strong password>"
 //   dotnet user-secrets set "Parameters:seed-test-user-password" "<a strong password>"
 
@@ -19,8 +18,7 @@ if (string.IsNullOrEmpty(builder.Configuration["Parameters:sql-password"]))
         "dotnet user-secrets set \"Parameters:sql-password\" \"<password>\" (run from FieldSales.AppHost).");
 
 IResourceBuilder<ParameterResource> sqlPassword = builder.AddParameter("sql-password", true);
-IResourceBuilder<ParameterResource> razorClientSecret = builder.AddParameter("razor-client-secret", true);
-IResourceBuilder<ParameterResource> blazorClientSecret = builder.AddParameter("blazor-client-secret", true);
+IResourceBuilder<ParameterResource> staffWebClientSecret = builder.AddParameter("staff-web-client-secret", true);
 IResourceBuilder<ParameterResource> sysAdminPassword = builder.AddParameter("seed-sysadmin-password", true);
 IResourceBuilder<ParameterResource> testUserPassword = builder.AddParameter("seed-test-user-password", true);
 
@@ -30,6 +28,7 @@ IResourceBuilder<SqlServerServerResource> sqlServer = builder.AddSqlServer("sqls
 IResourceBuilder<SqlServerDatabaseResource> identityDb = sqlServer.AddDatabase("IdentityDb");
 IResourceBuilder<SqlServerDatabaseResource> identityConfigDb = sqlServer.AddDatabase("IdentityConfigDb");
 IResourceBuilder<SqlServerDatabaseResource> identityOperationalDb = sqlServer.AddDatabase("IdentityOperationalDb");
+IResourceBuilder<SqlServerDatabaseResource> staffWebDb = sqlServer.AddDatabase("StaffWebDb");
 
 IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales_Identity>("identityserver")
     .WithReference(identityDb)
@@ -37,11 +36,24 @@ IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales
     .WithReference(identityOperationalDb)
     .WaitFor(sqlServer)
     .WithHttpsEndpoint(7201, name: "https")
-    .WithEnvironment("Clients__RazorClientUri", "https://localhost:5001")
-    .WithEnvironment("Clients__BlazorClientUri", "https://localhost:5002")
-    .WithEnvironment("Clients__RazorSecret", razorClientSecret)
-    .WithEnvironment("Clients__BlazorSecret", blazorClientSecret)
+    .WithEnvironment("Clients__StaffWebUri", "https://localhost:7203")
+    .WithEnvironment("Clients__StaffWebSecret", staffWebClientSecret)
     .WithEnvironment("Seed__SysAdminPassword", sysAdminPassword)
     .WithEnvironment("Seed__TestUserPassword", testUserPassword);
+
+IResourceBuilder<ProjectResource> staffApi = builder.AddProject<FieldSales_Api>("staff-api")
+    .WithHttpsEndpoint(7204, name: "https")
+    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
+    .WaitFor(identityServer);
+
+builder.AddProject<FieldSales_Web>("staff-web")
+    .WithReference(staffWebDb)
+    .WithHttpsEndpoint(7203, name: "https")
+    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
+    .WithEnvironment("Authentication__ClientSecret", staffWebClientSecret)
+    .WithEnvironment("StaffApi__BaseUrl", "https://localhost:7204")
+    .WaitFor(identityServer)
+    .WaitFor(staffApi)
+    .WaitFor(sqlServer);
 
 builder.Build().Run();

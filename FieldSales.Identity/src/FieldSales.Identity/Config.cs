@@ -13,7 +13,7 @@ namespace FieldSales.Identity;
 public sealed record SeedClientSpec(string ClientId, string ClientName, AbsoluteHttpUri Uri, string Secret);
 
 /// <summary>
-///     Token lifetimes applied to the seeded example clients. Duende's own <see cref="Client" />
+///     Token lifetimes applied to the seeded staff client. Duende's own <see cref="Client" />
 ///     defaults these exact values (3600/300/300) when a Client sets none of them, so this record
 ///     changes nothing on its own — it exists so <c>IdentityServer:TokenLifetimes</c> in
 ///     configuration is a real, exercised knob rather than a value nothing reads.
@@ -31,7 +31,9 @@ public sealed record TokenLifetimes(
 
 public static class Config
 {
-    public const string ApiScopeName = "api";
+    public const string StaffWebClientId = "fieldsales-staff-web";
+    public const string ApiScopeName = "fieldsales.api";
+    public const string ApiResourceName = "fieldsales-api";
 
     // Owned by the extracted admin-services library (ProtectedAdminRoles) so the host and the
     // library's self-demotion/last-administrator guards can never drift onto different role names.
@@ -52,13 +54,13 @@ public static class Config
     public static IEnumerable<ApiScope> ApiScopes =>
         new[]
         {
-            new ApiScope(ApiScopeName, "Default API Scope")
+            new ApiScope(ApiScopeName, "Field Sales API")
         };
 
     public static IEnumerable<ApiResource> ApiResources =>
         new[]
         {
-            new ApiResource("api-resource", "Default Protected Resource")
+            new ApiResource(ApiResourceName, "Field Sales API")
             {
                 Scopes = { ApiScopeName },
                 UserClaims = { "role" }
@@ -72,6 +74,7 @@ public static class Config
             ClientName = spec.ClientName,
             AllowedGrantTypes = GrantTypes.Code,
             RequirePkce = true,
+            RequireClientSecret = true,
             ClientSecrets = { new Secret(spec.Secret.Sha256()) },
             RedirectUris = { $"{spec.Uri}/signin-oidc" },
             PostLogoutRedirectUris = { $"{spec.Uri}/signout-callback-oidc" },
@@ -80,7 +83,6 @@ public static class Config
             {
                 IdentityServerConstants.StandardScopes.OpenId,
                 IdentityServerConstants.StandardScopes.Profile,
-                "email",
                 "roles",
                 ApiScopeName
             },

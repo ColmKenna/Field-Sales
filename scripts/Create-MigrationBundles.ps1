@@ -6,7 +6,8 @@ param (
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$projectPath = Join-Path $repositoryRoot "FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj"
+$identityProjectPath = Join-Path $repositoryRoot "FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj"
+$staffWebProjectPath = Join-Path $repositoryRoot "FieldSales.Web/FieldSales.Web.csproj"
 $resolvedOutputDir = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDir))
 
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
@@ -23,9 +24,10 @@ function Invoke-DotNet {
 Invoke-DotNet -Arguments @("tool", "restore")
 
 $bundles = @(
-    @{ Context = "ApplicationDbContext"; Name = "identity" },
-    @{ Context = "ConfigurationDbContext"; Name = "configuration" },
-    @{ Context = "PersistedGrantDbContext"; Name = "operational" }
+    @{ Context = "ApplicationDbContext"; Name = "identity"; Project = $identityProjectPath },
+    @{ Context = "ConfigurationDbContext"; Name = "configuration"; Project = $identityProjectPath },
+    @{ Context = "PersistedGrantDbContext"; Name = "operational"; Project = $identityProjectPath },
+    @{ Context = "StaffWebDbContext"; Name = "staff-web"; Project = $staffWebProjectPath }
 )
 
 foreach ($bundle in $bundles) {
@@ -33,8 +35,8 @@ foreach ($bundle in $bundles) {
     $artifactPath = Join-Path $resolvedOutputDir $artifactName
     $arguments = @(
         "ef", "migrations", "bundle",
-        "--project", $projectPath,
-        "--startup-project", $projectPath,
+        "--project", $bundle.Project,
+        "--startup-project", $bundle.Project,
         "--context", $bundle.Context,
         "--configuration", "Release",
         "--output", $artifactPath,
@@ -53,4 +55,4 @@ foreach ($bundle in $bundles) {
     }
 }
 
-Write-Host "All three migration bundles were created in $resolvedOutputDir."
+Write-Host "All $($bundles.Count) migration bundles were created in $resolvedOutputDir."

@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using Duende.IdentityServer.Events;
 using Duende.IdentityServer.Services;
+using Duende.IdentityServer.Models;
+using FieldSales.Identity;
 using FieldSales.Identity.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -53,6 +55,19 @@ public class LoginModel(
 
         await _events.RaiseAsync(new UserLoginFailureEvent(Input.Username, "invalid credentials"),
             HttpContext.RequestAborted);
+        if (returnUrl is not null)
+        {
+            AuthorizationRequest? authorization =
+                await _interaction.GetAuthorizationContextAsync(returnUrl, HttpContext.RequestAborted);
+            if (authorization?.Client.ClientId == Config.StaffWebClientId
+                && Uri.TryCreate(authorization.RedirectUri, UriKind.Absolute, out Uri? callback)
+                && callback.Scheme == Uri.UriSchemeHttps)
+            {
+                // The callback came from a validated OIDC authorization request. Return staff
+                // to I-01 for the retry state; the next attempt starts a fresh code flow.
+                return Redirect($"{callback.GetLeftPart(UriPartial.Authority)}/?error=sign-in");
+            }
+        }
         ErrorMessage = "Invalid username or password.";
         return Page();
     }

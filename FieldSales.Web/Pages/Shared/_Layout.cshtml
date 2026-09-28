@@ -1,0 +1,32 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Field Sales</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="container navigation" aria-label="Primary">
+            <a class="brand" asp-page="/Index">Field Sales</a>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                @foreach (var area in FieldSales.Web.Security.StaffAreas.PermittedTo(User))
+                {
+                    <a href="@area.Route">@area.Label</a>
+                }
+                <form method="post" asp-page="/SignOut">
+                    <button type="submit" class="button secondary">Sign out</button>
+                </form>
+            }
+        </nav>
+    </header>
+    <div class="container">
+        <main id="main" role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+</body>
+</html>

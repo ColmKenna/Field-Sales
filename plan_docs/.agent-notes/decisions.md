@@ -79,3 +79,58 @@ The reserved ports are proposals until the item that adds the project confirms t
 - Still open for WI-002: project names for the web/BFF and API, whether `roles` and
   `offline_access` are requested, the AppHost secret parameter name, and the business-role mapping.
 - The full contract is in `docs/template-adoption.md` § Client boundary for WI-002.
+
+## WI-002 staff access contract (2026-09-28, developer, Increment 1)
+
+- One staff website hosts the rep, manager and head-office areas. The new .NET 10 / Aspire projects
+  are `FieldSales.Web` (Razor Pages BFF, HTTPS 7203) and `FieldSales.Api` (HTTPS 7204). The
+  proposed I-01 sign-in and I-02 area-choice layouts are approved for this item.
+- Staff authenticate with the adopted identity host's username/password page. I-01 redirects to
+  that page; it does not collect a password in the BFF. A staff member needing recovery contacts a
+  `SysAdmin`, who uses the existing identity-admin password-reset page. Customer invitations and
+  recovery remain separate.
+- The business roles are the exact ASP.NET Identity role names `Field Salesperson`, `Sales Manager`
+  and `Head Office User`. `SysAdmin` remains a distinct security-administration role and grants no
+  staff area by itself. The BFF requests the `roles` identity scope to receive role claims.
+- The BFF requests `offline_access` for server-held refresh tokens. The browser holds only the
+  protected BFF session cookie. The AppHost secret parameter is `staff-web-client-secret`. The
+  WI-001 client id, API resource, scope and redirect/logout URIs remain as recorded in
+  `docs/template-adoption.md`.
+- The developer approved the Human-Led scenario gate: IAM-US-001 S1–S8 and IAM-US-002 S1–S2,
+  including direct-link denial of protected content and actions. Role removal during an open
+  website session is WI-003. The named scenario matrix is in `WI-002.md`.
+
+### Increment 2 (2026-09-28, developer)
+
+- Reuse **Admin → Roles** and **Admin → Users** to provision the three business roles and staff
+  accounts; no new provisioning UI or automatic staff-account seed is added.
+- An inactive staff account is represented by the existing **Suspend** action, which sets an
+  indefinite Identity lockout. The existing **Unlock** action reverses it.
+- Development seeding registers `fieldsales-staff-web`, `fieldsales.api` and `fieldsales-api`
+  instead of the template sample clients and API. The seeder remains additive: existing sample
+  registrations in a persistent Development database require SysAdmin review and removal through
+  `/Admin`, rather than automatic deletion of potentially edited records.
+
+### Increment 3 (2026-09-28, developer)
+
+- The BFF persists encrypted OIDC tickets and Data Protection keys in dedicated SQL Server
+  `StaffWebDb`; the browser receives an opaque, secure, HttpOnly cookie. Production requires a
+  certificate for the website key ring and the `staff-web` migration bundle.
+- The first API surface is authenticated `GET /staff/session`. It checks the signed bearer token,
+  `fieldsales-api` audience, `fieldsales.api` scope and at least one business role. The BFF calls
+  it with a server-held access token and refreshes that token using its server-held refresh token.
+- I-01 returns rejected staff credentials to a retry state. Protected landings exist for rep,
+  manager and head office; the sign-out POST ends the BFF and identity-host sessions. The
+  last-used destination, I-02 and area switching remain in Increment 4.
+
+### Increment 4 (2026-09-28, developer)
+
+- Persist each staff member's last-used area in `StaffWebDb`, keyed by their identity `sub` claim.
+  Resolve stored keys only through the known area map and select them only while the principal
+  still has the mapped business role. Never take a destination or role from browser state.
+- Use I-02 for first use when more than one area is permitted and no usable last-used area exists.
+  Show only areas held by the current principal. Single-area users go directly to their area.
+  Area navigation switches destinations inside the existing staff session. A valid permitted
+  direct link has priority over the saved default; protected request endpoints deny an unheld
+  area before protected page content or actions are reached.
+- IAM-US-002 S3, immediate role removal during an open session, remains WI-003.
