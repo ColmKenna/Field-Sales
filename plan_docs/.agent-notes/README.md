@@ -52,6 +52,10 @@ that starts cold finds it there.
   Pass the file path; Node 22 rejects a directory argument.
 - Render check for the console, from PowerShell:
   `& 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' --headless=new --disable-gpu --virtual-time-budget=8000 --user-data-dir="$env:TEMP\edge-headless" --dump-dom file:///D:/repos/Field-Sales/plan_docs/field-sales-delivery/delivery-console.html`
+- **VS Code locks project folders.** While this workspace is open, the C# Dev Kit, ReSharper and
+  Roslyn processes hold handles that block *renaming a folder*; renaming files still works. Do
+  folder-level restructuring in a detached `git worktree` outside the workspace, or have the
+  developer release the lock. Never kill the IDE's processes.
 - `plan-data.js` is about 10 MB. Don't Read it whole. Query it with Node
   (`global.window={}; require('./plan-data.js'); window.DELIVERY_PLAN`), and edit it with exact,
   count-checked string replacement.
