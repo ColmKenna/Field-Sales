@@ -16,6 +16,7 @@
                 {
                     <a href="@area.Route">@area.Label</a>
                 }
+                <span class="signed-in-user">@User.Identity?.Name</span>
                 <form method="post" asp-page="/SignOut">
                     <button type="submit" class="button secondary">Sign out</button>
                 </form>

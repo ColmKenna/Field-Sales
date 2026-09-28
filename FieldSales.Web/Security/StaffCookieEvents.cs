@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using System.Text.Json;
 using FieldSales.StaffAccess;
 using Microsoft.AspNetCore.Authentication;
@@ -12,9 +13,11 @@ public sealed class StaffCookieEvents(
     TimeProvider timeProvider,
     IStaffRoleLookup roleLookup,
     StaffAreaService areas,
+    AccessChangedTokenService accessChangedTokens,
     ILogger<StaffCookieEvents> logger) : CookieAuthenticationEvents
 {
     public const string LookupUnavailableKey = "staff-role-lookup-unavailable";
+    public const string RemovedRoleClaimType = "fieldsales:removed-staff-role";
 
     public override async Task ValidatePrincipal(CookieValidatePrincipalContext context)
     {
@@ -55,12 +58,39 @@ public sealed class StaffCookieEvents(
             return;
         }
 
-        if (StaffRoleClaims.ReplaceBusinessRoles(context.Principal!, result.Roles))
+        string[] previousRoles = context.Principal!.FindAll("role")
+            .Select(claim => claim.Value)
+            .Where(BusinessRoles.Contains)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (StaffRoleClaims.ReplaceBusinessRoles(context.Principal, result.Roles))
         {
+            ClaimsIdentity identity = context.Principal!.Identities.First();
+            foreach (Claim claim in identity.FindAll(RemovedRoleClaimType)
+                         .Where(claim => result.Roles.Contains(claim.Value, StringComparer.Ordinal)).ToArray())
+                identity.RemoveClaim(claim);
+            foreach (string role in previousRoles.Except(result.Roles, StringComparer.Ordinal))
+                if (!context.Principal.HasClaim(RemovedRoleClaimType, role))
+                    identity.AddClaim(new Claim(RemovedRoleClaimType, role));
             context.ReplacePrincipal(context.Principal!);
             context.ShouldRenew = true;
             await areas.ClearUnpermittedAreaAsync(context.Principal!, context.HttpContext.RequestAborted);
         }
+    }
+
+    public override Task RedirectToAccessDenied(RedirectContext<CookieAuthenticationOptions> context)
+    {
+        StaffArea? area = StaffAreas.ForLocalUrl(context.Request.Path.ToString());
+        string? subject = context.HttpContext.User.FindFirst("sub")?.Value;
+        if (area is null || string.IsNullOrWhiteSpace(subject)
+            || !context.HttpContext.User.HasClaim(RemovedRoleClaimType, area.Role))
+            return base.RedirectToAccessDenied(context);
+
+        bool wasWrite = !HttpMethods.IsGet(context.Request.Method)
+                        && !HttpMethods.IsHead(context.Request.Method);
+        string state = accessChangedTokens.Create(subject, area.Key, wasWrite);
+        context.Response.Redirect($"/AccessChanged?state={Uri.EscapeDataString(state)}");
+        return Task.CompletedTask;
     }
 
     private async Task<bool> RefreshTokenAsync(CookieValidatePrincipalContext context)

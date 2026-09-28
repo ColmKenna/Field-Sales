@@ -35,6 +35,7 @@ if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("
 
 builder.Services.AddSingleton<SqlTicketStore>();
 builder.Services.AddScoped<StaffAreaService>();
+builder.Services.AddSingleton<AccessChangedTokenService>();
 builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, TicketStoreCookieOptions>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
@@ -141,7 +142,7 @@ if (app.Environment.IsEnvironment("Testing"))
 {
     // A representative write for role-boundary tests until WI-004 adds catalogue actions.
     // It persists a subject-keyed area preference, so denied requests leave visible evidence.
-    app.MapPost("/__test/head-office-save", async (
+    app.MapPost("/HeadOffice/__test/save", async (
             ClaimsPrincipal user, StaffAreaService areas, HttpContext context) =>
             await areas.RememberAreaAsync(user, StaffAreas.HeadOffice, context.RequestAborted)
                 ? Results.NoContent()

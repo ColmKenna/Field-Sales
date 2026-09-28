@@ -5,6 +5,7 @@ using FieldSales.StaffAccess;
 using FieldSales.Web.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,13 +29,18 @@ public sealed class StaffCookieEventsTests
             };
         }));
         RecordingRoleLookup lookup = new();
+        ServiceCollection services = new();
+        services.AddDataProtection().UseEphemeralDataProtectionProvider();
+        using ServiceProvider serviceProvider = services.BuildServiceProvider();
         StaffCookieEvents events = new(new OneClientFactory(client), new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Authentication:Authority"] = "https://localhost:7201",
                 ["Authentication:ClientSecret"] = "server-secret"
             }).Build(), TimeProvider.System, lookup,
-            new StaffAreaService(new ServiceCollection().BuildServiceProvider(), TimeProvider.System),
+            new StaffAreaService(serviceProvider, TimeProvider.System),
+            new AccessChangedTokenService(
+                serviceProvider.GetRequiredService<IDataProtectionProvider>(), TimeProvider.System),
             NullLogger<StaffCookieEvents>.Instance);
         AuthenticationProperties properties = new();
         properties.StoreTokens(
