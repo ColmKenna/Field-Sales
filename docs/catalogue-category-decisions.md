@@ -14,6 +14,18 @@ Date: 2026-09-29. Source: T-1.1.1 / Product Management US-005 S4–S5.
 
 The existing `StaffWebDb` holds website tickets, protection keys, and last-used area preferences. The established application contract puts business endpoints in `FieldSales.Api`. The developer approved a dedicated SQL Server `CatalogueDb` and EF Core context owned by `FieldSales.Api`, reached from the BFF with its server-held access token, at the Increment 1 review. Category master data stays under the API role boundary and separate from website session storage.
 
+## Category model for Increment 3 review
+
+`FieldSales.Api.Catalogue.Category` stores only the stable ID, optional parent ID, and name. `CategoryTree` creates root and child nodes and returns breadcrumb segments with IDs for navigation. It walks parents iteratively, so the domain has no six-level cutoff. It rejects unknown parents and detects broken or cyclic ancestry when reading a breadcrumb.
+
+The implementation trims names and treats sibling names that differ only by case as duplicates (`OrdinalIgnoreCase`). The later SQL store must enforce this rule under concurrent writes; the in-memory check alone is insufficient. Confirm this naming convention in the Increment 3 review.
+
+## Proposed create-page layout for Increment 4 review
+
+- `/HeadOffice/Categories` lists root categories and offers **Add root category** with a name field.
+- Opening one category shows its current breadcrumb as links to its ancestors, followed by its direct child categories and an **Add subcategory** name field. The parent is the category being viewed. A successful create opens the new category.
+- A duplicate sibling name shows a field error and makes no change. The form uses the existing staff sign-in and Head Office role boundary. There are no product rows, counts, search, move, archive, or recategorise controls in this slice. Rename is added in Increment 5.
+
 ## Verification boundary
 
 WI-004 will verify root and nested creation, persistence across restart, a six-level breadcrumb, duplicate leaf names in different branches, role denial, rejected writes, and changed descendant breadcrumbs with stable category IDs after a rename. The developer approved the Human-Led scenario matrix on 2026-09-29.
