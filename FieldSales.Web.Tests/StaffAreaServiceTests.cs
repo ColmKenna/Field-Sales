@@ -41,6 +41,7 @@ public sealed class StaffAreaServiceTests
     [InlineData("/Rep", "rep")]
     [InlineData("/Manager/Reports?month=4", "manager")]
     [InlineData("/HeadOffice/#tools", "head-office")]
+    [InlineData("/HeadOffice/Categories", "head-office")]
     [InlineData("//attacker.test/Rep", null)]
     [InlineData("https://attacker.test/Manager", null)]
     [InlineData("/Representative", null)]

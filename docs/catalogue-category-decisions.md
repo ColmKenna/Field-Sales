@@ -10,9 +10,9 @@ Date: 2026-09-29. Source: T-1.1.1 / Product Management US-005 S4–S5.
 - Names are unique among siblings. The same leaf name can occur under different parents, where its full breadcrumb disambiguates it.
 - A create or rename submission rejected because the staff session expired or the role was removed makes no change. The application does not persist or replay that form submission after sign-in.
 
-## Persistence placement for Increment 1 review
+## Persistence placement
 
-The existing `StaffWebDb` holds website tickets, protection keys, and last-used area preferences. The established application contract puts business endpoints in `FieldSales.Api`. The proposed catalogue placement is a dedicated SQL Server `CatalogueDb` and EF Core context owned by `FieldSales.Api`, reached from the BFF with its server-held access token. This keeps category master data under the API role boundary and leaves website session storage separate. Confirm this placement at the Increment 1 review before the persistence increment.
+The existing `StaffWebDb` holds website tickets, protection keys, and last-used area preferences. The established application contract puts business endpoints in `FieldSales.Api`. The developer approved a dedicated SQL Server `CatalogueDb` and EF Core context owned by `FieldSales.Api`, reached from the BFF with its server-held access token, at the Increment 1 review. Category master data stays under the API role boundary and separate from website session storage.
 
 ## Verification boundary
 
@@ -24,4 +24,5 @@ The source also asks for product breadcrumbs to change while orders and calls re
 
 - Counts, search, move, recategorisation, and archive follow their own tasks. The category tree UI in this slice uses the H-15 proposal of one category at a time with its breadcrumb for navigation; the layout remains subject to the Increment 4 review.
 - The staff directory is the source of the rep-to-manager reporting line in the story context. Its cardinality and persistence remain a later staff-directory decision. WI-004 records this dependency without adding a reporting relationship to the category model.
+- A staff role does not identify a person's manager. The staff directory will supply that reporting line to later work; category requests use the existing Head Office User role and current-role checks.
 - Tablet language, Visit Planning administrator permissions, and dated-price day boundaries do not affect this category slice.

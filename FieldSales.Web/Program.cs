@@ -98,7 +98,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Staff", "StaffMember");
     options.Conventions.AuthorizePage("/Rep/Index", StaffRoles.FieldSalesperson);
     options.Conventions.AuthorizePage("/Manager/Index", StaffRoles.SalesManager);
-    options.Conventions.AuthorizePage("/HeadOffice/Index", StaffRoles.HeadOfficeUser);
+    options.Conventions.AuthorizeFolder("/HeadOffice", StaffRoles.HeadOfficeUser);
 });
 
 WebApplication app = builder.Build();
