@@ -1,9 +1,11 @@
+using FieldSales.StaffAccess;
+
 namespace FieldSales.Web.Security;
 
 public static class StaffRoles
 {
-    public const string FieldSalesperson = "Field Salesperson";
-    public const string SalesManager = "Sales Manager";
-    public const string HeadOfficeUser = "Head Office User";
-    public static readonly string[] All = [FieldSalesperson, SalesManager, HeadOfficeUser];
+    public const string FieldSalesperson = BusinessRoles.FieldSalesperson;
+    public const string SalesManager = BusinessRoles.SalesManager;
+    public const string HeadOfficeUser = BusinessRoles.HeadOfficeUser;
+    public static readonly string[] All = BusinessRoles.All;
 }

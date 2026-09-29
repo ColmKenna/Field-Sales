@@ -158,6 +158,140 @@ public sealed class StaffWebsiteScenarioTests
     }
 
     [Fact]
+    public async Task Should_SaveAuthorizedForm_When_HeadOfficeRoleIsHeld()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
+
+        using HttpResponseMessage save = await browser.PostAsync("/HeadOffice/__test/save", new StringContent(""));
+        Assert.Equal(HttpStatusCode.NoContent, save.StatusCode);
+
+        await using AsyncServiceScope scope = website.Services.CreateAsyncScope();
+        StaffWebDbContext db = scope.ServiceProvider.GetRequiredService<StaffWebDbContext>();
+        StaffAreaPreference preference = await db.StaffAreaPreferences.SingleAsync();
+        Assert.Equal("niamh", preference.SubjectId);
+        Assert.Equal(StaffAreas.HeadOffice, preference.Area);
+    }
+
+    [Fact]
+    public async Task Should_DenyTheNextRead_When_AWebsiteRoleWasRemoved()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "aoife", StaffRoles.SalesManager, StaffRoles.HeadOfficeUser);
+        Assert.Contains("head-office catalogue workspace is ready", await OpenAreaAsync(browser, "/HeadOffice"));
+
+        website.Roles.SetRoles("aoife", StaffRoles.SalesManager);
+        using HttpResponseMessage denied = await browser.GetAsync("/HeadOffice");
+        Assert.Equal(HttpStatusCode.Redirect, denied.StatusCode);
+        Assert.StartsWith("/AccessChanged?state=", denied.Headers.Location?.OriginalString);
+        Assert.DoesNotContain("head-office catalogue workspace", await denied.Content.ReadAsStringAsync());
+
+        using HttpResponseMessage changed = await browser.GetAsync(denied.Headers.Location);
+        string message = await changed.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        Assert.Contains("Access to Head office has changed", message);
+        Assert.Contains("This area is no longer available to your staff account.", message);
+        Assert.DoesNotContain("was not saved", message);
+        Assert.Contains("Open Sales manager", message);
+        Assert.DoesNotContain("head-office catalogue workspace is ready", message);
+        Assert.DoesNotContain("href=\"/HeadOffice\"", message);
+
+        await using (AsyncServiceScope scope = website.Services.CreateAsyncScope())
+            Assert.Empty(await scope.ServiceProvider.GetRequiredService<StaffWebDbContext>()
+                .StaffAreaPreferences.ToListAsync());
+        Assert.Equal("/Manager", await HomeDestinationAsync(browser));
+        Assert.DoesNotContain("/HeadOffice", await OpenAreaAsync(browser, "/Manager"));
+    }
+
+    [Fact]
+    public async Task Should_RejectAnOpenFormSave_When_TheRequiredRoleWasRemoved()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "aoife", StaffRoles.SalesManager, StaffRoles.HeadOfficeUser);
+        Assert.Contains("head-office catalogue workspace is ready", await OpenAreaAsync(browser, "/HeadOffice"));
+
+        website.Roles.SetRoles("aoife", StaffRoles.SalesManager);
+        using HttpResponseMessage denied = await browser.PostAsync("/HeadOffice/__test/save", new StringContent(""));
+        Assert.Equal(HttpStatusCode.Redirect, denied.StatusCode);
+        Assert.StartsWith("/AccessChanged?state=", denied.Headers.Location?.OriginalString);
+        using HttpResponseMessage changed = await browser.GetAsync(denied.Headers.Location);
+        string message = await changed.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        Assert.Contains("A change you just tried to make was not saved.", message);
+        Assert.Contains("Open Sales manager", message);
+        Assert.DoesNotContain("head-office catalogue workspace is ready", message);
+        await using AsyncServiceScope scope = website.Services.CreateAsyncScope();
+        Assert.Empty(await scope.ServiceProvider.GetRequiredService<StaffWebDbContext>()
+            .StaffAreaPreferences.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Should_OfferSignOutAndHelp_When_NoStaffAreaRemains()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
+        await OpenAreaAsync(browser, "/HeadOffice");
+
+        website.Roles.SetRoles("niamh");
+        using HttpResponseMessage denied = await browser.GetAsync("/HeadOffice");
+        Assert.StartsWith("/AccessChanged?state=", denied.Headers.Location?.OriginalString);
+        using HttpResponseMessage changed = await browser.GetAsync(denied.Headers.Location);
+        string message = await changed.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        Assert.Contains("No staff area is currently available", message);
+        Assert.Contains("Contact your administrator", message);
+        Assert.Contains("Sign out", message);
+        Assert.DoesNotContain("Open Sales manager", message);
+        Assert.DoesNotContain("head-office catalogue workspace is ready", message);
+
+        Match token = Regex.Match(message, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        Assert.True(token.Success);
+        using HttpResponseMessage signedOut = await browser.PostAsync("/SignOut",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token.Groups[1].Value
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, signedOut.StatusCode);
+    }
+
+    [Fact]
+    public async Task SeveralRemainingAreasOfferOnlyCurrentChoicesAfterRoleRemoval()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "aoife", StaffRoles.FieldSalesperson,
+            StaffRoles.SalesManager, StaffRoles.HeadOfficeUser);
+        website.Roles.SetRoles("aoife", StaffRoles.FieldSalesperson, StaffRoles.SalesManager);
+        Assert.Contains("manager workspace is ready", await OpenAreaAsync(browser, "/Manager"));
+
+        using HttpResponseMessage denied = await browser.GetAsync("/HeadOffice");
+        using HttpResponseMessage changed = await browser.GetAsync(denied.Headers.Location);
+        string message = await changed.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+        Assert.Contains("Open Field sales", message);
+        Assert.Contains("Choose another area", message);
+        Assert.Contains("/Manager", message);
+        Assert.DoesNotContain("href=\"/HeadOffice\"", message);
+    }
+
+    [Fact]
+    public async Task ProtectedContentIsUnavailableWhileCurrentRolesCannotBeChecked()
+    {
+        await using StaffWebsiteFactory website = new();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
+        website.Roles.Unavailable = true;
+
+        using HttpResponseMessage response = await browser.GetAsync("/HeadOffice");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.DoesNotContain("head-office catalogue workspace", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Should_DenyUnheldArea_When_AStaffMemberUsesADirectLink()
     {
         await using StaffWebsiteFactory website = new();
@@ -169,15 +303,25 @@ public sealed class StaffWebsiteScenarioTests
         Assert.Equal("/AccessDenied", read.Headers.Location?.AbsolutePath);
         Assert.DoesNotContain("head-office catalogue workspace", await read.Content.ReadAsStringAsync());
 
-        using HttpResponseMessage action = await browser.PostAsync("/HeadOffice", new StringContent(""));
+        using HttpResponseMessage action = await browser.PostAsync("/HeadOffice/__test/save", new StringContent(""));
         Assert.Equal(HttpStatusCode.Redirect, action.StatusCode);
         Assert.Equal("/AccessDenied", action.Headers.Location?.AbsolutePath);
+
+        await using (AsyncServiceScope scope = website.Services.CreateAsyncScope())
+        {
+            StaffWebDbContext db = scope.ServiceProvider.GetRequiredService<StaffWebDbContext>();
+            Assert.Empty(await db.StaffAreaPreferences.ToListAsync());
+        }
 
         using HttpResponseMessage denied = await browser.GetAsync("/AccessDenied");
         string html = await denied.Content.ReadAsStringAsync();
         Assert.Contains("That area is unavailable to your account", html);
         Assert.DoesNotContain("head-office catalogue workspace is ready", html);
         Assert.DoesNotContain("/HeadOffice", html);
+
+        using HttpResponseMessage forged = await browser.GetAsync("/AccessChanged?state=forged");
+        Assert.Equal(HttpStatusCode.Redirect, forged.StatusCode);
+        Assert.Equal("/AccessDenied", forged.Headers.Location?.OriginalString);
     }
 
     private static async Task SignInAsync(HttpClient browser, string subject, params string[] roles)

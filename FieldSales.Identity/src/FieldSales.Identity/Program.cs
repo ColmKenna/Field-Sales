@@ -12,10 +12,13 @@ using FieldSales.Identity.Services.Roles;
 using FieldSales.Identity.Services.SecretReveals;
 using FieldSales.Identity.Services.Users;
 using FieldSales.Identity.Services.Validation;
+using FieldSales.StaffAccess;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -109,6 +112,14 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.SlidingExpiration = true;
 });
 
+builder.Services.AddAuthentication().AddJwtBearer("StaffRoleLookup", options =>
+{
+    options.Authority = builder.Configuration["Authentication:Authority"];
+    options.Audience = "fieldsales-api";
+    options.RequireHttpsMetadata = true;
+    options.MapInboundClaims = false;
+});
+
 IIdentityServerBuilder isBuilder = builder.Services
     .AddIdentityServer(options =>
     {
@@ -171,6 +182,12 @@ builder.Services.AddHealthChecks()
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("SysAdminOnly", policy => policy.RequireRole(Config.SysAdminRole));
+    options.AddPolicy("StaffRoleLookup", policy => policy
+        .AddAuthenticationSchemes("StaffRoleLookup")
+        .RequireAuthenticatedUser()
+        .RequireAssertion(context => context.User.FindAll("scope")
+            .SelectMany(claim => claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Contains("fieldsales.api")));
 
     // Protection by omission. An endpoint that declares no authorisation is denied rather
     // than served, so a page added outside the /Admin convention fails closed. Everything
@@ -307,6 +324,21 @@ app.UseAuthorization();
 // Anonymous on purpose: challenging here would hand the login page returnUrl=/ when the
 // console is where the user is actually going. The challenge happens at /Admin instead.
 app.MapGet("/", () => Results.Redirect("/Admin")).ExcludeFromDescription().AllowAnonymous();
+
+app.MapGet("/staff/current-roles", async (ClaimsPrincipal principal,
+        UserManager<ApplicationUser> users) =>
+    {
+        string? subject = principal.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(subject)) return Results.Forbid();
+        ApplicationUser? user = await users.FindByIdAsync(subject);
+        if (user is null || await users.IsLockedOutAsync(user)) return Results.Forbid();
+        string[] roles = (await users.GetRolesAsync(user))
+            .Where(BusinessRoles.Contains)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        return Results.Ok(new CurrentStaffRolesResponse(subject, roles));
+    })
+    .RequireAuthorization("StaffRoleLookup");
 
 app.MapRazorPages();
 app.MapDefaultEndpoints();

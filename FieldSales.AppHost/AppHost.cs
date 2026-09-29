@@ -36,6 +36,7 @@ IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales
     .WithReference(identityOperationalDb)
     .WaitFor(sqlServer)
     .WithHttpsEndpoint(7201, name: "https")
+    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
     .WithEnvironment("Clients__StaffWebUri", "https://localhost:7203")
     .WithEnvironment("Clients__StaffWebSecret", staffWebClientSecret)
     .WithEnvironment("Seed__SysAdminPassword", sysAdminPassword)

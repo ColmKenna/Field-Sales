@@ -1,0 +1,29 @@
+@page
+@model FieldSales.Web.Pages.AccessChangedModel
+@{
+    ViewData["Title"] = "Staff area access changed";
+}
+<section class="access-changed" role="alert">
+    <h1>Access to @Model.Area.Label has changed</h1>
+    <p>This area is no longer available to your staff account.</p>
+    @if (Model.WasWrite)
+    {
+        <p>A change you just tried to make was not saved.</p>
+    }
+
+    @if (Model.PrimaryArea is { } primary)
+    {
+        <p><a class="button" href="@primary.Route">Open @primary.Label</a></p>
+        @if (Model.RemainingAreas.Count > 1)
+        {
+            <p><a asp-page="/Staff/Index">Choose another area</a></p>
+        }
+    }
+    else
+    {
+        <p>No staff area is currently available. Contact your administrator if you need access.</p>
+        <form method="post" asp-page="/SignOut">
+            <button type="submit" class="button">Sign out</button>
+        </form>
+    }
+</section>

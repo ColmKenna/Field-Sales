@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FieldSales.ServiceDefaults\FieldSales.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\FieldSales.StaffAccess\FieldSales.StaffAccess.csproj" />
   </ItemGroup>
 
 </Project>

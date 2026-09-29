@@ -13,6 +13,7 @@
         <PackageReference Include="Duende.IdentityServer.AspNetIdentity"/>
         <PackageReference Include="Duende.IdentityServer.EntityFramework"/>
         <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore"/>
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer"/>
         <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
@@ -25,6 +26,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\..\FieldSales.ServiceDefaults\FieldSales.ServiceDefaults.csproj"/>
         <ProjectReference Include="..\..\..\FieldSales.Identity.Admin.Services\FieldSales.Identity.Admin.Services.csproj"/>
+        <ProjectReference Include="..\..\..\FieldSales.StaffAccess\FieldSales.StaffAccess.csproj"/>
     </ItemGroup>
 
 </Project>

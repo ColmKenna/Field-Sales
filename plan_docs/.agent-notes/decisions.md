@@ -134,3 +134,10 @@ The reserved ports are proposals until the item that adds the project confirms t
   direct link has priority over the saved default; protected request endpoints deny an unheld
   area before protected page content or actions are reached.
 - IAM-US-002 S3, immediate role removal during an open session, remains WI-003.
+
+## WI-003 current staff-role boundary (2026-09-29, developer)
+
+- The identity host's current ASP.NET Identity role assignments are authoritative for staff area access. Its bearer-protected `/staff/current-roles` endpoint returns only the caller's own business roles, using the existing `fieldsales-api` audience and `fieldsales.api` scope.
+- The staff BFF refreshes business-role claims from that source before each protected request; the API checks the same source for authenticated staff requests. A lookup failure denies access without falling back to stale token or cookie roles. A removed last-used area is cleared while remaining permitted areas stay available in the same session.
+- A denied request to an area whose role was removed opens I-05. A denied write says the change was not saved; a denied read does not. I-05 offers only current areas, or sign-out and the existing administrator-contact guidance if none remain. An area never held keeps the generic access-denied page.
+- WI-003's protected Head Office POST is a Testing-only representative write. WI-004 owns production catalogue forms and persistence. No administrator contact URL was approved, so the existing guidance supplies the help text without a new destination.
