@@ -2,6 +2,8 @@ namespace FieldSales.Api.Catalogue;
 
 public sealed class Category
 {
+    public const int MaximumNameLength = 200;
+
     // EF Core materializes persisted categories through this constructor.
     private Category() { }
 

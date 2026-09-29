@@ -16,6 +16,9 @@ public sealed class CategoryTree
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         string trimmedName = name.Trim();
+        if (trimmedName.Length > Category.MaximumNameLength)
+            throw new ArgumentException($"A category name cannot exceed {Category.MaximumNameLength} characters.",
+                nameof(name));
         if (parentId is not null && !_categories.ContainsKey(parentId.Value))
             throw new ArgumentException("The parent category does not exist.", nameof(parentId));
 

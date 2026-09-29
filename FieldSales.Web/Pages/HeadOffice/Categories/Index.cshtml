@@ -1,0 +1,27 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Categories.IndexModel
+@{
+    ViewData["Title"] = "Categories";
+}
+<h1>Categories</h1>
+<p>Browse the catalogue structure or add a root category.</p>
+<form method="post">
+    <label asp-for="Name">Root category name</label>
+    <input asp-for="Name" maxlength="200" />
+    <span asp-validation-for="Name"></span>
+    <button type="submit">Add root category</button>
+</form>
+<h2>Root categories</h2>
+@if (Model.Roots.Count == 0)
+{
+    <p>No categories yet.</p>
+}
+else
+{
+    <ul>
+    @foreach (var category in Model.Roots)
+    {
+        <li><a asp-page="Detail" asp-route-id="@category.Id">@category.Name</a></li>
+    }
+    </ul>
+}

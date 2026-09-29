@@ -1,0 +1,34 @@
+@page "/HeadOffice/Categories/{id:guid}"
+@model FieldSales.Web.Pages.HeadOffice.Categories.DetailModel
+@{
+    ViewData["Title"] = Model.Details.Category.Name;
+}
+<nav aria-label="Category path">
+    <a asp-page="Index">Categories</a>
+    @foreach (var segment in Model.Details.Breadcrumb)
+    {
+        <span aria-hidden="true"> / </span>
+        <a asp-page="Detail" asp-route-id="@segment.Id">@segment.Name</a>
+    }
+</nav>
+<h1>@Model.Details.Category.Name</h1>
+<form method="post">
+    <label asp-for="Name">Subcategory name</label>
+    <input asp-for="Name" maxlength="200" />
+    <span asp-validation-for="Name"></span>
+    <button type="submit">Add subcategory</button>
+</form>
+<h2>Subcategories</h2>
+@if (Model.Details.Children.Count == 0)
+{
+    <p>No subcategories yet.</p>
+}
+else
+{
+    <ul>
+    @foreach (var category in Model.Details.Children)
+    {
+        <li><a asp-page="Detail" asp-route-id="@category.Id">@category.Name</a></li>
+    }
+    </ul>
+}

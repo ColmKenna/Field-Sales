@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $identityProjectPath = Join-Path $repositoryRoot "FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj"
 $staffWebProjectPath = Join-Path $repositoryRoot "FieldSales.Web/FieldSales.Web.csproj"
+$catalogueProjectPath = Join-Path $repositoryRoot "FieldSales.Api/FieldSales.Api.csproj"
 $resolvedOutputDir = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDir))
 
 New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
@@ -27,7 +28,8 @@ $bundles = @(
     @{ Context = "ApplicationDbContext"; Name = "identity"; Project = $identityProjectPath },
     @{ Context = "ConfigurationDbContext"; Name = "configuration"; Project = $identityProjectPath },
     @{ Context = "PersistedGrantDbContext"; Name = "operational"; Project = $identityProjectPath },
-    @{ Context = "StaffWebDbContext"; Name = "staff-web"; Project = $staffWebProjectPath }
+    @{ Context = "StaffWebDbContext"; Name = "staff-web"; Project = $staffWebProjectPath },
+    @{ Context = "CatalogueDbContext"; Name = "catalogue"; Project = $catalogueProjectPath }
 )
 
 foreach ($bundle in $bundles) {

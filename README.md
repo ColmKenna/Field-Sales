@@ -60,25 +60,26 @@ The identity host signs staff into one Razor Pages website, which calls the prot
 
        Staff browser --> [FieldSales.Web :7203] --> [FieldSales.Api :7204]
                               |
-                         [StaffWebDb]
+                         [StaffWebDb]                  [CatalogueDb]
                     encrypted tickets, DP keys, last area
 ```
 
 `FieldSales.Web` uses authorization code with PKCE. Its browser cookie holds an opaque session key;
 encrypted OIDC tickets and tokens live in `StaffWebDb`. `FieldSales.Api` validates the bearer token,
-audience, scope and a business role at `/staff/session`.
+audience, scope and a business role at `/staff/session`. The Head Office category pages
+call protected catalogue endpoints; category identities and parent links live in `CatalogueDb`.
 
 - **FieldSales.Identity**: The primary authentication host running Duende IdentityServer with ASP.NET Core Identity. Houses the Razor Pages UI for account workflows (Login, Logout, Access Denied) and the `/Admin` management console.
 - **FieldSales.Identity.Admin.Services**: A decoupled domain services library containing the business logic, validation, audit generation, and management operations for the admin console. It has no reference to the host's `DbContext` or user type; the host supplies adapters for the persistence ports it defines.
 - **AppHost / ServiceDefaults**: .NET Aspire orchestration and shared service defaults (OpenTelemetry, health checks, resilience).
-- **FieldSales.Web**: One staff Razor Pages BFF with I-01 entry, I-02 area choice, last-used permitted routing, protected rep/manager/head-office landings, server-side token refresh and sign-out.
-- **FieldSales.Api**: Protected staff API endpoint used by the BFF to check its delegated session.
+- **FieldSales.Web**: One staff Razor Pages BFF with I-01 entry, I-02 area choice, last-used permitted routing, protected rep/manager/head-office landings, server-side token refresh and sign-out. Head Office users can create root and nested categories at `/HeadOffice/Categories`.
+- **FieldSales.Api**: Protected staff session and catalogue endpoints used by the BFF.
 
 > [!NOTE]
-> **SQL Server is a deliberate, load-bearing choice, not a default you can flip.** All four
+> **SQL Server is a deliberate, load-bearing choice, not a default you can flip.** All five
 > `DbContext` registrations use `UseSqlServer`, the committed migrations are SQL Server-specific,
 > and the AppHost provisions a SQL Server container. Moving to PostgreSQL or another provider means
-> changing those registrations *and* regenerating all four migration histories — the one
+> changing those registrations *and* regenerating all five migration histories — the one
 > substitution this template does not make cheap. Decide before you build on it.
 
 ---
@@ -147,7 +148,7 @@ The `/Admin` section is restricted to users in the `SysAdmin` role and provides 
 
 ## Database Contexts
 
-The solution separates identity, API configuration, grants, and staff sessions across four Entity Framework Core `DbContext` instances:
+The solution separates identity, API configuration, grants, staff sessions, and catalogue data across five Entity Framework Core `DbContext` instances:
 
 1. **`ApplicationDbContext`** (Database: `IdentityDb`):
    - ASP.NET Core Identity (Users, Roles, UserClaims, UserRoles, Logins, Tokens).
@@ -160,6 +161,8 @@ The solution separates identity, API configuration, grants, and staff sessions a
    - Duende IdentityServer operational store (Authorization codes, refresh tokens, reference tokens, user consent, signing keys).
 4. **`StaffWebDbContext`** (Database: `StaffWebDb`):
    - Protected server-side staff tickets and the website's Data Protection keys.
+5. **`CatalogueDbContext`** (Database: `CatalogueDb`):
+   - Head Office categories with parent links and sibling-unique names.
 
 ---
 
@@ -296,10 +299,11 @@ Each `DbContext` has dedicated migrations:
 - `Migrations/Configuration` (`ConfigurationDbContext`)
 - `Migrations/Operational` (`PersistedGrantDbContext`)
 - `FieldSales.Web/Data/Migrations` (`StaffWebDbContext`)
+- `FieldSales.Api/Catalogue/Migrations` (`CatalogueDbContext`)
 
 ### First Run with .NET Aspire
 
-**In Development, nothing here is required.** The hosts apply pending migrations for all four
+**In Development, nothing here is required.** The hosts apply pending migrations for all five
 contexts on startup, so a fresh clone reaches a running application with a single
 `dotnet run --project FieldSales.AppHost`. Re-running is a no-op once the schema is current.
 
@@ -347,9 +351,10 @@ Invoke-MigrationBundle identity IdentityDb
 Invoke-MigrationBundle configuration IdentityConfigDb
 Invoke-MigrationBundle operational IdentityOperationalDb
 Invoke-MigrationBundle 'staff-web' StaffWebDb
+Invoke-MigrationBundle catalogue CatalogueDb
 ```
 
-After all four commands report `Done.`, restart the `identityserver` and `staff-web` resources in the Aspire
+After all five commands report `Done.`, restart the `identityserver`, `staff-api`, and `staff-web` resources in the Aspire
 Dashboard (or restart AppHost). The bundles are idempotent, so it is safe to run them again when
 deploying a new migration.
 
@@ -431,7 +436,7 @@ environment except Development and Testing.
 
 - [ ] `IdentityServer:SigningCertificatePath` and password configured — the host will not start without them.
 - [ ] `DataProtection:CertificatePath` and password configured for the identity host and staff website, so both key rings are encrypted at rest.
-- [ ] All four migration bundles applied to their databases.
+- [ ] All five migration bundles applied to their databases.
 - [ ] First administrator created with `--bootstrap-admin`, and the bootstrap credentials removed from configuration afterwards.
 - [ ] `fieldsales-staff-web` client, `fieldsales.api` scope and `fieldsales-api` resource registered through **Admin → Clients / API Scopes / APIs**. Development seeding does not run in production.
 - [ ] The three staff business roles created and staff accounts assigned through **Admin → Roles / Users**.

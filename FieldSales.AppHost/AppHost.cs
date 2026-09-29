@@ -29,6 +29,7 @@ IResourceBuilder<SqlServerDatabaseResource> identityDb = sqlServer.AddDatabase("
 IResourceBuilder<SqlServerDatabaseResource> identityConfigDb = sqlServer.AddDatabase("IdentityConfigDb");
 IResourceBuilder<SqlServerDatabaseResource> identityOperationalDb = sqlServer.AddDatabase("IdentityOperationalDb");
 IResourceBuilder<SqlServerDatabaseResource> staffWebDb = sqlServer.AddDatabase("StaffWebDb");
+IResourceBuilder<SqlServerDatabaseResource> catalogueDb = sqlServer.AddDatabase("CatalogueDb");
 
 IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales_Identity>("identityserver")
     .WithReference(identityDb)
@@ -43,6 +44,7 @@ IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales
     .WithEnvironment("Seed__TestUserPassword", testUserPassword);
 
 IResourceBuilder<ProjectResource> staffApi = builder.AddProject<FieldSales_Api>("staff-api")
+    .WithReference(catalogueDb)
     .WithHttpsEndpoint(7204, name: "https")
     .WithEnvironment("Authentication__Authority", "https://localhost:7201")
     .WaitFor(identityServer);

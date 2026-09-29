@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using System.Net;
+using System.Net.Http.Json;
 using FieldSales.StaffAccess;
 using FieldSales.Web.Data;
 using Microsoft.AspNetCore.Authentication;
@@ -29,6 +31,7 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
     public TestStaffRoleLookup Roles { get; } = new();
+    public TestCatalogueHandler Catalogue { get; } = new();
 
     public StaffWebsiteFactory() => _connection.Open();
 
@@ -58,6 +61,8 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
             services.AddDataProtection().UseEphemeralDataProtectionProvider();
             services.AddHttpClient(string.Empty)
                 .ConfigurePrimaryHttpMessageHandler(() => new TestStaffApiHandler());
+            services.AddHttpClient<FieldSales.Web.Catalogue.CatalogueApiClient>()
+                .ConfigurePrimaryHttpMessageHandler(() => Catalogue);
             services.RemoveAll<IStaffRoleLookup>();
             services.AddSingleton(Roles);
             services.AddSingleton<IStaffRoleLookup>(Roles);
@@ -143,6 +148,69 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
             next(app);
         };
     }
+}
+
+public sealed class TestCatalogueHandler : HttpMessageHandler
+{
+    private readonly Dictionary<Guid, FieldSales.Web.Catalogue.CategoryItem> _categories = [];
+
+    public int Count { get { lock (_categories) return _categories.Count; } }
+
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
+        Assert.Equal("test-access-token", request.Headers.Authorization?.Parameter);
+        string path = request.RequestUri!.AbsolutePath.TrimEnd('/');
+        if (path == "/catalogue/categories" && request.Method == HttpMethod.Get)
+        {
+            lock (_categories)
+                return Json(HttpStatusCode.OK, _categories.Values.Where(c => c.ParentId is null)
+                    .OrderBy(c => c.Name).ToArray());
+        }
+        if (path == "/catalogue/categories" && request.Method == HttpMethod.Post)
+        {
+            var body = await request.Content!.ReadFromJsonAsync<CreateRequest>(cancellationToken);
+            lock (_categories)
+            {
+                if (body!.ParentId is not null && !_categories.ContainsKey(body.ParentId.Value))
+                    return new HttpResponseMessage(HttpStatusCode.NotFound);
+                if (_categories.Values.Any(c => c.ParentId == body.ParentId &&
+                    string.Equals(c.Name, body.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    return new HttpResponseMessage(HttpStatusCode.Conflict);
+                FieldSales.Web.Catalogue.CategoryItem added = new(Guid.NewGuid(), body.ParentId, body.Name.Trim());
+                _categories.Add(added.Id, added);
+                return Json(HttpStatusCode.Created, added);
+            }
+        }
+        if (path.StartsWith("/catalogue/categories/", StringComparison.Ordinal)
+            && Guid.TryParse(path["/catalogue/categories/".Length..], out Guid id)
+            && request.Method == HttpMethod.Get)
+        {
+            lock (_categories)
+            {
+                if (!_categories.TryGetValue(id, out var selected))
+                    return new HttpResponseMessage(HttpStatusCode.NotFound);
+                List<FieldSales.Web.Catalogue.CategoryBreadcrumbSegment> pathSegments = [];
+                var current = selected;
+                while (true)
+                {
+                    pathSegments.Add(new(current.Id, current.Name));
+                    if (current.ParentId is null) break;
+                    current = _categories[current.ParentId.Value];
+                }
+                pathSegments.Reverse();
+                return Json(HttpStatusCode.OK, new FieldSales.Web.Catalogue.CategoryDetails(selected,
+                    pathSegments, _categories.Values.Where(c => c.ParentId == id).ToArray()));
+            }
+        }
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+    }
+
+    private static HttpResponseMessage Json<T>(HttpStatusCode status, T value) =>
+        new(status) { Content = JsonContent.Create(value) };
+
+    private sealed record CreateRequest(string Name, Guid? ParentId);
 }
 
 internal sealed class TestStaffApiHandler : HttpMessageHandler
