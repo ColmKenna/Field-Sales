@@ -1,0 +1,27 @@
+# Category foundation — WI-004
+
+Date: 2026-09-29. Source: T-1.1.1 / Product Management US-005 S4–S5.
+
+## Approved contract
+
+- The first catalogue slice uses the existing .NET 10, Aspire, Razor Pages BFF, Field Sales API, SQL Server, and EF Core stack. The staff website continues to send server-held access tokens to the business API. Head Office User is the only business role that can create or rename categories.
+- A category has a stable GUID identity, a name, and an optional parent category identity. The root has no parent. Depth is unlimited; six levels are an explicit display and verification target.
+- A breadcrumb is calculated from the current ancestor chain when read. Renaming a node changes the displayed paths of its descendants without changing category identities or rewriting records that refer to those identities.
+- Names are unique among siblings. The same leaf name can occur under different parents, where its full breadcrumb disambiguates it.
+- A create or rename submission rejected because the staff session expired or the role was removed makes no change. The application does not persist or replay that form submission after sign-in.
+
+## Persistence placement for Increment 1 review
+
+The existing `StaffWebDb` holds website tickets, protection keys, and last-used area preferences. The established application contract puts business endpoints in `FieldSales.Api`. The proposed catalogue placement is a dedicated SQL Server `CatalogueDb` and EF Core context owned by `FieldSales.Api`, reached from the BFF with its server-held access token. This keeps category master data under the API role boundary and leaves website session storage separate. Confirm this placement at the Increment 1 review before the persistence increment.
+
+## Verification boundary
+
+WI-004 will verify root and nested creation, persistence across restart, a six-level breadcrumb, duplicate leaf names in different branches, role denial, rejected writes, and changed descendant breadcrumbs with stable category IDs after a rename. The developer approved the Human-Led scenario matrix on 2026-09-29.
+
+The source also asks for product breadcrumbs to change while orders and calls remain untouched. None of those record types exists in the application yet. The approved WI-004 evidence is the derived category path and stable category identity; direct assertions over Product, Order, and Call records follow when those models are introduced. This does not authorize adding those models to WI-004.
+
+## Later boundaries
+
+- Counts, search, move, recategorisation, and archive follow their own tasks. The category tree UI in this slice uses the H-15 proposal of one category at a time with its breadcrumb for navigation; the layout remains subject to the Increment 4 review.
+- The staff directory is the source of the rep-to-manager reporting line in the story context. Its cardinality and persistence remain a later staff-directory decision. WI-004 records this dependency without adding a reporting relationship to the category model.
+- Tablet language, Visit Planning administrator permissions, and dated-price day boundaries do not affect this category slice.

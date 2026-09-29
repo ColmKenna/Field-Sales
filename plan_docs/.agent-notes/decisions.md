@@ -141,3 +141,10 @@ The reserved ports are proposals until the item that adds the project confirms t
 - The staff BFF refreshes business-role claims from that source before each protected request; the API checks the same source for authenticated staff requests. A lookup failure denies access without falling back to stale token or cookie roles. A removed last-used area is cleared while remaining permitted areas stay available in the same session.
 - A denied request to an area whose role was removed opens I-05. A denied write says the change was not saved; a denied read does not. I-05 offers only current areas, or sign-out and the existing administrator-contact guidance if none remain. An area never held keeps the generic access-denied page.
 - WI-003's protected Head Office POST is a Testing-only representative write. WI-004 owns production catalogue forms and persistence. No administrator contact URL was approved, so the existing guidance supplies the help text without a new destination.
+
+## WI-004 category contract (2026-09-29, developer, plan approval)
+
+- Use SQL Server and EF Core with stable GUID category identities and optional parent identities. Category depth is unlimited, with six levels as a display and verification target. Derive breadcrumbs from the current parent chain on read.
+- Category names are unique among siblings; duplicate leaf names under different parents are valid. A rejected or expired create/rename form changes nothing and is not persisted or replayed after sign-in.
+- The Human-Led scenario matrix is recorded in `WI-004.md`. Because Product, Order and Call records do not yet exist, WI-004 proves changing descendant category paths and stable category identities; direct assertions over those later record types follow their introduction.
+- The proposed physical store is an API-owned `CatalogueDb` separate from website session storage. Its placement awaits the Increment 1 review in `docs/catalogue-category-decisions.md`.
