@@ -32,6 +32,7 @@ p { line-height: 1.6; }
 .product-form input:focus-visible, .product-form select:focus-visible { outline: 3px solid #e48f2b; outline-offset: 2px; }
 .product-form input[readonly] { background: #f5f7fa; }
 .product-form .field-validation-error, .product-form .validation-summary-errors { color: #8c2f22; }
+.product-form .field-validation-valid { display: none; }
 .product-form .validation-summary-valid { display: none; }
 .product-form .button { margin-top: .75rem; justify-self: start; }
 .product-record { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; margin-block: 2rem; }
@@ -41,3 +42,8 @@ p { line-height: 1.6; }
 .product-form fieldset { margin: .75rem 0; padding: 1rem; border: 1px solid #b9c8d6; }
 .product-form [hidden] { display: none; }
 .product-form [data-price-basis-change] { border-left-color: #b57515; background: #fff6e6; }
+.price-summary { font-weight: 600; }
+.price-history { overflow-x: auto; margin-top: 1.25rem; }
+.price-history table { width: 100%; border-collapse: collapse; }
+.price-history caption { text-align: left; font-weight: 600; margin-bottom: .5rem; }
+.price-history th, .price-history td { padding: .6rem .4rem; text-align: left; border-bottom: 1px solid #d7dee6; }

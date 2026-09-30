@@ -65,4 +65,22 @@ public sealed class Product
     /// <remarks>The caller must load BasePrices. No price exists before the first entry.</remarks>
     public ProductBasePrice? BasePriceOn(DateOnly date) =>
         _basePrices.Where(price => price.EffectiveFrom <= date).MaxBy(price => price.EffectiveFrom);
+
+    /// <summary>Adds a dated entry without changing any existing price.</summary>
+    /// <remarks>The caller must load BasePrices. The database key also enforces date uniqueness.</remarks>
+    public void AddBasePrice(decimal amount, DateOnly effectiveFrom)
+    {
+        if (_basePrices.Any(price => price.EffectiveFrom == effectiveFrom))
+            throw new InvalidOperationException("A base price already starts on this date.");
+        _basePrices.Add(ProductBasePrice.Create(Id, amount, effectiveFrom));
+    }
+
+    /// <summary>Derives inclusive ranges in date order; the final entry has no end date.</summary>
+    /// <remarks>The caller must load BasePrices. No range exists before the first entry.</remarks>
+    public IReadOnlyList<ProductPricePeriod> BasePricePeriods()
+    {
+        ProductBasePrice[] prices = _basePrices.OrderBy(price => price.EffectiveFrom).ToArray();
+        return prices.Select((price, index) => new ProductPricePeriod(price,
+            index + 1 < prices.Length ? prices[index + 1].EffectiveFrom.AddDays(-1) : null)).ToArray();
+    }
 }

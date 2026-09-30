@@ -22,17 +22,51 @@
         <h2 id="price-heading">Base price</h2>
         @if (Model.Details.CurrentPrice is { } price)
         {
+            @if (Model.UpcomingPrice is { } next)
+            {
+                var change = next.Amount > price.Amount ? "rising to" : next.Amount < price.Amount ? "falling to" : "changing to";
+                <p class="price-summary">@price.Amount.ToString("C2", currency) · @change @next.Amount.ToString("C2", currency) on @next.EffectiveFrom.ToString("d MMM", CultureInfo.InvariantCulture)</p>
+            }
             <p>@price.Amount.ToString("C2", currency) per @Model.Details.Product.Unit · Effective from @price.EffectiveFrom.ToString("d MMM yyyy", currency)</p>
         }
         else
         {
             <p>No price in effect.</p>
+            @if (Model.UpcomingPrice is { } next)
+            {
+                <p>Starting at @next.Amount.ToString("C2", currency) on @next.EffectiveFrom.ToString("d MMM yyyy", CultureInfo.InvariantCulture)</p>
+            }
         }
+        <form method="post" asp-page-handler="Price" class="product-form">
+            <h3>Add a base price</h3>
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <label asp-for="BasePrice">Base price (€ per @Model.Details.Product.Unit)</label>
+            <input asp-for="BasePrice" type="number" min="0" step="0.01" required aria-describedby="price-dates" />
+            <span asp-validation-for="BasePrice" role="alert"></span>
+            <label asp-for="EffectiveFrom">Effective from</label>
+            <input asp-for="EffectiveFrom" type="date" required aria-describedby="price-dates price-capture-note" />
+            <span asp-validation-for="EffectiveFrom" role="alert"></span>
+            <p id="price-dates">Choose the date this price applies from. Previous prices stay in the history.</p>
+            <p id="price-capture-note">Existing orders keep the price captured</p>
+            <button type="submit" class="button">Add price</button>
+        </form>
+        <div class="price-history">
+            <table>
+                <caption>Base price history · newest first</caption>
+                <thead><tr><th scope="col">Effective from</th><th scope="col">Price per @Model.Details.Product.Unit</th></tr></thead>
+                <tbody>
+                    @foreach (var entry in Model.PriceHistory)
+                    {
+                        <tr><td><time datetime="@entry.EffectiveFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@entry.EffectiveFrom.ToString("d MMM yyyy", CultureInfo.InvariantCulture)</time></td><td>@entry.Amount.ToString("C2", currency)</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </section>
     <section aria-labelledby="unit-heading">
         <h2 id="unit-heading">Unit</h2>
         <form method="post" asp-page-handler="Unit" class="product-form" data-product-unit-form>
-            <div asp-validation-summary="All" role="alert"></div>
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
             <partial name="_UnitFields" model="@(new FieldSales.Web.Catalogue.ProductUnitFields(Model.Unit, Model.QuantityStep, Model.MinimumQuantity, Model.Details.CurrentPrice?.Amount, Model.Details.Product.Unit))" />
             <button type="submit" asp-page-handler="PreviewUnit" formnovalidate>Update preview</button>
             <button type="submit" class="button">Save unit</button>
