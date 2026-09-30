@@ -30,15 +30,23 @@ The implementation trims names and treats sibling names that differ only by case
 
 The category detail page has a separate **Rename category** form. It sends a server-side token to the Head Office protected API `PUT /catalogue/categories/{id}/name` route. The API changes only the name; IDs and parent links remain fixed. A descendant's next read derives its breadcrumb from the current ancestor names. Duplicate sibling names show a field error. Expired or removed-role form submissions stop before any API write and are not replayed after sign-in.
 
+## Test harness conventions
+
+- Domain rules and breadcrumb derivation: `FieldSales.Api.Tests/CategoryTreeTests.cs` (unit tests).
+- Protected API behavior, migration, SQL uniqueness, and restart persistence: `FieldSales.Api.Tests/CataloguePersistenceTests.cs` (SQL Server Testcontainers integration tests).
+- Razor Pages, antiforgery forms, and current staff role behavior: `FieldSales.Web.Tests/CategoryPageTests.cs` using the website factory and a test catalogue handler.
+- Complete website → API → SQL path: `FieldSales.Web.Tests/CategoryEndToEndTests.cs`, including a host restart.
+- Name future story scenario tests `Should_Outcome_When_Condition` so a failing result states the observable rule. Keep the Human-Led approved scenario list as test authority for WI-004.
+
 ## Verification boundary
 
-WI-004 will verify root and nested creation, persistence across restart, a six-level breadcrumb, duplicate leaf names in different branches, role denial, rejected writes, and changed descendant breadcrumbs with stable category IDs after a rename. The developer approved the Human-Led scenario matrix on 2026-09-29.
+WI-004 verifies root and nested creation, persistence across restart, a six-level breadcrumb, duplicate leaf names in different branches, role denial, rejected writes, and changed descendant breadcrumbs with stable category IDs after a rename. The developer approved the Human-Led scenario matrix on 2026-09-29.
 
 The source also asks for product breadcrumbs to change while orders and calls remain untouched. None of those record types exists in the application yet. The approved WI-004 evidence is the derived category path and stable category identity; direct assertions over Product, Order, and Call records follow when those models are introduced. This does not authorize adding those models to WI-004.
 
 ## Later boundaries
 
-- Counts, search, move, recategorisation, and archive follow their own tasks. The category tree UI in this slice uses the H-15 proposal of one category at a time with its breadcrumb for navigation; the layout remains subject to the Increment 4 review.
+- Counts, search, move, recategorisation, and archive follow their own tasks. The category tree UI in this slice uses the reviewed H-15 proposal of one category at a time with its breadcrumb for navigation.
 - The staff directory is the source of the rep-to-manager reporting line in the story context. Its cardinality and persistence remain a later staff-directory decision. WI-004 records this dependency without adding a reporting relationship to the category model.
 - A staff role does not identify a person's manager. The staff directory will supply that reporting line to later work; category requests use the existing Head Office User role and current-role checks.
 - Tablet language, Visit Planning administrator permissions, and dated-price day boundaries do not affect this category slice.

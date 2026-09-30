@@ -30,10 +30,18 @@ namespace FieldSales.Web.Tests;
 public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    private readonly HttpMessageHandler? _catalogueHandler;
+    private readonly string _accessToken;
     public TestStaffRoleLookup Roles { get; } = new();
     public TestCatalogueHandler Catalogue { get; } = new();
 
-    public StaffWebsiteFactory() => _connection.Open();
+    public StaffWebsiteFactory(HttpMessageHandler? catalogueHandler = null,
+        string accessToken = "test-access-token")
+    {
+        _catalogueHandler = catalogueHandler;
+        _accessToken = accessToken;
+        _connection.Open();
+    }
 
     public HttpClient CreateBrowser() => CreateClient(new WebApplicationFactoryClientOptions
     {
@@ -62,11 +70,11 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
             services.AddHttpClient(string.Empty)
                 .ConfigurePrimaryHttpMessageHandler(() => new TestStaffApiHandler());
             services.AddHttpClient<FieldSales.Web.Catalogue.CatalogueApiClient>()
-                .ConfigurePrimaryHttpMessageHandler(() => Catalogue);
+                .ConfigurePrimaryHttpMessageHandler(() => _catalogueHandler ?? Catalogue);
             services.RemoveAll<IStaffRoleLookup>();
             services.AddSingleton(Roles);
             services.AddSingleton<IStaffRoleLookup>(Roles);
-            services.AddSingleton<IStartupFilter, TestSignInStartupFilter>();
+            services.AddSingleton<IStartupFilter>(new TestSignInStartupFilter(_accessToken));
             services.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme, options =>
             {
                 options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(
@@ -94,7 +102,7 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
         if (disposing) _connection.Dispose();
     }
 
-    private sealed class TestSignInStartupFilter : IStartupFilter
+    private sealed class TestSignInStartupFilter(string accessToken) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
         {
@@ -134,7 +142,7 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
                     new AuthenticationToken
                     {
                         Name = "access_token",
-                        Value = "test-access-token"
+                        Value = accessToken
                     },
                     new AuthenticationToken
                     {
