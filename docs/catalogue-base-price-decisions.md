@@ -102,3 +102,38 @@ product-unit JavaScript cases pass. The full .NET run records 1,090 passes and t
 Windows Application Control failures. The initial temporary block on the rebuilt website test
 assembly did not persist on the normal subsequent build/run. Admin UI package access remains
 unresolved. WI-008 remains active at the Increment 3 review boundary.
+
+## Increment 4 — captured-price guidance and acceptance audit
+
+The developer approved this final increment on 2026-10-01. The price form now displays
+"Existing orders keep the price captured" before and after a save, with the date field's
+aria-describedby referencing the guidance. Past-dated additions append a new row; they do not
+change any existing amount or date. Actual captured-order assertions remain deferred by the
+approved scope until order lines exist.
+
+The three criteria below are quoted from T-1.3.1. These checks establish the implemented behavior;
+they do not replace the pending complete-suite acceptance gate.
+
+| Quoted source criterion | Evidence and result |
+|---|---|
+| Adding €13.20 effective 1 November 2026 over €12.50 shows "€12.50 · rising to €13.20 on 1 Nov" and the history lists both (S1, record part) | Passing ProductPricePageTests.Should_ShowComingRise_When_FuturePriceIsAdded checks the actual form, save, summary and newest-first history. Passing domain and SQL/API tests check October 31/November 1 boundaries and persisted future entries. Tablet switching is a separate slice. |
+| Adding €12.00 effective 1 September 2026 inserts it into history for 1 Sep – 31 Oct, with "Existing orders keep the price captured" (S3) | Passing ProductPriceApiTests.Should_InsertPastPrice_When_DateFallsBetweenExistingEntries proves the stored September 1–October 31 range and unchanged adjacent entries. Passing ProductPricePageTests.Should_ShowPastPriceAndCaptureNote_When_PastEntryIsAdded checks the form, resulting summary, all dates and exact note. An intervening entry ends the inserted range earlier, as approved and tested. |
+| A second price with the same Effective From is rejected with "A price already starts on 1 Nov 2026 — edit it instead" (S4) | Passing SQL/API duplicate-date scenario checks the exact field message, unchanged rows and a forced concurrent SQL conflict. The passing website duplicate scenario checks the displayed message and retained inputs. Editing remains unavailable in this approved append-only slice. |
+
+All agreed domain, SQL/API, BFF client and website page scenarios pass, including two future
+prices, today's price at the Dublin day boundary, the preceding day, host restart with persisted
+history, invalid requests and missing/expired access without writes or replay.
+
+ProductPriceEndToEndTests adds a complete browser-cookie/BFF/API/SQL scenario combining future
+save, duplicate rejection, past save and record reopening after host restart. Windows Application
+Control blocks its fixture's Docker.DotNet.dll before any assertions execute. This integrated
+scenario remains unverified and must pass when the environment is repaired.
+
+Final verification: warnings-as-errors solution build passes with zero warnings/errors; all 16
+console/product-unit JavaScript tests pass. The full .NET run has 1,092 passes and 81 failures:
+API 79/0, website 63/55, identity/admin 950/26 (passed/failed). Every failure contains Windows
+Application Control's Docker.DotNet.dll block (0x800711C7). No tests are skipped or weakened.
+An unrestricted admin UI npm ci retry still fails with GitHub Packages HTTP 401 for
+@colmkenna/ck-tabs@1.0.4, preventing its JavaScript suite from starting. Package credentials and
+machine security policy require local resolution. WI-008 remains active and the feature branch
+is not pushed as completed; no next work item is started.

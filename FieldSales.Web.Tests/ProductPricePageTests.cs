@@ -74,6 +74,32 @@ public sealed class ProductPricePageTests
     }
 
     [Fact]
+    public async Task Should_ShowPastPriceAndCaptureNote_When_PastEntryIsAdded()
+    {
+        using PriceReplyHandler api = new();
+        ProductPriceItem august = new(new DateOnly(2026, 8, 1), 12.50m);
+        ProductPriceItem september = new(new DateOnly(2026, 9, 1), 12m);
+        ProductPriceItem november = new(new DateOnly(2026, 11, 1), 13.20m);
+        api.Details = api.Details with { CurrentPrice = august, PriceHistory = [august, november] };
+        api.AfterSave = api.Details with { CurrentPrice = september, PriceHistory = [august, september, november] };
+        await using StaffWebsiteFactory website = new(api);
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser);
+        string form = await PageAsync(browser, api.Path);
+        Assert.Contains("Existing orders keep the price captured", form);
+        using HttpResponseMessage saved = await PostPriceAsync(browser, api.Path, form, "12.00", "2026-09-01");
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+        Assert.Equal(new SubmittedPrice(12m, september.EffectiveFrom), api.Submitted);
+        string record = await PageAsync(browser, api.Path);
+        Assert.Contains("€12.00 · rising to €13.20 on 1 Nov", record);
+        Assert.Contains("Existing orders keep the price captured", record);
+        Assert.Contains("datetime=\"2026-08-01\"", record);
+        Assert.Contains("datetime=\"2026-09-01\"", record);
+        Assert.Contains("datetime=\"2026-11-01\"", record);
+        Assert.Equal(1, api.SaveCount);
+    }
+
+    [Fact]
     public async Task Should_RejectDuplicateDate_When_PriceAlreadyStartsThatDay()
     {
         using PriceReplyHandler api = new();

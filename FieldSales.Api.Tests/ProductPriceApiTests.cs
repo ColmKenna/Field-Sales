@@ -75,6 +75,30 @@ public sealed class ProductPriceApiTests : IClassFixture<ProductPriceApplication
     }
 
     [Fact]
+    public async Task Should_InsertPastPrice_When_DateFallsBetweenExistingEntries()
+    {
+        Guid id = await _app.SeedAsync(new DateOnly(2026, 8, 1));
+        using HttpClient client = _app.CreateClient();
+        using HttpResponseMessage future = await AddAsync(client, id, 13.20m, new DateOnly(2026, 11, 1));
+        Assert.Equal(HttpStatusCode.Created, future.StatusCode);
+        using HttpResponseMessage past = await AddAsync(client, id, 12m, new DateOnly(2026, 9, 1));
+        Assert.Equal(HttpStatusCode.Created, past.StatusCode);
+        ProductDetails details = (await client.GetFromJsonAsync<ProductDetails>($"/catalogue/products/{id}"))!;
+        Assert.Equal(new ProductPriceItem(new DateOnly(2026, 9, 1), 12m), details.CurrentPrice);
+        Assert.Equal(3, details.PriceHistory.Count);
+
+        await using AsyncServiceScope scope = _app.Api.Services.CreateAsyncScope();
+        Product persisted = await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>()
+            .Products.Include(product => product.BasePrices).SingleAsync(product => product.Id == id);
+        ProductPricePeriod september = persisted.BasePricePeriods()[1];
+        Assert.Equal(new DateOnly(2026, 9, 1), september.Price.EffectiveFrom);
+        Assert.Equal(new DateOnly(2026, 10, 31), september.EffectiveThrough);
+        Assert.Equal(12.50m, persisted.BasePriceOn(new DateOnly(2026, 8, 31))!.Amount);
+        Assert.Equal(12m, persisted.BasePriceOn(new DateOnly(2026, 10, 31))!.Amount);
+        Assert.Equal(13.20m, persisted.BasePriceOn(new DateOnly(2026, 11, 1))!.Amount);
+    }
+
+    [Fact]
     public async Task Should_RejectDuplicateDate_When_PriceAlreadyStartsThatDay()
     {
         Guid id = await _app.SeedAsync(new DateOnly(2026, 9, 1));

@@ -44,9 +44,10 @@
             <input asp-for="BasePrice" type="number" min="0" step="0.01" required aria-describedby="price-dates" />
             <span asp-validation-for="BasePrice" role="alert"></span>
             <label asp-for="EffectiveFrom">Effective from</label>
-            <input asp-for="EffectiveFrom" type="date" required aria-describedby="price-dates" />
+            <input asp-for="EffectiveFrom" type="date" required aria-describedby="price-dates price-capture-note" />
             <span asp-validation-for="EffectiveFrom" role="alert"></span>
             <p id="price-dates">Choose the date this price applies from. Previous prices stay in the history.</p>
+            <p id="price-capture-note">Existing orders keep the price captured</p>
             <button type="submit" class="button">Add price</button>
         </form>
         <div class="price-history">
