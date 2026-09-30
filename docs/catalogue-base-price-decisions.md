@@ -111,8 +111,8 @@ aria-describedby referencing the guidance. Past-dated additions append a new row
 change any existing amount or date. Actual captured-order assertions remain deferred by the
 approved scope until order lines exist.
 
-The three criteria below are quoted from T-1.3.1. These checks establish the implemented behavior;
-they do not replace the pending complete-suite acceptance gate.
+The three criteria below are quoted from T-1.3.1. The checks establish the implemented behavior;
+the complete-suite acceptance gate also passes on the final retry recorded below.
 
 | Quoted source criterion | Evidence and result |
 |---|---|
@@ -129,7 +129,7 @@ save, duplicate rejection, past save and record reopening after host restart. Wi
 Control blocks its fixture's Docker.DotNet.dll before any assertions execute. This integrated
 scenario remains unverified and must pass when the environment is repaired.
 
-Final verification: warnings-as-errors solution build passes with zero warnings/errors; all 16
+Initial final verification attempt: warnings-as-errors solution build passes with zero warnings/errors; all 16
 console/product-unit JavaScript tests pass. The full .NET run has 1,092 passes and 81 failures:
 API 79/0, website 63/55, identity/admin 950/26 (passed/failed). Every failure contains Windows
 Application Control's Docker.DotNet.dll block (0x800711C7). No tests are skipped or weakened.
@@ -145,3 +145,17 @@ repository. All 18 admin UI tests now pass. Manifests, lockfiles and package ver
 The restore's audit identifies undici@7.29.0 via the jsdom test dependency as high severity; updating
 dependencies is outside this restore's scope. Windows Application Control remains the outstanding
 full-suite verification blocker, so WI-008 stays active.
+
+## Successful final retry — 2026-10-01
+
+After the developer addressed the local block and requested verification again, all 1,173 .NET
+tests pass: API 79, website 118, identity/admin 976, with zero failures or skips. This includes
+the previously blocked complete cookie/BFF/API/SQL price scenario, which verifies all three
+quoted source criteria in one flow and reopens the preserved history after host restart. All 18
+admin UI tests and 16 console/product-unit JavaScript tests also pass. The warnings-as-errors
+solution build succeeds with zero warnings and errors. No tests were weakened, and the agent
+made no machine security-policy changes. Final logs/TRX are under `.artifacts/wi008-retry/`.
+
+WI-008 is done in the console status map. The approved append-only and captured-order/tablet
+scope decisions remain unchanged. Stop at the verified feature branch for developer integration;
+WI-009 is the next item by console order and has not been started.
