@@ -51,4 +51,28 @@ public sealed class CategoryTreeTests
 
         Assert.Throws<InvalidOperationException>(() => tree.Add(" lotions ", suncare.Id));
     }
+
+    [Fact]
+    public void Should_RefreshDescendantPathWithoutChangingIdentity_When_AncestorIsRenamed()
+    {
+        CategoryTree tree = new([]);
+        Category root = tree.Add("Health");
+        Category suncare = tree.Add("Suncare", root.Id);
+        Category bodyCare = tree.Add("Body Care", root.Id);
+        Category sunLotions = tree.Add("Lotions", suncare.Id);
+        Category bodyLotions = tree.Add("Lotions", bodyCare.Id);
+        Guid[] ids = [root.Id, suncare.Id, sunLotions.Id, bodyCare.Id, bodyLotions.Id];
+
+        tree.Rename(suncare.Id, " Sun Care ");
+
+        Assert.Equal(ids, new[] { root.Id, suncare.Id, sunLotions.Id, bodyCare.Id, bodyLotions.Id });
+        Assert.Equal(suncare.Id, sunLotions.ParentId);
+        Assert.Equal(bodyCare.Id, bodyLotions.ParentId);
+        Assert.Equal(["Health", "Sun Care", "Lotions"],
+            tree.Breadcrumb(sunLotions.Id).Select(segment => segment.Name));
+        Assert.Equal(["Health", "Body Care", "Lotions"],
+            tree.Breadcrumb(bodyLotions.Id).Select(segment => segment.Name));
+        Assert.Throws<InvalidOperationException>(() => tree.Rename(suncare.Id, "body care"));
+        Assert.Equal("Sun Care", suncare.Name);
+    }
 }

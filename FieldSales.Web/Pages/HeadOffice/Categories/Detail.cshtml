@@ -12,6 +12,12 @@
     }
 </nav>
 <h1>@Model.Details.Category.Name</h1>
+<form method="post" asp-page-handler="Rename">
+    <label asp-for="RenameName">Category name</label>
+    <input asp-for="RenameName" maxlength="200" />
+    <span asp-validation-for="RenameName"></span>
+    <button type="submit">Rename category</button>
+</form>
 <form method="post">
     <label asp-for="Name">Subcategory name</label>
     <input asp-for="Name" maxlength="200" />

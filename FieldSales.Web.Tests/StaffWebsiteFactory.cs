@@ -184,6 +184,24 @@ public sealed class TestCatalogueHandler : HttpMessageHandler
             }
         }
         if (path.StartsWith("/catalogue/categories/", StringComparison.Ordinal)
+            && path.EndsWith("/name", StringComparison.Ordinal)
+            && Guid.TryParse(path["/catalogue/categories/".Length..^"/name".Length], out Guid renameId)
+            && request.Method == HttpMethod.Put)
+        {
+            var body = await request.Content!.ReadFromJsonAsync<RenameRequest>(cancellationToken);
+            lock (_categories)
+            {
+                if (!_categories.TryGetValue(renameId, out var selected))
+                    return new HttpResponseMessage(HttpStatusCode.NotFound);
+                if (_categories.Values.Any(c => c.Id != renameId && c.ParentId == selected.ParentId
+                    && string.Equals(c.Name, body!.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    return new HttpResponseMessage(HttpStatusCode.Conflict);
+                var renamed = selected with { Name = body!.Name.Trim() };
+                _categories[renameId] = renamed;
+                return Json(HttpStatusCode.OK, renamed);
+            }
+        }
+        if (path.StartsWith("/catalogue/categories/", StringComparison.Ordinal)
             && Guid.TryParse(path["/catalogue/categories/".Length..], out Guid id)
             && request.Method == HttpMethod.Get)
         {
@@ -211,6 +229,7 @@ public sealed class TestCatalogueHandler : HttpMessageHandler
         new(status) { Content = JsonContent.Create(value) };
 
     private sealed record CreateRequest(string Name, Guid? ParentId);
+    private sealed record RenameRequest(string Name);
 }
 
 internal sealed class TestStaffApiHandler : HttpMessageHandler

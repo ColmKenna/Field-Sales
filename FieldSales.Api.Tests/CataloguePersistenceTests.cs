@@ -71,6 +71,56 @@ public sealed class CataloguePersistenceTests
         Assert.Equal(2, await db.Categories.CountAsync());
     }
 
+    [Fact]
+    public async Task Should_RefreshDescendantBreadcrumbs_When_AncestorIsRenamed()
+    {
+        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        await sql.StartAsync();
+        await using WebApplicationFactory<Program> factory = CreateFactory(sql.GetConnectionString());
+        await MigrateAsync(factory);
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+
+        Guid health = await CreateIdAsync(client, "Health", null);
+        Guid sun = await CreateIdAsync(client, "Suncare", health);
+        Guid body = await CreateIdAsync(client, "Body Care", health);
+        Guid sunLotions = await CreateIdAsync(client, "Lotions", sun);
+        Guid bodyLotions = await CreateIdAsync(client, "Lotions", body);
+        Guid face = await CreateIdAsync(client, "Face", sunLotions);
+        Dictionary<Guid, Guid?> parentBefore;
+        await using (AsyncServiceScope scope = factory.Services.CreateAsyncScope())
+            parentBefore = await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>()
+                .Categories.AsNoTracking().ToDictionaryAsync(category => category.Id, category => category.ParentId);
+
+        using HttpResponseMessage deniedRep = await PutNameAsync(client, sun, "Denied", BusinessRoles.FieldSalesperson);
+        using HttpResponseMessage deniedManager = await PutNameAsync(client, sun, "Denied", BusinessRoles.SalesManager);
+        Assert.Equal(HttpStatusCode.Forbidden, deniedRep.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, deniedManager.StatusCode);
+        using HttpResponseMessage duplicate = await PutNameAsync(client, sun, "body care");
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        using HttpResponseMessage renamed = await PutNameAsync(client, sun, "Sun Care");
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+        Assert.Equal(sun, (await renamed.Content.ReadFromJsonAsync<CategoryItem>())!.Id);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token());
+        CategoryDetails descendant = (await client.GetFromJsonAsync<CategoryDetails>(
+            $"/catalogue/categories/{face}"))!;
+        Assert.Equal(["Health", "Sun Care", "Lotions", "Face"],
+            descendant.Breadcrumb.Select(segment => segment.Name));
+        CategoryDetails otherLeaf = (await client.GetFromJsonAsync<CategoryDetails>(
+            $"/catalogue/categories/{bodyLotions}"))!;
+        Assert.Equal(["Health", "Body Care", "Lotions"],
+            otherLeaf.Breadcrumb.Select(segment => segment.Name));
+        Assert.NotEqual(sunLotions, bodyLotions);
+        await using (AsyncServiceScope scope = factory.Services.CreateAsyncScope())
+        {
+            CatalogueDbContext db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
+            Assert.Equal(parentBefore,
+                await db.Categories.AsNoTracking().ToDictionaryAsync(category => category.Id, category => category.ParentId));
+            Assert.Equal("Sun Care", (await db.Categories.AsNoTracking().SingleAsync(category => category.Id == sun)).Name);
+        }
+    }
+
     private static async Task MigrateAsync(WebApplicationFactory<Program> factory)
     {
         _ = factory.Server;
@@ -112,6 +162,22 @@ public sealed class CataloguePersistenceTests
         using HttpRequestMessage request = new(HttpMethod.Post, "/catalogue/categories/");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token(currentRole));
         request.Content = JsonContent.Create(new { Name = name, ParentId = parentId });
+        return await client.SendAsync(request);
+    }
+
+    private static async Task<Guid> CreateIdAsync(HttpClient client, string name, Guid? parentId)
+    {
+        using HttpResponseMessage response = await PostAsync(client, name, parentId, BusinessRoles.HeadOfficeUser);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<CategoryItem>())!.Id;
+    }
+
+    private static async Task<HttpResponseMessage> PutNameAsync(HttpClient client, Guid id, string name,
+        string role = BusinessRoles.HeadOfficeUser)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Put, $"/catalogue/categories/{id}/name");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token(role));
+        request.Content = JsonContent.Create(new { Name = name });
         return await client.SendAsync(request);
     }
 

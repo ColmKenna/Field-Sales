@@ -14,21 +14,27 @@ public sealed class CategoryTree
 
     public Category Add(string name, Guid? parentId = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        string trimmedName = name.Trim();
-        if (trimmedName.Length > Category.MaximumNameLength)
-            throw new ArgumentException($"A category name cannot exceed {Category.MaximumNameLength} characters.",
-                nameof(name));
+        string trimmedName = NormalizeName(name);
         if (parentId is not null && !_categories.ContainsKey(parentId.Value))
             throw new ArgumentException("The parent category does not exist.", nameof(parentId));
 
-        if (_categories.Values.Any(category => category.ParentId == parentId
-                && string.Equals(category.Name, trimmedName, StringComparison.OrdinalIgnoreCase)))
+        if (HasSiblingName(parentId, trimmedName))
             throw new InvalidOperationException("A category with this name already exists under this parent.");
 
         Category added = new(Guid.NewGuid(), parentId, trimmedName);
         _categories.Add(added.Id, added);
         return added;
+    }
+
+    public Category Rename(Guid categoryId, string name)
+    {
+        if (!_categories.TryGetValue(categoryId, out Category? category))
+            throw new KeyNotFoundException("The category does not exist.");
+        string trimmedName = NormalizeName(name);
+        if (HasSiblingName(category.ParentId, trimmedName, categoryId))
+            throw new InvalidOperationException("A category with this name already exists under this parent.");
+        category.Rename(trimmedName);
+        return category;
     }
 
     public IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb(Guid categoryId)
@@ -52,4 +58,18 @@ public sealed class CategoryTree
         segments.Reverse();
         return segments;
     }
+
+    private static string NormalizeName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        string trimmedName = name.Trim();
+        if (trimmedName.Length > Category.MaximumNameLength)
+            throw new ArgumentException($"A category name cannot exceed {Category.MaximumNameLength} characters.",
+                nameof(name));
+        return trimmedName;
+    }
+
+    private bool HasSiblingName(Guid? parentId, string name, Guid? exceptId = null) =>
+        _categories.Values.Any(category => category.ParentId == parentId && category.Id != exceptId
+            && string.Equals(category.Name, name, StringComparison.OrdinalIgnoreCase));
 }

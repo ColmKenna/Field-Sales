@@ -72,7 +72,7 @@ call protected catalogue endpoints; category identities and parent links live in
 - **FieldSales.Identity**: The primary authentication host running Duende IdentityServer with ASP.NET Core Identity. Houses the Razor Pages UI for account workflows (Login, Logout, Access Denied) and the `/Admin` management console.
 - **FieldSales.Identity.Admin.Services**: A decoupled domain services library containing the business logic, validation, audit generation, and management operations for the admin console. It has no reference to the host's `DbContext` or user type; the host supplies adapters for the persistence ports it defines.
 - **AppHost / ServiceDefaults**: .NET Aspire orchestration and shared service defaults (OpenTelemetry, health checks, resilience).
-- **FieldSales.Web**: One staff Razor Pages BFF with I-01 entry, I-02 area choice, last-used permitted routing, protected rep/manager/head-office landings, server-side token refresh and sign-out. Head Office users can create root and nested categories at `/HeadOffice/Categories`.
+- **FieldSales.Web**: One staff Razor Pages BFF with I-01 entry, I-02 area choice, last-used permitted routing, protected rep/manager/head-office landings, server-side token refresh and sign-out. Head Office users can create and rename root or nested categories at `/HeadOffice/Categories`.
 - **FieldSales.Api**: Protected staff session and catalogue endpoints used by the BFF.
 
 > [!NOTE]

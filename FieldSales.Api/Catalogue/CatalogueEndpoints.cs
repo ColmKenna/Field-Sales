@@ -8,6 +8,7 @@ public sealed record CategoryDetails(CategoryItem Category,
     IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
     IReadOnlyList<CategoryItem> Children);
 public sealed record CreateCategoryRequest(string? Name, Guid? ParentId);
+public sealed record RenameCategoryRequest(string? Name);
 
 public static class CatalogueEndpoints
 {
@@ -75,6 +76,41 @@ public static class CatalogueEndpoints
             }
 
             return Results.Created($"/catalogue/categories/{added.Id}", ToItem(added));
+        });
+
+        categories.MapPut("/{id:guid}/name", async (Guid id, RenameCategoryRequest request,
+            CatalogueDbContext db, CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name)
+                || request.Name.Trim().Length > Category.MaximumNameLength)
+                return Results.BadRequest(new { Error = "Enter a category name of up to 200 characters." });
+
+            List<Category> existing = await db.Categories.ToListAsync(cancellationToken);
+            Category renamed;
+            try
+            {
+                renamed = new CategoryTree(existing).Rename(id, request.Name);
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound();
+            }
+            catch (InvalidOperationException)
+            {
+                return Results.Conflict(new { Error = "A category with this name already exists here." });
+            }
+
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (exception.InnerException is SqlException
+                       { Number: 2601 or 2627 })
+            {
+                return Results.Conflict(new { Error = "A category with this name already exists here." });
+            }
+
+            return Results.Ok(ToItem(renamed));
         });
     }
 

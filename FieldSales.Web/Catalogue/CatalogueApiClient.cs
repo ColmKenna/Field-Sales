@@ -12,6 +12,8 @@ public sealed record CategoryDetails(CategoryItem Category,
     IReadOnlyList<CategoryItem> Children);
 public enum CreateCategoryStatus { Created, Duplicate, ParentMissing, Invalid, Unavailable }
 public sealed record CreateCategoryResult(CreateCategoryStatus Status, CategoryItem? Category = null);
+public enum RenameCategoryStatus { Renamed, Duplicate, Missing, Invalid, Unavailable }
+public sealed record RenameCategoryResult(RenameCategoryStatus Status, CategoryItem? Category = null);
 
 public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
@@ -46,6 +48,22 @@ public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor c
             HttpStatusCode.NotFound => new(CreateCategoryStatus.ParentMissing),
             HttpStatusCode.BadRequest => new(CreateCategoryStatus.Invalid),
             _ => new(CreateCategoryStatus.Unavailable)
+        };
+    }
+
+    public async Task<RenameCategoryResult> RenameAsync(Guid id, string name,
+        CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Put,
+            $"/catalogue/categories/{id}/name", new { Name = name }, cancellationToken);
+        return response.StatusCode switch
+        {
+            HttpStatusCode.OK => new(RenameCategoryStatus.Renamed,
+                await response.Content.ReadFromJsonAsync<CategoryItem>(cancellationToken)),
+            HttpStatusCode.Conflict => new(RenameCategoryStatus.Duplicate),
+            HttpStatusCode.NotFound => new(RenameCategoryStatus.Missing),
+            HttpStatusCode.BadRequest => new(RenameCategoryStatus.Invalid),
+            _ => new(RenameCategoryStatus.Unavailable)
         };
     }
 

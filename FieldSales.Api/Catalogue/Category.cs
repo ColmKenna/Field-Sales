@@ -17,4 +17,6 @@ public sealed class Category
     public Guid Id { get; private set; }
     public Guid? ParentId { get; private set; }
     public string Name { get; private set; } = string.Empty;
+
+    internal void Rename(string name) => Name = name;
 }

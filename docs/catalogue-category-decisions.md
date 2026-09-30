@@ -24,7 +24,11 @@ The implementation trims names and treats sibling names that differ only by case
 
 - `/HeadOffice/Categories` lists root categories and offers **Add root category** with a name field.
 - Opening one category shows its current breadcrumb as links to its ancestors, followed by its direct child categories and an **Add subcategory** name field. The parent is the category being viewed. A successful create opens the new category.
-- A duplicate sibling name shows a field error and makes no change. The form uses the existing staff sign-in and Head Office role boundary. There are no product rows, counts, search, move, archive, or recategorise controls in this slice. Rename is added in Increment 5.
+- A duplicate sibling name shows a field error and makes no change. The form uses the existing staff sign-in and Head Office role boundary. There are no product rows, counts, search, move, archive, or recategorise controls in this slice.
+
+## Rename implemented in Increment 5
+
+The category detail page has a separate **Rename category** form. It sends a server-side token to the Head Office protected API `PUT /catalogue/categories/{id}/name` route. The API changes only the name; IDs and parent links remain fixed. A descendant's next read derives its breadcrumb from the current ancestor names. Duplicate sibling names show a field error. Expired or removed-role form submissions stop before any API write and are not replayed after sign-in.
 
 ## Verification boundary
 
