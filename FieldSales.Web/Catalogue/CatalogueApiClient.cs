@@ -5,11 +5,12 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace FieldSales.Web.Catalogue;
 
-public sealed record CategoryItem(Guid Id, Guid? ParentId, string Name);
+public sealed record CategoryItem(Guid Id, Guid? ParentId, string Name, int Here = 0, int Beneath = 0);
 public sealed record CategoryBreadcrumbSegment(Guid Id, string Name);
 public sealed record CategoryDetails(CategoryItem Category,
     IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
-    IReadOnlyList<CategoryItem> Children);
+    IReadOnlyList<CategoryItem> Children, IReadOnlyList<ProductItem> Products);
+public sealed record CategorySearchResult(Guid Id, string Path);
 public enum CreateCategoryStatus { Created, Duplicate, ParentMissing, Invalid, Unavailable }
 public sealed record CreateCategoryResult(CreateCategoryStatus Status, CategoryItem? Category = null);
 public enum RenameCategoryStatus { Renamed, Duplicate, Missing, Invalid, Unavailable }
@@ -43,6 +44,16 @@ public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor c
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<CategoryDetails>(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CategorySearchResult>?> SearchCategoriesAsync(string query,
+        CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Get,
+            $"/catalogue/categories/search?q={Uri.EscapeDataString(query)}", null, cancellationToken);
+        return response.IsSuccessStatusCode
+            ? await response.Content.ReadFromJsonAsync<CategorySearchResult[]>(cancellationToken)
+            : null;
     }
 
     public async Task<CreateCategoryResult> CreateAsync(string name, Guid? parentId,
