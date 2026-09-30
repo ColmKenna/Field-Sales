@@ -137,3 +137,11 @@ An unrestricted admin UI npm ci retry still fails with GitHub Packages HTTP 401 
 @colmkenna/ck-tabs@1.0.4, preventing its JavaScript suite from starting. Package credentials and
 machine security policy require local resolution. WI-008 remains active and the feature branch
 is not pushed as completed; no next work item is started.
+
+On 2026-10-01, the developer's requested npm restore succeeded after resolving configuration
+precedence: the project's unset GITHUB_PACKAGES_TOKEN reference was supplied from the saved
+local npm login credential for the restore process only. No credential was written into the
+repository. All 18 admin UI tests now pass. Manifests, lockfiles and package versions are unchanged.
+The restore's audit identifies undici@7.29.0 via the jsdom test dependency as high severity; updating
+dependencies is outside this restore's scope. Windows Application Control remains the outstanding
+full-suite verification blocker, so WI-008 stays active.
