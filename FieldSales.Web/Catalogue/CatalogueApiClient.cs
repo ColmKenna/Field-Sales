@@ -14,6 +14,16 @@ public enum CreateCategoryStatus { Created, Duplicate, ParentMissing, Invalid, U
 public sealed record CreateCategoryResult(CreateCategoryStatus Status, CategoryItem? Category = null);
 public enum RenameCategoryStatus { Renamed, Duplicate, Missing, Invalid, Unavailable }
 public sealed record RenameCategoryResult(RenameCategoryStatus Status, CategoryItem? Category = null);
+public sealed record ProductCategoryChoice(Guid Id, string Path);
+public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit);
+public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
+public sealed record ProductAttribute(string Name, string Value);
+public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
+    ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
+    IReadOnlyList<ProductAttribute> Attributes);
+public enum CreateProductStatus { Created, Invalid, Unavailable }
+public sealed record CreateProductResult(CreateProductStatus Status, ProductItem? Product = null,
+    IReadOnlyDictionary<string, string[]>? Errors = null);
 
 public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
@@ -66,6 +76,48 @@ public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor c
             _ => new(RenameCategoryStatus.Unavailable)
         };
     }
+
+    public async Task<IReadOnlyList<ProductCategoryChoice>?> ProductCategoriesAsync(CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Get,
+            "/catalogue/products/category-choices", null, cancellationToken);
+        return response.IsSuccessStatusCode
+            ? await response.Content.ReadFromJsonAsync<ProductCategoryChoice[]>(cancellationToken)
+            : null;
+    }
+
+    public async Task<ProductDetails?> ProductDetailsAsync(Guid id, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Get,
+            $"/catalogue/products/{id}", null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ProductDetails>(cancellationToken);
+    }
+
+    public async Task<CreateProductResult> CreateProductAsync(string code, string name, Guid? categoryId,
+        decimal? basePrice, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Post, "/catalogue/products/",
+            new { Code = code, Name = name, CategoryId = categoryId, Unit = "Each", BasePrice = basePrice }, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Created)
+            return new(CreateProductStatus.Created, await response.Content.ReadFromJsonAsync<ProductItem>(cancellationToken));
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            ProductValidationErrors? body = await response.Content.ReadFromJsonAsync<ProductValidationErrors>(cancellationToken);
+            return new(CreateProductStatus.Invalid, Errors: body?.Errors);
+        }
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            ProductSaveError? body = await response.Content.ReadFromJsonAsync<ProductSaveError>(cancellationToken);
+            return new(CreateProductStatus.Invalid, Errors: body is null ? null
+                : new Dictionary<string, string[]> { [body.Field] = [body.Error] });
+        }
+        return new(CreateProductStatus.Unavailable);
+    }
+
+    private sealed record ProductValidationErrors(Dictionary<string, string[]> Errors);
+    private sealed record ProductSaveError(string Field, string Error);
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path,
         object? body, CancellationToken cancellationToken)

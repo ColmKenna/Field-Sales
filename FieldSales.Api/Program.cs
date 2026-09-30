@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
 
 const string roleLookupUnavailableKey = "staff-role-lookup-unavailable";
@@ -113,6 +114,7 @@ app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new
     }))
     .RequireAuthorization("StaffApi");
 app.MapCatalogueEndpoints();
+app.MapProductEndpoints();
 app.MapDefaultEndpoints();
 app.Run();
 

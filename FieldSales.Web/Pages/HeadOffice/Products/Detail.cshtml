@@ -1,0 +1,55 @@
+@page "/HeadOffice/Products/{id:guid}"
+@model FieldSales.Web.Pages.HeadOffice.Products.DetailModel
+@using System.Globalization
+@{
+    ViewData["Title"] = Model.Details.Product.Name;
+    var currency = CultureInfo.GetCultureInfo("en-IE");
+}
+<p><a asp-page="/HeadOffice/Index">Back to catalogue</a></p>
+<h1>@Model.Details.Product.Code · @Model.Details.Product.Name</h1>
+<nav aria-label="Category path">
+    @foreach (var segment in Model.Details.Breadcrumb)
+    {
+        if (segment != Model.Details.Breadcrumb[0])
+        {
+            <span aria-hidden="true"> &gt; </span>
+        }
+        <a asp-page="/HeadOffice/Categories/Detail" asp-route-id="@segment.Id">@segment.Name</a>
+    }
+</nav>
+<div class="product-record">
+    <section aria-labelledby="price-heading">
+        <h2 id="price-heading">Base price</h2>
+        @if (Model.Details.CurrentPrice is { } price)
+        {
+            <p>@price.Amount.ToString("C2", currency) · Effective from @price.EffectiveFrom.ToString("d MMM yyyy", currency)</p>
+        }
+        else
+        {
+            <p>No price in effect.</p>
+        }
+    </section>
+    <section aria-labelledby="unit-heading"><h2 id="unit-heading">Unit</h2><p>@Model.Details.Product.Unit</p></section>
+    <section aria-labelledby="ranges-heading"><h2 id="ranges-heading">Ranges</h2><p>Unranged — orderable by all reps</p></section>
+    <section aria-labelledby="replacements-heading"><h2 id="replacements-heading">Replacements</h2><p>No replacements yet.</p></section>
+    <section aria-labelledby="profile-heading"><h2 id="profile-heading">Profile</h2><p>No profile yet.</p></section>
+    <section aria-labelledby="brands-heading"><h2 id="brands-heading">Brands</h2><p>No brands yet.</p></section>
+    <section aria-labelledby="supplier-heading"><h2 id="supplier-heading">Supplier</h2><p>No supplier yet.</p></section>
+    <section aria-labelledby="restriction-heading"><h2 id="restriction-heading">Restriction Group</h2><p>No restriction group yet.</p></section>
+    <section aria-labelledby="attributes-heading"><h2 id="attributes-heading">Attributes</h2>
+        @if (Model.Details.Attributes.Count == 0)
+        {
+            <p>No attributes yet.</p>
+        }
+        else
+        {
+            <dl>
+                @foreach (var item in Model.Details.Attributes)
+                {
+                    <dt>@item.Name</dt><dd>@item.Value</dd>
+                }
+            </dl>
+        }
+    </section>
+</div>
+<p><a asp-page="Create">Create another product</a></p>
