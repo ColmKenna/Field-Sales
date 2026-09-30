@@ -2,11 +2,77 @@ using FieldSales.Api.Catalogue;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
+using FieldSales.Quantities;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace FieldSales.Api.Tests;
 
 public sealed class ProductPersistenceTests
 {
+    [Fact]
+    public async Task Should_PreserveEachAndPriceHistory_When_QuantityMigrationUpgradesExistingProduct()
+    {
+        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        await sql.StartAsync();
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        Guid id = Guid.NewGuid();
+        Guid categoryId;
+        await using (CatalogueDbContext predecessor = new(options))
+        {
+            await predecessor.GetService<IMigrator>().MigrateAsync("20260930173447_AddMinimumProducts");
+            Category category = new CategoryTree([]).Add("Suncare");
+            predecessor.Categories.Add(category);
+            await predecessor.SaveChangesAsync();
+            categoryId = category.Id;
+            await predecessor.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO Products (Id, Code, Name, CategoryId, Unit, Attributes) VALUES ({id}, 'LEGACY', 'Existing product', {categoryId}, 'Each', '[]')");
+            await predecessor.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO ProductBasePrices (ProductId, EffectiveFrom, Amount) VALUES ({id}, '2026-09-30', 4.80)");
+            await predecessor.Database.MigrateAsync();
+        }
+        await using CatalogueDbContext upgraded = new(options);
+        Product product = await upgraded.Products.Include(product => product.BasePrices).SingleAsync();
+        Assert.Equal(id, product.Id);
+        Assert.Equal(categoryId, product.CategoryId);
+        Assert.Equal("Each", product.Unit);
+        Assert.Null(product.QuantityStep);
+        Assert.Null(product.MinimumQuantity);
+        Assert.True(product.GetQuantityRules().ValidateOrder(1m).IsValid);
+        Assert.False(product.GetQuantityRules().ValidateOrder(0m).IsValid);
+        Assert.Equal(4.80m, Assert.Single(product.BasePrices).Amount);
+        Assert.Empty(product.Attributes);
+    }
+
+    [Fact]
+    public async Task Should_PersistExactRulesAndRejectInvalidMinimum_When_ProductIsReloaded()
+    {
+        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        await sql.StartAsync();
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        Guid id;
+        await using (CatalogueDbContext setup = new(options))
+        {
+            await setup.Database.MigrateAsync();
+            Category category = new CategoryTree([]).Add("Tea");
+            setup.Categories.Add(category);
+            Assert.True(QuantityRules.TryCreate("kg", 0.000001m, 0.000003m, out var rules, out _));
+            Product product = Product.Create("TEA", "Loose tea", category.Id, 4.80m, new DateOnly(2026, 10, 1), rules);
+            setup.Products.Add(product);
+            await setup.SaveChangesAsync();
+            id = product.Id;
+            SqlException error = await Assert.ThrowsAsync<SqlException>(() => setup.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE Products SET QuantityStep = 0.5, MinimumQuantity = 0.7 WHERE Id = {id}"));
+            Assert.Equal(547, error.Number);
+        }
+        await using CatalogueDbContext reloaded = new(options);
+        Product saved = await reloaded.Products.Include(product => product.BasePrices).SingleAsync(product => product.Id == id);
+        Assert.Equal(0.000001m, saved.QuantityStep);
+        Assert.Equal(0.000003m, saved.MinimumQuantity);
+        Assert.True(saved.GetQuantityRules().ValidateOrder(0.000004m).IsValid);
+        Assert.Equal(4.80m, Assert.Single(saved.BasePrices).Amount);
+    }
+
     [Fact]
     public async Task Should_SaveOnlyOneProduct_When_DuplicateCodesAreSubmittedConcurrently()
     {
