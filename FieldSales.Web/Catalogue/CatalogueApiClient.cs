@@ -29,6 +29,9 @@ public sealed record CreateProductResult(CreateProductStatus Status, ProductItem
 public enum UpdateProductUnitStatus { Saved, Invalid, Missing, Unavailable }
 public sealed record UpdateProductUnitResult(UpdateProductUnitStatus Status,
     IReadOnlyDictionary<string, string[]>? Errors = null);
+public enum AddProductBasePriceStatus { Created, Invalid, Missing, Unavailable }
+public sealed record AddProductBasePriceResult(AddProductBasePriceStatus Status,
+    IReadOnlyDictionary<string, string[]>? Errors = null);
 
 public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
@@ -146,6 +149,28 @@ public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor c
             return new(UpdateProductUnitStatus.Invalid, body?.Errors);
         }
         return new(UpdateProductUnitStatus.Unavailable);
+    }
+
+    public async Task<AddProductBasePriceResult> AddProductBasePriceAsync(Guid id, decimal? basePrice,
+        DateOnly? effectiveFrom, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Post,
+            $"/catalogue/products/{id}/base-prices",
+            new { BasePrice = basePrice, EffectiveFrom = effectiveFrom }, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Created) return new(AddProductBasePriceStatus.Created);
+        if (response.StatusCode == HttpStatusCode.NotFound) return new(AddProductBasePriceStatus.Missing);
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            ProductValidationErrors? body = await response.Content.ReadFromJsonAsync<ProductValidationErrors>(cancellationToken);
+            return new(AddProductBasePriceStatus.Invalid, body?.Errors);
+        }
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            ProductSaveError? body = await response.Content.ReadFromJsonAsync<ProductSaveError>(cancellationToken);
+            return new(AddProductBasePriceStatus.Invalid, body is null ? null
+                : new Dictionary<string, string[]> { [body.Field] = [body.Error] });
+        }
+        return new(AddProductBasePriceStatus.Unavailable);
     }
 
     private sealed record ProductValidationErrors(Dictionary<string, string[]> Errors);

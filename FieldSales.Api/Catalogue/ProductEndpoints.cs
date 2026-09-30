@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using FieldSales.Quantities;
+using System.Globalization;
 
 namespace FieldSales.Api.Catalogue;
 
@@ -8,6 +9,7 @@ public sealed record ProductCategoryChoice(Guid Id, string Path);
 public sealed record CreateProductRequest(string? Code, string? Name, Guid? CategoryId,
     string? Unit, decimal? BasePrice, decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record SetProductUnitRequest(string? Unit, decimal? QuantityStep, decimal? MinimumQuantity);
+public sealed record AddProductBasePriceRequest(decimal? BasePrice, DateOnly? EffectiveFrom);
 public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit,
     decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
@@ -52,6 +54,7 @@ public static class ProductEndpoints
 
         products.MapPost("/", CreateAsync);
         products.MapPut("/{id:guid}/unit", SetUnitAsync);
+        products.MapPost("/{id:guid}/base-prices", AddBasePriceAsync);
     }
 
     private static async Task<IResult> CreateAsync(CreateProductRequest request, CatalogueDbContext db,
@@ -109,6 +112,45 @@ public static class ProductEndpoints
         await db.SaveChangesAsync(cancellationToken);
         return Results.Ok(ToItem(product));
     }
+
+    private static async Task<IResult> AddBasePriceAsync(Guid id, AddProductBasePriceRequest request,
+        CatalogueDbContext db, CancellationToken cancellationToken)
+    {
+        Product? product = await db.Products.Include(product => product.BasePrices)
+            .SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
+        if (product is null) return Results.NotFound();
+
+        Dictionary<string, string[]> errors = [];
+        if (request.BasePrice is null) errors["BasePrice"] = ["Enter a base price."];
+        else if (request.BasePrice < 0 || request.BasePrice > ProductBasePrice.MaximumAmount
+                 || decimal.Round(request.BasePrice.Value, 2) != request.BasePrice.Value)
+            errors["BasePrice"] = ["Enter a non-negative base price with up to two decimal places within the supported amount."];
+        if (request.EffectiveFrom is null) errors["EffectiveFrom"] = ["Enter an effective from date."];
+        if (errors.Count != 0) return Results.ValidationProblem(errors);
+
+        DateOnly effectiveFrom = request.EffectiveFrom!.Value;
+        if (product.BasePrices.Any(price => price.EffectiveFrom == effectiveFrom))
+            return DuplicatePrice(effectiveFrom);
+        product.AddBasePrice(request.BasePrice!.Value, effectiveFrom);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            // A competing insert may have won after the history was loaded.
+            if (!await db.ProductBasePrices.AsNoTracking().AnyAsync(price =>
+                    price.ProductId == id && price.EffectiveFrom == effectiveFrom, cancellationToken))
+                throw;
+            return DuplicatePrice(effectiveFrom);
+        }
+        return Results.Created($"/catalogue/products/{id}",
+            new ProductPriceItem(effectiveFrom, request.BasePrice.Value));
+    }
+
+    private static IResult DuplicatePrice(DateOnly effectiveFrom) => Results.Conflict(
+        new ProductSaveError("EffectiveFrom",
+            $"A price already starts on {effectiveFrom.ToString("d MMM yyyy", CultureInfo.InvariantCulture)} — edit it instead"));
 
     private static IResult Duplicate(Product product) => Results.Conflict(new ProductSaveError("Code",
         $"Code {product.Code} is already used by {product.Name}"));
