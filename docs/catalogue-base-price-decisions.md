@@ -70,3 +70,35 @@ has zero warnings/errors; all 16 console and product-unit JavaScript cases pass.
 suite records 1,075 passes and the same 80 Windows Application Control failures in website and
 identity SQL fixtures. Admin UI dependency access remains unresolved. This increment is committed
 for review with WI-008 still active; full acceptance and the website form remain outstanding.
+
+## Increment 3 — record form and history
+
+The developer approved continuing to the website increment on 2026-10-01. The existing product
+record, create form and unit form supply the Razor Pages and CSS conventions; the approved scope
+is an in-place price form and record display, following H-13's price section.
+
+The record adds amount per saved unit and Effective From fields with inline errors and antiforgery.
+Saving redirects to the same product record. A rejected form retains the entered amount/date and
+reloads the saved product's unit fields. The API's exact duplicate-date wording is displayed without
+offering an editing action, consistent with the approved append-only slice.
+
+CurrentPrice remains authoritative from the API. The nearest later history entry drives the
+coming-price summary; the website introduces no separate date resolver or clock. A rise uses
+"€12.50 · rising to €13.20 on 1 Nov"; a reduction uses "falling to" and an equal amount uses
+"changing to". If no price is effective, the earliest coming entry is shown with its date.
+The table lists full Effective From dates and prices newest first, keeping later changes visible.
+
+Website scenarios run the real Razor page, cookies, BFF requests and antiforgery boundary with
+scripted API responses. The SQL/API cases from Increment 2 remain the persistence evidence.
+The past-dated explanatory notice and final source-criteria audit are still Increment 4 work.
+
+The website cases caught the existing required Unit property rejecting price-only submissions.
+The Price handler now excludes only the other form's fields from ModelState before checking its
+own amount/date inputs. Price field errors remain visible and stored unit values are repopulated.
+
+Increment 3 verification: all 15 page cases pass, including stale-form denial without replay;
+all 78 API cases pass. The complete solution build has zero warnings/errors, and 16 console and
+product-unit JavaScript cases pass. The full .NET run records 1,090 passes and the existing 80
+Windows Application Control failures. The initial temporary block on the rebuilt website test
+assembly did not persist on the normal subsequent build/run. Admin UI package access remains
+unresolved. WI-008 remains active at the Increment 3 review boundary.
