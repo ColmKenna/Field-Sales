@@ -50,7 +50,9 @@ window.DELIVERY_PLAN = {
   "workItemStatus": {
     "WI-001": "done",
     "WI-002": "done",
-    "WI-003": "done"
+    "WI-003": "done",
+    "WI-004": "done",
+    "WI-005": "done"
   },
   "complexities": [
     "Simple",

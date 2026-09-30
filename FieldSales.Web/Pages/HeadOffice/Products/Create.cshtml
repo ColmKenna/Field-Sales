@@ -1,0 +1,37 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Products.CreateModel
+@{
+    ViewData["Title"] = "Create product";
+}
+<p><a asp-page="/HeadOffice/Index">Back to catalogue</a></p>
+<h1>Create product</h1>
+<p>Enter the essentials now. You can add the other details later.</p>
+@if (Model.Categories.Count == 0)
+{
+    <p role="status">Create a category before adding a product. <a asp-page="/HeadOffice/Categories/Index">Browse categories</a></p>
+}
+<form method="post" class="product-form">
+    <div asp-validation-summary="All" role="alert"></div>
+    <label asp-for="Code">Code</label>
+    <input asp-for="Code" maxlength="100" required />
+    <span asp-validation-for="Code"></span>
+    <label asp-for="Name">Name</label>
+    <input asp-for="Name" maxlength="200" required />
+    <span asp-validation-for="Name"></span>
+    <label asp-for="CategoryId">Category</label>
+    <select asp-for="CategoryId" required>
+        <option value="">Choose a category</option>
+        @foreach (var category in Model.Categories)
+        {
+            <option value="@category.Id">@category.Path</option>
+        }
+    </select>
+    <span asp-validation-for="CategoryId"></span>
+    <label for="product-unit">Unit</label>
+    <input id="product-unit" value="Each" readonly />
+    <label asp-for="BasePrice">Base price (€)</label>
+    <input asp-for="BasePrice" type="number" min="0" step="0.01" required aria-describedby="price-start" />
+    <span asp-validation-for="BasePrice"></span>
+    <p id="price-start">Effective from today.</p>
+    <button type="submit" class="button" disabled="@(Model.Categories.Count == 0)">Save product</button>
+</form>

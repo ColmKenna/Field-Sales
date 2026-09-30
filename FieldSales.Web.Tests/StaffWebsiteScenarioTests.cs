@@ -291,12 +291,14 @@ public sealed class StaffWebsiteScenarioTests
         Assert.DoesNotContain("head-office catalogue workspace", await response.Content.ReadAsStringAsync());
     }
 
-    [Fact]
-    public async Task Should_DenyUnheldArea_When_AStaffMemberUsesADirectLink()
+    [Theory]
+    [InlineData("colm", StaffRoles.FieldSalesperson)]
+    [InlineData("aoife", StaffRoles.SalesManager)]
+    public async Task Should_DenyUnheldArea_When_AStaffMemberUsesADirectLink(string subject, string role)
     {
         await using StaffWebsiteFactory website = new();
         using HttpClient browser = website.CreateBrowser();
-        await SignInAsync(browser, "colm", StaffRoles.FieldSalesperson);
+        await SignInAsync(browser, subject, role);
 
         using HttpResponseMessage read = await browser.GetAsync("/HeadOffice");
         Assert.Equal(HttpStatusCode.Redirect, read.StatusCode);

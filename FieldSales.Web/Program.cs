@@ -1,4 +1,5 @@
 using FieldSales.Web.Data;
+using FieldSales.Web.Catalogue;
 using FieldSales.Web.Security;
 using FieldSales.StaffAccess;
 using Microsoft.AspNetCore.Authentication;
@@ -38,6 +39,10 @@ builder.Services.AddScoped<StaffAreaService>();
 builder.Services.AddSingleton<AccessChangedTokenService>();
 builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, TicketStoreCookieOptions>();
 builder.Services.AddHttpClient();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient<CatalogueApiClient>((services, client) =>
+    client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>()["StaffApi:BaseUrl"]
+        ?? throw new InvalidOperationException("StaffApi:BaseUrl is required.")));
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
 builder.Services.AddScoped<StaffCookieEvents>();
 builder.Services.AddHostedService<ExpiredTicketsCleanupService>();
@@ -98,7 +103,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Staff", "StaffMember");
     options.Conventions.AuthorizePage("/Rep/Index", StaffRoles.FieldSalesperson);
     options.Conventions.AuthorizePage("/Manager/Index", StaffRoles.SalesManager);
-    options.Conventions.AuthorizePage("/HeadOffice/Index", StaffRoles.HeadOfficeUser);
+    options.Conventions.AuthorizeFolder("/HeadOffice", StaffRoles.HeadOfficeUser);
 });
 
 WebApplication app = builder.Build();

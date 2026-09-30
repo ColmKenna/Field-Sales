@@ -1,10 +1,14 @@
 using System.Security.Claims;
 using FieldSales.StaffAccess;
+using FieldSales.Api.Catalogue;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
+builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
 
 const string roleLookupUnavailableKey = "staff-role-lookup-unavailable";
@@ -70,6 +74,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy("HeadOfficeCatalogue", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(BusinessRoles.HeadOfficeUser)
+        .RequireAssertion(context => context.User.FindAll("scope")
+            .SelectMany(claim => claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Contains("fieldsales.api")));
     options.AddPolicy("StaffApi", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.All)
@@ -80,6 +90,18 @@ builder.Services.AddAuthorization(options =>
 });
 
 WebApplication app = builder.Build();
+if (app.Environment.IsDevelopment())
+{
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
+}
+else if (!app.Environment.IsEnvironment("Testing"))
+{
+    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
+    if ((await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>()
+            .Database.GetPendingMigrationsAsync()).Any())
+        throw new InvalidOperationException("CatalogueDb has pending migrations.");
+}
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -91,6 +113,8 @@ app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new
             .ToArray()
     }))
     .RequireAuthorization("StaffApi");
+app.MapCatalogueEndpoints();
+app.MapProductEndpoints();
 app.MapDefaultEndpoints();
 app.Run();
 
