@@ -227,7 +227,7 @@ public sealed class TestCatalogueHandler : HttpMessageHandler
                 }
                 pathSegments.Reverse();
                 return Json(HttpStatusCode.OK, new FieldSales.Web.Catalogue.CategoryDetails(selected,
-                    pathSegments, _categories.Values.Where(c => c.ParentId == id).ToArray()));
+                    pathSegments, _categories.Values.Where(c => c.ParentId == id).ToArray(), []));
             }
         }
         return new HttpResponseMessage(HttpStatusCode.NotFound);

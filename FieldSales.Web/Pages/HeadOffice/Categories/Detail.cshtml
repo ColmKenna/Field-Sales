@@ -12,6 +12,8 @@
     }
 </nav>
 <h1>@Model.Details.Category.Name</h1>
+<p>@Model.Details.Category.Beneath products beneath · @Model.Details.Category.Here here</p>
+<a asp-page="Index">Search categories</a>
 <form method="post" asp-page-handler="Rename">
     <label asp-for="RenameName">Category name</label>
     <input asp-for="RenameName" maxlength="200" />
@@ -34,7 +36,21 @@ else
     <ul>
     @foreach (var category in Model.Details.Children)
     {
-        <li><a asp-page="Detail" asp-route-id="@category.Id">@category.Name</a></li>
+        <li><a asp-page="Detail" asp-route-id="@category.Id">@category.Name</a> <span>@category.Beneath beneath</span></li>
+    }
+    </ul>
+}
+<h2>In @Model.Details.Category.Name</h2>
+@if (Model.Details.Products.Count == 0)
+{
+    <p>No products directly in this category.</p>
+}
+else
+{
+    <ul>
+    @foreach (var product in Model.Details.Products)
+    {
+        <li><a asp-page="/HeadOffice/Products/Detail" asp-route-id="@product.Id">@product.Code · @product.Name</a></li>
     }
     </ul>
 }

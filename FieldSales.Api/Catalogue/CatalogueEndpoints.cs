@@ -3,10 +3,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.Catalogue;
 
-public sealed record CategoryItem(Guid Id, Guid? ParentId, string Name);
+public sealed record CategoryItem(Guid Id, Guid? ParentId, string Name, int Here = 0, int Beneath = 0);
 public sealed record CategoryDetails(CategoryItem Category,
     IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
-    IReadOnlyList<CategoryItem> Children);
+    IReadOnlyList<CategoryItem> Children, IReadOnlyList<ProductItem> Products);
+public sealed record CategorySearchResult(Guid Id, string Path);
 public sealed record CreateCategoryRequest(string? Name, Guid? ParentId);
 public sealed record RenameCategoryRequest(string? Name);
 
@@ -19,12 +20,24 @@ public static class CatalogueEndpoints
 
         categories.MapGet("/", async (CatalogueDbContext db, CancellationToken cancellationToken) =>
         {
-            CategoryItem[] roots = await db.Categories.AsNoTracking()
-                .Where(category => category.ParentId == null)
-                .OrderBy(category => category.Name)
-                .Select(category => new CategoryItem(category.Id, category.ParentId, category.Name))
-                .ToArrayAsync(cancellationToken);
+            List<Category> all = await db.Categories.AsNoTracking().ToListAsync(cancellationToken);
+            var counts = await ReadCountsAsync(db, all, cancellationToken);
+            CategoryItem[] roots = all.Where(category => category.ParentId == null)
+                .OrderBy(category => category.Name).ThenBy(category => category.Id)
+                .Select(category => ToCountedItem(category, counts)).ToArray();
             return Results.Ok(roots);
+        });
+
+        categories.MapGet("/search", async (string? q, CatalogueDbContext db, CancellationToken cancellationToken) =>
+        {
+            string query = q?.Trim() ?? string.Empty;
+            if (query.Length == 0) return Results.Ok(Array.Empty<CategorySearchResult>());
+            List<Category> all = await db.Categories.AsNoTracking().ToListAsync(cancellationToken);
+            CategoryTree tree = new(all);
+            return Results.Ok(all.Where(category => category.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .Select(category => new CategorySearchResult(category.Id,
+                    string.Join(" > ", tree.Breadcrumb(category.Id).Select(segment => segment.Name))))
+                .OrderBy(result => result.Path, StringComparer.OrdinalIgnoreCase).ThenBy(result => result.Id).ToArray());
         });
 
         categories.MapGet("/{id:guid}", async (Guid id, CatalogueDbContext db,
@@ -35,10 +48,15 @@ public static class CatalogueEndpoints
             if (selected is null) return Results.NotFound();
 
             CategoryTree tree = new(all);
+            var counts = await ReadCountsAsync(db, all, cancellationToken);
             CategoryItem[] children = all.Where(category => category.ParentId == id)
-                .OrderBy(category => category.Name)
-                .Select(ToItem).ToArray();
-            return Results.Ok(new CategoryDetails(ToItem(selected), tree.Breadcrumb(id), children));
+                .OrderBy(category => category.Name).ThenBy(category => category.Id)
+                .Select(category => ToCountedItem(category, counts)).ToArray();
+            ProductItem[] products = await db.Products.AsNoTracking().Where(product => product.CategoryId == id)
+                .OrderBy(product => product.Code).ThenBy(product => product.Id)
+                .Select(product => new ProductItem(product.Id, product.Code, product.Name, product.CategoryId, product.Unit))
+                .ToArrayAsync(cancellationToken);
+            return Results.Ok(new CategoryDetails(ToCountedItem(selected, counts), tree.Breadcrumb(id), children, products));
         });
 
         categories.MapPost("/", async (CreateCategoryRequest request, CatalogueDbContext db,
@@ -116,4 +134,18 @@ public static class CatalogueEndpoints
 
     private static CategoryItem ToItem(Category category) =>
         new(category.Id, category.ParentId, category.Name);
+
+    private static CategoryItem ToCountedItem(Category category,
+        IReadOnlyDictionary<Guid, CategoryProductCount> counts) =>
+        new(category.Id, category.ParentId, category.Name, counts[category.Id].Here, counts[category.Id].Beneath);
+
+    private static async Task<IReadOnlyDictionary<Guid, CategoryProductCount>> ReadCountsAsync(
+        CatalogueDbContext db, IReadOnlyList<Category> categories, CancellationToken cancellationToken)
+    {
+        Dictionary<Guid, int> directCounts = await db.Products.AsNoTracking()
+            .GroupBy(product => product.CategoryId)
+            .Select(group => new { CategoryId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(group => group.CategoryId, group => group.Count, cancellationToken);
+        return CategoryProductCounts.Calculate(categories, directCounts);
+    }
 }

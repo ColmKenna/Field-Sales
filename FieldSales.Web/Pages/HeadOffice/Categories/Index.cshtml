@@ -5,23 +5,52 @@
 }
 <h1>Categories</h1>
 <p>Browse the catalogue structure or add a root category.</p>
+<form method="get">
+    <label for="category-search">Category name</label>
+    <input id="category-search" name="query" type="search" value="@Model.Query" />
+    <button type="submit">Search categories</button>
+    @if (Model.Query.Length > 0)
+    {
+        <a asp-page="Index">Clear search</a>
+    }
+</form>
 <form method="post">
     <label asp-for="Name">Root category name</label>
     <input asp-for="Name" maxlength="200" />
     <span asp-validation-for="Name"></span>
     <button type="submit">Add root category</button>
 </form>
-<h2>Root categories</h2>
-@if (Model.Roots.Count == 0)
+@if (Model.Query.Length > 0)
 {
-    <p>No categories yet.</p>
+    <h2>Search results</h2>
+    @if (Model.Results.Count == 0)
+    {
+        <p>No categories match “@Model.Query”.</p>
+    }
+    else
+    {
+        <ul>
+        @foreach (var result in Model.Results)
+        {
+            <li><a asp-page="Detail" asp-route-id="@result.Id">@result.Path</a></li>
+        }
+        </ul>
+    }
 }
 else
 {
-    <ul>
-    @foreach (var category in Model.Roots)
+    <h2>Root categories</h2>
+    @if (Model.Roots.Count == 0)
     {
-        <li><a asp-page="Detail" asp-route-id="@category.Id">@category.Name</a></li>
+        <p>No categories yet.</p>
     }
-    </ul>
+    else
+    {
+        <ul>
+        @foreach (var category in Model.Roots)
+        {
+            <li><a asp-page="Detail" asp-route-id="@category.Id">@category.Name</a> <span>@category.Beneath products beneath · @category.Here here</span></li>
+        }
+        </ul>
+    }
 }
