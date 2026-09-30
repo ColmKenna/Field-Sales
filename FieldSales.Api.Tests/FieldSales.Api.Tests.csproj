@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FieldSales.Api\FieldSales.Api.csproj" />
+    <ProjectReference Include="..\FieldSales.Quantities\FieldSales.Quantities.csproj" />
   </ItemGroup>
 
   <ItemGroup>

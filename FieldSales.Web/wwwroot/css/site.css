@@ -37,3 +37,7 @@ p { line-height: 1.6; }
 .product-record { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; margin-block: 2rem; }
 .product-record section { padding: 1.25rem; border: 1px solid #d7dee6; border-radius: .6rem; background: #fff; }
 .product-record h2 { margin-top: 0; font-size: 1.1rem; }
+.product-form [data-unit-fields], .product-form fieldset { display: grid; gap: .5rem; }
+.product-form fieldset { margin: .75rem 0; padding: 1rem; border: 1px solid #b9c8d6; }
+.product-form [hidden] { display: none; }
+.product-form [data-price-basis-change] { border-left-color: #b57515; background: #fff6e6; }

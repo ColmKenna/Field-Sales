@@ -1,12 +1,15 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using FieldSales.Quantities;
 
 namespace FieldSales.Api.Catalogue;
 
 public sealed record ProductCategoryChoice(Guid Id, string Path);
 public sealed record CreateProductRequest(string? Code, string? Name, Guid? CategoryId,
-    string? Unit, decimal? BasePrice);
-public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit);
+    string? Unit, decimal? BasePrice, decimal? QuantityStep = null, decimal? MinimumQuantity = null);
+public sealed record SetProductUnitRequest(string? Unit, decimal? QuantityStep, decimal? MinimumQuantity);
+public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit,
+    decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
 public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
     ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
@@ -48,6 +51,7 @@ public static class ProductEndpoints
         });
 
         products.MapPost("/", CreateAsync);
+        products.MapPut("/{id:guid}/unit", SetUnitAsync);
     }
 
     private static async Task<IResult> CreateAsync(CreateProductRequest request, CatalogueDbContext db,
@@ -61,7 +65,9 @@ public static class ProductEndpoints
         if (request.CategoryId is null || request.CategoryId == Guid.Empty
             || !await db.Categories.AnyAsync(category => category.Id == request.CategoryId, cancellationToken))
             errors["CategoryId"] = ["Choose a category"];
-        if (request.Unit != "Each") errors["Unit"] = ["Choose Each as the unit."];
+        QuantityRules.TryCreate(request.Unit, request.QuantityStep, request.MinimumQuantity,
+            out QuantityRules? rules, out var quantityErrors);
+        foreach (var error in quantityErrors) errors[error.Key] = error.Value;
         if (request.BasePrice is null) errors["BasePrice"] = ["Enter a base price."];
         else if (request.BasePrice < 0 || request.BasePrice > ProductBasePrice.MaximumAmount
                  || decimal.Round(request.BasePrice.Value, 2) != request.BasePrice.Value)
@@ -74,7 +80,7 @@ public static class ProductEndpoints
         if (existing is not null) return Duplicate(existing);
 
         Product added = Product.Create(code, request.Name!, request.CategoryId!.Value,
-            request.BasePrice!.Value, Today(clock));
+            request.BasePrice!.Value, Today(clock), rules!);
         db.Products.Add(added);
         try
         {
@@ -90,11 +96,26 @@ public static class ProductEndpoints
         return Results.Created($"/catalogue/products/{added.Id}", ToItem(added));
     }
 
+    private static async Task<IResult> SetUnitAsync(Guid id, SetProductUnitRequest request,
+        CatalogueDbContext db, CancellationToken cancellationToken)
+    {
+        Product? product = await db.Products.SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
+        if (product is null) return Results.NotFound();
+        if (!QuantityRules.TryCreate(request.Unit, request.QuantityStep, request.MinimumQuantity, out var rules, out var errors))
+            return Results.ValidationProblem(errors.ToDictionary(error => error.Key, error => error.Value));
+        // No order records exist in this slice. Order capture must supply actual usage here
+        // before unit changes on ordered products can be offered (historical changes: WI-068).
+        product.SetQuantityRules(rules, hasOrders: false);
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.Ok(ToItem(product));
+    }
+
     private static IResult Duplicate(Product product) => Results.Conflict(new ProductSaveError("Code",
         $"Code {product.Code} is already used by {product.Name}"));
 
     private static ProductItem ToItem(Product product) =>
-        new(product.Id, product.Code, product.Name, product.CategoryId, product.Unit);
+        new(product.Id, product.Code, product.Name, product.CategoryId, product.Unit,
+            product.QuantityStep, product.MinimumQuantity);
 
     private static DateOnly Today(TimeProvider clock) => DateOnly.FromDateTime(
         TimeZoneInfo.ConvertTime(clock.GetUtcNow(), BusinessTimeZone).DateTime);

@@ -1,3 +1,5 @@
+using FieldSales.Quantities;
+
 namespace FieldSales.Api.Catalogue;
 
 public sealed record ProductAttribute(string Name, string Value);
@@ -17,12 +19,14 @@ public sealed class Product
     public string Name { get; private set; } = string.Empty;
     public Guid CategoryId { get; private set; }
     public string Unit { get; private set; } = "Each";
+    public decimal? QuantityStep { get; private set; }
+    public decimal? MinimumQuantity { get; private set; }
     public Guid? ParentProductId { get; private set; }
     public IReadOnlyList<ProductAttribute> Attributes { get; private set; } = [];
     public IReadOnlyList<ProductBasePrice> BasePrices => _basePrices.AsReadOnly();
 
     public static Product Create(string code, string name, Guid categoryId,
-        decimal basePrice, DateOnly effectiveFrom)
+        decimal basePrice, DateOnly effectiveFrom, QuantityRules? quantityRules = null)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Trim().Length > MaximumCodeLength)
             throw new ArgumentException("Enter a product code of up to 100 characters.", nameof(code));
@@ -36,7 +40,25 @@ public sealed class Product
             Id = Guid.NewGuid(), Code = code.Trim(), Name = name.Trim(), CategoryId = categoryId
         };
         product._basePrices.Add(ProductBasePrice.Create(product.Id, basePrice, effectiveFrom));
+        if (quantityRules is not null) product.SetQuantityRules(quantityRules, hasOrders: false);
         return product;
+    }
+
+    public void SetQuantityRules(QuantityRules rules, bool hasOrders)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        if (hasOrders && Unit != rules.Unit.ToCode())
+            throw new InvalidOperationException("This product has orders. Its unit cannot be changed yet.");
+        Unit = rules.Unit.ToCode();
+        QuantityStep = rules.Unit == UnitOfMeasure.Each ? null : rules.Step.Amount;
+        MinimumQuantity = rules.Unit == UnitOfMeasure.Each ? null : rules.Minimum.Amount;
+    }
+
+    public QuantityRules GetQuantityRules()
+    {
+        if (!QuantityRules.TryCreate(Unit, QuantityStep, MinimumQuantity, out QuantityRules? rules, out _))
+            throw new InvalidOperationException("The saved product has invalid quantity rules.");
+        return rules;
     }
 
     /// <summary>Returns the latest base price effective on or before the supplied business date.</summary>

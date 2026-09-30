@@ -1,0 +1,23 @@
+@model FieldSales.Web.Catalogue.ProductUnitFields
+<div data-unit-fields data-original-unit="@Model.OriginalUnit" data-price-amount="@Model.FormattedPrice">
+    <label asp-for="Unit">Unit</label>
+    <select asp-for="Unit" data-unit-select>
+        <option value="Each">Each</option>
+        <option value="kg">kg</option>
+        <option value="litre">litre</option>
+        <option value="metre">metre</option>
+    </select>
+    <span asp-validation-for="Unit"></span>
+    <fieldset data-measure-fields hidden="@(Model.Unit == "Each")" disabled="@(Model.Unit == "Each")">
+        <legend>Measured quantities</legend>
+        <label asp-for="QuantityStep">Quantity step</label>
+        <input asp-for="QuantityStep" type="number" min="0.000001" step="0.000001" required="@(Model.Unit != "Each")" data-quantity-step />
+        <span asp-validation-for="QuantityStep"></span>
+        <label asp-for="MinimumQuantity">Minimum quantity</label>
+        <input asp-for="MinimumQuantity" type="number" min="0.000001" step="0.000001" aria-describedby="minimum-default" />
+        <span asp-validation-for="MinimumQuantity"></span>
+        <p id="minimum-default">Leave blank to use the quantity step as the minimum.</p>
+    </fieldset>
+    <p data-resulting-price aria-live="polite">@(Model.PriceAmount is null ? $"Price per {Model.Unit}" : $"Resulting price: {Model.FormattedPrice} per {Model.Unit}")</p>
+    <p data-price-basis-change role="status" hidden="@(!Model.PriceBasisChanged)">Price basis changes from @Model.FormattedPrice per @Model.OriginalUnit to @Model.FormattedPrice per @Model.Unit. The amount stays the same.</p>
+</div>

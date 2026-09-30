@@ -54,7 +54,8 @@ public static class CatalogueEndpoints
                 .Select(category => ToCountedItem(category, counts)).ToArray();
             ProductItem[] products = await db.Products.AsNoTracking().Where(product => product.CategoryId == id)
                 .OrderBy(product => product.Code).ThenBy(product => product.Id)
-                .Select(product => new ProductItem(product.Id, product.Code, product.Name, product.CategoryId, product.Unit))
+                .Select(product => new ProductItem(product.Id, product.Code, product.Name, product.CategoryId, product.Unit,
+                    product.QuantityStep, product.MinimumQuantity))
                 .ToArrayAsync(cancellationToken);
             return Results.Ok(new CategoryDetails(ToCountedItem(selected, counts), tree.Breadcrumb(id), children, products));
         });

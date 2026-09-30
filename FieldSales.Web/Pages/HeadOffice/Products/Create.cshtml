@@ -10,7 +10,7 @@
 {
     <p role="status">Create a category before adding a product. <a asp-page="/HeadOffice/Categories/Index">Browse categories</a></p>
 }
-<form method="post" class="product-form">
+<form method="post" class="product-form" data-product-unit-form>
     <div asp-validation-summary="All" role="alert"></div>
     <label asp-for="Code">Code</label>
     <input asp-for="Code" maxlength="100" required />
@@ -27,11 +27,12 @@
         }
     </select>
     <span asp-validation-for="CategoryId"></span>
-    <label for="product-unit">Unit</label>
-    <input id="product-unit" value="Each" readonly />
-    <label asp-for="BasePrice">Base price (€)</label>
-    <input asp-for="BasePrice" type="number" min="0" step="0.01" required aria-describedby="price-start" />
+    <partial name="_UnitFields" model="@(new FieldSales.Web.Catalogue.ProductUnitFields(Model.Unit, Model.QuantityStep, Model.MinimumQuantity, Model.BasePrice))" />
+    <label asp-for="BasePrice" data-base-price-label>Base price (€ per @Model.Unit)</label>
+    <input asp-for="BasePrice" type="number" min="0" step="0.01" required aria-describedby="price-start" data-base-price />
     <span asp-validation-for="BasePrice"></span>
     <p id="price-start">Effective from today.</p>
+    <button type="submit" asp-page-handler="Preview" formnovalidate>Update preview</button>
     <button type="submit" class="button" disabled="@(Model.Categories.Count == 0)">Save product</button>
 </form>
+<script src="~/js/product-unit-form.js" asp-append-version="true" defer></script>

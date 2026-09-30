@@ -16,7 +16,8 @@ public sealed record CreateCategoryResult(CreateCategoryStatus Status, CategoryI
 public enum RenameCategoryStatus { Renamed, Duplicate, Missing, Invalid, Unavailable }
 public sealed record RenameCategoryResult(RenameCategoryStatus Status, CategoryItem? Category = null);
 public sealed record ProductCategoryChoice(Guid Id, string Path);
-public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit);
+public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit,
+    decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
 public sealed record ProductAttribute(string Name, string Value);
 public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
@@ -24,6 +25,9 @@ public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryB
     IReadOnlyList<ProductAttribute> Attributes);
 public enum CreateProductStatus { Created, Invalid, Unavailable }
 public sealed record CreateProductResult(CreateProductStatus Status, ProductItem? Product = null,
+    IReadOnlyDictionary<string, string[]>? Errors = null);
+public enum UpdateProductUnitStatus { Saved, Invalid, Missing, Unavailable }
+public sealed record UpdateProductUnitResult(UpdateProductUnitStatus Status,
     IReadOnlyDictionary<string, string[]>? Errors = null);
 
 public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor contexts)
@@ -107,10 +111,12 @@ public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor c
     }
 
     public async Task<CreateProductResult> CreateProductAsync(string code, string name, Guid? categoryId,
-        decimal? basePrice, CancellationToken cancellationToken)
+        decimal? basePrice, CancellationToken cancellationToken, string unit = "Each",
+        decimal? quantityStep = null, decimal? minimumQuantity = null)
     {
         using HttpResponseMessage response = await SendAsync(HttpMethod.Post, "/catalogue/products/",
-            new { Code = code, Name = name, CategoryId = categoryId, Unit = "Each", BasePrice = basePrice }, cancellationToken);
+            new { Code = code, Name = name, CategoryId = categoryId, Unit = unit, BasePrice = basePrice,
+                QuantityStep = quantityStep, MinimumQuantity = minimumQuantity }, cancellationToken);
         if (response.StatusCode == HttpStatusCode.Created)
             return new(CreateProductStatus.Created, await response.Content.ReadFromJsonAsync<ProductItem>(cancellationToken));
         if (response.StatusCode == HttpStatusCode.BadRequest)
@@ -125,6 +131,21 @@ public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor c
                 : new Dictionary<string, string[]> { [body.Field] = [body.Error] });
         }
         return new(CreateProductStatus.Unavailable);
+    }
+
+    public async Task<UpdateProductUnitResult> UpdateProductUnitAsync(Guid id, string unit,
+        decimal? quantityStep, decimal? minimumQuantity, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Put, $"/catalogue/products/{id}/unit",
+            new { Unit = unit, QuantityStep = quantityStep, MinimumQuantity = minimumQuantity }, cancellationToken);
+        if (response.IsSuccessStatusCode) return new(UpdateProductUnitStatus.Saved);
+        if (response.StatusCode == HttpStatusCode.NotFound) return new(UpdateProductUnitStatus.Missing);
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            ProductValidationErrors? body = await response.Content.ReadFromJsonAsync<ProductValidationErrors>(cancellationToken);
+            return new(UpdateProductUnitStatus.Invalid, body?.Errors);
+        }
+        return new(UpdateProductUnitStatus.Unavailable);
     }
 
     private sealed record ProductValidationErrors(Dictionary<string, string[]> Errors);

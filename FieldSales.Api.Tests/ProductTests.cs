@@ -1,9 +1,41 @@
 using FieldSales.Api.Catalogue;
+using FieldSales.Quantities;
 
 namespace FieldSales.Api.Tests;
 
 public sealed class ProductTests
 {
+    [Fact]
+    public void Should_RejectUnitChange_When_ProductHasOrders()
+    {
+        Product product = Product.Create("TEA", "Tea", Guid.NewGuid(), 4.80m, new DateOnly(2026, 10, 1));
+        Assert.True(QuantityRules.TryCreate("kg", 0.5m, 1m, out var kg, out _));
+        Assert.Throws<InvalidOperationException>(() => product.SetQuantityRules(kg, hasOrders: true));
+        Assert.Equal("Each", product.Unit);
+        Assert.Null(product.QuantityStep);
+        Assert.Null(product.MinimumQuantity);
+        Assert.Equal(4.80m, Assert.Single(product.BasePrices).Amount);
+        product.SetQuantityRules(kg, hasOrders: false);
+        Assert.True(product.GetQuantityRules().ValidateOrder(1.5m).IsValid);
+        Assert.False(product.GetQuantityRules().ValidateOrder(1.2m).IsValid);
+        Assert.Equal(4.80m, Assert.Single(product.BasePrices).Amount);
+    }
+
+    [Fact]
+    public void Should_ClearMeasureRules_When_ProductReturnsToEach()
+    {
+        Assert.True(QuantityRules.TryCreate("kg", 0.5m, null, out var kg, out _));
+        Product product = Product.Create("TEA", "Tea", Guid.NewGuid(), 4.80m, new DateOnly(2026, 10, 1), kg);
+        Assert.Equal(0.5m, product.MinimumQuantity);
+        Assert.True(QuantityRules.TryCreate("Each", null, null, out var each, out _));
+        product.SetQuantityRules(each, hasOrders: false);
+        Assert.Null(product.QuantityStep);
+        Assert.Null(product.MinimumQuantity);
+        Assert.False(product.GetQuantityRules().ValidateOrder(0m).IsValid);
+        Assert.False(product.GetQuantityRules().ValidateOrder(1.5m).IsValid);
+        Assert.True(product.GetQuantityRules().ValidateOrder(1m).IsValid);
+    }
+
     [Fact]
     public void Should_SeedInitialPriceAndNormalizeText_When_MinimumProductIsCreated()
     {
