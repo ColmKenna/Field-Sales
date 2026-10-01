@@ -23,13 +23,9 @@ IDataProtectionBuilder dataProtection = builder.Services.AddDataProtection()
 
 if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
 {
-    string certificatePath = builder.Configuration["DataProtection:CertificatePath"]
-        ?? throw new InvalidOperationException("DataProtection:CertificatePath is required outside Development.");
-    string certificatePassword = builder.Configuration["DataProtection:CertificatePassword"]
-        ?? throw new InvalidOperationException("DataProtection:CertificatePassword is required outside Development.");
-    string resolvedPath = Path.IsPathRooted(certificatePath)
-        ? certificatePath
-        : Path.Combine(builder.Environment.ContentRootPath, certificatePath);
+    string certificatePath = builder.Configuration.Required("DataProtection:CertificatePath", "DataProtection:CertificatePath is required outside Development.", allowBlank: true);
+    string certificatePassword = builder.Configuration.Required("DataProtection:CertificatePassword", "DataProtection:CertificatePassword is required outside Development.", allowBlank: true);
+    string resolvedPath = StartupConfiguration.ResolveCertificatePath(builder.Environment.ContentRootPath, certificatePath);
     dataProtection.ProtectKeysWithCertificate(
         X509CertificateLoader.LoadPkcs12FromFile(resolvedPath, certificatePassword));
 }
@@ -41,8 +37,7 @@ builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient<CatalogueApiClient>((services, client) =>
-    client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>()["StaffApi:BaseUrl"]
-        ?? throw new InvalidOperationException("StaffApi:BaseUrl is required."))).AddSafeReadResilience();
+    client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>().Required("StaffApi:BaseUrl", "StaffApi:BaseUrl is required.", allowBlank: true))).AddSafeReadResilience();
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>().AddSafeReadResilience();
 builder.Services.AddScoped<StaffCookieEvents>();
 builder.Services.AddHostedService<ExpiredTicketsCleanupService>();
@@ -66,11 +61,9 @@ builder.Services.AddAuthentication(options =>
     })
     .AddOpenIdConnect(options =>
     {
-        options.Authority = builder.Configuration["Authentication:Authority"]
-            ?? throw new InvalidOperationException("Authentication:Authority is required.");
+        options.Authority = builder.Configuration.Required("Authentication:Authority", "Authentication:Authority is required.", allowBlank: true);
         options.ClientId = StaffApiContract.WebClientId;
-        options.ClientSecret = builder.Configuration["Authentication:ClientSecret"]
-            ?? throw new InvalidOperationException("Authentication:ClientSecret is required.");
+        options.ClientSecret = builder.Configuration.Required("Authentication:ClientSecret", "Authentication:ClientSecret is required.", allowBlank: true);
         options.ResponseType = "code";
         options.UsePkce = true;
         options.SaveTokens = true; // The ticket store protects these server-side.
@@ -108,17 +101,10 @@ builder.Services.AddRazorPages(options =>
 
 WebApplication app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+await DatabaseStartup.EnsureSchemaAsync<StaffWebDbContext>(app.Services, app.Environment, "StaffWebDb",
+    context => context.Database.MigrateAsync(), context => context.Database.GetPendingMigrationsAsync());
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
 {
-    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
-    await scope.ServiceProvider.GetRequiredService<StaffWebDbContext>().Database.MigrateAsync();
-}
-else if (!app.Environment.IsEnvironment("Testing"))
-{
-    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
-    if ((await scope.ServiceProvider.GetRequiredService<StaffWebDbContext>()
-            .Database.GetPendingMigrationsAsync()).Any())
-        throw new InvalidOperationException("StaffWebDb has pending migrations.");
     app.UseExceptionHandler(error => error.Run(async context =>
     {
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;

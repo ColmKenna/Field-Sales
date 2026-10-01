@@ -1,4 +1,4 @@
-using FieldSales.Identity.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;

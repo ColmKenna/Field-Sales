@@ -10,11 +10,11 @@ namespace FieldSales.Identity.Pages.Admin.IdentityResources;
 
 public class EditInputModel
 {
-    [StringLength(200)]
+    [StringLength(ValidationConstants.MaxDisplayNameLength)]
     [Display(Name = "Display Name")]
     public string? DisplayName { get; set; }
 
-    [StringLength(1000)] public string? Description { get; set; }
+    [StringLength(ValidationConstants.MaxDescriptionLength)] public string? Description { get; set; }
 
     [Display(Name = "Enabled")] public bool Enabled { get; set; }
 

@@ -42,9 +42,7 @@ if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("
         throw new InvalidOperationException(
             "DataProtection:CertificatePath and DataProtection:CertificatePassword are required outside Development.");
 
-    string resolvedCertificatePath = Path.IsPathRooted(certificatePath)
-        ? certificatePath
-        : Path.Combine(builder.Environment.ContentRootPath, certificatePath);
+    string resolvedCertificatePath = StartupConfiguration.ResolveCertificatePath(builder.Environment.ContentRootPath, certificatePath);
     try
     {
         X509Certificate2 certificate = Pkcs12CertificateLoader.LoadFromFile(
@@ -168,9 +166,7 @@ else
         throw new InvalidOperationException(
             "IdentityServer:SigningCertificatePath and IdentityServer:SigningCertificatePassword are required outside Development.");
 
-    string resolvedCertPath = Path.IsPathRooted(certPath)
-        ? certPath
-        : Path.Combine(builder.Environment.ContentRootPath, certPath);
+    string resolvedCertPath = StartupConfiguration.ResolveCertificatePath(builder.Environment.ContentRootPath, certPath);
     X509Certificate2 cert = Pkcs12CertificateLoader.LoadFromFile(resolvedCertPath, certPassword);
     isBuilder.AddSigningCredential(cert);
 }

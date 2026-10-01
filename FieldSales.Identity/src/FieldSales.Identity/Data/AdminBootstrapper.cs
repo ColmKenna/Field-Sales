@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,15 +24,12 @@ public static class AdminBootstrapper
             return;
         }
 
-        if (!await roleManager.RoleExistsAsync(Config.SysAdminRole))
+        IdentityResult roleResult = await AdminAccountCreation.EnsureRoleAsync(roleManager, Config.SysAdminRole);
+        if (!roleResult.Succeeded)
         {
-            IdentityResult roleResult = await roleManager.CreateAsync(new IdentityRole(Config.SysAdminRole));
-            if (!roleResult.Succeeded)
-            {
-                logger.LogError("Admin bootstrap failed to create role '{Role}': {Errors}",
-                    Config.SysAdminRole, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
-                return;
-            }
+            logger.LogError("Admin bootstrap failed to create role '{Role}': {Errors}",
+                Config.SysAdminRole, roleResult.Describe(", "));
+            return;
         }
 
         ApplicationUser? existingUser = await userManager.FindByEmailAsync(email);
@@ -41,18 +39,10 @@ public static class AdminBootstrapper
             return;
         }
 
-        var user = new ApplicationUser
-        {
-            UserName = email,
-            Email = email,
-            EmailConfirmed = true,
-            FullName = "System Administrator"
-        };
-
-        IdentityResult result = await userManager.CreateAsync(user, password);
+        var (user, result) = await AdminAccountCreation.CreateAsync(userManager, email, "System Administrator", password);
         if (!result.Succeeded)
         {
-            logger.LogError("Admin bootstrap failed to create user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            logger.LogError("Admin bootstrap failed to create user: {Errors}", result.Describe(", "));
             return;
         }
 
@@ -60,7 +50,7 @@ public static class AdminBootstrapper
         if (!assignment.Succeeded)
         {
             logger.LogError("Admin bootstrap failed to assign role '{Role}': {Errors}",
-                Config.SysAdminRole, string.Join(", ", assignment.Errors.Select(e => e.Description)));
+                Config.SysAdminRole, assignment.Describe(", "));
             return;
         }
         logger.LogInformation("Administrator account '{Email}' successfully created via one-time bootstrap.", email);

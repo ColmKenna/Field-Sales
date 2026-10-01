@@ -26,8 +26,7 @@ const string roleLookupUnavailableKey = StaffApiContract.LookupUnavailableKey;
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = builder.Configuration["Authentication:Authority"]
-            ?? throw new InvalidOperationException("Authentication:Authority is required.");
+        options.Authority = builder.Configuration.Required("Authentication:Authority", "Authentication:Authority is required.", allowBlank: true);
         options.Audience = StaffApiContract.Audience;
         options.RequireHttpsMetadata = true;
         options.MapInboundClaims = false;
@@ -99,18 +98,8 @@ if (!app.Environment.IsEnvironment("Testing"))
     using var registrationScope = app.Services.CreateScope();
     registrationScope.ServiceProvider.GetRequiredService<ReferenceCatalogueRegistry>().ValidateRegistrations();
 }
-if (app.Environment.IsDevelopment())
-{
-    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
-    await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
-}
-else if (!app.Environment.IsEnvironment("Testing"))
-{
-    await using AsyncServiceScope scope = app.Services.CreateAsyncScope();
-    if ((await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>()
-            .Database.GetPendingMigrationsAsync()).Any())
-        throw new InvalidOperationException("CatalogueDb has pending migrations.");
-}
+await DatabaseStartup.EnsureSchemaAsync<CatalogueDbContext>(app.Services, app.Environment, "CatalogueDb",
+    context => context.Database.MigrateAsync(), context => context.Database.GetPendingMigrationsAsync());
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

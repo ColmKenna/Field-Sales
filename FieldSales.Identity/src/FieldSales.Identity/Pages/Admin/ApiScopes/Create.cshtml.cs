@@ -10,15 +10,15 @@ namespace FieldSales.Identity.Pages.Admin.ApiScopes;
 public class CreateInputModel
 {
     [Required(ErrorMessage = "Scope name is required")]
-    [StringLength(200, ErrorMessage = "Scope name must not exceed 200 characters")]
+    [StringLength(ValidationConstants.MaxScopeNameLength, ErrorMessage = "Scope name must not exceed 200 characters")]
     [Display(Name = "Scope Name")]
     public string Name { get; set; } = string.Empty;
 
-    [StringLength(200, ErrorMessage = "Display name must not exceed 200 characters")]
+    [StringLength(ValidationConstants.MaxDisplayNameLength, ErrorMessage = "Display name must not exceed 200 characters")]
     [Display(Name = "Display Name")]
     public string? DisplayName { get; set; }
 
-    [StringLength(1000, ErrorMessage = "Description must not exceed 1000 characters")]
+    [StringLength(ValidationConstants.MaxDescriptionLength, ErrorMessage = "Description must not exceed 1000 characters")]
     public string? Description { get; set; }
 }
 

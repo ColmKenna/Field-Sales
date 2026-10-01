@@ -91,16 +91,7 @@ public static class PaginationExtensions
             routeValues["Filter"] = filter;
         }
 
-        return new PaginationModel(
-            result.Items.Count,
-            result.TotalCount,
-            result.PageNumber,
-            result.TotalPages,
-            result.HasPreviousPage,
-            result.HasNextPage,
-            noun,
-            page,
-            routeValues);
+        return result.ToPagination(noun, routeValues, page);
     }
 
     public static PaginationModel ToPagination<T>(

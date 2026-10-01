@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using System.Security.Claims;
 using Duende.IdentityServer.EntityFramework.DbContexts;
 using Duende.IdentityServer.EntityFramework.Mappers;
@@ -41,13 +42,10 @@ public static class SeedData
         string sysAdminEmail,
         string sysAdminPassword)
     {
-        if (!await roleManager.RoleExistsAsync(Config.SysAdminRole))
-        {
-            IdentityResult roleResult = await roleManager.CreateAsync(new IdentityRole(Config.SysAdminRole));
-            if (!roleResult.Succeeded)
-                throw new InvalidOperationException(
-                    $"Failed to seed role '{Config.SysAdminRole}': {string.Join(", ", roleResult.Errors.Select(e => e.Description))}");
-        }
+        IdentityResult roleResult = await AdminAccountCreation.EnsureRoleAsync(roleManager, Config.SysAdminRole);
+        if (!roleResult.Succeeded)
+            throw new InvalidOperationException(
+                $"Failed to seed role '{Config.SysAdminRole}': {roleResult.Describe(", ")}");
 
         await EnsureUserAsync(userManager, sysAdminEmail, "System Administrator", sysAdminPassword,
             Config.SysAdminRole);
@@ -80,18 +78,12 @@ public static class SeedData
         ApplicationUser? user = await userManager.FindByNameAsync(email);
         if (user is null)
         {
-            user = new ApplicationUser
-            {
-                UserName = email,
-                Email = email,
-                EmailConfirmed = true,
-                FullName = fullName
-            };
-
-            IdentityResult result = await userManager.CreateAsync(user, password);
+            var created = await AdminAccountCreation.CreateAsync(userManager, email, fullName, password);
+            user = created.User;
+            IdentityResult result = created.Result;
             if (!result.Succeeded)
                 throw new InvalidOperationException(
-                    $"Failed to seed user '{email}': {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                    $"Failed to seed user '{email}': {result.Describe(", ")}");
 
             await userManager.AddClaimsAsync(user, new[]
             {

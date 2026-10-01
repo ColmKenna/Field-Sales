@@ -9,11 +9,11 @@ namespace FieldSales.Identity.Pages.Admin.ApiScopes;
 
 public class EditInputModel
 {
-    [StringLength(200)]
+    [StringLength(ValidationConstants.MaxDisplayNameLength)]
     [Display(Name = "Display Name")]
     public string? DisplayName { get; set; }
 
-    [StringLength(1000)] public string? Description { get; set; }
+    [StringLength(ValidationConstants.MaxDescriptionLength)] public string? Description { get; set; }
 
     public bool Enabled { get; set; } = true;
 

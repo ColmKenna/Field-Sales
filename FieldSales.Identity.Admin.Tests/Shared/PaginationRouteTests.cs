@@ -26,6 +26,22 @@ public class PaginationRouteTests
         new QueryCollection(entries.ToDictionary(e => e.Key, e => new Microsoft.Extensions.Primitives.StringValues(e.Value)));
 
     [Fact]
+    public void FilterAndExplicitRouteOverloadsPreservePaginationAndRoutes()
+    {
+        var result = FieldSales.Identity.Services.ListResult<string>.Page(["one", "two"], 6,
+            FieldSales.Identity.Services.Pagination.From(2, 2));
+        var filtered = result.ToPagination("clients", "filter", "./Custom");
+        var explicitRoutes = result.ToPagination("clients", new Dictionary<string, string?> { ["Filter"] = "filter" }, "./Custom");
+        Assert.Equal(2, filtered.CurrentCount);
+        Assert.Equal(6, filtered.TotalCount);
+        Assert.Equal(2, filtered.PageNumber);
+        Assert.Equal(3, filtered.TotalPages);
+        Assert.Equal("./Custom", filtered.Page);
+        Assert.Equal(filtered.NextPageRoute(null), explicitRoutes.NextPageRoute(null));
+        Assert.Equal(filtered.PreviousPageRoute(null), explicitRoutes.PreviousPageRoute(null));
+    }
+
+    [Fact]
     public void ExplicitRouteValues_AreCarriedOntoBothLinks()
     {
         PaginationModel model = Model(routeValues: new Dictionary<string, string?> { ["Filter"] = "acme" });
