@@ -56,8 +56,9 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
 
     private async Task<IActionResult> ShowAsync(Guid id)
     {
-        CategoryDetails? details = await catalogue.DetailsAsync(id, HttpContext.RequestAborted);
-        if (details is null) return NotFound();
+        var read = await catalogue.DetailsAsync(id, HttpContext.RequestAborted);
+        if (!read.Found) return read.FailureResult();
+        CategoryDetails details = read.Value!;
         Details = details;
         if (!ModelState.ContainsKey(nameof(RenameName))) RenameName = details.Category.Name;
         return Page();

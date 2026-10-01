@@ -5,21 +5,10 @@ using System.Globalization;
 
 namespace FieldSales.Api.Catalogue;
 
-public sealed record ProductCategoryChoice(Guid Id, string Path);
 public sealed record CreateProductRequest(string? Code, string? Name, Guid? CategoryId,
     string? Unit, decimal? BasePrice, decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record SetProductUnitRequest(string? Unit, decimal? QuantityStep, decimal? MinimumQuantity);
 public sealed record AddProductBasePriceRequest(decimal? BasePrice, DateOnly? EffectiveFrom);
-public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit,
-    decimal? QuantityStep = null, decimal? MinimumQuantity = null);
-public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
-public sealed record ProductBrandItem(Guid Id, string Name, bool IsArchived, bool IsPrimary);
-public sealed record ProductReferenceItem(Guid Id, string Name, bool IsArchived);
-public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
-    ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
-    IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null,
-    ProductReferenceItem? Profile = null, ProductReferenceItem? Supplier = null);
-public sealed record ProductSaveError(string Field, string Error);
 
 public static class ProductEndpoints
 {
@@ -58,11 +47,12 @@ public static class ProductEndpoints
             var supplier = await db.Suppliers.AsNoTracking().Where(item => item.Id == product.SupplierId)
                 .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
             return Results.Ok(new ProductDetails(ToItem(product),
-                new CategoryTree(categories).Breadcrumb(product.CategoryId),
+                new CategoryTree(categories).Breadcrumb(product.CategoryId)
+                    .Select(segment => new FieldSales.Catalogue.Contracts.CategoryBreadcrumbSegment(segment.Id, segment.Name)).ToArray(),
                 price is null ? null : new ProductPriceItem(price.EffectiveFrom, price.Amount),
                 product.BasePrices.OrderByDescending(entry => entry.EffectiveFrom)
                     .Select(entry => new ProductPriceItem(entry.EffectiveFrom, entry.Amount)).ToArray(),
-                product.Attributes, brands, profile, supplier));
+                product.Attributes.Select(attribute => new FieldSales.Catalogue.Contracts.ProductAttribute(attribute.Name, attribute.Value, attribute.IsArchived)).ToArray(), brands, profile, supplier));
         });
 
         products.MapPost("/", CreateAsync);

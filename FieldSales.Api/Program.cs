@@ -18,7 +18,7 @@ builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, Produ
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageReader, ReferenceUsageReader>();
 builder.Services.AddScoped<ProductBrandAssignments>();
 builder.Services.AddScoped<ProductReferenceAssignments>();
-builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
+builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>().AddSafeReadResilience();
 
 const string roleLookupUnavailableKey = "staff-role-lookup-unavailable";
 

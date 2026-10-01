@@ -3,11 +3,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.Catalogue;
 
-public sealed record CategoryItem(Guid Id, Guid? ParentId, string Name, int Here = 0, int Beneath = 0);
-public sealed record CategoryDetails(CategoryItem Category,
-    IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
-    IReadOnlyList<CategoryItem> Children, IReadOnlyList<ProductItem> Products);
-public sealed record CategorySearchResult(Guid Id, string Path);
 public sealed record CreateCategoryRequest(string? Name, Guid? ParentId);
 public sealed record RenameCategoryRequest(string? Name);
 
@@ -57,14 +52,14 @@ public static class CatalogueEndpoints
                 .Select(product => new ProductItem(product.Id, product.Code, product.Name, product.CategoryId, product.Unit,
                     product.QuantityStep, product.MinimumQuantity))
                 .ToArrayAsync(cancellationToken);
-            return Results.Ok(new CategoryDetails(ToCountedItem(selected, counts), tree.Breadcrumb(id), children, products));
+            return Results.Ok(new CategoryDetails(ToCountedItem(selected, counts), tree.Breadcrumb(id).Select(segment => new FieldSales.Catalogue.Contracts.CategoryBreadcrumbSegment(segment.Id, segment.Name)).ToArray(), children, products));
         });
 
         categories.MapPost("/", async (CreateCategoryRequest request, CatalogueDbContext db,
             CancellationToken cancellationToken) =>
         {
             if (!NameRules.IsValid(request.Name, Category.MaximumNameLength))
-                return Results.BadRequest(new { Error = "Enter a category name of up to 200 characters." });
+                return Results.BadRequest(new CatalogueError("Enter a category name of up to 200 characters."));
 
             List<Category> existing = await db.Categories.AsNoTracking().ToListAsync(cancellationToken);
             CategoryTree tree = new(existing);
@@ -79,7 +74,7 @@ public static class CatalogueEndpoints
             }
             catch (InvalidOperationException)
             {
-                return Results.Conflict(new { Error = "A category with this name already exists here." });
+                return Results.Conflict(new CatalogueError("A category with this name already exists here."));
             }
 
             db.Categories.Add(added);
@@ -90,7 +85,7 @@ public static class CatalogueEndpoints
             catch (DbUpdateException exception) when (exception.InnerException is SqlException
                        { Number: 2601 or 2627 })
             {
-                return Results.Conflict(new { Error = "A category with this name already exists here." });
+                return Results.Conflict(new CatalogueError("A category with this name already exists here."));
             }
 
             return Results.Created($"/catalogue/categories/{added.Id}", ToItem(added));
@@ -100,7 +95,7 @@ public static class CatalogueEndpoints
             CatalogueDbContext db, CancellationToken cancellationToken) =>
         {
             if (!NameRules.IsValid(request.Name, Category.MaximumNameLength))
-                return Results.BadRequest(new { Error = "Enter a category name of up to 200 characters." });
+                return Results.BadRequest(new CatalogueError("Enter a category name of up to 200 characters."));
 
             List<Category> existing = await db.Categories.ToListAsync(cancellationToken);
             Category renamed;
@@ -114,7 +109,7 @@ public static class CatalogueEndpoints
             }
             catch (InvalidOperationException)
             {
-                return Results.Conflict(new { Error = "A category with this name already exists here." });
+                return Results.Conflict(new CatalogueError("A category with this name already exists here."));
             }
 
             try
@@ -124,7 +119,7 @@ public static class CatalogueEndpoints
             catch (DbUpdateException exception) when (exception.InnerException is SqlException
                        { Number: 2601 or 2627 })
             {
-                return Results.Conflict(new { Error = "A category with this name already exists here." });
+                return Results.Conflict(new CatalogueError("A category with this name already exists here."));
             }
 
             return Results.Ok(ToItem(renamed));

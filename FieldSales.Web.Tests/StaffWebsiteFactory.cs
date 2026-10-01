@@ -160,7 +160,7 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
 
 public sealed class TestCatalogueHandler : HttpMessageHandler
 {
-    private readonly Dictionary<Guid, FieldSales.Web.Catalogue.CategoryItem> _categories = [];
+    private readonly Dictionary<Guid, FieldSales.Catalogue.Contracts.CategoryItem> _categories = [];
 
     public int Count { get { lock (_categories) return _categories.Count; } }
 
@@ -186,7 +186,7 @@ public sealed class TestCatalogueHandler : HttpMessageHandler
                 if (_categories.Values.Any(c => c.ParentId == body.ParentId &&
                     string.Equals(c.Name, body.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
                     return new HttpResponseMessage(HttpStatusCode.Conflict);
-                FieldSales.Web.Catalogue.CategoryItem added = new(Guid.NewGuid(), body.ParentId, body.Name.Trim());
+                FieldSales.Catalogue.Contracts.CategoryItem added = new(Guid.NewGuid(), body.ParentId, body.Name.Trim());
                 _categories.Add(added.Id, added);
                 return Json(HttpStatusCode.Created, added);
             }
@@ -217,7 +217,7 @@ public sealed class TestCatalogueHandler : HttpMessageHandler
             {
                 if (!_categories.TryGetValue(id, out var selected))
                     return new HttpResponseMessage(HttpStatusCode.NotFound);
-                List<FieldSales.Web.Catalogue.CategoryBreadcrumbSegment> pathSegments = [];
+                List<FieldSales.Catalogue.Contracts.CategoryBreadcrumbSegment> pathSegments = [];
                 var current = selected;
                 while (true)
                 {
@@ -226,7 +226,7 @@ public sealed class TestCatalogueHandler : HttpMessageHandler
                     current = _categories[current.ParentId.Value];
                 }
                 pathSegments.Reverse();
-                return Json(HttpStatusCode.OK, new FieldSales.Web.Catalogue.CategoryDetails(selected,
+                return Json(HttpStatusCode.OK, new FieldSales.Catalogue.Contracts.CategoryDetails(selected,
                     pathSegments, _categories.Values.Where(c => c.ParentId == id).ToArray(), []));
             }
         }

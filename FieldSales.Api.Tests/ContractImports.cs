@@ -1,0 +1,10 @@
+global using CategoryItem = FieldSales.Catalogue.Contracts.CategoryItem;
+global using CategoryDetails = FieldSales.Catalogue.Contracts.CategoryDetails;
+global using CategorySearchResult = FieldSales.Catalogue.Contracts.CategorySearchResult;
+global using ProductCategoryChoice = FieldSales.Catalogue.Contracts.ProductCategoryChoice;
+global using ProductItem = FieldSales.Catalogue.Contracts.ProductItem;
+global using ProductPriceItem = FieldSales.Catalogue.Contracts.ProductPriceItem;
+global using ProductBrandItem = FieldSales.Catalogue.Contracts.ProductBrandItem;
+global using ProductReferenceItem = FieldSales.Catalogue.Contracts.ProductReferenceItem;
+global using ProductDetails = FieldSales.Catalogue.Contracts.ProductDetails;
+global using ProductSaveError = FieldSales.Catalogue.Contracts.ProductSaveError;

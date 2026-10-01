@@ -20,7 +20,7 @@ Full baseline started with `dotnet test FieldSales.slnx --no-restore --verbosity
 
 - [x] **1. Regression coverage and behavior fixes** — CR-001–004, CR-010; R01–02. Query-only claim targets, status-based handler responses, protected-role constants, bootstrap assignment checks, consistent dates.
 - [x] **2. Validation and Razor helpers** — CR-014, CR-020–021, CR-031, CR-042; R03, R06–07. ModelState mapping, authoritative validation, unit normalization, category outcomes/breadcrumbs, confirmation/tab/alert helpers.
-- [ ] **3. Catalogue contracts and HTTP handling** — CR-030; R04–05. Shared response contracts, explicit read outcomes, response decoding, availability/authentication handling, safe-read retries only.
+- [x] **3. Catalogue contracts and HTTP handling** — CR-030; R04–05. Shared response contracts, explicit read outcomes, response decoding, availability/authentication handling, safe-read retries only.
 - [ ] **4. Staff contracts and navigation** — CR-013, CR-032–033; R13. Constants/scope matching, subject lookup, landing/session helpers, role diff, configured ticket expiry.
 - [ ] **5. Reference data and pagination** — CR-015–016, CR-022–023; R10–12. Registry/keys, structured validation, unique classification, batch usage, paged-result/query helpers.
 - [ ] **6. Audit and client-secret services** — CR-011, CR-041; R08. Per-operation audit metadata/failure boundary, shared secret generation, deterministic time, create/clone persistence tails, preset/grant constants.
@@ -35,7 +35,7 @@ Run affected projects and SQL Server tests after each step; do not commit failed
 
 Each step records its changes, exact validation outcome, and justified boundary decisions here before its commit.
 
-### Step 1 � completed
+### Step 1 — completed
 
 - Both claim editor actions explicitly bind the target from the query, reject blank targets, and never use a conflicting form target. Kept handler parameter signatures for existing callers while making the binding source explicit.
 - User mutations now expose AdminMutationStatus alongside their specialized payloads; missing-user/role outcomes and user/client handlers use statuses rather than message comparisons. Password reset also returns 404 directly for a missing outcome. UserUnlockResult retains its existing specialized typed status.
@@ -43,9 +43,16 @@ Each step records its changes, exact validation outcome, and justified boundary 
 - Added eight real HTTP claim-binding cases, fourteen revised-message outcome cases, bootstrap failure logging coverage, password-reset status coverage, and rendered September date assertions. Existing protected-role guard tests remain the regression coverage for protected membership.
 - Validation: Identity admin **1,000 passed**, Web **163 passed**, zero failures/skips, including their SQL Server suites. A concurrent focused rebuild hit Windows test-host file locks; reran the complete Identity suite after the earlier run ended, successfully. `git diff --check` passed.
 
-### Step 2 � completed
+### Step 2 — completed
 
 - Added host-level ModelState extensions preserving existing prefixes and summary errors; migrated catalogue and Identity client/API editor mappings. Typed API basics validation retains its existing dedicated mapping boundary.
 - Added shared domain/request name and price predicates, category path formatting, Web unit normalization/preview checks and category creation error mapping. UI annotations retain their distinct field-specific wording; domain validation is authoritative. The omitted Unit fallback remains create-only.
 - Shared case-sensitive confirmation matching, validation-tab selection using actual errors, validation-summary and status-alert markup, and category breadcrumbs with the category-page separator. Authentication service errors now select their matching tab.
 - Validation: full API **93 passed**, Web **169 passed**, Identity admin **1,011 passed**, zero failures/skips, including SQL Server tests. Final Identity alert markup was rebuilt and verified with its complete suite. Strengthened the existing authentication service-error tab assertion; both editor characterisation tests passed afterward. New tests cover ModelState prefixes/summary, confirmation case/trim, quantity binder-error clearing and retained unrelated input, legacy creation, price/name boundaries, and ancestry. Existing end-to-end preview/rejection tests passed. A parallel solution build encountered a static-assets cache lock; serial builds/tests avoid competing builds of aliased project references.
+
+### Step 3 — completed
+
+- Added FieldSales.Catalogue.Contracts for response and error records without changing JSON property names, optional fields, or request payloads. API projections explicitly map domain attributes and breadcrumbs; EF entities and Web operation results remain separate.
+- Centralized validation/conflict decoding and JSON reads. Catalogue pages now distinguish missing (404), unavailable (503), unauthorized (challenge), and forbidden (access denial). Malformed/empty responses and transport failures become unavailable; caller cancellation propagates. Writes retain their operation-specific outcomes, with unreadable error payloads treated as unavailable.
+- Staff clients replace the inherited resilience pipeline with one whose retries exclude unsafe methods. The installed resilience package exposes handler removal as experimental; its diagnostic is suppressed only around that one call, with the reason documented there. This avoids retaining a second pipeline that could replay writes.
+- Validation: solution build **passed with zero warnings/errors**; full API **93 passed**, Web **187 passed**, Identity admin **1,011 passed**, no failures/skips. Added distinct read/page outcome, malformed success/error, network failure, cancellation-before/during-send, serialization/legacy optional fields, and inherited-pipeline write non-replay tests. Existing payload/validation/conflict tests passed. All SQL Server suites passed. Restore/build required access to the existing NuGet/Aspire cache; elevated restore resolved the restricted-access failures. Checklist encoding normalized to UTF-8.

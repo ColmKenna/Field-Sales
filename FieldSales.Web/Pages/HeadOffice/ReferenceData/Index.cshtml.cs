@@ -18,9 +18,9 @@ public sealed class IndexModel(CatalogueApiClient catalogue) : PageModel
     public Task<IActionResult> OnGetAsync() => ShowAsync();
     public async Task<IActionResult> OnGetConfirmAsync(Guid id)
     {
-        try { Confirmation = await catalogue.ReferenceItemAsync(ListKey, id, HttpContext.RequestAborted); }
-        catch (HttpRequestException) { return StatusCode(503); }
-        if (Confirmation is null) return NotFound();
+        var read = await catalogue.ReferenceItemAsync(ListKey, id, HttpContext.RequestAborted);
+        if (!read.Found) return read.FailureResult();
+        Confirmation = read.Value!;
         Action = ReferenceRetirementPolicy.Decide(Confirmation.IsArchived, Confirmation.Usage);
         return await ShowAsync();
     }
@@ -52,15 +52,11 @@ public sealed class IndexModel(CatalogueApiClient catalogue) : PageModel
     }
     private async Task<IActionResult> ShowAsync()
     {
-        try
-        {
-            var list = await catalogue.ReferenceListAsync(ListKey, ShowArchived, HttpContext.RequestAborted);
-            if (list is null) return NotFound();
-            List = list;
-            if (Request.Method == "POST" && Id is Guid id && !ModelState.IsValid && ModelState.ContainsKey(nameof(Name)))
-                List = List with { Items = List.Items.Select(item => item.Id == id ? item with { Name = Name } : item).ToArray() };
-            return Page();
-        }
-        catch (HttpRequestException) { return StatusCode(503); }
+        var read = await catalogue.ReferenceListAsync(ListKey, ShowArchived, HttpContext.RequestAborted);
+        if (!read.Found) return read.FailureResult();
+        List = read.Value!;
+        if (Request.Method == "POST" && Id is Guid id && !ModelState.IsValid && ModelState.ContainsKey(nameof(Name)))
+            List = List with { Items = List.Items.Select(item => item.Id == id ? item with { Name = Name } : item).ToArray() };
+        return Page();
     }
 }

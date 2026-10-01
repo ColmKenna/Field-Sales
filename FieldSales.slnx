@@ -12,4 +12,5 @@
     <Project Path="FieldSales.Web.Tests/FieldSales.Web.Tests.csproj"/>
     <Project Path="FieldSales.Api/FieldSales.Api.csproj"/>
     <Project Path="FieldSales.Api.Tests/FieldSales.Api.Tests.csproj"/>
+    <Project Path="FieldSales.Catalogue.Contracts/FieldSales.Catalogue.Contracts.csproj"/>
 </Solution>

@@ -42,8 +42,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient<CatalogueApiClient>((services, client) =>
     client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>()["StaffApi:BaseUrl"]
-        ?? throw new InvalidOperationException("StaffApi:BaseUrl is required.")));
-builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
+        ?? throw new InvalidOperationException("StaffApi:BaseUrl is required."))).AddSafeReadResilience();
+builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>().AddSafeReadResilience();
 builder.Services.AddScoped<StaffCookieEvents>();
 builder.Services.AddHostedService<ExpiredTicketsCleanupService>();
 

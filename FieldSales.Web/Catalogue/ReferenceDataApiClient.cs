@@ -9,24 +9,11 @@ public sealed record ReferenceSaveResult(ReferenceSaveStatus Status, string? Err
 
 public sealed partial class CatalogueApiClient
 {
-    public async Task<ReferenceListViewModel?> ReferenceListAsync(string key, bool showArchived,
-        CancellationToken cancellationToken)
-    {
-        using var response = await SendAsync(HttpMethod.Get,
-            $"/catalogue/reference-data/{Uri.EscapeDataString(key)}?showArchived={showArchived}", null, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound) return null;
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ReferenceListViewModel>(cancellationToken);
-    }
+    public Task<CatalogueReadResult<ReferenceListViewModel>> ReferenceListAsync(string key, bool showArchived, CancellationToken cancellationToken) =>
+        ReadAsync<ReferenceListViewModel>($"/catalogue/reference-data/{Uri.EscapeDataString(key)}?showArchived={showArchived}", cancellationToken);
 
-    public async Task<ReferenceListItem?> ReferenceItemAsync(string key, Guid id, CancellationToken cancellationToken)
-    {
-        using var response = await SendAsync(HttpMethod.Get,
-            $"/catalogue/reference-data/{Uri.EscapeDataString(key)}/{id}", null, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound) return null;
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ReferenceListItem>(cancellationToken);
-    }
+    public Task<CatalogueReadResult<ReferenceListItem>> ReferenceItemAsync(string key, Guid id, CancellationToken cancellationToken) =>
+        ReadAsync<ReferenceListItem>($"/catalogue/reference-data/{Uri.EscapeDataString(key)}/{id}", cancellationToken);
 
     public async Task<ReferenceSaveResult> SaveReferenceNameAsync(string key, Guid? id, string name,
         CancellationToken cancellationToken)
@@ -50,17 +37,12 @@ public sealed partial class CatalogueApiClient
     {
         if (response.IsSuccessStatusCode) return new(ReferenceSaveStatus.Saved);
         if (response.StatusCode == HttpStatusCode.NotFound) return new(ReferenceSaveStatus.Missing);
-        if (response.StatusCode == HttpStatusCode.Conflict)
+        if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.BadRequest)
         {
-            var body = await response.Content.ReadFromJsonAsync<ReferenceError>(cancellationToken);
-            return new(ReferenceSaveStatus.Invalid, body?.Error);
-        }
-        if (response.StatusCode == HttpStatusCode.BadRequest)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ProductValidationErrors>(cancellationToken);
-            return new(ReferenceSaveStatus.Invalid, body?.Errors.Values.SelectMany(errors => errors).FirstOrDefault());
+            var errors = await ReadErrorsAsync(response, cancellationToken);
+            return errors is null ? new(ReferenceSaveStatus.Unavailable)
+                : new(ReferenceSaveStatus.Invalid, errors.Values.SelectMany(messages => messages).FirstOrDefault());
         }
         return new(ReferenceSaveStatus.Unavailable);
     }
-    private sealed record ReferenceError(string Field, string Error);
 }

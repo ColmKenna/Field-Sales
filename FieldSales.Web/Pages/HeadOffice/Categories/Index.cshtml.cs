@@ -22,13 +22,15 @@ public sealed class IndexModel(CatalogueApiClient catalogue) : PageModel
         Query = query?.Trim() ?? string.Empty;
         if (Query.Length > 0)
         {
-            IReadOnlyList<CategorySearchResult>? results = await catalogue.SearchCategoriesAsync(Query, HttpContext.RequestAborted);
-            if (results is null) return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            var search = await catalogue.SearchCategoriesAsync(Query, HttpContext.RequestAborted);
+            if (!search.Found) return search.FailureResult();
+            IReadOnlyList<CategorySearchResult> results = search.Value!;
             Results = results;
             return Page();
         }
-        IReadOnlyList<CategoryItem>? roots = await catalogue.RootsAsync(HttpContext.RequestAborted);
-        if (roots is null) return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        var read = await catalogue.RootsAsync(HttpContext.RequestAborted);
+        if (!read.Found) return read.FailureResult();
+        IReadOnlyList<CategoryItem> roots = read.Value!;
         Roots = roots;
         return Page();
     }
@@ -46,8 +48,9 @@ public sealed class IndexModel(CatalogueApiClient catalogue) : PageModel
 
     private async Task<IActionResult> ShowFormAsync()
     {
-        IReadOnlyList<CategoryItem>? roots = await catalogue.RootsAsync(HttpContext.RequestAborted);
-        if (roots is null) return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        var read = await catalogue.RootsAsync(HttpContext.RequestAborted);
+        if (!read.Found) return read.FailureResult();
+        IReadOnlyList<CategoryItem> roots = read.Value!;
         Roots = roots;
         return Page();
     }

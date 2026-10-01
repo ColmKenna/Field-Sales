@@ -44,8 +44,9 @@ public sealed class CreateModel(CatalogueApiClient catalogue) : PageModel
 
     private async Task<IActionResult> ShowFormAsync()
     {
-        IReadOnlyList<ProductCategoryChoice>? categories = await catalogue.ProductCategoriesAsync(HttpContext.RequestAborted);
-        if (categories is null) return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        var read = await catalogue.ProductCategoriesAsync(HttpContext.RequestAborted);
+        if (!read.Found) return read.FailureResult();
+        IReadOnlyList<ProductCategoryChoice> categories = read.Value!;
         Categories = categories;
         return Page();
     }

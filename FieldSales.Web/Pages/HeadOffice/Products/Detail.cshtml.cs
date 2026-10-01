@@ -61,8 +61,9 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
 
     private async Task<IActionResult> ShowAsync(Guid id, bool populate = false)
     {
-        ProductDetails? details = await catalogue.ProductDetailsAsync(id, HttpContext.RequestAborted);
-        if (details is null) return NotFound();
+        var read = await catalogue.ProductDetailsAsync(id, HttpContext.RequestAborted);
+        if (!read.Found) return read.FailureResult();
+        ProductDetails details = read.Value!;
         Details = details;
         PriceHistory = details.PriceHistory.OrderByDescending(price => price.EffectiveFrom).ToArray();
         // CurrentPrice is resolved by the API's business date; the next entry is therefore future.
