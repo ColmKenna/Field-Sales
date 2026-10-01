@@ -7,6 +7,7 @@
 <h1>@Model.Details.Category.Name</h1>
 <p>@Model.Details.Category.Beneath products beneath · @Model.Details.Category.Here here</p>
 <a asp-page="Index">Search categories</a>
+<p><a asp-page="/HeadOffice/Products/Index" asp-route-categoryId="@Model.Details.Category.Id">View all products beneath this category</a></p>
 <form method="post" asp-page-handler="Rename">
     <label asp-for="RenameName">Category name</label>
     <input asp-for="RenameName" maxlength="200" />

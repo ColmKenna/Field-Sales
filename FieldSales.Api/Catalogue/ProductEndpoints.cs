@@ -63,6 +63,7 @@ public static class ProductEndpoints
                     await ActiveChoicesAsync(db.RestrictionGroups, cancellationToken))));
         });
 
+        products.MapGet("/search", ProductSearchQuery.SearchAsync);
         products.MapPost("/", CreateAsync);
         products.MapPut("/{id:guid}/unit", SetUnitAsync);
         products.MapPost("/{id:guid}/base-prices", AddBasePriceAsync);
@@ -196,6 +197,6 @@ public static class ProductEndpoints
         new(product.Id, product.Code, product.Name, product.CategoryId, product.Unit,
             product.QuantityStep, product.MinimumQuantity);
 
-    private static DateOnly Today(TimeProvider clock) => DateOnly.FromDateTime(
+    internal static DateOnly Today(TimeProvider clock) => DateOnly.FromDateTime(
         TimeZoneInfo.ConvertTime(clock.GetUtcNow(), BusinessTimeZone).DateTime);
 }

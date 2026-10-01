@@ -1,0 +1,72 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Products.IndexModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Products";
+    var currency = CultureInfo.GetCultureInfo("en-IE");
+}
+<p><a asp-page="/HeadOffice/Index">Back to catalogue</a></p>
+<div class="product-list-heading">
+    <h1>Products</h1>
+    <a class="button" asp-page="Create">+ Product</a>
+</div>
+<form method="get" class="product-search-form">
+    <div class="product-search-field">
+        <label asp-for="Query">Search products</label>
+        <input asp-for="Query" type="search" placeholder="Code, name, brand or supplier" />
+    </div>
+    <div class="product-search-field">
+        <label asp-for="CategoryId">Category</label>
+        <select asp-for="CategoryId">
+            <option value="">All categories</option>
+            @foreach (var category in Model.Results.Categories)
+            {
+                <option value="@category.Id">@category.Path</option>
+            }
+        </select>
+    </div>
+    <div class="product-search-field">
+        <label asp-for="BrandId">Brand</label>
+        <select asp-for="BrandId">
+            <option value="">All brands</option>
+            @foreach (var brand in Model.Results.Brands)
+            {
+                <option value="@brand.Id">@brand.Name@(brand.IsArchived ? " (archived)" : "")</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="button">Search</button>
+    @if (!string.IsNullOrEmpty(Model.Query) || Model.CategoryId is not null || Model.BrandId is not null)
+    {
+        <a asp-page="Index">Clear filters</a>
+    }
+    <div class="product-include-choice">
+        <label><input type="checkbox" disabled aria-describedby="product-include-note" /> Include unavailable and archived-category products</label>
+        <p id="product-include-note">No unavailable or archived-category products.</p>
+    </div>
+</form>
+<p role="status">@Model.Results.Items.Count @(Model.Results.Items.Count == 1 ? "product" : "products")</p>
+@if (Model.Results.Items.Count == 0)
+{
+    <p>@(string.IsNullOrEmpty(Model.Query) && Model.CategoryId is null && Model.BrandId is null ? "No products yet." : "No products match these filters.")</p>
+}
+else
+{
+    <ul class="product-search-results" aria-label="Products">
+        @foreach (var product in Model.Results.Items)
+        {
+            <li data-product-result>
+                <a class="product-result-link" asp-page="Detail" asp-route-id="@product.Id">
+                    <div class="product-result-title">
+                        <strong>@product.Code · @product.Name</strong>
+                        <span>@string.Join(" > ", product.Breadcrumb.Select(part => part.Name))</span>
+                    </div>
+                    <div class="product-result-summary">
+                        <span>@(product.PrimaryBrand is { } brand ? brand.Name + (brand.IsArchived ? " (archived)" : "") : "No primary brand") · @product.State</span>
+                        <span class="product-result-price">@(product.CurrentPrice is { } price ? price.Amount.ToString("C2", currency) + " per " + product.Unit : "No price in effect")</span>
+                    </div>
+                </a>
+            </li>
+        }
+    </ul>
+}

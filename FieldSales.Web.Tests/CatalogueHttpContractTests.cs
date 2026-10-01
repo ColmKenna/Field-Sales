@@ -46,6 +46,7 @@ public sealed class CatalogueHttpContractTests
         CatalogueApiClient client = Client(http, services);
         var result = await client.ProductDetailsAsync(Guid.NewGuid(), CancellationToken.None);
         Assert.Equal(expected, result.Status);
+        Assert.Equal(expected, (await client.SearchProductsAsync("SPF30", null, null, CancellationToken.None)).Status);
         Assert.Equal(expected, (await client.StaffSessionAsync(CancellationToken.None)).Status);
         Assert.Null(result.Value);
         IActionResult page = result.FailureResult();
@@ -70,6 +71,47 @@ public sealed class CatalogueHttpContractTests
             { BaseAddress = new Uri("https://api.test") };
         Assert.Equal(CatalogueReadStatus.Unavailable,
             (await Client(http, services).ProductDetailsAsync(Guid.NewGuid(), CancellationToken.None)).Status);
+        Assert.Equal(CatalogueReadStatus.Unavailable,
+            (await Client(http, services).SearchProductsAsync("SPF30", null, null, CancellationToken.None)).Status);
+    }
+
+    [Fact]
+    public async Task ProductSearch_EncodesLiteralQueryAndFiltersAndUsesServerHeldBearerToken()
+    {
+        Guid category = Guid.NewGuid(), brand = Guid.NewGuid();
+        const string query = "A&B / 50% + SPF30";
+        using var services = TokenServices();
+        using var http = new HttpClient(new ReplyHandler((request, _) =>
+        {
+            Assert.Equal("/catalogue/products/search", request.RequestUri!.AbsolutePath);
+            Assert.Equal("server-held-access-token", request.Headers.Authorization!.Parameter);
+            var parameters = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(request.RequestUri.Query);
+            Assert.Equal(query, parameters["q"].ToString());
+            Assert.Equal(category.ToString(), parameters["categoryId"].ToString());
+            Assert.Equal(brand.ToString(), parameters["brandId"].ToString());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = System.Net.Http.Json.JsonContent.Create(new ProductSearchResponse([], [], []))
+            });
+        })) { BaseAddress = new Uri("https://api.test") };
+        var result = await Client(http, services).SearchProductsAsync(query, category, brand, CancellationToken.None);
+        Assert.True(result.Found);
+        Assert.Empty(result.Value!.Items);
+    }
+
+    [Theory]
+    [InlineData("""{"items":[null],"categories":[],"brands":[]}""")]
+    [InlineData("""{"items":[],"categories":[null],"brands":[]}""")]
+    [InlineData("""{"items":[],"categories":[],"brands":[null]}""")]
+    [InlineData("""{"items":[{}],"categories":[],"brands":[]}""")]
+    public async Task ProductSearch_RejectsIncompleteSuccessfulPayloads(string body)
+    {
+        using var services = TokenServices();
+        using var http = new HttpClient(new ReplyHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") })))
+            { BaseAddress = new Uri("https://api.test") };
+        Assert.Equal(CatalogueReadStatus.Unavailable,
+            (await Client(http, services).SearchProductsAsync("", null, null, CancellationToken.None)).Status);
     }
 
     [Theory]

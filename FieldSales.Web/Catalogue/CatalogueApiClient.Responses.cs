@@ -25,6 +25,12 @@ public sealed partial class CatalogueApiClient
     {
         null => false,
         FieldSales.StaffAccess.StaffSessionResponse session => !string.IsNullOrWhiteSpace(session.Subject) && session.Roles is not null,
+        ProductSearchResponse search => search.Items is not null && search.Categories is not null && search.Brands is not null
+            && search.Items.All(item => item is not null && item.Code is not null && item.Name is not null
+                && item.Breadcrumb is not null && item.Breadcrumb.All(part => part is not null && part.Name is not null)
+                && item.State is not null && item.Unit is not null && (item.PrimaryBrand is null || item.PrimaryBrand.Name is not null))
+            && search.Categories.All(category => category is not null && category.Path is not null)
+            && search.Brands.All(brand => brand is not null && brand.Name is not null),
         ProductDetails details => details.Product is not null && details.Product.Name is not null
             && details.Breadcrumb is not null && details.PriceHistory is not null && details.Attributes is not null,
         CategoryDetails details => details.Category is not null && details.Category.Name is not null
