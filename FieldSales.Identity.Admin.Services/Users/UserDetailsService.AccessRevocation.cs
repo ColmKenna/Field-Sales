@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Validation;
 using Duende.IdentityServer.Models;
 using FieldSales.Identity.Services.AuditLogs;
 using Microsoft.EntityFrameworkCore;
@@ -92,7 +93,7 @@ public partial class UserDetailsService
     {
         await AuditDeniedAsync(AuditAction.RevokeUserAccess, AuditReasonCode.NotFound, userId, userId,
             "User not found.", cancellationToken);
-        return UserAccessRevokeResult.Failed("User not found.");
+        return UserAccessRevokeResult.Failed("User not found.", AdminMutationStatus.NotFound);
     }
 
     private async Task<UserAccessRevokeResult> DenyRevokeAccessSelfActionAsync(UserId userId, string targetName, CancellationToken cancellationToken)

@@ -98,9 +98,11 @@ public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
         return RedirectToPage(new { name = Name });
     }
 
-    public async Task<IActionResult> OnPostAddClaimAsync(string name, string claimType,
+    public async Task<IActionResult> OnPostAddClaimAsync([FromQuery] string name, string claimType,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(name)) return NotFound();
+
         bool success = await _apiScopeEditorService.AddClaimAsync(ScopeName.Create(name), ClaimType.Create(claimType),
             cancellationToken);
         if (!success)
@@ -109,9 +111,11 @@ public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
         return RedirectToPage(new { name });
     }
 
-    public async Task<IActionResult> OnPostRemoveClaimAsync(string name, string claimType,
+    public async Task<IActionResult> OnPostRemoveClaimAsync([FromQuery] string name, string claimType,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(name)) return NotFound();
+
         bool success = await _apiScopeEditorService.RemoveClaimAsync(ScopeName.Create(name),
             ClaimType.Create(claimType), cancellationToken);
         if (!success)

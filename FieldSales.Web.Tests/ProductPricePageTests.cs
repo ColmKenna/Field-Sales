@@ -20,7 +20,9 @@ public sealed class ProductPricePageTests
         await SignInAsync(browser);
         string html = await PageAsync(browser, api.Path);
         Assert.Contains("€12.50 per kg", html);
-        Assert.Contains("Effective from 1 Sept 2026", html);
+        Assert.Contains("Effective from 1 Sep 2026", html);
+        Assert.Contains("1 Sep 2026</time>", html);
+        Assert.DoesNotContain("Sept", html);
         Assert.Contains("value=\"kg\" selected=\"selected\"", html);
         Assert.Contains("name=\"QuantityStep\"", html);
         Assert.Contains("value=\"0.5\"", html);

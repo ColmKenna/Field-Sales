@@ -23,12 +23,12 @@ public partial class UserDetailsService
             case RoleAdditionStatus.UserNotFound:
                 await AuditDeniedAsync(AuditAction.AddRole, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
-                return RoleChangeResult.Failed("User not found.");
+                return RoleChangeResult.Failed("User not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
 
             case RoleAdditionStatus.RoleNotFound:
                 await AuditDeniedAsync(AuditAction.AddRole, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "Role not found.", cancellationToken);
-                return RoleChangeResult.Failed("Role not found.");
+                return RoleChangeResult.Failed("Role not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
 
             case RoleAdditionStatus.AlreadyMember:
                 return RoleChangeResult.Succeeded();

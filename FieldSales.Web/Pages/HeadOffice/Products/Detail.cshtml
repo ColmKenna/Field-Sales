@@ -27,7 +27,7 @@
                 var change = next.Amount > price.Amount ? "rising to" : next.Amount < price.Amount ? "falling to" : "changing to";
                 <p class="price-summary">@price.Amount.ToString("C2", currency) · @change @next.Amount.ToString("C2", currency) on @next.EffectiveFrom.ToString("d MMM", CultureInfo.InvariantCulture)</p>
             }
-            <p>@price.Amount.ToString("C2", currency) per @Model.Details.Product.Unit · Effective from @price.EffectiveFrom.ToString("d MMM yyyy", currency)</p>
+            <p>@price.Amount.ToString("C2", currency) per @Model.Details.Product.Unit · Effective from @price.EffectiveFrom.ToString("d MMM yyyy", CultureInfo.InvariantCulture)</p>
         }
         else
         {

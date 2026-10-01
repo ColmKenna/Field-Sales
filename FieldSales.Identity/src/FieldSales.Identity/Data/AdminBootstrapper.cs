@@ -56,7 +56,13 @@ public static class AdminBootstrapper
             return;
         }
 
-        await userManager.AddToRoleAsync(user, Config.SysAdminRole);
+        IdentityResult assignment = await userManager.AddToRoleAsync(user, Config.SysAdminRole);
+        if (!assignment.Succeeded)
+        {
+            logger.LogError("Admin bootstrap failed to assign role '{Role}': {Errors}",
+                Config.SysAdminRole, string.Join(", ", assignment.Errors.Select(e => e.Description)));
+            return;
+        }
         logger.LogInformation("Administrator account '{Email}' successfully created via one-time bootstrap.", email);
     }
 }

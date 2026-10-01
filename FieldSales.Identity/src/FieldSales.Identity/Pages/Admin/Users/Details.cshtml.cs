@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Validation;
 using System.Security.Claims;
 using FieldSales.Identity.Services.Users;
 using Microsoft.AspNetCore.Mvc;
@@ -85,7 +86,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         RoleChangeResult result = await _userDetailsService.AddRoleAsync(TargetUserId, role, cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage is "User not found." or "Role not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
             ErrorMessage = result.ErrorMessage;
@@ -104,7 +105,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         RoleChangeResult result = await _userDetailsService.RemoveRoleAsync(TargetUserId, role, cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage == "User not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
             ErrorMessage = result.ErrorMessage;
@@ -126,7 +127,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
                 cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage == "User not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
             ErrorMessage = result.ErrorMessage;
@@ -147,7 +148,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
             new UserClaim(claimType, claimValue), cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage == "User not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
             ErrorMessage = result.ErrorMessage;
@@ -166,7 +167,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         UserAccessRevokeResult result = await _userDetailsService.RevokeUserAccessAsync(Context, cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage == "User not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
             ErrorMessage = result.ErrorMessage;
@@ -190,7 +191,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         UserSuspendResult result = await _userDetailsService.SuspendUserAsync(Context, cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage == "User not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
             ErrorMessage = result.ErrorMessage;
         }
@@ -214,7 +215,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         UserDeleteResult result = await _userDetailsService.DeleteUserAsync(Context, cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage == "User not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
             ErrorMessage = result.ErrorMessage;
             return RedirectToUserTab("danger");

@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Validation;
 using FieldSales.Identity.Services.Clients;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -55,7 +56,7 @@ public class DetailsModel(IClientOverviewService clientOverviewService) : PageMo
             await _clientOverviewService.DeleteClientAsync(ClientId.Create(id), cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage == "Client not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
             DeleteBlockedMessage = result.ErrorMessage;

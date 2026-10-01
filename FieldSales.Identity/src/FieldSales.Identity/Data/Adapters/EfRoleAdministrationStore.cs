@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Users;
 using FieldSales.Identity.Services;
 using FieldSales.Identity.Services.Roles;
 using Microsoft.AspNetCore.Identity;
@@ -34,7 +35,7 @@ public sealed class EfRoleAdministrationStore(
         {
             Id = RoleId.Create(r.Id),
             Name = r.Name ?? string.Empty,
-            IsProtected = r.Name == "SysAdmin"
+            IsProtected = r.Name == ProtectedAdminRoles.SysAdmin
         }).ToList();
 
         return new ListResult<RoleListItem>
@@ -58,7 +59,7 @@ public sealed class EfRoleAdministrationStore(
         {
             Id = RoleId.Create(role.Id),
             Name = role.Name ?? string.Empty,
-            IsProtected = role.Name == "SysAdmin"
+            IsProtected = role.Name == ProtectedAdminRoles.SysAdmin
         };
     }
 

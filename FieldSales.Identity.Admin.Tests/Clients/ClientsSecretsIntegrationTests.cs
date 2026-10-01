@@ -66,7 +66,7 @@ public class ClientsSecretsIntegrationTests : IDisposable
                 : generateResult ?? ClientSecretGenerateResult.Succeeded("plaintext-secret-value"));
         mock.Setup(s => s.RevokeClientSecretAsync(It.IsAny<ClientId>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientId id, int _, CancellationToken _) => id.Value == "non-existent"
-                ? ClientSecretRevokeResult.Failed("Client not found.")
+                ? ClientSecretRevokeResult.Failed("Client not found.", status: FieldSales.Identity.Services.Validation.AdminMutationStatus.NotFound)
                 : revokeResult ?? ClientSecretRevokeResult.Succeeded());
         return mock.Object;
     }

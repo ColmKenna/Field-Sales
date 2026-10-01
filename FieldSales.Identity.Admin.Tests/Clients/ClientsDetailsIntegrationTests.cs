@@ -72,7 +72,7 @@ public class ClientsDetailsIntegrationTests : IDisposable
             .ReturnsAsync(toggleSuccess);
         mock.Setup(s => s.DeleteClientAsync(It.IsAny<ClientId>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientId id, CancellationToken _) => id.Value == "non-existent"
-                ? ClientDeleteResult.Failed("Client not found.")
+                ? ClientDeleteResult.Failed("Client not found.", status: FieldSales.Identity.Services.Validation.AdminMutationStatus.NotFound)
                 : deleteResult ?? ClientDeleteResult.Failed("Client must be disabled before it can be deleted."));
         return mock.Object;
     }
@@ -150,7 +150,7 @@ public class ClientsDetailsIntegrationTests : IDisposable
 
         IElement? statusBadge = document.QuerySelector("span.status-badge");
         Assert.NotNull(statusBadge);
-        Assert.Contains("â€¢ Active", statusBadge!.TextContent);
+        Assert.Contains("• Active", statusBadge!.TextContent);
 
         IElement? backLink = document.QuerySelector("a.back-link");
         Assert.NotNull(backLink);

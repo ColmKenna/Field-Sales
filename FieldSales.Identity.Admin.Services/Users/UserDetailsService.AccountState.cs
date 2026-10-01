@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Validation;
 using FieldSales.Identity.Services.AuditLogs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -27,7 +28,7 @@ public partial class UserDetailsService
             case PasswordResetStatus.UserNotFound:
                 await AuditDeniedAsync(AuditAction.ResetPassword, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
-                return PasswordResetResult.Failed("User not found.");
+                return PasswordResetResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case PasswordResetStatus.ValidationFailed:
                 await AuditDeniedAsync(AuditAction.ResetPassword, AuditReasonCode.ValidationFailed, userId,
@@ -69,7 +70,7 @@ public partial class UserDetailsService
             case UserSuspendStatus.UserNotFound:
                 await AuditDeniedAsync(AuditAction.SuspendUser, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
-                return UserSuspendResult.Failed("User not found.");
+                return UserSuspendResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case UserSuspendStatus.SelfActionBlocked:
                 await AuditDeniedAsync(AuditAction.SuspendUser, AuditReasonCode.SelfAction, userId, outcome.TargetName,
@@ -153,7 +154,7 @@ public partial class UserDetailsService
             case UserDeleteStatus.UserNotFound:
                 await AuditDeniedAsync(AuditAction.DeleteUser, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
-                return UserDeleteResult.Failed("User not found.");
+                return UserDeleteResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case UserDeleteStatus.SelfActionBlocked:
                 await AuditDeniedAsync(AuditAction.DeleteUser, AuditReasonCode.SelfAction, userId, outcome.TargetName,

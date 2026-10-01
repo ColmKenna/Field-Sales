@@ -120,7 +120,7 @@ public class ClientsDetailsPageModelTests
         var mockService = new Mock<IClientOverviewService>();
         mockService
             .Setup(s => s.DeleteClientAsync(ClientId.Create("coop.market.razor"), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(ClientDeleteResult.Failed("Client not found."));
+            .ReturnsAsync(ClientDeleteResult.Failed("Client not found.", status: FieldSales.Identity.Services.Validation.AdminMutationStatus.NotFound));
 
         var pageModel = new DetailsModel(mockService.Object) { DeleteConfirmation = "DELETE" };
 

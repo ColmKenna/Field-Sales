@@ -137,17 +137,21 @@ public class EditModel(IIdentityResourceEditorService editorService) : PageModel
         return await RenderOutcomeAsync(result, Name, cancellationToken);
     }
 
-    public async Task<IActionResult> OnPostAddClaimAsync(string name, string claimType,
+    public async Task<IActionResult> OnPostAddClaimAsync([FromQuery] string name, string claimType,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(name)) return NotFound();
+
         IdentityResourceEditResult result = await _editorService.AddClaimAsync(ScopeName.Create(name),
             ClaimType.Create(claimType), cancellationToken);
         return await RenderOutcomeAsync(result, name, cancellationToken);
     }
 
-    public async Task<IActionResult> OnPostRemoveClaimAsync(string name, string claimType,
+    public async Task<IActionResult> OnPostRemoveClaimAsync([FromQuery] string name, string claimType,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(name)) return NotFound();
+
         IdentityResourceEditResult result = await _editorService.RemoveClaimAsync(ScopeName.Create(name),
             ClaimType.Create(claimType), cancellationToken);
         return await RenderOutcomeAsync(result, name, cancellationToken);

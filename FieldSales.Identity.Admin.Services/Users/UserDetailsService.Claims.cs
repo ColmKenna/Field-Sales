@@ -52,7 +52,7 @@ public partial class UserDetailsService
             case ClaimMutationStatus.UserNotFound:
                 await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
-                return ClaimChangeResult.Failed("User not found.");
+                return ClaimChangeResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case ClaimMutationStatus.ValidationFailed:
                 await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId,
@@ -128,7 +128,7 @@ public partial class UserDetailsService
             case ClaimMutationStatus.UserNotFound:
                 await AuditDeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
-                return ClaimChangeResult.Failed("User not found.");
+                return ClaimChangeResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case ClaimMutationStatus.ValidationFailed:
                 await AuditDeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.ValidationFailed, userId,

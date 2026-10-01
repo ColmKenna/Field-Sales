@@ -290,7 +290,7 @@ public class UsersDetailsIntegrationTests : IDisposable
         Assert.True(removeButton!.IsDisabled);
 
         // The reason is visible text, not a title. A disabled control is not focusable, so a
-        // title on it is unreachable by keyboard and never announced â€” it explained the refusal
+        // title on it is unreachable by keyboard and never announced — it explained the refusal
         // only to a sighted mouse user hovering the button they had been told not to press.
         IElement? reason = document.QuerySelector("#tab-panel-roles .danger-row-desc");
         Assert.NotNull(reason);
@@ -518,7 +518,7 @@ public class UsersDetailsIntegrationTests : IDisposable
         mock.Setup(s =>
                 s.RevokeUserAccessAsync(It.Is<UserActionContext>(c => c.Target == UserId.Create("non-existent")),
                     It.IsAny<CancellationToken>()))
-            .ReturnsAsync(UserAccessRevokeResult.Failed("User not found."));
+            .ReturnsAsync(UserAccessRevokeResult.Failed("User not found.", status: FieldSales.Identity.Services.Validation.AdminMutationStatus.NotFound));
 
         HttpClient httpClient = CreateClient(mock.Object, false);
         (string token, string cookie) =

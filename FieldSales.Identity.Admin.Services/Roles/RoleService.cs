@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Users;
 using FieldSales.Identity.Services.AuditLogs;
 using FieldSales.Identity.Services.Validation;
 
@@ -8,7 +9,7 @@ public class RoleService(
     IAuditWriter auditWriter) : IRoleService
 {
     // We pass SysAdminRole as the protected role that cannot be deleted.
-    private const string ProtectedRoleName = "SysAdmin";
+    private const string ProtectedRoleName = ProtectedAdminRoles.SysAdmin;
     private readonly IAuditWriter _auditWriter = auditWriter;
     private readonly IRoleAdministrationStore _store = store;
 

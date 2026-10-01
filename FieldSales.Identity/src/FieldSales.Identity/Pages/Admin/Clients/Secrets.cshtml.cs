@@ -102,7 +102,7 @@ public class SecretsModel(
             await _clientSecretsService.RevokeClientSecretAsync(ClientId.Create(Id), secretId, cancellationToken);
         if (!result.Success)
         {
-            if (result.ErrorMessage is "Client not found." or "Secret not found.")
+            if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
             RevokeErrorMessage = result.ErrorMessage;

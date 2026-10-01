@@ -57,7 +57,7 @@ public class UsersDetailsPageModelTests
     {
         var service = new Mock<IUserDetailsService>();
         service.Setup(s => s.AddRoleAsync(UserId.Create("user-1"), "missing-role", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(RoleChangeResult.Failed("Role not found."));
+            .ReturnsAsync(RoleChangeResult.Failed("Role not found.", status: FieldSales.Identity.Services.Validation.AdminMutationStatus.NotFound));
         DetailsModel model = CreateModel(service);
         model.Id = "user-1";
 
@@ -141,5 +141,56 @@ public class UsersDetailsPageModelTests
         await model.OnGetAsync(CancellationToken.None);
 
         Assert.Empty(model.UnassignedRoles);
+    }
+
+    [Theory]
+    [InlineData("AddRole", true)] [InlineData("AddRole", false)]
+    [InlineData("RemoveRole", true)] [InlineData("RemoveRole", false)]
+    [InlineData("AddClaim", true)] [InlineData("AddClaim", false)]
+    [InlineData("RemoveClaim", true)] [InlineData("RemoveClaim", false)]
+    [InlineData("Revoke", true)] [InlineData("Revoke", false)]
+    [InlineData("Suspend", true)] [InlineData("Suspend", false)]
+    [InlineData("Delete", true)] [InlineData("Delete", false)]
+    public async Task MutationResponse_UsesStatusRegardlessOfMessage(string handler, bool missing)
+    {
+        var service = new Mock<IUserDetailsService>();
+        var status = missing ? FieldSales.Identity.Services.Validation.AdminMutationStatus.NotFound
+            : FieldSales.Identity.Services.Validation.AdminMutationStatus.Denied;
+        const string message = "A revised explanation.";
+        service.Setup(s => s.AddRoleAsync(It.IsAny<UserId>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RoleChangeResult.Failed(message, status: status));
+        service.Setup(s => s.RemoveRoleAsync(It.IsAny<UserId>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RoleChangeResult.Failed(message, status: status));
+        service.Setup(s => s.AddClaimAsync(It.IsAny<UserId>(), It.IsAny<UserClaim>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClaimChangeResult.Failed(message, status));
+        service.Setup(s => s.RemoveClaimAsync(It.IsAny<UserId>(), It.IsAny<UserClaim>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClaimChangeResult.Failed(message, status));
+        service.Setup(s => s.RevokeUserAccessAsync(It.IsAny<UserActionContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UserAccessRevokeResult.Failed(message, status));
+        service.Setup(s => s.SuspendUserAsync(It.IsAny<UserActionContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UserSuspendResult.Failed(message, status));
+        service.Setup(s => s.DeleteUserAsync(It.IsAny<UserActionContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UserDeleteResult.Failed(message, status));
+        DetailsModel model = CreateModel(service);
+        model.Id = "user-1";
+        model.DeleteConfirmation = "DELETE";
+        IActionResult result = handler switch
+        {
+            "AddRole" => await model.OnPostAddRoleAsync("Support", CancellationToken.None),
+            "RemoveRole" => await model.OnPostRemoveRoleAsync("Support", CancellationToken.None),
+            "AddClaim" => await model.OnPostAddClaimAsync("review_claim", "value", CancellationToken.None),
+            "RemoveClaim" => await model.OnPostRemoveClaimAsync("review_claim", "value", CancellationToken.None),
+            "Revoke" => await model.OnPostRevokeUserAccessAsync(CancellationToken.None),
+            "Suspend" => await model.OnPostSuspendAsync(CancellationToken.None),
+            _ => await model.OnPostDeleteAsync(CancellationToken.None)
+        };
+        if (missing) Assert.IsType<NotFoundResult>(result);
+        else
+        {
+            var redirect = Assert.IsType<RedirectToPageResult>(result);
+            Assert.Equal(handler.Contains("Role") ? "roles" : handler.Contains("Claim") ? "claims"
+                : handler == "Revoke" ? "access" : "danger", redirect.RouteValues!["tab"]);
+            Assert.Equal(message, model.ErrorMessage);
+        }
     }
 }

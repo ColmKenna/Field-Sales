@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using FieldSales.Identity.Services.Users;
+using FieldSales.Identity.Services.Validation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -46,6 +47,8 @@ public class ResetPasswordModel(IUserDetailsService userDetailsService) : PageMo
 
         PasswordResetResult result =
             await _userDetailsService.ResetPasswordAsync(UserId.Create(Id), Input.NewPassword, cancellationToken);
+
+        if (result.Status == AdminMutationStatus.NotFound) return NotFound();
 
         if (!result.Success)
         {

@@ -62,27 +62,29 @@ public class RoleChangeResult
 
 public class ClaimChangeResult
 {
-    public bool Success { get; set; }
+    public bool Success => Status == AdminMutationStatus.Succeeded;
+    public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
     public string? ErrorMessage { get; set; }
 
-    public static ClaimChangeResult Succeeded() => new() { Success = true };
+    public static ClaimChangeResult Succeeded() => new() { Status = AdminMutationStatus.Succeeded };
 
-    public static ClaimChangeResult Failed(string errorMessage) =>
-        new() { Success = false, ErrorMessage = errorMessage };
+    public static ClaimChangeResult Failed(string errorMessage, AdminMutationStatus status = AdminMutationStatus.Denied) =>
+        new() { Status = status, ErrorMessage = errorMessage };
 }
 
 public class UserAccessRevokeResult
 {
-    public bool Success { get; set; }
+    public bool Success => Status == AdminMutationStatus.Succeeded;
+    public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
     public string? ErrorMessage { get; set; }
     public string? WarningMessage { get; set; }
     public int RevokedGrantCount { get; set; }
 
     public static UserAccessRevokeResult Succeeded(int revokedGrantCount, string? warningMessage = null) =>
-        new() { Success = true, RevokedGrantCount = revokedGrantCount, WarningMessage = warningMessage };
+        new() { Status = AdminMutationStatus.Succeeded, RevokedGrantCount = revokedGrantCount, WarningMessage = warningMessage };
 
-    public static UserAccessRevokeResult Failed(string errorMessage) =>
-        new() { Success = false, ErrorMessage = errorMessage };
+    public static UserAccessRevokeResult Failed(string errorMessage, AdminMutationStatus status = AdminMutationStatus.Denied) =>
+        new() { Status = status, ErrorMessage = errorMessage };
 }
 
 /// <summary>
@@ -156,33 +158,36 @@ public interface IUserDetailsService
 
 public class PasswordResetResult
 {
-    public bool Success { get; set; }
+    public bool Success => Status == AdminMutationStatus.Succeeded;
+    public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
     public string? ErrorMessage { get; set; }
 
-    public static PasswordResetResult Succeeded() => new() { Success = true };
+    public static PasswordResetResult Succeeded() => new() { Status = AdminMutationStatus.Succeeded };
 
-    public static PasswordResetResult Failed(string errorMessage) =>
-        new() { Success = false, ErrorMessage = errorMessage };
+    public static PasswordResetResult Failed(string errorMessage, AdminMutationStatus status = AdminMutationStatus.Denied) =>
+        new() { Status = status, ErrorMessage = errorMessage };
 }
 
 public class UserSuspendResult
 {
-    public bool Success { get; set; }
+    public bool Success => Status == AdminMutationStatus.Succeeded;
+    public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
     public string? ErrorMessage { get; set; }
 
-    public static UserSuspendResult Succeeded() => new() { Success = true };
+    public static UserSuspendResult Succeeded() => new() { Status = AdminMutationStatus.Succeeded };
 
-    public static UserSuspendResult Failed(string errorMessage) =>
-        new() { Success = false, ErrorMessage = errorMessage };
+    public static UserSuspendResult Failed(string errorMessage, AdminMutationStatus status = AdminMutationStatus.Denied) =>
+        new() { Status = status, ErrorMessage = errorMessage };
 }
 
 public class UserDeleteResult
 {
-    public bool Success { get; set; }
+    public bool Success => Status == AdminMutationStatus.Succeeded;
+    public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
     public string? ErrorMessage { get; set; }
 
-    public static UserDeleteResult Succeeded() => new() { Success = true };
+    public static UserDeleteResult Succeeded() => new() { Status = AdminMutationStatus.Succeeded };
 
-    public static UserDeleteResult Failed(string errorMessage) =>
-        new() { Success = false, ErrorMessage = errorMessage };
+    public static UserDeleteResult Failed(string errorMessage, AdminMutationStatus status = AdminMutationStatus.Denied) =>
+        new() { Status = status, ErrorMessage = errorMessage };
 }

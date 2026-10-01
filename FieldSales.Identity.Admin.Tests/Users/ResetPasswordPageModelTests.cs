@@ -95,4 +95,18 @@ public class ResetPasswordPageModelTests
         Assert.Equal("user-1", redirect.RouteValues!["id"]);
         Assert.Equal("Password has been successfully reset.", model.TempData["StatusMessage"]);
     }
+    [Fact]
+    public async Task OnPostAsync_MissingStatus_DoesNotReloadAnApparentlyExistingAccount()
+    {
+        var service = new Mock<IUserDetailsService>();
+        service.Setup(s => s.ResetPasswordAsync(UserId.Create("user-1"), "new-password", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PasswordResetResult.Failed("Changed wording", FieldSales.Identity.Services.Validation.AdminMutationStatus.NotFound));
+        service.Setup(s => s.GetUserDetailsAsync(It.IsAny<UserActionContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Account());
+        ResetPasswordModel model = CreateModel(service);
+        model.Id = "user-1";
+        model.Input.NewPassword = "new-password";
+        Assert.IsType<NotFoundResult>(await model.OnPostAsync(CancellationToken.None));
+        service.Verify(s => s.GetUserDetailsAsync(It.IsAny<UserActionContext>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }
