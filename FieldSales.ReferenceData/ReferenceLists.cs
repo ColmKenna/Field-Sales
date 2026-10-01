@@ -11,11 +11,22 @@ public interface IReferenceUsageSource
     string SourceKey { get; }
     bool Supports(string listKey);
     Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken cancellationToken);
+
+    // Small/custom providers can use this sequential fallback; SQL catalogue providers override it.
+    async Task<IReadOnlyDictionary<Guid, ReferenceCount>> CountManyAsync(string listKey,
+        IReadOnlyList<Guid> ids, CancellationToken cancellationToken)
+    {
+        Dictionary<Guid, ReferenceCount> counts = [];
+        foreach (Guid id in ids.Distinct()) counts[id] = await CountAsync(new(listKey, id), cancellationToken);
+        return counts;
+    }
 }
 
 public interface IReferenceUsageReader
 {
     Task<ReferenceUsage> ReadAsync(ReferenceItemKey item, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<Guid, ReferenceUsage>> ReadManyAsync(string listKey,
+        IReadOnlyList<Guid> ids, CancellationToken cancellationToken);
 }
 
 public sealed class ReferenceUsage

@@ -26,9 +26,9 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var pagination = Pagination.From(PageNumber, _options.DefaultPageSize);
-        PageNumber = pagination.PageNumber;
+        ListQuery query = ListQuery.ForPage(Filter, PageNumber, _options.DefaultPageSize);
+        PageNumber = query.Pagination.PageNumber;
 
-        Clients = await _clientListService.GetClientsAsync(new ListQuery(Filter, pagination), cancellationToken);
+        Clients = await _clientListService.GetClientsAsync(query, cancellationToken);
     }
 }

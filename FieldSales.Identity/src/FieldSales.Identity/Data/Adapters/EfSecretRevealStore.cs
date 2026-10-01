@@ -138,11 +138,9 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
 
     private static bool IsDigestCollision(DbUpdateException ex)
     {
-        if (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2627 || sqlEx.Number == 2601)) return true;
-
-        // SQLite unique constraint error code
+        if (FieldSales.Identity.Services.Validation.UniqueConstraintViolationDetector.IsUniqueConstraintViolation(ex)) return true;
+        // Retain the supported fake-store collision signal used by provider-independent tests.
         string message = ex.InnerException?.Message ?? ex.Message;
-        return message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase)
-               || message.Contains("DuplicateKeyException", StringComparison.OrdinalIgnoreCase);
+        return message.Contains("DuplicateKeyException", StringComparison.OrdinalIgnoreCase);
     }
 }

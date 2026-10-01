@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Validation;
 
-internal static class UniqueConstraintViolationDetector
+public static class UniqueConstraintViolationDetector
 {
     public static bool IsUniqueConstraintViolation(DbUpdateException exception)
     {

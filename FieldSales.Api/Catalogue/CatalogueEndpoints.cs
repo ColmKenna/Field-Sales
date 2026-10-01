@@ -82,8 +82,7 @@ public static class CatalogueEndpoints
             {
                 await db.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException exception) when (exception.InnerException is SqlException
-                       { Number: 2601 or 2627 })
+            catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
             {
                 return Results.Conflict(new CatalogueError("A category with this name already exists here."));
             }
@@ -116,8 +115,7 @@ public static class CatalogueEndpoints
             {
                 await db.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException exception) when (exception.InnerException is SqlException
-                       { Number: 2601 or 2627 })
+            catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
             {
                 return Results.Conflict(new CatalogueError("A category with this name already exists here."));
             }

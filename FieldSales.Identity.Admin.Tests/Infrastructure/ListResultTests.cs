@@ -2,6 +2,23 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
 public class ListResultTests
 {
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(int.MaxValue, int.MaxValue)]
+    [InlineData(2, 10)]
+    public void PageFactory_NormalizesRequestsWithoutLosingItemsOrTotals(int page, int size)
+    {
+        Pagination expected = Pagination.Normalize(page, size);
+        var result = ListResult<string>.Page(["retained"], 21, new(page, size, -1));
+        Assert.Equal(expected.PageNumber, result.PageNumber);
+        Assert.Equal(expected.PageSize, result.PageSize);
+        Assert.Equal(21, result.TotalCount);
+        Assert.Equal("retained", Assert.Single(result.Items));
+        ListQuery query = ListQuery.ForPage(" original filter ", page, size);
+        Assert.Equal(" original filter ", query.Filter);
+        Assert.Equal(expected, query.Pagination);
+    }
+
     [Fact]
     public void Empty_ReturnsZeroCountAndEmptyItems()
     {

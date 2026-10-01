@@ -27,6 +27,25 @@ public sealed class BrandEndToEndTests(ProductApplication app) : IClassFixture<P
     private const string ApiPath = "/catalogue/reference-data/brands";
 
     [Fact]
+    public async Task UnknownReferenceKey_Returns404OnEveryRoute()
+    {
+        using var api = app.CreateApiClient();
+        string root = "/catalogue/reference-data/unknown";
+        Guid id = Guid.NewGuid();
+        foreach (string path in new[] { root, root + "/choices", $"{root}/{id}" })
+        {
+            using var response = await api.GetAsync(path);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+        using var create = await api.PostAsJsonAsync(root, new { Name = "name" });
+        using var rename = await api.PutAsJsonAsync($"{root}/{id}/name", new { Name = "name" });
+        using var retire = await api.PostAsJsonAsync($"{root}/{id}/retire", new { Action = ReferenceAction.Delete });
+        Assert.Equal(HttpStatusCode.NotFound, create.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, rename.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, retire.StatusCode);
+    }
+
+    [Fact]
     public async Task Should_SaveBrand_When_NameIsValid()
     {
         await ResetAsync();

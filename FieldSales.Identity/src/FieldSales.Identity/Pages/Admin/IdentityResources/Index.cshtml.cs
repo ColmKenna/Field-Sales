@@ -28,11 +28,11 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var pagination = Pagination.From(PageNumber, _options.DefaultPageSize);
-        PageNumber = pagination.PageNumber;
+        ListQuery query = ListQuery.ForPage(Filter, PageNumber, _options.DefaultPageSize);
+        PageNumber = query.Pagination.PageNumber;
 
         IdentityResources =
-            await _identityResourceListService.GetIdentityResourcesAsync(new ListQuery(Filter, pagination),
+            await _identityResourceListService.GetIdentityResourcesAsync(query,
                 cancellationToken);
     }
 

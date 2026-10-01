@@ -51,13 +51,7 @@ public sealed class EfIdentityUserAdministrationStore(
             })
             .ToListAsync(cancellationToken);
 
-        return new ListResult<UserListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<UserListItem>.Page(items, totalCount, pagination);
     }
 
     public async Task<UserUnlockOutcome> UnlockUserAsync(

@@ -38,13 +38,7 @@ public sealed class EfRoleAdministrationStore(
             IsProtected = r.Name == ProtectedAdminRoles.SysAdmin
         }).ToList();
 
-        return new ListResult<RoleListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<RoleListItem>.Page(items, totalCount, pagination);
     }
 
     public async Task<RoleDetailsModel?> FindRoleAsync(RoleId roleId, CancellationToken cancellationToken = default)

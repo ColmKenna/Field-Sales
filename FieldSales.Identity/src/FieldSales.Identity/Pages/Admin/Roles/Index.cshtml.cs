@@ -31,10 +31,10 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var pagination = Pagination.From(PageNumber, _options.DefaultPageSize);
-        PageNumber = pagination.PageNumber;
+        ListQuery query = ListQuery.ForPage(Filter, PageNumber, _options.DefaultPageSize);
+        PageNumber = query.Pagination.PageNumber;
 
-        Roles = await _roleService.GetRolesAsync(new ListQuery(Filter, pagination), cancellationToken);
+        Roles = await _roleService.GetRolesAsync(query, cancellationToken);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(string id, CancellationToken cancellationToken)

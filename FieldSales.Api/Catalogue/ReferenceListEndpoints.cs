@@ -14,34 +14,33 @@ public static class ReferenceListEndpoints
     {
         var group = app.MapGroup("/catalogue/reference-data").RequireAuthorization("HeadOfficeCatalogue");
         group.MapGet("/{listKey}", async (string listKey, bool? showArchived,
-            IEnumerable<IReferenceListStore> stores, IReferenceUsageReader usage, CancellationToken cancellationToken) =>
+            ReferenceCatalogueRegistry registry, IReferenceUsageReader usage, CancellationToken cancellationToken) =>
         {
-            var store = stores.SingleOrDefault(store => store.Definition.Key == listKey);
+            var store = registry.Find(listKey);
             if (store is null) return Results.NotFound();
             try
             {
                 var all = await store.ListAsync(cancellationToken);
-                List<ReferenceListItem> items = [];
-                foreach (var item in all.Where(item => showArchived == true || !item.IsArchived))
-                    items.Add(new(item.Id, item.Name, item.IsArchived,
-                        await usage.ReadAsync(new(listKey, item.Id), cancellationToken)));
+                var visible = all.Where(item => showArchived == true || !item.IsArchived).ToArray();
+                var counts = await usage.ReadManyAsync(listKey, visible.Select(item => item.Id).ToArray(), cancellationToken);
+                var items = visible.Select(item => new ReferenceListItem(item.Id, item.Name, item.IsArchived, counts[item.Id])).ToArray();
                 return Results.Ok(new ReferenceListViewModel(store.Definition,
-                    stores.Select(store => store.Definition).ToArray(), items,
+                    registry.Definitions, items,
                     all.Count(item => item.IsArchived), showArchived == true));
             }
             catch (ReferenceUsageUnavailableException) { return Results.StatusCode(503); }
         });
-        group.MapGet("/{listKey}/choices", async (string listKey, IEnumerable<IReferenceListStore> stores,
+        group.MapGet("/{listKey}/choices", async (string listKey, ReferenceCatalogueRegistry registry,
             CancellationToken cancellationToken) =>
         {
-            var store = stores.SingleOrDefault(store => store.Definition.Key == listKey);
+            var store = registry.Find(listKey);
             return store is null ? Results.NotFound()
                 : Results.Ok((await store.ListAsync(cancellationToken)).Where(item => !item.IsArchived).ToArray());
         });
         group.MapGet("/{listKey}/{id:guid}", async (string listKey, Guid id,
-            IEnumerable<IReferenceListStore> stores, IReferenceUsageReader usage, CancellationToken cancellationToken) =>
+            ReferenceCatalogueRegistry registry, IReferenceUsageReader usage, CancellationToken cancellationToken) =>
         {
-            var store = stores.SingleOrDefault(store => store.Definition.Key == listKey);
+            var store = registry.Find(listKey);
             if (store is null) return Results.NotFound();
             var item = await store.FindAsync(id, cancellationToken);
             if (item is null) return Results.NotFound();
@@ -50,15 +49,15 @@ public static class ReferenceListEndpoints
             catch (ReferenceUsageUnavailableException) { return Results.StatusCode(503); }
         });
         group.MapPost("/{listKey}", async (string listKey, ReferenceNameRequest request,
-            IEnumerable<IReferenceListStore> stores, CancellationToken cancellationToken) =>
-            await SaveAsync(listKey, null, request, stores, cancellationToken));
+            ReferenceCatalogueRegistry registry, CancellationToken cancellationToken) =>
+            await SaveAsync(listKey, null, request, registry, cancellationToken));
         group.MapPut("/{listKey}/{id:guid}/name", async (string listKey, Guid id, ReferenceNameRequest request,
-            IEnumerable<IReferenceListStore> stores, CancellationToken cancellationToken) =>
-            await SaveAsync(listKey, id, request, stores, cancellationToken));
+            ReferenceCatalogueRegistry registry, CancellationToken cancellationToken) =>
+            await SaveAsync(listKey, id, request, registry, cancellationToken));
         group.MapPost("/{listKey}/{id:guid}/retire", async (string listKey, Guid id, ReferenceRetireRequest request,
-            IEnumerable<IReferenceListStore> stores, IReferenceUsageReader usage, CancellationToken cancellationToken) =>
+            ReferenceCatalogueRegistry registry, IReferenceUsageReader usage, CancellationToken cancellationToken) =>
         {
-            var store = stores.SingleOrDefault(store => store.Definition.Key == listKey);
+            var store = registry.Find(listKey);
             if (store is null) return Results.NotFound();
             if (!Enum.IsDefined(request.Action)) return Results.BadRequest();
             try
@@ -80,19 +79,20 @@ public static class ReferenceListEndpoints
     }
 
     private static async Task<IResult> SaveAsync(string listKey, Guid? id, ReferenceNameRequest request,
-        IEnumerable<IReferenceListStore> stores, CancellationToken cancellationToken)
+        ReferenceCatalogueRegistry registry, CancellationToken cancellationToken)
     {
-        var store = stores.SingleOrDefault(store => store.Definition.Key == listKey);
+        var store = registry.Find(listKey);
         if (store is null) return Results.NotFound();
+        if (!NameRules.IsValid(request.Name, NamedReferenceItem.MaximumNameLength))
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+                { ["Name"] = [NameRules.ErrorMessage(store.Definition.SingularLabel.ToLowerInvariant(), NamedReferenceItem.MaximumNameLength)] });
         try
         {
             var item = await store.SaveAsync(id, request.Name ?? string.Empty, cancellationToken);
             return item is null ? Results.NotFound() : id is null
                 ? Results.Created($"/catalogue/reference-data/{listKey}/{item.Id}", item) : Results.Ok(item);
         }
-        catch (ArgumentException exception) { return Results.ValidationProblem(new Dictionary<string, string[]>
-            { ["Name"] = [exception.Message.Split(" (Parameter", StringSplitOptions.None)[0]] }); }
-        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
         { return Results.Conflict(new ReferenceListError("Name", $"A {store.Definition.SingularLabel.ToLowerInvariant()} with this name already exists.")); }
         catch (DbUpdateConcurrencyException) { return Conflict(); }
     }

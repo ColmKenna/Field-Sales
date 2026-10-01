@@ -57,13 +57,7 @@ public sealed class EfAdminAuditStore(ApplicationDbContext dbContext) : IAdminAu
 
         var items = pageEntities.Select(MapToListItem).ToList();
 
-        return new ListResult<AuditLogListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<AuditLogListItem>.Page(items, totalCount, pagination);
     }
 
     private static IQueryable<AuditLogEntry> ApplyFilter(IQueryable<AuditLogEntry> query, AuditLogFilter filter)

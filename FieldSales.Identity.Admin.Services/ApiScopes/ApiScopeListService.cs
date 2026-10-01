@@ -48,13 +48,7 @@ public class ApiScopeListService(
         foreach (ApiScopeListItem item in items)
             item.ClientReferenceCount = referenceCounts[ScopeName.Create(item.Name)];
 
-        return new ListResult<ApiScopeListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<ApiScopeListItem>.Page(items, totalCount, pagination);
     }
 
     public async Task<ApiScopeDeleteResult> DeleteApiScopeAsync(string name,

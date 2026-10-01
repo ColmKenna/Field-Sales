@@ -7,7 +7,7 @@ namespace FieldSales.Web.Pages.HeadOffice.ReferenceData;
 
 public sealed class IndexModel(CatalogueApiClient catalogue) : PageModel
 {
-    [BindProperty(SupportsGet = true)] public string ListKey { get; set; } = "brands";
+    [BindProperty(SupportsGet = true)] public string ListKey { get; set; } = ReferenceListKeys.Brands;
     [BindProperty(SupportsGet = true)] public bool ShowArchived { get; set; }
     [BindProperty] public Guid? Id { get; set; }
     [BindProperty] public string Name { get; set; } = string.Empty;

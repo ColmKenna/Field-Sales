@@ -55,13 +55,7 @@ public class IdentityResourceListService(
         foreach (IdentityResourceListItem item in items)
             item.ClientReferenceCount = referenceCounts[ScopeName.Create(item.Name)];
 
-        return new ListResult<IdentityResourceListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<IdentityResourceListItem>.Page(items, totalCount, pagination);
     }
 
     public async Task<IdentityResourceDeleteResult> DeleteIdentityResourceAsync(string name,

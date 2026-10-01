@@ -15,6 +15,7 @@ builder.Services.AddScoped<IReferenceListStore, AttributeNameListStore>();
 builder.Services.AddScoped<IReferenceListStore, SupplierListStore>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductBrandUsageSource>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductReferenceUsageSource>();
+builder.Services.AddScoped<ReferenceCatalogueRegistry>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageReader, ReferenceUsageReader>();
 builder.Services.AddScoped<ProductBrandAssignments>();
 builder.Services.AddScoped<ProductReferenceAssignments>();
@@ -93,6 +94,11 @@ builder.Services.AddAuthorization(options =>
 });
 
 WebApplication app = builder.Build();
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    using var registrationScope = app.Services.CreateScope();
+    registrationScope.ServiceProvider.GetRequiredService<ReferenceCatalogueRegistry>().ValidateRegistrations();
+}
 if (app.Environment.IsDevelopment())
 {
     await using AsyncServiceScope scope = app.Services.CreateAsyncScope();

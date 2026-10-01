@@ -5,4 +5,8 @@ namespace FieldSales.Identity.Services;
 ///     endpoint (Users, Clients, Roles, ApiScopes, Apis, IdentityResources) as two loose parameters —
 ///     bound together here so the pair travels as one value from Razor page to store.
 /// </summary>
-public sealed record ListQuery(string? Filter, Pagination Pagination = default);
+public sealed record ListQuery(string? Filter, Pagination Pagination = default)
+{
+    public static ListQuery ForPage(string? filter, int pageNumber, int pageSize) =>
+        new(filter, Pagination.Normalize(pageNumber, pageSize));
+}

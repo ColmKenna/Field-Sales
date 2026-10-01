@@ -94,13 +94,7 @@ public class GrantListService(
             IsExpired = g.Expiration.HasValue && g.Expiration.Value <= currentUtc
         }).ToList();
 
-        return new ListResult<GrantListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<GrantListItem>.Page(items, totalCount, pagination);
     }
 
     public static string FormatRelativeExpiration(DateTime? expiration, DateTime utcNow)

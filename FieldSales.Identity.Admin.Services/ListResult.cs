@@ -20,17 +20,17 @@ public class ListResult<T>
 
     public bool HasNextPage => PageNumber < TotalPages;
 
-    public static ListResult<T> Empty(Pagination pagination)
+    public static ListResult<T> Page(IReadOnlyList<T> items, int totalCount, Pagination pagination)
     {
         Pagination normalized = pagination.Normalize();
-        return new ListResult<T>
+        return new()
         {
-            Items = Array.Empty<T>(),
-            TotalCount = 0,
-            PageNumber = normalized.PageNumber,
-            PageSize = normalized.PageSize
+            Items = items, TotalCount = totalCount,
+            PageNumber = normalized.PageNumber, PageSize = normalized.PageSize
         };
     }
+
+    public static ListResult<T> Empty(Pagination pagination) => Page(Array.Empty<T>(), 0, pagination);
 
     public static ListResult<T> Empty(int pageNumber = 1, int pageSize = 10) =>
         Empty(Pagination.Normalize(pageNumber, pageSize));

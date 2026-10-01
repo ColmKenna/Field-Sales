@@ -16,7 +16,7 @@ public abstract class NamedReferenceItem
     public void Rename(string name)
     {
         if (!NameRules.IsValid(name, MaximumNameLength))
-            throw new ArgumentException($"Enter a {ItemLabel} name of up to 200 characters.", nameof(name));
+            throw new ArgumentException(NameRules.ErrorMessage(ItemLabel, MaximumNameLength), nameof(name));
         Name = name.Trim();
     }
     public void Archive() => IsArchived = true;

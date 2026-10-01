@@ -91,7 +91,7 @@ public static class ProductEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
         {
             // The unique index settles concurrent saves; report the persisted winner's code and name.
             existing = await db.Products.AsNoTracking()
@@ -137,7 +137,7 @@ public static class ProductEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 2601 or 2627 })
+        catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
         {
             // A competing insert may have won after the history was loaded.
             if (!await db.ProductBasePrices.AsNoTracking().AnyAsync(price =>

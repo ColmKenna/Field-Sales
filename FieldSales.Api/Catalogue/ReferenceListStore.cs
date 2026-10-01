@@ -58,13 +58,13 @@ public class ReferenceListStore<T>(CatalogueDbContext db, ReferenceListDefinitio
 }
 
 public sealed class BrandListStore(CatalogueDbContext db)
-    : ReferenceListStore<Brand>(db, new("brands", "Brand", "Brands", ["products"]), Brand.Create);
+    : ReferenceListStore<Brand>(db, new(ReferenceListKeys.Brands, "Brand", "Brands", ["products"]), Brand.Create);
 public sealed class ProductProfileListStore(CatalogueDbContext db)
-    : ReferenceListStore<ProductProfile>(db, new("profiles", "Product Profile", "Product Profiles", ["products"]), ProductProfile.Create);
+    : ReferenceListStore<ProductProfile>(db, new(ReferenceListKeys.Profiles, "Product Profile", "Product Profiles", ["products"]), ProductProfile.Create);
 public sealed class AttributeNameListStore(CatalogueDbContext db)
-    : ReferenceListStore<AttributeName>(db, new("attribute-names", "Attribute", "Attribute names", ["products"]), AttributeName.Create);
+    : ReferenceListStore<AttributeName>(db, new(ReferenceListKeys.AttributeNames, "Attribute", "Attribute names", ["products"]), AttributeName.Create);
 public sealed class SupplierListStore(CatalogueDbContext db)
-    : ReferenceListStore<Supplier>(db, new("suppliers", "Supplier", "Suppliers", ["products"]), Supplier.Create);
+    : ReferenceListStore<Supplier>(db, new(ReferenceListKeys.Suppliers, "Supplier", "Suppliers", ["products"]), Supplier.Create);
 
 /// <summary>Storage boundary for the later assignment editor. Reads and writes share one transaction.</summary>
 public sealed class ProductBrandAssignments(CatalogueDbContext db)

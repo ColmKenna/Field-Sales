@@ -33,13 +33,7 @@ public class ApiResourceListService(ConfigurationDbContext configurationDbContex
             })
             .ToListAsync(cancellationToken);
 
-        return new ListResult<ApiResourceListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<ApiResourceListItem>.Page(items, totalCount, pagination);
     }
 
     private static IQueryable<ApiResource> ApplyFilter(IQueryable<ApiResource> query, string? filter)

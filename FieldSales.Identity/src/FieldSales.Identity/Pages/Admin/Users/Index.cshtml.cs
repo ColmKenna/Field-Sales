@@ -28,10 +28,10 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var pagination = Pagination.From(PageNumber, _options.DefaultPageSize);
-        PageNumber = pagination.PageNumber;
+        ListQuery query = ListQuery.ForPage(Filter, PageNumber, _options.DefaultPageSize);
+        PageNumber = query.Pagination.PageNumber;
 
-        Users = await _userListService.GetUsersAsync(new ListQuery(Filter, pagination), cancellationToken);
+        Users = await _userListService.GetUsersAsync(query, cancellationToken);
     }
 
     public async Task<IActionResult> OnPostUnlockAsync(string id, CancellationToken cancellationToken)

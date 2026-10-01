@@ -26,10 +26,10 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var pagination = Pagination.From(PageNumber, _options.DefaultPageSize);
-        PageNumber = pagination.PageNumber;
+        ListQuery query = ListQuery.ForPage(Filter, PageNumber, _options.DefaultPageSize);
+        PageNumber = query.Pagination.PageNumber;
 
         ApiResources =
-            await _apiResourceListService.GetApiResourcesAsync(new ListQuery(Filter, pagination), cancellationToken);
+            await _apiResourceListService.GetApiResourcesAsync(query, cancellationToken);
     }
 }

@@ -39,13 +39,7 @@ public class ClientListService(ConfigurationDbContext configurationDbContext) : 
 
         var items = rows.Select(MapToListItem).ToList();
 
-        return new ListResult<ClientListItem>
-        {
-            Items = items,
-            TotalCount = totalCount,
-            PageNumber = pagination.PageNumber,
-            PageSize = pagination.PageSize
-        };
+        return ListResult<ClientListItem>.Page(items, totalCount, pagination);
     }
 
     private sealed record ClientListRow(
