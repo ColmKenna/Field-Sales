@@ -16,8 +16,31 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
     [BindProperty] public string Unit { get; set; } = "Each";
     [BindProperty] public decimal? QuantityStep { get; set; }
     [BindProperty] public decimal? MinimumQuantity { get; set; }
+    [BindProperty] public ProductClassificationInput? Classification { get; set; }
+    public IReadOnlyList<ProductReferenceItem> ProfileChoices { get; private set; } = [];
+    public IReadOnlyList<ProductReferenceItem> BrandChoices { get; private set; } = [];
+    public IReadOnlyList<ProductReferenceItem> SupplierChoices { get; private set; } = [];
+    public IReadOnlyList<ProductReferenceItem> RestrictionGroupChoices { get; private set; } = [];
 
     public Task<IActionResult> OnGetAsync(Guid id) => ShowAsync(id, populate: true);
+
+    public async Task<IActionResult> OnPostClassificationAsync(Guid id)
+    {
+        ModelState.Remove(nameof(Unit));
+        ModelState.Remove(nameof(QuantityStep));
+        ModelState.Remove(nameof(MinimumQuantity));
+        ModelState.Remove(nameof(BasePrice));
+        ModelState.Remove(nameof(EffectiveFrom));
+        Classification ??= new();
+        if (!ModelState.IsValid) return await ShowAsync(id, populate: true);
+        var result = await catalogue.SetProductClassificationAsync(id, Classification.ToRequest(), HttpContext.RequestAborted);
+        if (result.Status == SetProductClassificationStatus.Saved) return RedirectToPage("Detail", new { id });
+        if (result.Status == SetProductClassificationStatus.Missing) return NotFound();
+        if (result.Status != SetProductClassificationStatus.Invalid || result.Errors is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        ModelState.AddErrors(result.Errors, nameof(Classification));
+        return await ShowAsync(id, populate: true);
+    }
 
     public async Task<IActionResult> OnPostPriceAsync(Guid id)
     {
@@ -65,6 +88,15 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
         if (!read.Found) return read.FailureResult();
         ProductDetails details = read.Value!;
         Details = details;
+        Classification ??= ProductClassificationInput.From(details);
+        var choices = details.ClassificationChoices;
+        ProfileChoices = Choices(choices?.Profiles, details.Profile is { } profile ? [profile] : [], [Classification.ProfileId]);
+        SupplierChoices = Choices(choices?.Suppliers, details.Supplier is { } supplier ? [supplier] : [], [Classification.SupplierId]);
+        RestrictionGroupChoices = Choices(choices?.RestrictionGroups,
+            details.RestrictionGroup is { } group ? [group] : [], [Classification.RestrictionGroupId]);
+        BrandChoices = Choices(choices?.Brands, details.Brands?.Select(brand =>
+            new ProductReferenceItem(brand.Id, brand.Name, brand.IsArchived)).ToArray() ?? [],
+            Classification.AlternativeBrandIds.Select(id => (Guid?)id).Append(Classification.PrimaryBrandId));
         PriceHistory = details.PriceHistory.OrderByDescending(price => price.EffectiveFrom).ToArray();
         // CurrentPrice is resolved by the API's business date; the next entry is therefore future.
         UpcomingPrice = PriceHistory.Where(price => details.CurrentPrice is null
@@ -77,5 +109,14 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
             MinimumQuantity = details.Product.MinimumQuantity;
         }
         return Page();
+    }
+
+    private static IReadOnlyList<ProductReferenceItem> Choices(IReadOnlyList<ProductReferenceItem>? active,
+        IEnumerable<ProductReferenceItem> saved, IEnumerable<Guid?> selected)
+    {
+        var choices = (active ?? []).Concat(saved).DistinctBy(item => item.Id).ToList();
+        foreach (Guid id in selected.Where(id => id is not null).Select(id => id!.Value).Distinct())
+            if (!choices.Any(item => item.Id == id)) choices.Add(new(id, "Selection unavailable", false));
+        return choices.OrderBy(item => item.Name).ToArray();
     }
 }

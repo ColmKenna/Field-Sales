@@ -41,7 +41,8 @@ public static class ProductEndpoints
             var brands = await db.Brands.AsNoTracking().Where(brand => brand.Id == product.PrimaryBrandId
                 || db.ProductAlternativeBrands.Any(link => link.ProductId == id && link.BrandId == brand.Id))
                 .OrderBy(brand => brand.Name).Select(brand => new ProductBrandItem(brand.Id, brand.Name,
-                    brand.IsArchived, brand.Id == product.PrimaryBrandId)).ToArrayAsync(cancellationToken);
+                    brand.IsArchived, brand.Id == product.PrimaryBrandId,
+                    db.ProductAlternativeBrands.Any(link => link.ProductId == id && link.BrandId == brand.Id))).ToArrayAsync(cancellationToken);
             var profile = await db.ProductProfiles.AsNoTracking().Where(item => item.Id == product.ProductProfileId)
                 .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
             var supplier = await db.Suppliers.AsNoTracking().Where(item => item.Id == product.SupplierId)
@@ -54,13 +55,46 @@ public static class ProductEndpoints
                 price is null ? null : new ProductPriceItem(price.EffectiveFrom, price.Amount),
                 product.BasePrices.OrderByDescending(entry => entry.EffectiveFrom)
                     .Select(entry => new ProductPriceItem(entry.EffectiveFrom, entry.Amount)).ToArray(),
-                product.Attributes.Select(attribute => new FieldSales.Catalogue.Contracts.ProductAttribute(attribute.Name, attribute.Value, attribute.IsArchived)).ToArray(), brands, profile, supplier, restrictionGroup));
+                product.Attributes.Select(attribute => new FieldSales.Catalogue.Contracts.ProductAttribute(attribute.Name, attribute.Value, attribute.IsArchived)).ToArray(),
+                brands, profile, supplier, restrictionGroup, new ProductClassificationChoices(
+                    await ActiveChoicesAsync(db.ProductProfiles, cancellationToken),
+                    await ActiveChoicesAsync(db.Brands, cancellationToken),
+                    await ActiveChoicesAsync(db.Suppliers, cancellationToken),
+                    await ActiveChoicesAsync(db.RestrictionGroups, cancellationToken))));
         });
 
         products.MapPost("/", CreateAsync);
         products.MapPut("/{id:guid}/unit", SetUnitAsync);
         products.MapPost("/{id:guid}/base-prices", AddBasePriceAsync);
+        products.MapPut("/{id:guid}/classification", SetClassificationAsync);
     }
+
+    private static Task<ProductReferenceItem[]> ActiveChoicesAsync<T>(IQueryable<T> items,
+        CancellationToken cancellationToken) where T : NamedReferenceItem => items.AsNoTracking()
+        .Where(item => !item.IsArchived).OrderBy(item => item.Name)
+        .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).ToArrayAsync(cancellationToken);
+
+    private static async Task<IResult> SetClassificationAsync(Guid id, SetProductClassificationRequest request,
+        ProductReferenceAssignments assignments, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await assignments.SaveClassificationAsync(id, request, cancellationToken);
+            return result.Status switch
+            {
+                ProductClassificationSaveStatus.Missing => Results.NotFound(),
+                ProductClassificationSaveStatus.Invalid => Results.ValidationProblem(result.Errors!.ToDictionary(pair => pair.Key, pair => pair.Value)),
+                _ => Results.NoContent()
+            };
+        }
+        catch (DbUpdateConcurrencyException) { return ClassificationConflict(); }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 547 or 1205 })
+        { return ClassificationConflict(); }
+        catch (SqlException exception) when (exception.Number == 1205) { return ClassificationConflict(); }
+    }
+
+    private static IResult ClassificationConflict() => Results.Conflict(new ProductSaveError(string.Empty,
+        "The product or a selected reference changed. Reload the record before continuing."));
 
     private static async Task<IResult> CreateAsync(CreateProductRequest request, CatalogueDbContext db,
         TimeProvider clock, CancellationToken cancellationToken)

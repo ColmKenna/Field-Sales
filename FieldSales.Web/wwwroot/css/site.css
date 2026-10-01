@@ -49,3 +49,13 @@ p { line-height: 1.6; }
 .price-history th, .price-history td { padding: .6rem .4rem; text-align: left; border-bottom: 1px solid #d7dee6; }
 .reference-add, .reference-filter, .reference-item form { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-block: 1rem; }
 .reference-item, .reference-confirmation { padding: 1rem; margin-block: 1rem; border: 1px solid #ccc; border-radius: .5rem; }
+.classification-section { grid-column: 1 / -1; }
+.classification-summary, .classification-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1rem; }
+.classification-summary dt { font-weight: 600; }
+.classification-summary dd { margin: .4rem 0 0; }
+.classification-summary ul { margin: 0; padding-left: 1.25rem; }
+.product-form.classification-form { max-width: none; }
+.classification-field { display: grid; align-content: start; gap: .5rem; }
+.product-form .alternative-brands { grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); }
+.product-form .brand-choice { display: flex; align-items: center; gap: .6rem; font-weight: 400; }
+.product-form .brand-choice input { width: 1.2rem; min-height: 1.2rem; flex: 0 0 1.2rem; }

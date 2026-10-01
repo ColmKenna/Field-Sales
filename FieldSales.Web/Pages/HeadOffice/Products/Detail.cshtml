@@ -65,41 +65,88 @@
     </section>
     <section aria-labelledby="ranges-heading"><h2 id="ranges-heading">Ranges</h2><p>Unranged — orderable by all reps</p></section>
     <section aria-labelledby="replacements-heading"><h2 id="replacements-heading">Replacements</h2><p>No replacements yet.</p></section>
-    <section aria-labelledby="profile-heading"><h2 id="profile-heading">Profile</h2>
-        @if (Model.Details.Profile is { } profile)
-        {
-            <p>@profile.Name@(profile.IsArchived ? " (archived)" : "")</p>
-        }
-        else { <p>No profile yet.</p> }
-    </section>
-    <section aria-labelledby="brands-heading"><h2 id="brands-heading">Brands</h2>
-        @if (Model.Details.Brands is not { Count: > 0 })
-        {
-            <p>No brands yet.</p>
-        }
-        else
-        {
-            <ul>
-                @foreach (var brand in Model.Details.Brands.OrderByDescending(brand => brand.IsPrimary))
+    <section aria-labelledby="classification-heading" class="classification-section">
+        <h2 id="classification-heading">Classification</h2>
+        <dl class="classification-summary">
+            <div><dt>Profile</dt><dd>@(Model.Details.Profile is { } profile ? profile.Name + (profile.IsArchived ? " (archived)" : "") : "No profile yet.")</dd></div>
+            <div><dt>Brands</dt><dd>
+                @if (Model.Details.Brands is not { Count: > 0 }) { <span>No brands yet.</span> }
+                else
                 {
-                    <li>@brand.Name@(brand.IsArchived ? " (archived)" : "")@(brand.IsPrimary ? " · Primary" : " · Alternative")</li>
+                    <ul>
+                        @foreach (var brand in Model.Details.Brands.OrderByDescending(brand => brand.IsPrimary))
+                        {
+                            <li>@brand.Name@(brand.IsArchived ? " (archived)" : "")@(brand.IsPrimary ? " · Primary" : "")@(!brand.IsPrimary || brand.IsAlternative ? " · Alternative" : "")</li>
+                        }
+                    </ul>
                 }
-            </ul>
-        }
-    </section>
-    <section aria-labelledby="supplier-heading"><h2 id="supplier-heading">Supplier</h2>
-        @if (Model.Details.Supplier is { } supplier)
-        {
-            <p>@supplier.Name@(supplier.IsArchived ? " (archived)" : "")</p>
-        }
-        else { <p>No supplier yet.</p> }
-    </section>
-    <section aria-labelledby="restriction-heading"><h2 id="restriction-heading">Restriction Group</h2>
-        @if (Model.Details.RestrictionGroup is { } restrictionGroup)
-        {
-            <p>@restrictionGroup.Name@(restrictionGroup.IsArchived ? " (archived)" : "")</p>
-        }
-        else { <p>No restriction group yet.</p> }
+            </dd></div>
+            <div><dt>Supplier</dt><dd>@(Model.Details.Supplier is { } supplier ? supplier.Name + (supplier.IsArchived ? " (archived)" : "") : "No supplier yet.")</dd></div>
+            <div><dt>Restriction Group</dt><dd>@(Model.Details.RestrictionGroup is { } group ? group.Name + (group.IsArchived ? " (archived)" : "") : "No restriction group yet.")</dd></div>
+        </dl>
+        <form method="post" asp-page-handler="Classification" class="product-form classification-form">
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <p id="classification-help">All fields are optional. Choose a primary brand before adding alternative brands. Existing archived selections can be kept or replaced.</p>
+            <div class="classification-fields">
+                <div class="classification-field">
+                    <label asp-for="Classification!.ProfileId">Profile</label>
+                    <select asp-for="Classification!.ProfileId" aria-describedby="classification-help">
+                        <option value="">No profile</option>
+                        @foreach (var item in Model.ProfileChoices)
+                        {
+                            <option value="@item.Id">@item.Name@(item.IsArchived ? " (archived)" : "")</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Classification!.ProfileId" role="alert"></span>
+                </div>
+                <div class="classification-field">
+                    <label asp-for="Classification!.PrimaryBrandId">Primary brand</label>
+                    <select asp-for="Classification!.PrimaryBrandId" aria-describedby="classification-help">
+                        <option value="">No primary brand</option>
+                        @foreach (var item in Model.BrandChoices)
+                        {
+                            <option value="@item.Id">@item.Name@(item.IsArchived ? " (archived)" : "")</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Classification!.PrimaryBrandId" role="alert"></span>
+                </div>
+                <div class="classification-field">
+                    <label asp-for="Classification!.SupplierId">Supplier</label>
+                    <select asp-for="Classification!.SupplierId" aria-describedby="classification-help">
+                        <option value="">No supplier</option>
+                        @foreach (var item in Model.SupplierChoices)
+                        {
+                            <option value="@item.Id">@item.Name@(item.IsArchived ? " (archived)" : "")</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Classification!.SupplierId" role="alert"></span>
+                </div>
+                <div class="classification-field">
+                    <label asp-for="Classification!.RestrictionGroupId">Restriction group</label>
+                    <select asp-for="Classification!.RestrictionGroupId" aria-describedby="classification-help">
+                        <option value="">No restriction group</option>
+                        @foreach (var item in Model.RestrictionGroupChoices)
+                        {
+                            <option value="@item.Id">@item.Name@(item.IsArchived ? " (archived)" : "")</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Classification!.RestrictionGroupId" role="alert"></span>
+                </div>
+            </div>
+            <fieldset class="alternative-brands" aria-describedby="classification-help">
+                <legend>Alternative brands</legend>
+                @if (Model.BrandChoices.Count == 0) { <p>No brands available.</p> }
+                @foreach (var item in Model.BrandChoices)
+                {
+                    <label class="brand-choice" for="alternative-@item.Id">
+                        <input type="checkbox" id="alternative-@item.Id" name="Classification.AlternativeBrandIds" value="@item.Id" checked="@(Model.Classification!.AlternativeBrandIds.Contains(item.Id))" />
+                        <span>@item.Name@(item.IsArchived ? " (archived)" : "")</span>
+                    </label>
+                }
+                <span asp-validation-for="Classification!.AlternativeBrandIds" role="alert"></span>
+            </fieldset>
+            <button type="submit" class="button">Save classification</button>
+        </form>
     </section>
     <section aria-labelledby="attributes-heading"><h2 id="attributes-heading">Attributes</h2>
         @if (Model.Details.Attributes.Count == 0)

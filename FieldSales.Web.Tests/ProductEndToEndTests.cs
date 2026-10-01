@@ -369,6 +369,13 @@ public sealed class ProductApplication : IAsyncLifetime
     public StaffWebsiteFactory CreateWebsite(WebApplicationFactory<CatalogueDbContext>? api = null) =>
         new((api ?? Api).Server.CreateHandler(), Token());
 
+    public async Task RestartAsync()
+    {
+        await Api.DisposeAsync();
+        Api = NewApi();
+        _ = Api.Server;
+    }
+
     public HttpClient CreateApiClient()
     {
         HttpClient client = Api.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
