@@ -115,7 +115,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddAuthentication().AddJwtBearer("StaffRoleLookup", options =>
 {
     options.Authority = builder.Configuration["Authentication:Authority"];
-    options.Audience = "fieldsales-api";
+    options.Audience = StaffApiContract.Audience;
     options.RequireHttpsMetadata = true;
     options.MapInboundClaims = false;
 });
@@ -185,9 +185,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("StaffRoleLookup", policy => policy
         .AddAuthenticationSchemes("StaffRoleLookup")
         .RequireAuthenticatedUser()
-        .RequireAssertion(context => context.User.FindAll("scope")
-            .SelectMany(claim => claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            .Contains("fieldsales.api")));
+        .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
 
     // Protection by omission. An endpoint that declares no authorisation is denied rather
     // than served, so a page added outside the /Admin convention fails closed. Everything
@@ -328,7 +326,7 @@ app.MapGet("/", () => Results.Redirect("/Admin")).ExcludeFromDescription().Allow
 app.MapGet("/staff/current-roles", async (ClaimsPrincipal principal,
         UserManager<ApplicationUser> users) =>
     {
-        string? subject = principal.FindFirstValue("sub");
+        string? subject = principal.GetStaffSubject();
         if (string.IsNullOrWhiteSpace(subject)) return Results.Forbid();
         ApplicationUser? user = await users.FindByIdAsync(subject);
         if (user is null || await users.IsLockedOutAsync(user)) return Results.Forbid();

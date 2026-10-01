@@ -84,6 +84,10 @@ public sealed class ProtectedAreasTests
         Assert.Equal(HttpStatusCode.Redirect, direct.StatusCode);
         Assert.Equal("/Manager", direct.Headers.Location?.OriginalString);
 
+        HttpResponseMessage external = await client.GetAsync("/?returnUrl=https%3A%2F%2Fattacker.test%2FManager");
+        Assert.Equal(HttpStatusCode.Redirect, external.StatusCode);
+        Assert.Equal("/Staff", external.Headers.Location?.OriginalString);
+
         HttpResponseMessage denied = await client.GetAsync("/?returnUrl=%2FHeadOffice");
         Assert.Equal(HttpStatusCode.Redirect, denied.StatusCode);
         Assert.Equal("/AccessDenied", denied.Headers.Location?.OriginalString);
@@ -98,6 +102,7 @@ public sealed class ProtectedAreasTests
                 {
                     ["Authentication:Authority"] = "https://localhost:7201",
                     ["Authentication:ClientSecret"] = "test-secret",
+                    ["StaffApi:BaseUrl"] = "https://staff-api.test",
                     ["ConnectionStrings:StaffWebDb"] = "Server=localhost;Database=unused;User Id=sa;Password=unused;TrustServerCertificate=True"
                 }));
             builder.ConfigureTestServices(services =>

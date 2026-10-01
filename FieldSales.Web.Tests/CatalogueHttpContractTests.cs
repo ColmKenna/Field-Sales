@@ -15,6 +15,23 @@ namespace FieldSales.Web.Tests;
 
 public sealed class CatalogueHttpContractTests
 {
+    [Fact]
+    public async Task StaffSession_UsesTheTypedBearerClientAndDecodesRoles()
+    {
+        using var services = TokenServices();
+        using var http = new HttpClient(new ReplyHandler((request, _) =>
+        {
+            Assert.Equal("/staff/session", request.RequestUri!.AbsolutePath);
+            Assert.Equal("server-held-access-token", request.Headers.Authorization!.Parameter);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = System.Net.Http.Json.JsonContent.Create(new FieldSales.StaffAccess.StaffSessionResponse("staff", ["Sales Manager"])) });
+        })) { BaseAddress = new Uri("https://api.test") };
+        var session = await Client(http, services).StaffSessionAsync(CancellationToken.None);
+        Assert.True(session.Found);
+        Assert.Equal("staff", session.Value!.Subject);
+        Assert.Equal(["Sales Manager"], session.Value.Roles);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.NotFound, CatalogueReadStatus.Missing)]
     [InlineData(HttpStatusCode.ServiceUnavailable, CatalogueReadStatus.Unavailable)]
@@ -29,6 +46,7 @@ public sealed class CatalogueHttpContractTests
         CatalogueApiClient client = Client(http, services);
         var result = await client.ProductDetailsAsync(Guid.NewGuid(), CancellationToken.None);
         Assert.Equal(expected, result.Status);
+        Assert.Equal(expected, (await client.StaffSessionAsync(CancellationToken.None)).Status);
         Assert.Null(result.Value);
         IActionResult page = result.FailureResult();
         switch (expected)

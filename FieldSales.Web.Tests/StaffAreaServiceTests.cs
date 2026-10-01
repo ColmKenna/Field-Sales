@@ -9,6 +9,30 @@ namespace FieldSales.Web.Tests;
 
 public sealed class StaffAreaServiceTests
 {
+    [Theory]
+    [InlineData(0, false, StaffLandingStatus.Denied, null)]
+    [InlineData(1, false, StaffLandingStatus.Direct, "/Rep")]
+    [InlineData(2, false, StaffLandingStatus.Choose, null)]
+    [InlineData(2, true, StaffLandingStatus.Direct, "/Manager")]
+    public async Task Landing_UsesRememberedAreaBeforeSingleOrMultipleChoices(int count, bool remember, StaffLandingStatus expected, string? route)
+    {
+        await using SqliteConnection connection = await OpenDatabaseAsync();
+        await using ServiceProvider services = CreateServices(connection);
+        StaffAreaService service = new(services, TimeProvider.System);
+        string[] roles = new[] { StaffRoles.FieldSalesperson, StaffRoles.SalesManager }.Take(count).ToArray();
+        ClaimsPrincipal user = User(roles);
+        if (remember) Assert.True(await service.RememberAreaAsync(user, StaffAreas.Manager));
+        StaffLanding landing = await service.ResolveLandingAsync(user);
+        Assert.Equal(expected, landing.Status);
+        Assert.Equal(route, landing.Route);
+        Assert.Equal(count, landing.Areas.Count);
+        if (remember)
+        {
+            StaffLanding revoked = await service.ResolveLandingAsync(User(StaffRoles.FieldSalesperson));
+            Assert.Equal("/Rep", revoked.Route);
+        }
+    }
+
     [Fact]
     public async Task RememberedAreaIsReturnedOnlyWhileStaffStillHasItsRole()
     {

@@ -26,11 +26,9 @@ public class IndexModel : PageModel
                 return RedirectToPage("/AccessDenied");
             }
 
-            string? lastArea = await _areas.GetLastPermittedAreaAsync(User, HttpContext.RequestAborted);
-            if (lastArea is not null) return LocalRedirect(lastArea);
-            IReadOnlyList<StaffArea> permitted = StaffAreas.PermittedTo(User);
-            if (permitted.Count == 1) return LocalRedirect(permitted[0].Route);
-            if (permitted.Count > 1) return RedirectToPage("/Staff/Index");
+            StaffLanding landing = await _areas.ResolveLandingAsync(User, HttpContext.RequestAborted);
+            if (landing.Status == StaffLandingStatus.Direct) return LocalRedirect(landing.Route!);
+            if (landing.Status == StaffLandingStatus.Choose) return RedirectToPage("/Staff/Index");
             return RedirectToPage("/AccessDenied");
         }
         SignInFailed = error == "sign-in";

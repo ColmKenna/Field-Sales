@@ -1,3 +1,4 @@
+using FieldSales.StaffAccess;
 using System.Security.Claims;
 using FieldSales.Web.Data;
 using Microsoft.EntityFrameworkCore;
@@ -35,11 +36,27 @@ public static class StaffAreas
     }
 }
 
+public enum StaffLandingStatus { Direct, Choose, Denied }
+public sealed record StaffLanding(StaffLandingStatus Status, IReadOnlyList<StaffArea> Areas, string? Route = null);
+
 public sealed class StaffAreaService(IServiceProvider services, TimeProvider clock)
 {
+    public async Task<StaffLanding> ResolveLandingAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<StaffArea> permitted = StaffAreas.PermittedTo(user);
+        string? remembered = await GetLastPermittedAreaAsync(user, cancellationToken);
+        if (remembered is not null) return new(StaffLandingStatus.Direct, permitted, remembered);
+        return permitted.Count switch
+        {
+            0 => new(StaffLandingStatus.Denied, permitted),
+            1 => new(StaffLandingStatus.Direct, permitted, permitted[0].Route),
+            _ => new(StaffLandingStatus.Choose, permitted)
+        };
+    }
+
     public async Task ClearUnpermittedAreaAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
     {
-        string? subject = user.FindFirst("sub")?.Value;
+        string? subject = user.GetStaffSubject();
         if (string.IsNullOrWhiteSpace(subject)) return;
 
         StaffWebDbContext db = services.GetRequiredService<StaffWebDbContext>();
@@ -54,7 +71,7 @@ public sealed class StaffAreaService(IServiceProvider services, TimeProvider clo
 
     public async Task<string?> GetLastPermittedAreaAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
     {
-        string? subject = user.FindFirst("sub")?.Value;
+        string? subject = user.GetStaffSubject();
         if (string.IsNullOrWhiteSpace(subject)) return null;
 
         StaffWebDbContext db = services.GetRequiredService<StaffWebDbContext>();
@@ -69,7 +86,7 @@ public sealed class StaffAreaService(IServiceProvider services, TimeProvider clo
     public async Task<bool> RememberAreaAsync(ClaimsPrincipal user, string key, CancellationToken cancellationToken = default)
     {
         StaffArea? area = StaffAreas.Find(key);
-        string? subject = user.FindFirst("sub")?.Value;
+        string? subject = user.GetStaffSubject();
         if (area is null || string.IsNullOrWhiteSpace(subject) || !user.IsInRole(area.Role)) return false;
 
         StaffWebDbContext db = services.GetRequiredService<StaffWebDbContext>();

@@ -170,6 +170,8 @@ public sealed class TestCatalogueHandler : HttpMessageHandler
         Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
         Assert.Equal("test-access-token", request.Headers.Authorization?.Parameter);
         string path = request.RequestUri!.AbsolutePath.TrimEnd('/');
+        if (path == "/staff/session" && request.Method == HttpMethod.Get)
+            return Json(HttpStatusCode.OK, new FieldSales.StaffAccess.StaffSessionResponse("staff-1", ["Sales Manager"]));
         if (path == "/catalogue/categories" && request.Method == HttpMethod.Get)
         {
             lock (_categories)

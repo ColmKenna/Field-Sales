@@ -1,3 +1,4 @@
+using FieldSales.StaffAccess;
 using Duende.IdentityServer;
 using Duende.IdentityServer.Models;
 using FieldSales.Identity.Services.Users;
@@ -31,9 +32,9 @@ public sealed record TokenLifetimes(
 
 public static class Config
 {
-    public const string StaffWebClientId = "fieldsales-staff-web";
-    public const string ApiScopeName = "fieldsales.api";
-    public const string ApiResourceName = "fieldsales-api";
+    public const string StaffWebClientId = StaffApiContract.WebClientId;
+    public const string ApiScopeName = StaffApiContract.Scope;
+    public const string ApiResourceName = StaffApiContract.Audience;
 
     // Owned by the extracted admin-services library (ProtectedAdminRoles) so the host and the
     // library's self-demotion/last-administrator guards can never drift onto different role names.

@@ -24,6 +24,7 @@ public sealed partial class CatalogueApiClient
     private static bool HasRequiredContent<T>(T? body) => body switch
     {
         null => false,
+        FieldSales.StaffAccess.StaffSessionResponse session => !string.IsNullOrWhiteSpace(session.Subject) && session.Roles is not null,
         ProductDetails details => details.Product is not null && details.Product.Name is not null
             && details.Breadcrumb is not null && details.PriceHistory is not null && details.Attributes is not null,
         CategoryDetails details => details.Category is not null && details.Category.Name is not null

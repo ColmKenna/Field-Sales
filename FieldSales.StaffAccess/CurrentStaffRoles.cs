@@ -58,7 +58,7 @@ public sealed class HttpStaffRoleLookup(HttpClient client, IConfiguration config
 
 public static class StaffRoleClaims
 {
-    public static bool ReplaceBusinessRoles(ClaimsPrincipal principal, IReadOnlyList<string> roles)
+    public static StaffRoleReplacement ReplaceBusinessRoles(ClaimsPrincipal principal, IReadOnlyList<string> roles)
     {
         if (roles.Any(role => !BusinessRoles.Contains(role)))
             throw new InvalidDataException("The current staff roles response contains an unknown role.");
@@ -70,7 +70,7 @@ public static class StaffRoleClaims
             .Order(StringComparer.Ordinal)
             .ToArray();
         string[] current = roles.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-        if (previous.SequenceEqual(current, StringComparer.Ordinal)) return false;
+        if (previous.SequenceEqual(current, StringComparer.Ordinal)) return new(false, []);
 
         foreach (ClaimsIdentity identity in principal.Identities)
             foreach (Claim claim in identity.FindAll("role").Where(claim => BusinessRoles.Contains(claim.Value)).ToArray())
@@ -78,6 +78,6 @@ public static class StaffRoleClaims
         ClaimsIdentity destination = principal.Identities.First();
         foreach (string role in current)
             destination.AddClaim(new Claim("role", role));
-        return true;
+        return new(true, previous.Except(current, StringComparer.Ordinal).ToArray());
     }
 }

@@ -1,3 +1,4 @@
+using FieldSales.StaffAccess;
 using FieldSales.Web.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -16,7 +17,7 @@ public sealed class AccessChangedModel(AccessChangedTokenService tokens) : PageM
         AccessChangedState? change = tokens.Read(state);
         StaffArea? area = StaffAreas.Find(change?.AreaKey);
         if (change is null || area is null
-            || change.Subject != User.FindFirst("sub")?.Value
+            || change.Subject != User.GetStaffSubject()
             || User.IsInRole(area.Role)
             || !User.HasClaim(StaffCookieEvents.RemovedRoleClaimType, area.Role))
             return RedirectToPage("/AccessDenied");

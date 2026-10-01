@@ -68,7 +68,7 @@ builder.Services.AddAuthentication(options =>
     {
         options.Authority = builder.Configuration["Authentication:Authority"]
             ?? throw new InvalidOperationException("Authentication:Authority is required.");
-        options.ClientId = "fieldsales-staff-web";
+        options.ClientId = StaffApiContract.WebClientId;
         options.ClientSecret = builder.Configuration["Authentication:ClientSecret"]
             ?? throw new InvalidOperationException("Authentication:ClientSecret is required.");
         options.ResponseType = "code";
@@ -80,7 +80,7 @@ builder.Services.AddAuthentication(options =>
         options.TokenValidationParameters.RoleClaimType = "role";
         options.ClaimActions.MapJsonKey("role", "role");
         options.Scope.Clear();
-        foreach (string scope in new[] { "openid", "profile", "roles", "fieldsales.api", "offline_access" })
+        foreach (string scope in new[] { "openid", "profile", "roles", StaffApiContract.Scope, "offline_access" })
             options.Scope.Add(scope);
         options.Events.OnRemoteFailure = context =>
         {

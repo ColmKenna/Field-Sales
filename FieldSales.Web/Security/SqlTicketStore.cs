@@ -30,7 +30,7 @@ public sealed class SqlTicketStore(
         {
             Key = key,
             ProtectedValue = _protector.Protect(TicketSerializer.Default.Serialize(ticket)),
-            ExpiresUtc = ticket.Properties.ExpiresUtc ?? timeProvider.GetUtcNow().AddHours(8)
+            ExpiresUtc = Expiry(ticket, scope.ServiceProvider)
         });
         await db.SaveChangesAsync(cancellationToken);
         return key;
@@ -43,9 +43,14 @@ public sealed class SqlTicketStore(
         StoredTicket? stored = await db.Tickets.FindAsync([key], cancellationToken);
         if (stored is null) return;
         stored.ProtectedValue = _protector.Protect(TicketSerializer.Default.Serialize(ticket));
-        stored.ExpiresUtc = ticket.Properties.ExpiresUtc ?? timeProvider.GetUtcNow().AddHours(8);
+        stored.ExpiresUtc = Expiry(ticket, scope.ServiceProvider);
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private DateTimeOffset Expiry(AuthenticationTicket ticket, IServiceProvider services) =>
+        ticket.Properties.ExpiresUtc ?? timeProvider.GetUtcNow().Add(
+            services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+                .Get(ticket.AuthenticationScheme).ExpireTimeSpan);
 
     public async Task<AuthenticationTicket?> RetrieveAsync(string key, CancellationToken cancellationToken)
     {

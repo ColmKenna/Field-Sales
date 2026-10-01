@@ -20,14 +20,14 @@ builder.Services.AddScoped<ProductBrandAssignments>();
 builder.Services.AddScoped<ProductReferenceAssignments>();
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>().AddSafeReadResilience();
 
-const string roleLookupUnavailableKey = "staff-role-lookup-unavailable";
+const string roleLookupUnavailableKey = StaffApiContract.LookupUnavailableKey;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.Authority = builder.Configuration["Authentication:Authority"]
             ?? throw new InvalidOperationException("Authentication:Authority is required.");
-        options.Audience = "fieldsales-api";
+        options.Audience = StaffApiContract.Audience;
         options.RequireHttpsMetadata = true;
         options.MapInboundClaims = false;
         options.TokenValidationParameters.RoleClaimType = "role";
@@ -35,7 +35,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnTokenValidated = async context =>
             {
-                string? subject = context.Principal?.FindFirstValue("sub");
+                string? subject = context.Principal.GetStaffSubject();
                 string authorization = context.Request.Headers.Authorization.ToString();
                 if (string.IsNullOrWhiteSpace(subject)
                     || !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
@@ -45,9 +45,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 }
                 // The policy returns Forbidden for a valid token lacking this scope.
                 // Such a token cannot call the identity lookup endpoint either.
-                if (!context.Principal!.FindAll("scope")
-                        .SelectMany(claim => claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                        .Contains("fieldsales.api"))
+                if (!context.Principal!.HasScope(StaffApiContract.Scope))
                     return;
 
                 try
@@ -86,15 +84,11 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("HeadOfficeCatalogue", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.HeadOfficeUser)
-        .RequireAssertion(context => context.User.FindAll("scope")
-            .SelectMany(claim => claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            .Contains("fieldsales.api")));
+        .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
     options.AddPolicy("StaffApi", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.All)
-        .RequireAssertion(context => context.User.FindAll("scope")
-            .SelectMany(claim => claim.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            .Contains("fieldsales.api")));
+        .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
     options.FallbackPolicy = options.GetPolicy("StaffApi");
 });
 
@@ -114,13 +108,9 @@ else if (!app.Environment.IsEnvironment("Testing"))
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new
-    {
-        Subject = user.FindFirstValue("sub"),
-        Roles = user.FindAll("role").Select(claim => claim.Value)
-            .Where(BusinessRoles.Contains)
-            .ToArray()
-    }))
+app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new StaffSessionResponse(
+        user.GetStaffSubject()!, user.FindAll("role").Select(claim => claim.Value)
+            .Where(BusinessRoles.Contains).ToArray())))
     .RequireAuthorization("StaffApi");
 app.MapCatalogueEndpoints();
 app.MapProductEndpoints();
