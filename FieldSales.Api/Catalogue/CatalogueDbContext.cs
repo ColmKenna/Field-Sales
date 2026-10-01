@@ -10,9 +10,26 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductBasePrice> ProductBasePrices => Set<ProductBasePrice>();
+    public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<ProductAlternativeBrand> ProductAlternativeBrands => Set<ProductAlternativeBrand>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Brand>(entity =>
+        {
+            entity.ToTable("Brands");
+            entity.HasKey(brand => brand.Id);
+            entity.Property(brand => brand.Name).HasMaxLength(Brand.MaximumNameLength)
+                .UseCollation("Latin1_General_100_CI_AS").IsRequired();
+            entity.HasIndex(brand => brand.Name).IsUnique().HasDatabaseName("UX_Brands_Name");
+            entity.Property(brand => brand.Version).IsRowVersion();
+        });
+        modelBuilder.Entity<ProductAlternativeBrand>(entity =>
+        {
+            entity.ToTable("ProductAlternativeBrands");
+            entity.HasKey(link => new { link.ProductId, link.BrandId });
+            entity.HasOne<Brand>().WithMany().HasForeignKey(link => link.BrandId).OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<Category>(entity =>
         {
             entity.ToTable("Categories");
@@ -47,6 +64,12 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
             entity.Property(product => product.MinimumQuantity).HasPrecision(Quantity.Precision, Quantity.Scale);
             entity.HasOne<Category>().WithMany().HasForeignKey(product => product.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Brand>().WithMany().HasForeignKey(product => product.PrimaryBrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(product => product.AlternativeBrands).WithOne().HasForeignKey(link => link.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(product => product.AlternativeBrands).HasField("_alternativeBrands")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.HasOne<Product>().WithMany().HasForeignKey(product => product.ParentProductId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.Property(product => product.Attributes)
