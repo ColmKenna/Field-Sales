@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Persistence;
 using System.Data;
 using Duende.IdentityServer.EntityFramework.Entities;
 using Duende.IdentityServer.EntityFramework.Mappers;
@@ -5,7 +6,6 @@ using FieldSales.Identity.Services.AuditLogs;
 using FieldSales.Identity.Services.Scopes;
 using FieldSales.Identity.Services.Validation;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
@@ -73,24 +73,16 @@ public partial class ClientDetailsService
         if (requestedScopes.Any(scope => scope.Length > ValidationConstants.MaxScopeNameLength))
             return await DenyPermissionsScopeTooLongAsync(clientId, cancellationToken);
 
-        var outcome = AdminMutationResult.NotFoundResult();
         string targetName = clientId;
         audit.TargetName = targetName;
-        audit.TargetName = clientId;
 
-        IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
-            _configurationDbContext.ChangeTracker.Clear();
-            await using IDbContextTransaction transaction =
-                await _configurationDbContext.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, cancellationToken);
             Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
             if (client is null)
             {
-                outcome = AdminMutationResult.NotFoundResult();
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return AdminMutationResult.NotFoundResult();
             }
 
             targetName = client.ClientName ?? clientId;
@@ -109,11 +101,10 @@ public partial class ClientDetailsService
                 .ToList();
             if (unknownScopes.Count > 0)
             {
-                outcome = AdminMutationResult.ValidationFailure(
+                await transaction.RollbackAsync(cancellationToken);
+                return AdminMutationResult.ValidationFailure(
                     "Input.AllowedScopes",
                     $"Unknown scope(s): {string.Join(", ", unknownScopes)}.");
-                await transaction.RollbackAsync(cancellationToken);
-                return;
             }
 
             bool isInteractive = IsInteractiveClient(client);
@@ -122,11 +113,10 @@ public partial class ClientDetailsService
                 : requestedScopes.Where(scope => !identityScopeSet.Contains(scope)).ToList();
             if (isInteractive && !identityScopeSet.Contains("openid"))
             {
-                outcome = AdminMutationResult.ValidationFailure(
+                await transaction.RollbackAsync(cancellationToken);
+                return AdminMutationResult.ValidationFailure(
                     "Input.AllowedScopes",
                     "The required 'openid' identity resource is not configured.");
-                await transaction.RollbackAsync(cancellationToken);
-                return;
             }
 
             Duende.IdentityServer.Models.Client proposed = client.ToModel();
@@ -134,16 +124,15 @@ public partial class ClientDetailsService
             string? validationError = await ValidateClientAsync(proposed, cancellationToken);
             if (validationError is not null)
             {
-                outcome = AdminMutationResult.ValidationFailure("Input.AllowedScopes", validationError);
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return AdminMutationResult.ValidationFailure("Input.AllowedScopes", validationError);
             }
 
             ReplaceCollection(client.AllowedScopes, finalScopes, scope => new ClientScope { Scope = scope });
             await _configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            outcome = AdminMutationResult.Success();
-        });
+            return AdminMutationResult.Success();
+        }, cancellationToken);
 
         if (!outcome.Succeeded)
             return await DenyPermissionsFailedAsync(clientId, targetName, outcome, cancellationToken);

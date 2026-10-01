@@ -72,6 +72,48 @@ public class ClientsCreateIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task CloneRedirectSerializesHandleAndRevealsSecretOnlyOnce()
+    {
+        string sourceId = $"clone-source-{Guid.NewGuid():N}";
+        string targetId = $"clone-target-{Guid.NewGuid():N}";
+        await _factory.RunInScopeAsync(async services =>
+        {
+            var db = services.GetRequiredService<ConfigurationDbContext>();
+            db.Clients.Add(new Duende.IdentityServer.Models.Client
+            {
+                ClientId = sourceId, ClientName = "Source", AllowedGrantTypes = GrantTypes.ClientCredentials,
+                ClientSecrets = [new Secret("old secret".Sha256())]
+            }.ToEntity());
+            await db.SaveChangesAsync();
+        });
+        var page = await _client.GetAsync($"/Admin/Clients/Clone/{sourceId}");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        var document = await GetDocumentAsync(page);
+        var token = Assert.IsAssignableFrom<IHtmlInputElement>(document.QuerySelector("input[name='__RequestVerificationToken']"));
+        var posted = await _client.PostAsync($"/Admin/Clients/Clone/{sourceId}", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token.Value, ["SourceClientId"] = sourceId,
+                ["Input.ClientId"] = targetId, ["Input.ClientName"] = "Target"
+            }));
+        Assert.Equal(HttpStatusCode.Redirect, posted.StatusCode);
+        Assert.Equal($"/Admin/Clients/Create?clientId={targetId}", posted.Headers.Location?.OriginalString);
+        var revealed = await _client.GetAsync(posted.Headers.Location);
+        Assert.Equal(HttpStatusCode.OK, revealed.StatusCode);
+        var revealedDocument = await GetDocumentAsync(revealed);
+        var secret = Assert.IsAssignableFrom<IHtmlInputElement>(revealedDocument.QuerySelector("#generated-secret-input"));
+        Assert.False(string.IsNullOrWhiteSpace(secret.Value));
+        await _factory.RunInScopeAsync(async services =>
+        {
+            var stored = await services.GetRequiredService<ConfigurationDbContext>().Clients
+                .Include(client => client.ClientSecrets).SingleAsync(client => client.ClientId == targetId);
+            Assert.Equal(secret.Value.Sha256(), Assert.Single(stored.ClientSecrets).Value);
+        });
+        var refreshed = await _client.GetAsync(posted.Headers.Location);
+        Assert.Null((await GetDocumentAsync(refreshed)).QuerySelector("#secret-reveal-banner"));
+    }
+
+    [Fact]
     public async Task OnGet_Should_Return200OK_AndRenderCreateFormWithPresetCards()
     {
         HttpResponseMessage response = await _client.GetAsync("/Admin/Clients/Create");

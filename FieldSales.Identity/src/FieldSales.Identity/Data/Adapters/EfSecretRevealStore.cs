@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Persistence;
 using System.Data;
 using FieldSales.Identity.Services.SecretReveals;
 using Microsoft.Data.SqlClient;
@@ -56,49 +57,37 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
         string actorSubjectIdStr = securityContext.ActorSubjectId.Value ?? string.Empty;
         string purposeStr = securityContext.Purpose.ToString();
         string targetId = securityContext.TargetId;
-        var lookup = SecretRevealLookup.NotFound();
-
-        IExecutionStrategy strategy = _dbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        return await IdentityTransactions.RunAsync(_dbContext, IsolationLevel.Serializable, async transaction =>
         {
-            // A retry must not reuse entities tracked from the failed attempt.
-            _dbContext.ChangeTracker.Clear();
-            lookup = SecretRevealLookup.NotFound();
-
-            await using IDbContextTransaction transaction = await _dbContext.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable, cancellationToken);
             SecretRevealRecord? record = await LoadForConsumeAsync(handleDigest, cancellationToken);
             if (record is null)
             {
                 await transaction.CommitAsync(cancellationToken);
-                return;
+                return SecretRevealLookup.NotFound();
             }
 
             if (!string.Equals(record.ActorSubjectId, actorSubjectIdStr, StringComparison.Ordinal)
                 || !string.Equals(record.Purpose, purposeStr, StringComparison.Ordinal)
                 || !string.Equals(record.TargetId, targetId, StringComparison.Ordinal))
             {
-                lookup = SecretRevealLookup.WrongContext();
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return SecretRevealLookup.WrongContext();
             }
 
             if (record.ExpiresUtc <= now)
             {
-                lookup = SecretRevealLookup.Expired();
                 _dbContext.SecretRevealRecords.Remove(record);
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return;
+                return SecretRevealLookup.Expired();
             }
 
-            lookup = SecretRevealLookup.Revealed(record.ProtectedPayload);
+            var revealed = SecretRevealLookup.Revealed(record.ProtectedPayload);
             _dbContext.SecretRevealRecords.Remove(record);
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-        });
-
-        return lookup;
+            return revealed;
+        }, cancellationToken);
     }
 
     public async Task CleanupExpiredAsync(DateTimeOffset now, int batchSize,

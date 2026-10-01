@@ -130,7 +130,7 @@ public class ClientsClonePageModelTests
         RedirectToPageResult redirect = Assert.IsType<RedirectToPageResult>(result);
         Assert.Equal("./Create", redirect.PageName);
         Assert.Equal("target-client", redirect.RouteValues!["clientId"]);
-        Assert.Equal("opaque-handle", ((SecretRevealHandle)model.TempData["SecretRevealHandle"]!).Value);
+        Assert.Equal("opaque-handle", Assert.IsType<string>(model.TempData[FieldSales.Identity.Presentation.SecretRevealPresentation.HandleKey]));
         Assert.DoesNotContain("plaintext-secret", model.TempData.Values.OfType<string>());
     }
 }

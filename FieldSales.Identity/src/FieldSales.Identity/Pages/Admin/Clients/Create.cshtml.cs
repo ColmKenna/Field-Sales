@@ -27,7 +27,7 @@ public class CreateModel(
 
     public string? CreatedClientId { get; set; }
 
-    [TempData] public string? SecretRevealHandle { get; set; }
+    [TempData(Key = SecretRevealPresentation.HandleKey)] public string? SecretRevealHandle { get; set; }
 
     public bool RevealMode => !string.IsNullOrEmpty(CreatedSecret);
 
@@ -40,15 +40,8 @@ public class CreateModel(
         AvailablePresets = _clientPresetService.GetAvailablePresets();
         await LoadAvailableScopesAsync(cancellationToken);
 
-        string? handle = SecretRevealHandle;
-        if (!string.IsNullOrEmpty(handle) && !string.IsNullOrWhiteSpace(clientId))
-        {
-            SecretRevealConsumeResult reveal = await _secretRevealService.ConsumeAsync(
-                new SecretRevealTarget(SecretRevealPurpose.ClientCreated, clientId),
-                Services.SecretReveals.SecretRevealHandle.Create(handle), cancellationToken);
-            if (reveal.Status == SecretRevealConsumeStatus.Revealed)
-                CreatedSecret = reveal.Plaintext;
-        }
+        CreatedSecret = await _secretRevealService.TryRevealAsync(
+            new SecretRevealTarget(SecretRevealPurpose.ClientCreated, clientId ?? string.Empty), SecretRevealHandle, cancellationToken);
 
         CreatedClientId = clientId;
 
@@ -79,11 +72,10 @@ public class CreateModel(
 
         if (!string.IsNullOrEmpty(result.PlaintextSecret))
         {
-            SecretRevealTicket ticket = await _secretRevealService.IssueAsync(
+            SecretRevealHandle = await _secretRevealService.IssueHandleAsync(
                 new SecretRevealTarget(SecretRevealPurpose.ClientCreated, result.ClientId!),
                 result.PlaintextSecret,
                 cancellationToken);
-            SecretRevealHandle = ticket.Handle;
         }
 
         return RedirectToPage("./Create", new { clientId = result.ClientId });

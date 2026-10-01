@@ -1,3 +1,4 @@
+using FieldSales.Identity.Services.Persistence;
 using System.Data;
 using System.Globalization;
 using Duende.IdentityServer.EntityFramework.Entities;
@@ -5,7 +6,6 @@ using Duende.IdentityServer.EntityFramework.Mappers;
 using FieldSales.Identity.Services.AuditLogs;
 using FieldSales.Identity.Services.Validation;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
@@ -74,34 +74,23 @@ public partial class ClientDetailsService
 
         string targetName = clientId;
 
-        bool found = false;
-        bool enabled = false;
         DateTimeOffset now = _timeProvider.GetUtcNow();
         audit.TargetName = targetName;
 
-        IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        var (found, enabled) = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
-            _configurationDbContext.ChangeTracker.Clear();
-            found = false;
-            await using IDbContextTransaction transaction =
-                await _configurationDbContext.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, cancellationToken);
-
             Client? client = await _configurationDbContext.Clients
                 .Include(c => c.Properties)
                 .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
             if (client is null)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return (Found: false, Enabled: false);
             }
 
-            found = true;
             targetName = client.ClientName ?? clientId;
             audit.TargetName = targetName;
             client.Enabled = !client.Enabled;
-            enabled = client.Enabled;
 
             ClientProperty? disabledAtProperty =
                 client.Properties.FirstOrDefault(p => p.Key == DisabledAtPropertyKey);
@@ -118,7 +107,8 @@ public partial class ClientDetailsService
 
             await _configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-        });
+            return (Found: true, Enabled: client.Enabled);
+        }, cancellationToken);
 
         if (!found)
             return await DenyToggleStatusNotFoundAsync(clientId, cancellationToken);
@@ -157,28 +147,20 @@ public partial class ClientDetailsService
         string clientName = clientId;
 
         audit.TargetName = clientName;
-        var outcome = ClientDeleteResult.Failed(
-            "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
+
         DateTimeOffset now = _timeProvider.GetUtcNow();
         audit.TargetName = clientName;
 
-        IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
-            _configurationDbContext.ChangeTracker.Clear();
-            await using IDbContextTransaction transaction =
-                await _configurationDbContext.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, cancellationToken);
-
             Client? client = await _configurationDbContext.Clients
                 .Include(c => c.Properties)
                 .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
             if (client is null)
             {
-                outcome = ClientDeleteResult.Failed(
-                    "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return ClientDeleteResult.Failed(
+                    "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
             }
 
             clientName = client.ClientName ?? client.ClientId;
@@ -190,16 +172,16 @@ public partial class ClientDetailsService
                 AuditReasonCode reasonCode = client.Enabled
                     ? AuditReasonCode.ClientEnabled
                     : AuditReasonCode.RetentionPeriod;
-                outcome = ClientDeleteResult.Failed(deleteBlockReason!, reasonCode);
+
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return ClientDeleteResult.Failed(deleteBlockReason!, reasonCode);
             }
 
             _configurationDbContext.Clients.Remove(client);
             await _configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            outcome = ClientDeleteResult.Succeeded();
-        });
+            return ClientDeleteResult.Succeeded();
+        }, cancellationToken);
 
         if (!outcome.Success)
             return await DenyDeleteClientFailedAsync(clientId, clientName, outcome, cancellationToken);

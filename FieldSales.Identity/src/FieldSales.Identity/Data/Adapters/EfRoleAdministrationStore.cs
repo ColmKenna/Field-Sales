@@ -1,3 +1,5 @@
+using FieldSales.Identity.Services.Persistence;
+using FieldSales.Identity.Presentation;
 using FieldSales.Identity.Services.Users;
 using FieldSales.Identity.Services;
 using FieldSales.Identity.Services.Roles;
@@ -60,19 +62,12 @@ public sealed class EfRoleAdministrationStore(
     public async Task<(RoleCreateOutcome Status, RoleId? RoleId, string? ErrorMessage)> CreateRoleAsync(
         RoleCreateInputModel input, CancellationToken cancellationToken = default)
     {
-        (RoleCreateOutcome Status, RoleId? RoleId, string? ErrorMessage) outcome = (
-            Status: RoleCreateOutcome.NameCollision, RoleId: null, ErrorMessage: null);
-
-        IExecutionStrategy strategy = _dbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
         {
-            _dbContext.ChangeTracker.Clear();
-
             IdentityRole? existingRole = await _roleManager.FindByNameAsync(input.Name);
             if (existingRole is not null)
             {
-                outcome = (RoleCreateOutcome.NameCollision, null, null);
-                return;
+                return (RoleCreateOutcome.NameCollision, (RoleId?)null, (string?)null);
             }
 
             await using IDbContextTransaction transaction =
@@ -84,42 +79,32 @@ public sealed class EfRoleAdministrationStore(
             if (!result.Succeeded)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                string errorMessage = string.Join(" ", result.Errors.Select(e => e.Description));
-                outcome = (RoleCreateOutcome.ValidationFailed, null, errorMessage);
-                return;
+                string errorMessage = result.Describe();
+
+                return (RoleCreateOutcome.ValidationFailed, (RoleId?)null, errorMessage);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            outcome = (RoleCreateOutcome.Succeeded, RoleId.Create(newRole.Id), null);
+            return (RoleCreateOutcome.Succeeded, (RoleId?)RoleId.Create(newRole.Id), (string?)null);
         });
-
-        return outcome;
     }
 
     public async Task<(RoleDeleteOutcome Status, string TargetName)> DeleteRoleAsync(RoleId roleId,
         string protectedRoleName, CancellationToken cancellationToken = default)
     {
         string roleIdStr = roleId.Value ?? string.Empty;
-        (RoleDeleteOutcome Status, string TargetName) outcome = (Status: RoleDeleteOutcome.RoleNotFound,
-            TargetName: roleIdStr);
-
-        IExecutionStrategy strategy = _dbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
         {
-            _dbContext.ChangeTracker.Clear();
-            outcome = (RoleDeleteOutcome.RoleNotFound, roleIdStr);
-
             IdentityRole? role = await _roleManager.FindByIdAsync(roleIdStr);
-            if (role is null) return;
+            if (role is null) return (RoleDeleteOutcome.RoleNotFound, roleIdStr);
 
             string targetName = role.Name ?? role.Id;
 
             if (string.Equals(role.Name, protectedRoleName, StringComparison.OrdinalIgnoreCase))
             {
-                outcome = (RoleDeleteOutcome.ProtectedRoleBlocked, targetName);
-                return;
+                return (RoleDeleteOutcome.ProtectedRoleBlocked, targetName);
             }
 
             await using IDbContextTransaction transaction =
@@ -129,17 +114,15 @@ public sealed class EfRoleAdministrationStore(
             if (!result.Succeeded)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                outcome = (RoleDeleteOutcome.ValidationFailed, targetName);
-                return;
+
+                return (RoleDeleteOutcome.ValidationFailed, targetName);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            outcome = (RoleDeleteOutcome.Succeeded, targetName);
+            return (RoleDeleteOutcome.Succeeded, targetName);
         });
-
-        return outcome;
     }
 
     private static IQueryable<IdentityRole> ApplyFilter(IQueryable<IdentityRole> query, string? filter)

@@ -27,7 +27,7 @@ public class SecretsModel(
 
     public string? GeneratedSecret { get; set; }
 
-    [TempData] public string? SecretRevealHandle { get; set; }
+    [TempData(Key = SecretRevealPresentation.HandleKey)] public string? SecretRevealHandle { get; set; }
 
     [TempData] public string? RevokeErrorMessage { get; set; }
 
@@ -40,15 +40,8 @@ public class SecretsModel(
         if (string.IsNullOrWhiteSpace(Id))
             return NotFound();
 
-        string? handle = SecretRevealHandle;
-        if (!string.IsNullOrEmpty(handle))
-        {
-            SecretRevealConsumeResult reveal = await _secretRevealService.ConsumeAsync(
-                new SecretRevealTarget(SecretRevealPurpose.ClientSecretGenerated, Id),
-                Services.SecretReveals.SecretRevealHandle.Create(handle), cancellationToken);
-            if (reveal.Status == SecretRevealConsumeStatus.Revealed)
-                GeneratedSecret = reveal.Plaintext;
-        }
+        GeneratedSecret = await _secretRevealService.TryRevealAsync(
+            new SecretRevealTarget(SecretRevealPurpose.ClientSecretGenerated, Id), SecretRevealHandle, cancellationToken);
 
         ClientSecretsModel? secrets =
             await _clientSecretsService.GetClientSecretsAsync(ClientId.Create(Id), cancellationToken);
@@ -82,11 +75,10 @@ public class SecretsModel(
 
         if (!string.IsNullOrEmpty(result.PlaintextSecret))
         {
-            SecretRevealTicket ticket = await _secretRevealService.IssueAsync(
+            SecretRevealHandle = await _secretRevealService.IssueHandleAsync(
                 new SecretRevealTarget(SecretRevealPurpose.ClientSecretGenerated, Id),
                 result.PlaintextSecret,
                 cancellationToken);
-            SecretRevealHandle = ticket.Handle;
         }
 
         return RedirectToPage(new { id = Id });

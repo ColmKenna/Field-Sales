@@ -40,7 +40,7 @@ public class EditorModel : PageModel
 
     public string? GeneratedSecret { get; set; }
 
-    [TempData] public string? SecretRevealHandle { get; set; }
+    [TempData(Key = SecretRevealPresentation.HandleKey)] public string? SecretRevealHandle { get; set; }
 
     [TempData] public string? ErrorMessage { get; set; }
 
@@ -81,16 +81,8 @@ public class EditorModel : PageModel
         if (Tab == EditorTab.Scopes)
             await LoadAttachableScopeNamesAsync(editor.Scopes, cancellationToken);
 
-        string? handle = SecretRevealHandle;
-        if (!string.IsNullOrEmpty(handle))
-        {
-            SecretRevealConsumeResult reveal = await _secretRevealService.ConsumeAsync(
-                new SecretRevealTarget(SecretRevealPurpose.ApiResourceSecretGenerated, ResourceName),
-                Services.SecretReveals.SecretRevealHandle.Create(handle),
-                cancellationToken);
-            if (reveal.Status == SecretRevealConsumeStatus.Revealed)
-                GeneratedSecret = reveal.Plaintext;
-        }
+        GeneratedSecret = await _secretRevealService.TryRevealAsync(
+            new SecretRevealTarget(SecretRevealPurpose.ApiResourceSecretGenerated, ResourceName), SecretRevealHandle, cancellationToken);
 
         return Page();
     }
@@ -128,11 +120,10 @@ public class EditorModel : PageModel
         if (!result.Success)
             return await RedisplayWithErrorsAsync(result.Errors, EditorTab.Secrets, cancellationToken);
 
-        SecretRevealTicket ticket = await _secretRevealService.IssueAsync(
+        SecretRevealHandle = await _secretRevealService.IssueHandleAsync(
             new SecretRevealTarget(SecretRevealPurpose.ApiResourceSecretGenerated, ResourceName),
             result.PlaintextSecret!,
             cancellationToken);
-        SecretRevealHandle = ticket.Handle;
         return RedirectToEditorTab(EditorTab.Secrets);
     }
 

@@ -1,9 +1,9 @@
+using FieldSales.Identity.Services.Persistence;
 using Duende.IdentityServer.EntityFramework.Entities;
 using FieldSales.Identity.Services.AuditLogs;
 using FieldSales.Identity.Services.Scopes;
 using FieldSales.Identity.Services.Validation;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FieldSales.Identity.Services.Apis;
 
@@ -120,12 +120,10 @@ public partial class ApiResourceEditorService
         if (scopeCollision || identityResourceCollision)
             return await DenyScopeNameCollisionAsync(name, scopeName, cancellationToken);
 
-        // Perform creation of global ApiScope and attachment to ApiResource in a single atomic transaction
-        IExecutionStrategy executionStrategy = _configurationDbContext.Database.CreateExecutionStrategy();
-        return await executionStrategy.ExecuteAsync(async () =>
+        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, null, async transaction =>
         {
-            await using IDbContextTransaction transaction =
-                await _configurationDbContext.Database.BeginTransactionAsync(cancellationToken);
+            ApiResource? current = await LoadResourceAsync(name, false, cancellationToken);
+            if (current is null) return AdminMutationResult.NotFoundResult();
             try
             {
                 _configurationDbContext.ApiScopes.Add(new ApiScope
@@ -134,34 +132,26 @@ public partial class ApiResourceEditorService
                     DisplayName = scopeDisplayName,
                     Enabled = true
                 });
-
-                entity.Scopes.Add(new ApiResourceScope { Scope = scopeName });
-
+                current.Scopes.Add(new ApiResourceScope { Scope = scopeName });
                 await _configurationDbContext.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-
-                await _auditWriter.WriteAsync(new AdminAuditEvent(
-                    AuditCategory.ApiResource, AuditAction.CreateScope, AuditOutcome.Succeeded,
-                    AuditReasonCode.Succeeded,
-                    name, name,
-                    Details: $"Created and attached new scope '{scopeName}' to API Resource"), cancellationToken);
-
                 return AdminMutationResult.Success();
             }
             catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
             {
                 await transaction.RollbackAsync(cancellationToken);
-                await AuditDeniedAsync(AuditAction.CreateScope, AuditReasonCode.NameCollision, name, name,
-                    $"A scope or identity resource named '{scopeName}' already exists.", cancellationToken);
                 return AdminMutationResult.ConflictResult("CreateScope.ScopeName",
                     $"A scope or identity resource named '{scopeName}' already exists.");
             }
-            catch
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
-            }
-        });
+        }, cancellationToken);
+        if (outcome.Status == AdminMutationStatus.NotFound)
+            return await DenyResourceNotFoundAsync(AuditAction.CreateScope, name, cancellationToken);
+        if (outcome.Status == AdminMutationStatus.Conflict)
+            return await DenyScopeNameCollisionAsync(name, scopeName, cancellationToken);
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.ApiResource, AuditAction.CreateScope, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            name, name, Details: $"Created and attached new scope '{scopeName}' to API Resource"), cancellationToken);
+        return outcome;
     }
 
     private async Task<AdminMutationResult> DenyScopeCreationValidationFailureAsync(

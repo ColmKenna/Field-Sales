@@ -1,10 +1,10 @@
+using FieldSales.Identity.Services.Persistence;
 using System.Data;
 using Duende.IdentityServer.EntityFramework.DbContexts;
 using Duende.IdentityServer.EntityFramework.Entities;
 using FieldSales.Identity.Services.AuditLogs;
 using FieldSales.Identity.Services.Scopes;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FieldSales.Identity.Services.ApiScopes;
 
@@ -55,29 +55,19 @@ public class ApiScopeListService(
         CancellationToken cancellationToken = default)
     {
         string targetName = name;
-        ApiScopeDeleteResult outcome = ApiScopeDeleteResult.NotFound;
-        AuditReasonCode deniedReason = AuditReasonCode.NotFound;
-        string? deniedDetails = null;
 
         return await AuditOperation.RunAsync(_auditWriter, AuditCategory.ApiScope, AuditAction.Delete, name, targetName, async audit =>
         {
-            IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            var (outcome, deniedReason, deniedDetails) = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
             {
-                _configurationDbContext.ChangeTracker.Clear();
-                await using IDbContextTransaction transaction =
-                    await _configurationDbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable,
-                        cancellationToken);
                 ApiScope? scope = await _configurationDbContext.ApiScopes
                     .FirstOrDefaultAsync(s => s.Name == name, cancellationToken);
 
                 if (scope is null)
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    outcome = ApiScopeDeleteResult.NotFound;
-                    deniedReason = AuditReasonCode.NotFound;
-                    deniedDetails = $"API Scope '{name}' was not found.";
-                    return;
+                    return (Outcome: ApiScopeDeleteResult.NotFound,
+                        Reason: AuditReasonCode.NotFound, Details: (string?)$"API Scope '{name}' was not found.");
                 }
 
                 targetName = scope.DisplayName ?? name;
@@ -88,18 +78,17 @@ public class ApiScopeListService(
                 if (referenceCounts[ScopeName.Create(name)] > 0)
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    outcome = ApiScopeDeleteResult.Blocked;
-                    deniedReason = AuditReasonCode.ReferencedResource;
-                    deniedDetails = $"API Scope '{name}' is referenced by one or more clients.";
-                    return;
+                    return (Outcome: ApiScopeDeleteResult.Blocked,
+                        Reason: AuditReasonCode.ReferencedResource, Details: (string?)$"API Scope '{name}' is referenced by one or more clients.");
                 }
 
                 _configurationDbContext.ApiScopes.Remove(scope);
                 await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
-                outcome = ApiScopeDeleteResult.Deleted;
-            });
+                return (Outcome: ApiScopeDeleteResult.Deleted,
+                        Reason: AuditReasonCode.Succeeded, Details: (string?)null);
+            }, cancellationToken);
 
             if (outcome != ApiScopeDeleteResult.Deleted)
             {

@@ -37,9 +37,8 @@ public class ReferenceListStore<T>(CatalogueDbContext db, ReferenceListDefinitio
     }
     public Task<ReferenceMutationStatus> RetireAsync(Guid id, ReferenceAction action,
         IReferenceUsageReader usage, CancellationToken cancellationToken) =>
-        db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        CatalogueTransactions.RunAsync(db, IsolationLevel.Serializable, async transaction =>
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
             T? item = await db.Set<T>().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
             if (item is null) return ReferenceMutationStatus.Missing;
             var currentUsage = await usage.ReadAsync(new(Definition.Key, id), cancellationToken);
@@ -54,7 +53,7 @@ public class ReferenceListStore<T>(CatalogueDbContext db, ReferenceListDefinitio
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return ReferenceMutationStatus.Saved;
-        });
+        }, cancellationToken);
 }
 
 public sealed class BrandListStore(CatalogueDbContext db)
@@ -70,9 +69,8 @@ public sealed class SupplierListStore(CatalogueDbContext db)
 public sealed class ProductBrandAssignments(CatalogueDbContext db)
 {
     public Task SetAsync(Guid productId, Guid? primaryId, IReadOnlyList<Guid> alternativeIds,
-        CancellationToken cancellationToken = default) => db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        CancellationToken cancellationToken = default) => CatalogueTransactions.RunAsync(db, IsolationLevel.Serializable, async transaction =>
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var product = await db.Products.Include(product => product.AlternativeBrands)
             .SingleAsync(product => product.Id == productId, cancellationToken);
         var ids = alternativeIds.Concat(primaryId is Guid primary ? [primary] : Array.Empty<Guid>()).Distinct().ToArray();
@@ -81,5 +79,5 @@ public sealed class ProductBrandAssignments(CatalogueDbContext db)
         product.SetBrands(primaryId is Guid id ? brands[id] : null, alternativeIds.Select(id => brands[id]).ToArray());
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-    });
+    }, cancellationToken);
 }

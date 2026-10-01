@@ -64,11 +64,10 @@ public class CloneModel(
 
         if (!string.IsNullOrEmpty(result.PlaintextSecret))
         {
-            SecretRevealTicket ticket = await _secretRevealService.IssueAsync(
+            TempData[SecretRevealPresentation.HandleKey] = await _secretRevealService.IssueHandleAsync(
                 new SecretRevealTarget(SecretRevealPurpose.ClientCreated, result.ClientId!),
                 result.PlaintextSecret,
                 cancellationToken);
-            TempData["SecretRevealHandle"] = ticket.Handle;
         }
 
         return RedirectToPage("./Create", new { clientId = result.ClientId });

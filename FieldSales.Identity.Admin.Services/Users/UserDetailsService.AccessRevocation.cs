@@ -1,8 +1,8 @@
+using FieldSales.Identity.Services.Persistence;
 using FieldSales.Identity.Services.Validation;
 using Duende.IdentityServer.Models;
 using FieldSales.Identity.Services.AuditLogs;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using PersistedGrant = Duende.IdentityServer.EntityFramework.Entities.PersistedGrant;
 
 namespace FieldSales.Identity.Services.Users;
@@ -21,8 +21,6 @@ public partial class UserDetailsService
             return await DenyRevokeAccessUserNotFoundAsync(userId, cancellationToken);
 
         string targetName = userId.Value;
-        int revokedCount = 0;
-        var clientIds = new List<string>();
 
         audit.TargetName = targetName;
 
@@ -36,24 +34,21 @@ public partial class UserDetailsService
         if (rotation.Status == SecurityStampRotationStatus.SelfActionBlocked)
             return await DenyRevokeAccessSelfActionAsync(userId, targetName, cancellationToken);
 
-        IExecutionStrategy grantStrategy = _persistedGrantDbContext.Database.CreateExecutionStrategy();
-        await grantStrategy.ExecuteAsync(async () =>
+        var (clientIds, revokedCount) = await IdentityTransactions.RunAsync(_persistedGrantDbContext, null, async transaction =>
         {
-            _persistedGrantDbContext.ChangeTracker.Clear();
-            await using IDbContextTransaction transaction =
-                await _persistedGrantDbContext.Database.BeginTransactionAsync(cancellationToken);
-            clientIds = await _persistedGrantDbContext.PersistedGrants
+            var clientIds = await _persistedGrantDbContext.PersistedGrants
                 .Where(g => g.SubjectId == userId && g.ClientId != null && g.ClientId != "")
                 .Select(g => g.ClientId!)
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
-            revokedCount = await _persistedGrantDbContext.PersistedGrants
+            int revokedCount = await _persistedGrantDbContext.PersistedGrants
                 .Where(g => g.SubjectId == userId)
                 .ExecuteDeleteAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
-        });
+            return (clientIds, revokedCount);
+        }, cancellationToken);
 
         await _auditWriter.WriteAsync(new AdminAuditEvent(
                 AuditCategory.User, AuditAction.RevokeUserAccess, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,

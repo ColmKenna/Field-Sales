@@ -1,10 +1,10 @@
+using FieldSales.Identity.Services.Persistence;
 using System.Data;
 using Duende.IdentityServer.EntityFramework.Entities;
 using Duende.IdentityServer.EntityFramework.Mappers;
 using FieldSales.Identity.Services.AuditLogs;
 using FieldSales.Identity.Services.Validation;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
@@ -144,24 +144,16 @@ public partial class ClientDetailsService
         if (errors.HasErrors)
             return await DenyAuthenticationValidationFailureAsync(clientId, errors, cancellationToken);
 
-        var outcome = AdminMutationResult.NotFoundResult();
         string targetName = clientId;
         audit.TargetName = targetName;
-        audit.TargetName = clientId;
 
-        IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
-            _configurationDbContext.ChangeTracker.Clear();
-            await using IDbContextTransaction transaction =
-                await _configurationDbContext.Database.BeginTransactionAsync(
-                    IsolationLevel.Serializable, cancellationToken);
             Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
             if (client is null)
             {
-                outcome = AdminMutationResult.NotFoundResult();
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return AdminMutationResult.NotFoundResult();
             }
 
             targetName = client.ClientName ?? clientId;
@@ -181,9 +173,8 @@ public partial class ClientDetailsService
             string? validationError = await ValidateClientAsync(proposed, cancellationToken);
             if (validationError is not null)
             {
-                outcome = AdminMutationResult.ValidationFailure("Input.GrantTypes", validationError);
                 await transaction.RollbackAsync(cancellationToken);
-                return;
+                return AdminMutationResult.ValidationFailure("Input.GrantTypes", validationError);
             }
 
             client.RequirePkce = input.RequirePkce;
@@ -202,8 +193,8 @@ public partial class ClientDetailsService
             client.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
             await _configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            outcome = AdminMutationResult.Success();
-        });
+            return AdminMutationResult.Success();
+        }, cancellationToken);
 
         if (!outcome.Succeeded)
             return await DenyAuthenticationFailedAsync(clientId, targetName, outcome, cancellationToken);
