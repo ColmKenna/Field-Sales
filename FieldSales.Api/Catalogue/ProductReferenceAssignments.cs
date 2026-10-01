@@ -19,6 +19,17 @@ public sealed class ProductReferenceAssignments(CatalogueDbContext db)
         await transaction.CommitAsync(cancellationToken);
     }, cancellationToken);
 
+    public Task SetRestrictionGroupAsync(Guid productId, Guid? groupId,
+        CancellationToken cancellationToken = default) => CatalogueTransactions.RunAsync(db, IsolationLevel.Serializable, async transaction =>
+    {
+        var product = await db.Products.SingleAsync(product => product.Id == productId, cancellationToken);
+        var group = groupId is Guid g ? await db.RestrictionGroups.SingleOrDefaultAsync(item => item.Id == g, cancellationToken) : null;
+        if (groupId is not null && group is null) throw new ArgumentException("A selected reference no longer exists.");
+        product.SetRestrictionGroup(group);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }, cancellationToken);
+
     public Task AddAttributeAsync(Guid productId, Guid nameId, string value,
         CancellationToken cancellationToken = default) => CatalogueTransactions.RunAsync(db, IsolationLevel.Serializable, async transaction =>
     {

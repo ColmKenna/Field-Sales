@@ -78,7 +78,8 @@ public sealed class ProductBrandUsageSource(CatalogueDbContext db) : IReferenceU
 public sealed class ProductReferenceUsageSource(CatalogueDbContext db) : IReferenceUsageSource
 {
     public string SourceKey => "products";
-    public bool Supports(string listKey) => listKey is ReferenceListKeys.Profiles or ReferenceListKeys.AttributeNames or ReferenceListKeys.Suppliers;
+    public bool Supports(string listKey) => listKey is ReferenceListKeys.Profiles or ReferenceListKeys.AttributeNames
+        or ReferenceListKeys.Suppliers or ReferenceListKeys.RestrictionGroups;
     public async Task<IReadOnlyDictionary<Guid, ReferenceCount>> CountManyAsync(string listKey,
         IReadOnlyList<Guid> ids, CancellationToken cancellationToken)
     {
@@ -88,6 +89,8 @@ public sealed class ProductReferenceUsageSource(CatalogueDbContext db) : IRefere
                 .Select(product => new ReferenceLink { ItemId = product.ProductProfileId!.Value, ProductId = product.Id }),
             ReferenceListKeys.Suppliers => db.Products.Where(product => product.SupplierId != null && ids.Contains(product.SupplierId.Value))
                 .Select(product => new ReferenceLink { ItemId = product.SupplierId!.Value, ProductId = product.Id }),
+            ReferenceListKeys.RestrictionGroups => db.Products.Where(product => product.RestrictionGroupId != null && ids.Contains(product.RestrictionGroupId.Value))
+                .Select(product => new ReferenceLink { ItemId = product.RestrictionGroupId!.Value, ProductId = product.Id }),
             ReferenceListKeys.AttributeNames => db.ProductAttributeValues.Where(value => ids.Contains(value.AttributeNameId))
                 .Select(value => new ReferenceLink { ItemId = value.AttributeNameId, ProductId = value.ProductId }).Distinct(),
             _ => throw new ArgumentException("Unknown product reference list.", nameof(listKey))
@@ -111,6 +114,7 @@ public sealed class ProductReferenceUsageSource(CatalogueDbContext db) : IRefere
         {
             ReferenceListKeys.Profiles => await db.Products.LongCountAsync(product => product.ProductProfileId == item.ItemId, cancellationToken),
             ReferenceListKeys.Suppliers => await db.Products.LongCountAsync(product => product.SupplierId == item.ItemId, cancellationToken),
+            ReferenceListKeys.RestrictionGroups => await db.Products.LongCountAsync(product => product.RestrictionGroupId == item.ItemId, cancellationToken),
             ReferenceListKeys.AttributeNames => await db.ProductAttributeValues.Where(value => value.AttributeNameId == item.ItemId)
                 .Select(value => value.ProductId).Distinct().LongCountAsync(cancellationToken),
             _ => throw new ArgumentException("Unknown product reference list.", nameof(item))

@@ -23,6 +23,7 @@ public sealed class Product
     public Guid? PrimaryBrandId { get; private set; }
     public Guid? ProductProfileId { get; private set; }
     public Guid? SupplierId { get; private set; }
+    public Guid? RestrictionGroupId { get; private set; }
     public IReadOnlyList<ProductAlternativeBrand> AlternativeBrands => _alternativeBrands.AsReadOnly();
     public string Unit { get; private set; } = "Each";
     public decimal? QuantityStep { get; private set; }
@@ -78,6 +79,13 @@ public sealed class Product
             throw new ArgumentException("Archived suppliers cannot be selected for new references.", nameof(supplier));
         ProductProfileId = profile?.Id;
         SupplierId = supplier?.Id;
+    }
+
+    public void SetRestrictionGroup(RestrictionGroup? group)
+    {
+        if (group is { IsArchived: true } && RestrictionGroupId != group.Id)
+            throw new ArgumentException("Archived restriction groups cannot be selected for new references.", nameof(group));
+        RestrictionGroupId = group?.Id;
     }
 
     public void AddAttribute(AttributeName name, string value) => _attributeValues.Add(

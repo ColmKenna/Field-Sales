@@ -4,6 +4,7 @@ using FieldSales.Api.Catalogue;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FieldSales.Api.Catalogue.Migrations
 {
     [DbContext(typeof(CatalogueDbContext))]
-    partial class CatalogueDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001190518_AddRestrictionGroups")]
+    partial class AddRestrictionGroups
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -202,7 +205,6 @@ namespace FieldSales.Api.Catalogue.Migrations
             modelBuilder.Entity("FieldSales.Api.Catalogue.ProductAttributeValue", b =>
                 {
                     b.Property<Guid>("Id")
-                    .ValueGeneratedNever()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("AttributeNameId")

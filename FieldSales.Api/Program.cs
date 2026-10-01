@@ -13,6 +13,7 @@ builder.Services.AddScoped<IReferenceListStore, BrandListStore>();
 builder.Services.AddScoped<IReferenceListStore, ProductProfileListStore>();
 builder.Services.AddScoped<IReferenceListStore, AttributeNameListStore>();
 builder.Services.AddScoped<IReferenceListStore, SupplierListStore>();
+builder.Services.AddScoped<IReferenceListStore, RestrictionGroupListStore>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductBrandUsageSource>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductReferenceUsageSource>();
 builder.Services.AddScoped<ReferenceCatalogueRegistry>();

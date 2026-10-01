@@ -86,6 +86,7 @@ public sealed class ProductReferencePersistenceTests
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_RefuseDeletion_When_ProductReferencesExist(string key)
     {
         await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
@@ -99,6 +100,7 @@ public sealed class ProductReferencePersistenceTests
         {
             "profiles" => ProductProfile.Create("Chilled"),
             "suppliers" => Supplier.Create("Supplier"),
+            "restriction-groups" => RestrictionGroup.Create("Pharmacy-only medicines"),
             _ => AttributeName.Create("Weight")
         };
         db.Add(item);
@@ -107,11 +109,13 @@ public sealed class ProductReferencePersistenceTests
         await db.SaveChangesAsync();
         var assignments = new ProductReferenceAssignments(db);
         if (key == "attribute-names") await assignments.AddAttributeAsync(product.Id, item.Id, "200 g");
+        else if (key == "restriction-groups") await assignments.SetRestrictionGroupAsync(product.Id, item.Id);
         else await assignments.SetClassificationAsync(product.Id, key == "profiles" ? item.Id : null, key == "suppliers" ? item.Id : null);
         string command = key switch
         {
             "profiles" => "DELETE FROM ProductProfiles WHERE Id = @id",
             "suppliers" => "DELETE FROM Suppliers WHERE Id = @id",
+            "restriction-groups" => "DELETE FROM RestrictionGroups WHERE Id = @id",
             _ => "DELETE FROM AttributeNames WHERE Id = @id"
         };
         var error = await Assert.ThrowsAsync<SqlException>(() => db.Database.ExecuteSqlRawAsync(command, new SqlParameter("@id", item.Id)));

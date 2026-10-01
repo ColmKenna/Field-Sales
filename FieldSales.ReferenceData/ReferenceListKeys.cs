@@ -6,4 +6,5 @@ public static class ReferenceListKeys
     public const string Profiles = "profiles";
     public const string AttributeNames = "attribute-names";
     public const string Suppliers = "suppliers";
+    public const string RestrictionGroups = "restriction-groups";
 }

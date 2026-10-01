@@ -64,6 +64,9 @@ public sealed class AttributeNameListStore(CatalogueDbContext db)
     : ReferenceListStore<AttributeName>(db, new(ReferenceListKeys.AttributeNames, "Attribute", "Attribute names", ["products"]), AttributeName.Create);
 public sealed class SupplierListStore(CatalogueDbContext db)
     : ReferenceListStore<Supplier>(db, new(ReferenceListKeys.Suppliers, "Supplier", "Suppliers", ["products"]), Supplier.Create);
+// Permissions join the required sources when the Coverage area registers its usage source (WI-029).
+public sealed class RestrictionGroupListStore(CatalogueDbContext db)
+    : ReferenceListStore<RestrictionGroup>(db, new(ReferenceListKeys.RestrictionGroups, "Restriction Group", "Restriction Groups", ["products"]), RestrictionGroup.Create);
 
 /// <summary>Storage boundary for the later assignment editor. Reads and writes share one transaction.</summary>
 public sealed class ProductBrandAssignments(CatalogueDbContext db)

@@ -25,6 +25,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_SaveAndRenameAcrossRestart_When_ReferenceNameIsValid(string key)
     {
         await ResetAsync();
@@ -33,7 +34,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
         {
             await SignInAsync(browser);
             string html = await HtmlAsync(browser, key);
-            foreach (string choice in new[] { "brands", "profiles", "attribute-names", "suppliers" })
+            foreach (string choice in new[] { "brands", "profiles", "attribute-names", "suppliers", "restriction-groups" })
                 Assert.Contains($"value=\"{choice}\"", html);
             using var added = await PostAsync(browser, key, "Save", html, new() { ["Name"] = " Fresh " });
             Assert.Equal(HttpStatusCode.Redirect, added.StatusCode);
@@ -54,6 +55,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_RejectNames_When_InvalidOrDuplicateIncludingArchived(string key)
     {
         await ResetAsync();
@@ -86,6 +88,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_DeleteOnlyUnusedItems_When_Confirmed(string key)
     {
         await ResetAsync();
@@ -109,6 +112,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_PreserveAndLabelExistingReferences_When_UsedItemIsArchived(string key)
     {
         Guid category = await ResetAsync();
@@ -149,6 +153,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_HideArchivedAndRestoreSelection_When_ToggleAndUnarchiveAreUsed(string key)
     {
         Guid category = await ResetAsync();
@@ -203,6 +208,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_RefuseDelete_When_ReferenceIsAddedAfterPageLoad(string key)
     {
         Guid category = await ResetAsync();
@@ -226,6 +232,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
     [InlineData("profiles")]
     [InlineData("attribute-names")]
     [InlineData("suppliers")]
+    [InlineData("restriction-groups")]
     public async Task Should_DenyMutationWithoutReplay_When_AccessIsMissing(string key)
     {
         await ResetAsync();
@@ -280,6 +287,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
         await db.ProductProfiles.ExecuteDeleteAsync();
         await db.AttributeNames.ExecuteDeleteAsync();
         await db.Suppliers.ExecuteDeleteAsync();
+        await db.RestrictionGroups.ExecuteDeleteAsync();
         await db.Brands.ExecuteDeleteAsync();
         return category;
     }
@@ -304,6 +312,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
             "profiles" => await db.ProductProfiles.SingleAsync(item => item.Id == id),
             "attribute-names" => await db.AttributeNames.SingleAsync(item => item.Id == id),
             "suppliers" => await db.Suppliers.SingleAsync(item => item.Id == id),
+            "restriction-groups" => await db.RestrictionGroups.SingleAsync(item => item.Id == id),
             _ => throw new ArgumentOutOfRangeException(nameof(key))
         };
         item.Archive();
@@ -323,6 +332,7 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
         await using var scope = app.Api.Services.CreateAsyncScope();
         var assignments = scope.ServiceProvider.GetRequiredService<ProductReferenceAssignments>();
         if (key == "attribute-names") await assignments.AddAttributeAsync(productId, id, value);
+        else if (key == "restriction-groups") await assignments.SetRestrictionGroupAsync(productId, id);
         else await assignments.SetClassificationAsync(productId, key == "profiles" ? id : null, key == "suppliers" ? id : null);
     }
     private static Dictionary<string, string> Fields(Guid id, ReferenceAction action) => new()
