@@ -148,3 +148,27 @@ The reserved ports are proposals until the item that adds the project confirms t
 - Category names are unique among siblings; duplicate leaf names under different parents are valid. A rejected or expired create/rename form changes nothing and is not persisted or replayed after sign-in.
 - The Human-Led scenario matrix is recorded in `WI-004.md`. Because Product, Order and Call records do not yet exist, WI-004 proves changing descendant category paths and stable category identities; direct assertions over those later record types follow their introduction.
 - At the Increment 1 review, the developer approved an API-owned `CatalogueDb` separate from website session storage. The BFF calls its business endpoints with server-held tokens. See `docs/catalogue-category-decisions.md`.
+
+## WI-011 archived Restriction Groups (2026-10-01, developer, plan approval)
+
+- **MI-45 is decided.** While a Restriction Group is archived, its products are hidden from every rep,
+  whether or not the rep holds its permission. The rule fails closed. Permissions are kept untouched,
+  so un-archiving restores each rep's previous visibility exactly. Products with no group are
+  unaffected.
+- The rule lives in one place: `RestrictedProductVisibility.VisibleToRep(products, groups,
+  permittedGroupIds)` in `FieldSales.Api/Catalogue/`. **WI-043** (snapshot builder) must apply it
+  rather than re-deriving visibility, and must pass the rep's current permissions from **WI-029**.
+- A product cannot be newly assigned to an archived group, but an unchanged existing link is kept.
+  **WI-012**'s editor inherits this through `Product.SetRestrictionGroup` /
+  `ProductReferenceAssignments.SetRestrictionGroupAsync`.
+- **WI-029** must register an `IReferenceUsageSource` with key
+  `RestrictionGroupListStore.PermissionSource` (`"restriction-permissions"`, labels
+  permission/permissions) for the `restriction-groups` list, and add that key to the list's required
+  sources. Until then the S5 archive message ("N permissions will be kept but have no effect while
+  archived") cannot appear in production.
+- Archive confirmation wording: "N permissions will be kept but have no effect while archived"
+  (singular "1 permission will be kept but has no effect while archived") and "N products will be
+  hidden from every rep while archived". The un-archive confirmation says "N permissions will take
+  effect again".
+- An In Progress order line for such a product (valid when captured) is a WI-043 obligation: no
+  orders or tablet exist yet.

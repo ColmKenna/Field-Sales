@@ -94,7 +94,13 @@
         }
         else { <p>No supplier yet.</p> }
     </section>
-    <section aria-labelledby="restriction-heading"><h2 id="restriction-heading">Restriction Group</h2><p>No restriction group yet.</p></section>
+    <section aria-labelledby="restriction-heading"><h2 id="restriction-heading">Restriction Group</h2>
+        @if (Model.Details.RestrictionGroup is { } restrictionGroup)
+        {
+            <p>@restrictionGroup.Name@(restrictionGroup.IsArchived ? " (archived)" : "")</p>
+        }
+        else { <p>No restriction group yet.</p> }
+    </section>
     <section aria-labelledby="attributes-heading"><h2 id="attributes-heading">Attributes</h2>
         @if (Model.Details.Attributes.Count == 0)
         {

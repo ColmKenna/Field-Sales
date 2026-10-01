@@ -24,6 +24,10 @@
         {
             <p>It will be offered again for new selections.</p>
         }
+        @foreach (var note in Model.List.SelectedList.NotesFor(Model.Action, item.Usage))
+        {
+            <p>@note</p>
+        }
         <form method="post" asp-page-handler="Retire">
             <input type="hidden" name="ListKey" value="@Model.ListKey" />
             <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />

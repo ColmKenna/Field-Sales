@@ -13,6 +13,7 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
     public DbSet<ProductProfile> ProductProfiles => Set<ProductProfile>();
     public DbSet<AttributeName> AttributeNames => Set<AttributeName>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<RestrictionGroup> RestrictionGroups => Set<RestrictionGroup>();
     public DbSet<ProductAttributeValue> ProductAttributeValues => Set<ProductAttributeValue>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -22,6 +23,7 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
         ConfigureReference<ProductProfile>(modelBuilder, "ProductProfiles");
         ConfigureReference<AttributeName>(modelBuilder, "AttributeNames");
         ConfigureReference<Supplier>(modelBuilder, "Suppliers");
+        ConfigureReference<RestrictionGroup>(modelBuilder, "RestrictionGroups");
         modelBuilder.Entity<ProductAttributeValue>(entity =>
         {
             entity.ToTable("ProductAttributeValues");
@@ -77,6 +79,8 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
             entity.HasOne<ProductProfile>().WithMany().HasForeignKey(product => product.ProductProfileId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Supplier>().WithMany().HasForeignKey(product => product.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<RestrictionGroup>().WithMany().HasForeignKey(product => product.RestrictionGroupId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(product => product.AttributeValues).WithOne().HasForeignKey(value => value.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);

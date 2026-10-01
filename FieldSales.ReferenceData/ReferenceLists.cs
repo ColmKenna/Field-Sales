@@ -75,8 +75,24 @@ public static class ReferenceRetirementPolicy
         isArchived ? ReferenceAction.Unarchive : usage.IsUsed ? ReferenceAction.Archive : ReferenceAction.Delete;
 }
 
+/// <summary>A confirmation line for an action, shown only when the named usage source counts references.</summary>
+/// <remarks>The text follows the count, e.g. "3" + "permissions will be kept but have no effect while archived".</remarks>
+public sealed record ReferenceActionNote(ReferenceAction Action, string SourceKey, string SingularText, string PluralText)
+{
+    public string? Describe(ReferenceUsage usage)
+    {
+        long count = usage.Counts.FirstOrDefault(count => count.SourceKey == SourceKey)?.Count ?? 0;
+        return count == 0 ? null : $"{count} {(count == 1 ? SingularText : PluralText)}";
+    }
+}
+
 public sealed record ReferenceListDefinition(string Key, string SingularLabel, string PluralLabel,
-    IReadOnlyList<string> RequiredUsageSources);
+    IReadOnlyList<string> RequiredUsageSources, IReadOnlyList<ReferenceActionNote>? ActionNotes = null)
+{
+    public IReadOnlyList<string> NotesFor(ReferenceAction action, ReferenceUsage usage) =>
+        (ActionNotes ?? []).Where(note => note.Action == action)
+            .Select(note => note.Describe(usage)).OfType<string>().ToArray();
+}
 public sealed record ReferenceListItem(Guid Id, string Name, bool IsArchived, ReferenceUsage Usage);
 public sealed record ReferenceListViewModel(ReferenceListDefinition SelectedList,
     IReadOnlyList<ReferenceListDefinition> AvailableLists, IReadOnlyList<ReferenceListItem> Items,

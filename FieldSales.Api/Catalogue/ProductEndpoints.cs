@@ -46,13 +46,15 @@ public static class ProductEndpoints
                 .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
             var supplier = await db.Suppliers.AsNoTracking().Where(item => item.Id == product.SupplierId)
                 .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
+            var restrictionGroup = await db.RestrictionGroups.AsNoTracking().Where(item => item.Id == product.RestrictionGroupId)
+                .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
             return Results.Ok(new ProductDetails(ToItem(product),
                 new CategoryTree(categories).Breadcrumb(product.CategoryId)
                     .Select(segment => new FieldSales.Catalogue.Contracts.CategoryBreadcrumbSegment(segment.Id, segment.Name)).ToArray(),
                 price is null ? null : new ProductPriceItem(price.EffectiveFrom, price.Amount),
                 product.BasePrices.OrderByDescending(entry => entry.EffectiveFrom)
                     .Select(entry => new ProductPriceItem(entry.EffectiveFrom, entry.Amount)).ToArray(),
-                product.Attributes.Select(attribute => new FieldSales.Catalogue.Contracts.ProductAttribute(attribute.Name, attribute.Value, attribute.IsArchived)).ToArray(), brands, profile, supplier));
+                product.Attributes.Select(attribute => new FieldSales.Catalogue.Contracts.ProductAttribute(attribute.Name, attribute.Value, attribute.IsArchived)).ToArray(), brands, profile, supplier, restrictionGroup));
         });
 
         products.MapPost("/", CreateAsync);

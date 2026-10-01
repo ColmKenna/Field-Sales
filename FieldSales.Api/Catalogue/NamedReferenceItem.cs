@@ -59,6 +59,18 @@ public sealed class Supplier : NamedReferenceItem
     }
 }
 
+public sealed class RestrictionGroup : NamedReferenceItem
+{
+    private RestrictionGroup() { }
+    protected override string ItemLabel => "restriction group";
+    public static RestrictionGroup Create(string name)
+    {
+        RestrictionGroup item = new();
+        item.Initialize(name);
+        return item;
+    }
+}
+
 public sealed class ProductAttributeValue
 {
     private ProductAttributeValue() { }
