@@ -9,6 +9,10 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IReferenceListStore, BrandListStore>();
+builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductBrandUsageSource>();
+builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageReader, ReferenceUsageReader>();
+builder.Services.AddScoped<ProductBrandAssignments>();
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
 
 const string roleLookupUnavailableKey = "staff-role-lookup-unavailable";
@@ -115,6 +119,7 @@ app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new
     .RequireAuthorization("StaffApi");
 app.MapCatalogueEndpoints();
 app.MapProductEndpoints();
+app.MapReferenceListEndpoints();
 app.MapDefaultEndpoints();
 app.Run();
 

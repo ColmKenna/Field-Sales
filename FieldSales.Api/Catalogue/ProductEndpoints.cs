@@ -13,9 +13,10 @@ public sealed record AddProductBasePriceRequest(decimal? BasePrice, DateOnly? Ef
 public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit,
     decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
+public sealed record ProductBrandItem(Guid Id, string Name, bool IsArchived, bool IsPrimary);
 public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
     ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
-    IReadOnlyList<ProductAttribute> Attributes);
+    IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null);
 public sealed record ProductSaveError(string Field, string Error);
 
 public static class ProductEndpoints
@@ -44,12 +45,16 @@ public static class ProductEndpoints
             if (product is null) return Results.NotFound();
             List<Category> categories = await db.Categories.AsNoTracking().ToListAsync(cancellationToken);
             ProductBasePrice? price = product.BasePriceOn(Today(clock));
+            var brands = await db.Brands.AsNoTracking().Where(brand => brand.Id == product.PrimaryBrandId
+                || db.ProductAlternativeBrands.Any(link => link.ProductId == id && link.BrandId == brand.Id))
+                .OrderBy(brand => brand.Name).Select(brand => new ProductBrandItem(brand.Id, brand.Name,
+                    brand.IsArchived, brand.Id == product.PrimaryBrandId)).ToArrayAsync(cancellationToken);
             return Results.Ok(new ProductDetails(ToItem(product),
                 new CategoryTree(categories).Breadcrumb(product.CategoryId),
                 price is null ? null : new ProductPriceItem(price.EffectiveFrom, price.Amount),
                 product.BasePrices.OrderByDescending(entry => entry.EffectiveFrom)
                     .Select(entry => new ProductPriceItem(entry.EffectiveFrom, entry.Amount)).ToArray(),
-                product.Attributes));
+                product.Attributes, brands));
         });
 
         products.MapPost("/", CreateAsync);

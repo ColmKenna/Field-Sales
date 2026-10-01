@@ -47,3 +47,5 @@ p { line-height: 1.6; }
 .price-history table { width: 100%; border-collapse: collapse; }
 .price-history caption { text-align: left; font-weight: 600; margin-bottom: .5rem; }
 .price-history th, .price-history td { padding: .6rem .4rem; text-align: left; border-bottom: 1px solid #d7dee6; }
+.reference-add, .reference-filter, .reference-item form { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-block: 1rem; }
+.reference-item, .reference-confirmation { padding: 1rem; margin-block: 1rem; border: 1px solid #ccc; border-radius: .5rem; }

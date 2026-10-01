@@ -1,0 +1,47 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.ReferenceData.IndexModel
+@using FieldSales.ReferenceData
+@{
+    ViewData["Title"] = "Reference data";
+}
+<p><a asp-page="/HeadOffice/Index">Back to catalogue</a></p>
+<h1>Reference data</h1>
+<div asp-validation-summary="All" role="alert"></div>
+@if (Model.Confirmation is { } item)
+{
+    <section class="reference-confirmation" aria-labelledby="confirmation-heading">
+        <h2 id="confirmation-heading">@Model.Action.ToLabel() "@item.Name"?</h2>
+        <p>@item.Usage.Description</p>
+        @if (Model.Action == ReferenceAction.Archive)
+        {
+            <p>It stays on existing records and stops appearing in new selections.</p>
+        }
+        else if (Model.Action == ReferenceAction.Delete)
+        {
+            <p>This permanently removes the @Model.List.SelectedList.SingularLabel.ToLowerInvariant().</p>
+        }
+        else
+        {
+            <p>It will be offered again for new selections.</p>
+        }
+        <form method="post" asp-page-handler="Retire">
+            <input type="hidden" name="ListKey" value="@Model.ListKey" />
+            <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />
+            <input type="hidden" name="Id" value="@item.Id" />
+            <input type="hidden" name="Action" value="@((int)Model.Action)" />
+            <button type="submit">Confirm @Model.Action.ToLabel()</button>
+            <a asp-page="Index" asp-route-listKey="@Model.ListKey" asp-route-showArchived="@Model.ShowArchived">Cancel</a>
+        </form>
+    </section>
+}
+else
+{
+    <form method="post" asp-page-handler="Save" class="reference-add">
+        <input type="hidden" name="ListKey" value="@Model.ListKey" />
+        <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />
+        <label asp-for="Name">New @Model.List.SelectedList.SingularLabel.ToLowerInvariant() name</label>
+        <input asp-for="Name" maxlength="200" required />
+        <button type="submit">Add @Model.List.SelectedList.SingularLabel.ToLowerInvariant()</button>
+    </form>
+    <partial name="_ReferenceList" model="Model.List" />
+}

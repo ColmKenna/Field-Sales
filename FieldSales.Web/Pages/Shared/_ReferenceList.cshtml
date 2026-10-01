@@ -1,0 +1,36 @@
+@model FieldSales.ReferenceData.ReferenceListViewModel
+@using FieldSales.ReferenceData
+<form method="get" class="reference-filter">
+    <label for="reference-list">List</label>
+    <select id="reference-list" name="ListKey">
+        @foreach (var list in Model.AvailableLists)
+        {
+            <option value="@list.Key" selected="@(list.Key == Model.SelectedList.Key)">@list.PluralLabel</option>
+        }
+    </select>
+    <label><input type="checkbox" name="ShowArchived" value="true" checked="@Model.ShowArchived" /> Show archived (@Model.ArchivedCount)</label>
+    <button type="submit">Show list</button>
+</form>
+<h2>@Model.SelectedList.PluralLabel</h2>
+@if (Model.Items.Count == 0)
+{
+    <p>No @Model.SelectedList.PluralLabel.ToLowerInvariant() to show.</p>
+}
+@foreach (var item in Model.Items)
+{
+    var action = ReferenceRetirementPolicy.Decide(item.IsArchived, item.Usage);
+    <section class="reference-item" data-reference-id="@item.Id">
+        <h3>@item.Name@(item.IsArchived ? " (archived)" : "")</h3>
+        <p>@item.Usage.Description</p>
+        <form method="post" asp-page-handler="Save">
+            <input type="hidden" name="ListKey" value="@Model.SelectedList.Key" />
+            <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />
+            <input type="hidden" name="Id" value="@item.Id" />
+            <label for="name-@item.Id">Name</label>
+            <input id="name-@item.Id" name="Name" value="@item.Name" maxlength="200" required />
+            <button type="submit">Save name</button>
+        </form>
+        <a asp-page="/HeadOffice/ReferenceData/Index" asp-page-handler="Confirm" asp-route-id="@item.Id"
+           asp-route-listKey="@Model.SelectedList.Key" asp-route-showArchived="@Model.ShowArchived">@action.ToLabel()</a>
+    </section>
+}

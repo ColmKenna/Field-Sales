@@ -10,6 +10,7 @@ public sealed class Product
     public const int MaximumNameLength = 200;
 
     private readonly List<ProductBasePrice> _basePrices = [];
+    private readonly List<ProductAlternativeBrand> _alternativeBrands = [];
 
     // EF Core materializes persisted products through this constructor.
     private Product() { }
@@ -18,6 +19,8 @@ public sealed class Product
     public string Code { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
     public Guid CategoryId { get; private set; }
+    public Guid? PrimaryBrandId { get; private set; }
+    public IReadOnlyList<ProductAlternativeBrand> AlternativeBrands => _alternativeBrands.AsReadOnly();
     public string Unit { get; private set; } = "Each";
     public decimal? QuantityStep { get; private set; }
     public decimal? MinimumQuantity { get; private set; }
@@ -59,6 +62,26 @@ public sealed class Product
         if (!QuantityRules.TryCreate(Unit, QuantityStep, MinimumQuantity, out QuantityRules? rules, out _))
             throw new InvalidOperationException("The saved product has invalid quantity rules.");
         return rules;
+    }
+
+    // Caller loads existing links and checks brand state inside the shared transaction.
+    public void SetBrands(Brand? primary, IReadOnlyList<Brand> alternatives)
+    {
+        ArgumentNullException.ThrowIfNull(alternatives);
+        if (alternatives.Count > 0 && primary is null)
+            throw new ArgumentException("Choose a primary brand when alternative brands are supplied.", nameof(primary));
+        if (alternatives.Select(brand => brand.Id).Distinct().Count() != alternatives.Count)
+            throw new ArgumentException("Choose each alternative brand once.", nameof(alternatives));
+        var previous = _alternativeBrands.Select(link => link.BrandId).ToHashSet();
+        if (PrimaryBrandId is Guid previousPrimary) previous.Add(previousPrimary);
+        IEnumerable<Brand> selected = primary is null ? alternatives : alternatives.Prepend(primary);
+        if (selected.Any(brand => brand.IsArchived && !previous.Contains(brand.Id)))
+            throw new ArgumentException("Archived brands cannot be selected for new references.", nameof(alternatives));
+        PrimaryBrandId = primary?.Id;
+        var next = alternatives.Select(brand => brand.Id).ToHashSet();
+        _alternativeBrands.RemoveAll(link => !next.Contains(link.BrandId));
+        foreach (Guid id in next.Where(id => !_alternativeBrands.Any(link => link.BrandId == id)))
+            _alternativeBrands.Add(new ProductAlternativeBrand(Id, id));
     }
 
     /// <summary>Returns the latest base price effective on or before the supplied business date.</summary>

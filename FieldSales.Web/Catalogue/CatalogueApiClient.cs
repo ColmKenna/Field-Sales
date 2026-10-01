@@ -20,9 +20,10 @@ public sealed record ProductItem(Guid Id, string Code, string Name, Guid Categor
     decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
 public sealed record ProductAttribute(string Name, string Value);
+public sealed record ProductBrandItem(Guid Id, string Name, bool IsArchived, bool IsPrimary);
 public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
     ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
-    IReadOnlyList<ProductAttribute> Attributes);
+    IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null);
 public enum CreateProductStatus { Created, Invalid, Unavailable }
 public sealed record CreateProductResult(CreateProductStatus Status, ProductItem? Product = null,
     IReadOnlyDictionary<string, string[]>? Errors = null);
@@ -33,7 +34,7 @@ public enum AddProductBasePriceStatus { Created, Invalid, Missing, Unavailable }
 public sealed record AddProductBasePriceResult(AddProductBasePriceStatus Status,
     IReadOnlyDictionary<string, string[]>? Errors = null);
 
-public sealed class CatalogueApiClient(HttpClient client, IHttpContextAccessor contexts)
+public sealed partial class CatalogueApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
     public async Task<IReadOnlyList<CategoryItem>?> RootsAsync(CancellationToken cancellationToken)
     {
