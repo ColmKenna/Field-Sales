@@ -7,9 +7,12 @@ using FieldSales.ReferenceData;
 using FieldSales.Web.Catalogue;
 using FieldSales.Web.Data;
 using FieldSales.Web.Security;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext;
+using RestrictionGroupListStore = CatalogueApi::FieldSales.Api.Catalogue.RestrictionGroupListStore;
 using Product = CatalogueApi::FieldSales.Api.Catalogue.Product;
 using NamedReferenceItem = CatalogueApi::FieldSales.Api.Catalogue.NamedReferenceItem;
 using ProductReferenceAssignments = CatalogueApi::FieldSales.Api.Catalogue.ProductReferenceAssignments;
@@ -19,6 +22,7 @@ namespace FieldSales.Web.Tests;
 public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string Page = "/HeadOffice/ReferenceData";
+    private const string RestrictionGroups = ReferenceListKeys.RestrictionGroups;
     private static string ApiPath(string key) => "/catalogue/reference-data/" + key;
 
     [Theory]
@@ -275,6 +279,85 @@ public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassF
             Assert.Equal(id, (await ItemsAsync(key)).Single().Id);
             Assert.Equal("Protected", (await ItemsAsync(key)).Single().Name);
         }
+    }
+
+    [Fact]
+    public async Task Should_ISee3PermissionsWillBeKeptButHaveNoEffectWhileArchived_When_RestrictionGroupHighValueEquipmentHas3RepsWithPermission()
+    {
+        await ResetAsync();
+        Guid id = await CreateAsync(RestrictionGroups, "High-value equipment");
+        await using var api = WithPermissions(id, 3);
+        await using var website = app.CreateWebsite(api);
+        using var browser = website.CreateBrowser();
+        await SignInAsync(browser);
+        string row = Row(await HtmlAsync(browser, RestrictionGroups), id);
+        Assert.Contains("Used by 3 permissions", row);
+        Assert.Contains(">Archive</a>", row);
+        Assert.DoesNotContain(">Delete</a>", row);
+        string confirm = await HtmlAsync(browser, RestrictionGroups, id);
+        Assert.Contains("<p>3 permissions will be kept but have no effect while archived</p>", confirm);
+        Assert.DoesNotContain("hidden from every rep", confirm);
+        using var archived = await PostAsync(browser, RestrictionGroups, "Retire", confirm, Fields(id, ReferenceAction.Archive));
+        Assert.Equal(HttpStatusCode.Redirect, archived.StatusCode);
+        Assert.True((await ItemsAsync(RestrictionGroups)).Single().IsArchived);
+        Assert.Contains("Used by 3 permissions", Row(await HtmlAsync(browser, RestrictionGroups, showArchived: true), id));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task Should_ShowPermissionNoteOnlyWhenCounted_When_GroupHas0Or1Permissions(int permissions)
+    {
+        Guid category = await ResetAsync();
+        Guid id = await CreateAsync(RestrictionGroups, "Pharmacy-only medicines");
+        await AssignAsync(RestrictionGroups, await ProductAsync(category), id);
+        await using var api = WithPermissions(id, permissions);
+        await using var website = app.CreateWebsite(api);
+        using var browser = website.CreateBrowser();
+        await SignInAsync(browser);
+        string confirm = await HtmlAsync(browser, RestrictionGroups, id);
+        Assert.Contains("<p>1 product will be hidden from every rep while archived</p>", confirm);
+        if (permissions == 0) Assert.DoesNotContain("will be kept but", confirm);
+        else Assert.Contains("<p>1 permission will be kept but has no effect while archived</p>", confirm);
+    }
+
+    [Fact]
+    public async Task Should_SayPermissionsTakeEffectAgain_When_GroupIsUnarchived()
+    {
+        Guid category = await ResetAsync();
+        Guid id = await CreateAsync(RestrictionGroups, "High-value equipment");
+        for (int index = 0; index < 2; index++) await AssignAsync(RestrictionGroups, await ProductAsync(category), id);
+        await using var api = WithPermissions(id, 3);
+        await using var website = app.CreateWebsite(api);
+        using var browser = website.CreateBrowser();
+        await SignInAsync(browser);
+        string archive = await HtmlAsync(browser, RestrictionGroups, id);
+        Assert.Contains("<p>3 permissions will be kept but have no effect while archived</p>", archive);
+        Assert.Contains("<p>2 products will be hidden from every rep while archived</p>", archive);
+        Assert.DoesNotContain("take effect again", archive);
+        using var archived = await PostAsync(browser, RestrictionGroups, "Retire", archive, Fields(id, ReferenceAction.Archive));
+        Assert.Equal(HttpStatusCode.Redirect, archived.StatusCode);
+        string restore = await HtmlAsync(browser, RestrictionGroups, id, showArchived: true);
+        Assert.Contains("It will be offered again for new selections.", restore);
+        Assert.Contains("<p>3 permissions will take effect again</p>", restore);
+        Assert.DoesNotContain("will be kept but", restore);
+        Assert.DoesNotContain("hidden from every rep", restore);
+        using var restored = await PostAsync(browser, RestrictionGroups, "Retire", restore, Fields(id, ReferenceAction.Unarchive));
+        Assert.Equal(HttpStatusCode.Redirect, restored.StatusCode);
+        Assert.False((await ItemsAsync(RestrictionGroups)).Single().IsArchived);
+    }
+
+    private WebApplicationFactory<CatalogueDbContext> WithPermissions(Guid group, long count) =>
+        app.NewApi().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.AddSingleton<IReferenceUsageSource>(new PermissionUsageSource(group, count))));
+
+    // Stands in for the Coverage area's permission source until WI-029 registers the real one.
+    private sealed class PermissionUsageSource(Guid group, long count) : IReferenceUsageSource
+    {
+        public string SourceKey => RestrictionGroupListStore.PermissionSource;
+        public bool Supports(string listKey) => listKey == ReferenceListKeys.RestrictionGroups;
+        public Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken cancellationToken) =>
+            Task.FromResult(new ReferenceCount(SourceKey, "permission", "permissions", item.ItemId == group ? count : 0));
     }
 
     private async Task<Guid> ResetAsync()

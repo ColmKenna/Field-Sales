@@ -64,9 +64,23 @@ public sealed class AttributeNameListStore(CatalogueDbContext db)
     : ReferenceListStore<AttributeName>(db, new(ReferenceListKeys.AttributeNames, "Attribute", "Attribute names", ["products"]), AttributeName.Create);
 public sealed class SupplierListStore(CatalogueDbContext db)
     : ReferenceListStore<Supplier>(db, new(ReferenceListKeys.Suppliers, "Supplier", "Suppliers", ["products"]), Supplier.Create);
-// Permissions join the required sources when the Coverage area registers its usage source (WI-029).
 public sealed class RestrictionGroupListStore(CatalogueDbContext db)
-    : ReferenceListStore<RestrictionGroup>(db, new(ReferenceListKeys.RestrictionGroups, "Restriction Group", "Restriction Groups", ["products"]), RestrictionGroup.Create);
+    : ReferenceListStore<RestrictionGroup>(db, ListDefinition, RestrictionGroup.Create)
+{
+    /// <summary>The Coverage area's permission usage source key. It joins the required sources once registered (WI-029).</summary>
+    public const string PermissionSource = "restriction-permissions";
+
+    // While archived, a group's permissions grant nothing and its products are hidden from every rep (MI-45).
+    private static readonly ReferenceListDefinition ListDefinition = new(ReferenceListKeys.RestrictionGroups,
+        "Restriction Group", "Restriction Groups", ["products"],
+    [
+        new(ReferenceAction.Archive, PermissionSource,
+            "permission will be kept but has no effect while archived", "permissions will be kept but have no effect while archived"),
+        new(ReferenceAction.Archive, "products",
+            "product will be hidden from every rep while archived", "products will be hidden from every rep while archived"),
+        new(ReferenceAction.Unarchive, PermissionSource, "permission will take effect again", "permissions will take effect again")
+    ]);
+}
 
 /// <summary>Storage boundary for the later assignment editor. Reads and writes share one transaction.</summary>
 public sealed class ProductBrandAssignments(CatalogueDbContext db)
