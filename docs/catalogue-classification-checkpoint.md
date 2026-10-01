@@ -1,7 +1,8 @@
 # Product classification — WI-012 layout checkpoint
 
 Date: 2026-10-01. Source: T-1.6.1 / PRD-US-004, H-13/H13.2.
-Status: awaiting human layout review. WI-012 remains active.
+Status: complete. The developer approved the rendered layout in this chat with
+`Continue T-1.6.1` on 2026-10-01, after reviewing checkpoint commit `f512711`.
 
 ## Layout for review
 
@@ -63,8 +64,46 @@ JavaScript: 16 passed. Solution build with warnings as errors: zero warnings/err
 The full bounded solution run passed: 118 API, 1,046 identity and 221 website tests
 (1,385 total), with zero failures/skips. TRX/log evidence is in `.artifacts/wi012-full`.
 
-The review is specifically the H13.2 section order and editing layout. Human
-confirmation remains pending. Resume with `Continue T-1.6.1`, then finish the
-acceptance audit, mark the item done and push its feature branch. Attributes,
+The review confirms the H13.2 section order and editing layout. Attributes,
 restriction visibility on tablets, availability, replacements and quantity breaks
 remain in their separately planned items.
+
+## Acceptance audit
+
+The five criteria below quote the WI-012 card's implementation guidance, also
+numbered in T-1.6.1. All pass.
+
+1. **"Profile \"Chilled\", Primary Brand \"SunCo\", Alternative Brand \"GlowCo\",
+   supplier \"Irish Health Supplies\", Restriction Group none saves and shows."**
+   `Should_SaveAndShowClassification_When_SourceExampleIsSubmitted` submits those
+   exact values through the website, checks the saved summary and selected controls,
+   then reopens the website/API against the same SQL database after an API restart.
+2. **"Adding an Alternative Brand with no Primary Brand shows \"Choose a primary
+   brand first\"."** `Should_KeepEnteredValuesAndSavedRecord_When_PrimaryBrandIsMissing`
+   checks the exact message, retained inputs and unchanged persisted classification.
+   `Should_RejectWholeSave_When_AlternativesHaveNoPrimary` covers both new assignment
+   and removal of an existing primary.
+3. **"A product may hold at most one Restriction Group; setting \"Pharmacy-only
+   medicines\" saves it."** The source-example website test assigns and displays
+   that group. `Should_UpdateUsageCounts_When_ClassificationIsReplacedOrCleared`
+   verifies replacement and clearing. The existing scalar RestrictionGroupId stores
+   one optional group; classification saves do not add another relationship.
+4. **"Archived items (e.g. Profile \"Frozen\") are not offered, and a product
+   already set to one shows \"Frozen (archived)\"."**
+   `Should_PreserveRecordAndLabels_When_ArchivedLinksAreRetainedThenReplaced` excludes
+   unused archived Frozen from choices and checks existing archived profile, both
+   brand roles, supplier and group labels. Its existing profile is Chilled; the
+   name-independent Razor label appends the same ` (archived)` suffix to Frozen.
+   Domain characterization separately retains an existing archived Frozen profile.
+   API stale-selection cases reject new archived references before any mutation.
+5. **"Brand, profile, supplier and group usage now appears in each list's
+   \"Used by …\" count through T-1.5.1's interface."** The source-example website
+   test checks `Used by 1 product` for every assigned reference through the real
+   reference-list API. The usage-count API test checks replacement and clearing;
+   `Should_CountProductOnce_When_BrandHasBothRoles` checks distinct product counting.
+
+Source self-verification: criteria 1–5 pass with the evidence above; H-13 layout
+passes with developer checkpoint approval; the provisional message is reconciled
+to actual commit `feat(wi-012): edit product classification atomically on the record`.
+The full approved scenario matrix and verification counts are retained in
+`plan_docs/.agent-notes/WI-012.md`. No required placeholder remains unresolved.
