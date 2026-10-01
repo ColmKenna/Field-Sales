@@ -44,7 +44,11 @@ that starts cold finds it there.
 ## Environment gotchas (Windows dev machine)
 
 - **Docker Desktop must be running.** The SQL Server Testcontainers suites fail, not skip, without it.
-- Full test run: `dotnet test <solution>.slnx`. It takes about 2 minutes, so run it in the background.
+- Full test run: `dotnet test FieldSales.slnx --no-build --no-restore -m:1 --settings sqlserver.runsettings`
+  after a build. It takes several minutes, so run it in the background. A plain `dotnet test FieldSales.slnx`
+  runs the projects in parallel and starts too many SQL Server containers at once. They crash at startup with
+  "This program has encountered a fatal error", and dozens of tests fail before running (seen on
+  2026-10-01, WI-011). The bounded settings still run every test. See `docs/refactoring-verification.md`.
 - Front-end tests: `npm ci` then `npm run test:admin-ui` in the identity host project folder. The
   `postinstall` step re-copies two vendored files under `wwwroot/lib`, which then differ only in line
   endings. Restore them with `git checkout -- <host>/wwwroot/lib` and never commit that noise.
