@@ -74,7 +74,13 @@
     </section>
     <section aria-labelledby="ranges-heading"><h2 id="ranges-heading">Ranges</h2><p>Unranged — orderable by all reps</p></section>
     <section aria-labelledby="replacements-heading"><h2 id="replacements-heading">Replacements</h2><p>No replacements yet.</p></section>
-    <section aria-labelledby="profile-heading"><h2 id="profile-heading">Profile</h2><p>No profile yet.</p></section>
+    <section aria-labelledby="profile-heading"><h2 id="profile-heading">Profile</h2>
+        @if (Model.Details.Profile is { } profile)
+        {
+            <p>@profile.Name@(profile.IsArchived ? " (archived)" : "")</p>
+        }
+        else { <p>No profile yet.</p> }
+    </section>
     <section aria-labelledby="brands-heading"><h2 id="brands-heading">Brands</h2>
         @if (Model.Details.Brands is not { Count: > 0 })
         {
@@ -90,7 +96,13 @@
             </ul>
         }
     </section>
-    <section aria-labelledby="supplier-heading"><h2 id="supplier-heading">Supplier</h2><p>No supplier yet.</p></section>
+    <section aria-labelledby="supplier-heading"><h2 id="supplier-heading">Supplier</h2>
+        @if (Model.Details.Supplier is { } supplier)
+        {
+            <p>@supplier.Name@(supplier.IsArchived ? " (archived)" : "")</p>
+        }
+        else { <p>No supplier yet.</p> }
+    </section>
     <section aria-labelledby="restriction-heading"><h2 id="restriction-heading">Restriction Group</h2><p>No restriction group yet.</p></section>
     <section aria-labelledby="attributes-heading"><h2 id="attributes-heading">Attributes</h2>
         @if (Model.Details.Attributes.Count == 0)
@@ -102,7 +114,7 @@
             <dl>
                 @foreach (var item in Model.Details.Attributes)
                 {
-                    <dt>@item.Name</dt><dd>@item.Value</dd>
+                    <dt>@item.Name@(item.IsArchived ? " (archived)" : "")</dt><dd>@item.Value</dd>
                 }
             </dl>
         }
