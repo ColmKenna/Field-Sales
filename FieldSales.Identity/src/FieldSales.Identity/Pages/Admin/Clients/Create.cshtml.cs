@@ -53,7 +53,7 @@ public class CreateModel(
         CreatedClientId = clientId;
 
         if (string.IsNullOrWhiteSpace(Input.ClientId) && string.IsNullOrWhiteSpace(CreatedClientId))
-            ApplyPresetDefaults("web");
+            ApplyPresetDefaults(ClientPresetIds.Web);
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
@@ -92,7 +92,7 @@ public class CreateModel(
     private void ApplyPresetDefaults(string presetId)
     {
         Input.SelectedPreset = presetId;
-        ClientPreset? preset = _clientPresetService.GetPreset(presetId) ?? _clientPresetService.GetPreset("web");
+        ClientPreset? preset = _clientPresetService.GetPreset(presetId) ?? _clientPresetService.GetPreset(ClientPresetIds.Web);
 
         if (preset is not null)
         {

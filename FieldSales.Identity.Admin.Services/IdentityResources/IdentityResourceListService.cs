@@ -69,7 +69,7 @@ public class IdentityResourceListService(
         AuditReasonCode deniedReason = AuditReasonCode.NotFound;
         string? deniedDetails = null;
 
-        try
+        return await AuditOperation.RunAsync(_auditWriter, AuditCategory.IdentityResource, AuditAction.Delete, name, targetName, async audit =>
         {
             IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
             await strategy.ExecuteAsync(async () =>
@@ -92,6 +92,7 @@ public class IdentityResourceListService(
                 }
 
                 targetName = resource.DisplayName ?? name;
+                audit.TargetName = targetName;
 
                 if (resource.NonEditable)
                 {
@@ -134,15 +135,7 @@ public class IdentityResourceListService(
                 name, targetName,
                 Details: $"Deleted Identity Resource '{name}'"), cancellationToken);
             return IdentityResourceDeleteResult.Deleted;
-        }
-        catch (Exception ex)
-        {
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.IdentityResource, AuditAction.Delete, AuditOutcome.Failed,
-                AuditReasonCode.PersistenceFailure,
-                name, targetName, Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
-            throw;
-        }
+        }, cancellationToken);
     }
 
     private async Task<IdentityResourceDeleteResult> DenyProtectedNameBlockedAsync(string name, CancellationToken cancellationToken)

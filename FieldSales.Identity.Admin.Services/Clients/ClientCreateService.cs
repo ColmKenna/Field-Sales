@@ -1,8 +1,6 @@
-using Duende.IdentityModel;
 using Duende.IdentityServer.EntityFramework.DbContexts;
 using Duende.IdentityServer.EntityFramework.Entities;
 using Duende.IdentityServer.EntityFramework.Mappers;
-using Duende.IdentityServer.Models;
 using Duende.IdentityServer.Validation;
 using FieldSales.Identity.Services.AuditLogs;
 using FieldSales.Identity.Services.Secrets;
@@ -15,8 +13,10 @@ namespace FieldSales.Identity.Services.Clients;
 public partial class ClientCreateService(
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter,
-    IClientConfigurationValidator clientConfigurationValidator) : IClientCreateService
+    IClientConfigurationValidator clientConfigurationValidator,
+    TimeProvider? timeProvider = null) : IClientCreateService
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     public const string PresetPropertyKey = "admin:preset";
     private readonly IAuditWriter _auditWriter = auditWriter;
     private readonly IClientConfigurationValidator _clientConfigurationValidator = clientConfigurationValidator;
@@ -52,7 +52,7 @@ public partial class ClientCreateService(
         return ExecuteAuditedAsync(
             targetId,
             targetName,
-            () => CreateClientCoreAsync(input!, cancellationToken),
+            audit => CreateClientCoreAsync(input!, audit, cancellationToken),
             cancellationToken);
     }
 
@@ -64,12 +64,12 @@ public partial class ClientCreateService(
         return ExecuteAuditedAsync(
             targetId,
             targetName,
-            () => CloneClientCoreAsync(sourceClientId, input!, cancellationToken),
+            audit => CloneClientCoreAsync(sourceClientId, input!, audit, cancellationToken),
             cancellationToken);
     }
 
     private async Task<ClientCreateResult> CloneClientCoreAsync(string sourceClientId, ClientCreateInputModel input,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         if (input is null)
             throw new ArgumentNullException(nameof(input));
@@ -159,51 +159,17 @@ public partial class ClientCreateService(
         string? plaintextSecret = null;
         if (clonedClient.RequireClientSecret)
         {
-            plaintextSecret = CryptoRandom.CreateUniqueId();
-            clonedClient.ClientSecrets.Add(new ClientSecret
-            {
-                Description = "Initial client secret (cloned)",
-                Value = plaintextSecret.Sha256(),
-                Type = SecretType.SharedSecret.ToSecretTypeValue(),
-                Created = DateTime.UtcNow
-            });
+            GeneratedClientSecret generated = ClientSecretFactory.Create(_timeProvider, "Initial client secret (cloned)");
+            plaintextSecret = generated.Plaintext;
+            clonedClient.ClientSecrets.Add(generated.Secret);
         }
 
-        Duende.IdentityServer.Models.Client clientModel = clonedClient.ToModel();
-        var validationContext = new ClientConfigurationValidationContext(clientModel);
-        await _clientConfigurationValidator.ValidateAsync(validationContext, cancellationToken);
-
-        if (!validationContext.IsValid)
-            return await DenyInvalidClientConfigurationAsync(clientId!, clientName!, validationContext.ErrorMessage, cancellationToken);
-
-        try
-        {
-            _configurationDbContext.Clients.Add(clonedClient);
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
-
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Client, AuditAction.Create, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                clientId, clientName,
-                Details: $"Cloned client '{clientName}' from '{sourceClientId}'"), cancellationToken);
-
-            return ClientCreateResult.Succeeded(clientId!, plaintextSecret);
-        }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
-        {
-            await AuditDeniedAsync(AuditReasonCode.NameCollision, clientId!, clientName!,
-                $"A client with ID '{clientId}' already exists.", cancellationToken);
-            return ClientCreateResult.Failed("ClientId", $"A client with ID '{clientId}' already exists.",
-                AdminMutationStatus.Conflict);
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(clientId!, clientName!, ex, cancellationToken);
-            throw;
-        }
+        audit.TargetName = clientName ?? clientId ?? string.Empty;
+        return await PersistClientAsync(clonedClient, plaintextSecret, $"Cloned client '{clientName}' from '{sourceClientId}'", cancellationToken);
     }
 
     private async Task<ClientCreateResult> CreateClientCoreAsync(ClientCreateInputModel input,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         if (input is null)
             throw new ArgumentNullException(nameof(input));
@@ -342,9 +308,9 @@ public partial class ClientCreateService(
             });
 
         if (grantTypes.Count == 0)
-            grantTypes = input.SelectedPreset == "m2m"
-                ? ["client_credentials"]
-                : ["authorization_code"];
+            grantTypes = input.SelectedPreset == ClientPresetIds.MachineToMachine
+                ? [Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials]
+                : [Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode];
 
         foreach (string grantType in grantTypes)
             client.AllowedGrantTypes.Add(new ClientGrantType { GrantType = grantType });
@@ -356,7 +322,7 @@ public partial class ClientCreateService(
 
         foreach (string origin in corsOrigins) client.AllowedCorsOrigins.Add(new ClientCorsOrigin { Origin = origin });
 
-        if (scopes.Count == 0 && input.SelectedPreset != "m2m")
+        if (scopes.Count == 0 && input.SelectedPreset != ClientPresetIds.MachineToMachine)
         {
             if (!validSystemScopes.Contains("openid"))
                 return await DenyMissingOpenIdAsync(clientId!, clientName!, cancellationToken);
@@ -370,82 +336,44 @@ public partial class ClientCreateService(
         string? plaintextSecret = null;
         if (input.RequireClientSecret)
         {
-            plaintextSecret = CryptoRandom.CreateUniqueId();
-            client.ClientSecrets.Add(new ClientSecret
-            {
-                Description = "Initial client secret",
-                Value = plaintextSecret.Sha256(),
-                Type = SecretType.SharedSecret.ToSecretTypeValue(),
-                Created = DateTime.UtcNow
-            });
+            GeneratedClientSecret generated = ClientSecretFactory.Create(_timeProvider, "Initial client secret");
+            plaintextSecret = generated.Plaintext;
+            client.ClientSecrets.Add(generated.Secret);
         }
 
-        Duende.IdentityServer.Models.Client clientModel = client.ToModel();
-        var validationContext = new ClientConfigurationValidationContext(clientModel);
+        audit.TargetName = clientName ?? clientId ?? string.Empty;
+        return await PersistClientAsync(client, plaintextSecret, $"Created client '{clientName}'", cancellationToken);
+    }
+
+    private async Task<ClientCreateResult> PersistClientAsync(Client client, string? plaintextSecret,
+        string details, CancellationToken cancellationToken)
+    {
+        var validationContext = new ClientConfigurationValidationContext(client.ToModel());
         await _clientConfigurationValidator.ValidateAsync(validationContext, cancellationToken);
-
         if (!validationContext.IsValid)
-            return await DenyInvalidClientConfigurationAsync(clientId!, clientName!, validationContext.ErrorMessage, cancellationToken);
-
+            return await DenyInvalidClientConfigurationAsync(client.ClientId, client.ClientName,
+                validationContext.ErrorMessage, cancellationToken);
         try
         {
             _configurationDbContext.Clients.Add(client);
             await _configurationDbContext.SaveChangesAsync(cancellationToken);
-
             await _auditWriter.WriteAsync(new AdminAuditEvent(
                 AuditCategory.Client, AuditAction.Create, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                clientId, clientName,
-                Details: $"Created client '{clientName}'"), cancellationToken);
-
-            return ClientCreateResult.Succeeded(clientId!, plaintextSecret);
+                client.ClientId, client.ClientName, Details: details), cancellationToken);
+            return ClientCreateResult.Succeeded(client.ClientId, plaintextSecret);
         }
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
-            await AuditDeniedAsync(AuditReasonCode.NameCollision, clientId!, clientName!,
-                $"A client with ID '{clientId}' already exists.", cancellationToken);
-            return ClientCreateResult.Failed("ClientId", $"A client with ID '{clientId}' already exists.",
-                AdminMutationStatus.Conflict);
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(clientId!, clientName!, ex, cancellationToken);
-            throw;
+            return await DenyClientIdInUseAsync(client.ClientId, client.ClientName, cancellationToken);
         }
     }
 
-    private async Task<ClientCreateResult> ExecuteAuditedAsync(
+    private Task<ClientCreateResult> ExecuteAuditedAsync(
         string targetId,
         string targetName,
-        Func<Task<ClientCreateResult>> operation,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await operation();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(targetId, targetName, ex, cancellationToken);
-            throw;
-        }
-    }
-
-    private async Task AuditFailedAsync(
-        string targetId,
-        string targetName,
-        Exception ex,
-        CancellationToken cancellationToken)
-    {
-        const string marker = "FieldSales.Identity.Audit.ClientCreate.Failed";
-        if (ex.Data.Contains(marker))
-            return;
-
-        ex.Data[marker] = true;
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.Create, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
-            targetId, targetName,
-            Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
-    }
+        Func<AuditOperation, Task<ClientCreateResult>> operation,
+        CancellationToken cancellationToken) =>
+        AuditOperation.RunAsync(_auditWriter, AuditCategory.Client, AuditAction.Create, targetId, targetName, operation, cancellationToken);
 
     private Task AuditDeniedAsync(AuditReasonCode reasonCode, string targetId, string targetName, string details,
         CancellationToken cancellationToken)

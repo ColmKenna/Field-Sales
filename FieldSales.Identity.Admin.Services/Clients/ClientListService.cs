@@ -7,8 +7,8 @@ namespace FieldSales.Identity.Services.Clients;
 
 public class ClientListService(ConfigurationDbContext configurationDbContext) : IClientListService
 {
-    private const string GrantTypeAuthorizationCode = "authorization_code";
-    private const string GrantTypeClientCredentials = "client_credentials";
+    private const string GrantTypeAuthorizationCode = Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode;
+    private const string GrantTypeClientCredentials = Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials;
     private const string GrantTypeHybrid = "hybrid";
     private const string GrantTypeImplicit = "implicit";
     private const string GrantTypeDeviceCode = "urn:ietf:params:oauth:grant-type:device_code";

@@ -14,11 +14,11 @@ public partial class ApiResourceEditorService
             AuditAction.SetEnabled,
             name.Value,
             name.Value,
-            () => SetEnabledCoreAsync(name.Value, enabled, cancellationToken),
+            audit => SetEnabledCoreAsync(name.Value, enabled, audit, cancellationToken),
             cancellationToken);
 
     private async Task<AdminMutationResult> SetEnabledCoreAsync(string name, bool enabled,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         name = name?.Trim() ?? string.Empty;
         ApiResource? entity =
@@ -26,23 +26,18 @@ public partial class ApiResourceEditorService
         if (entity is null)
             return await DenyResourceNotFoundAsync(AuditAction.SetEnabled, name, cancellationToken);
 
-        try
-        {
-            entity.Enabled = enabled;
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        audit.TargetName = name;
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.ApiResource, AuditAction.SetEnabled, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                name, name,
-                Details: $"Set API Resource enabled status to {enabled}"), cancellationToken);
+        entity.Enabled = enabled;
+        await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            return AdminMutationResult.Success();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.SetEnabled, name, name, ex, cancellationToken);
-            throw;
-        }
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.ApiResource, AuditAction.SetEnabled, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            name, name,
+            Details: $"Set API Resource enabled status to {enabled}"), cancellationToken);
+
+        return AdminMutationResult.Success();
+
     }
 
     public Task<AdminMutationResult> DeleteAsync(ScopeName name, CancellationToken cancellationToken = default) =>
@@ -50,10 +45,10 @@ public partial class ApiResourceEditorService
             AuditAction.Delete,
             name.Value,
             name.Value,
-            () => DeleteCoreAsync(name.Value, cancellationToken),
+            audit => DeleteCoreAsync(name.Value, audit, cancellationToken),
             cancellationToken);
 
-    private async Task<AdminMutationResult> DeleteCoreAsync(string name, CancellationToken cancellationToken = default)
+    private async Task<AdminMutationResult> DeleteCoreAsync(string name, AuditOperation audit, CancellationToken cancellationToken = default)
     {
         name = name?.Trim() ?? string.Empty;
         ApiResource? entity =
@@ -61,22 +56,17 @@ public partial class ApiResourceEditorService
         if (entity is null)
             return await DenyResourceNotFoundAsync(AuditAction.Delete, name, cancellationToken);
 
-        try
-        {
-            _configurationDbContext.ApiResources.Remove(entity);
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        audit.TargetName = name;
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.ApiResource, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                name, name,
-                Details: $"Deleted API Resource '{name}'"), cancellationToken);
+        _configurationDbContext.ApiResources.Remove(entity);
+        await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            return AdminMutationResult.Success();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.Delete, name, name, ex, cancellationToken);
-            throw;
-        }
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.ApiResource, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            name, name,
+            Details: $"Deleted API Resource '{name}'"), cancellationToken);
+
+        return AdminMutationResult.Success();
+
     }
 }

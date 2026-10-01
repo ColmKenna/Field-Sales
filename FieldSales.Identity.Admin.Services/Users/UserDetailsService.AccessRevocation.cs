@@ -11,10 +11,10 @@ public partial class UserDetailsService
 {
     public Task<UserAccessRevokeResult> RevokeUserAccessAsync(UserActionContext context,
         CancellationToken cancellationToken = default) =>
-        RevokeUserAccessCoreAsync(context, cancellationToken);
+        ExecuteAuditedAsync(AuditAction.RevokeUserAccess, context.Target.Value, audit => RevokeUserAccessCoreAsync(context, audit, cancellationToken), cancellationToken);
 
     private async Task<UserAccessRevokeResult> RevokeUserAccessCoreAsync(UserActionContext context,
-        CancellationToken cancellationToken)
+        AuditOperation audit, CancellationToken cancellationToken)
     {
         UserId userId = context.Target;
         if (string.IsNullOrWhiteSpace(userId))
@@ -24,47 +24,42 @@ public partial class UserDetailsService
         int revokedCount = 0;
         var clientIds = new List<string>();
 
-        try
+        audit.TargetName = targetName;
+
+        SecurityStampRotationOutcome rotation = await _store.RotateSecurityStampAsync(context, cancellationToken);
+        targetName = rotation.TargetName;
+        audit.TargetName = targetName;
+
+        if (rotation.Status == SecurityStampRotationStatus.UserNotFound)
+            return await DenyRevokeAccessUserNotFoundAsync(userId, cancellationToken);
+
+        if (rotation.Status == SecurityStampRotationStatus.SelfActionBlocked)
+            return await DenyRevokeAccessSelfActionAsync(userId, targetName, cancellationToken);
+
+        IExecutionStrategy grantStrategy = _persistedGrantDbContext.Database.CreateExecutionStrategy();
+        await grantStrategy.ExecuteAsync(async () =>
         {
-            SecurityStampRotationOutcome rotation = await _store.RotateSecurityStampAsync(context, cancellationToken);
-            targetName = rotation.TargetName;
+            _persistedGrantDbContext.ChangeTracker.Clear();
+            await using IDbContextTransaction transaction =
+                await _persistedGrantDbContext.Database.BeginTransactionAsync(cancellationToken);
+            clientIds = await _persistedGrantDbContext.PersistedGrants
+                .Where(g => g.SubjectId == userId && g.ClientId != null && g.ClientId != "")
+                .Select(g => g.ClientId!)
+                .Distinct()
+                .ToListAsync(cancellationToken);
 
-            if (rotation.Status == SecurityStampRotationStatus.UserNotFound)
-                return await DenyRevokeAccessUserNotFoundAsync(userId, cancellationToken);
+            revokedCount = await _persistedGrantDbContext.PersistedGrants
+                .Where(g => g.SubjectId == userId)
+                .ExecuteDeleteAsync(cancellationToken);
 
-            if (rotation.Status == SecurityStampRotationStatus.SelfActionBlocked)
-                return await DenyRevokeAccessSelfActionAsync(userId, targetName, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
 
-            IExecutionStrategy grantStrategy = _persistedGrantDbContext.Database.CreateExecutionStrategy();
-            await grantStrategy.ExecuteAsync(async () =>
-            {
-                _persistedGrantDbContext.ChangeTracker.Clear();
-                await using IDbContextTransaction transaction =
-                    await _persistedGrantDbContext.Database.BeginTransactionAsync(cancellationToken);
-                clientIds = await _persistedGrantDbContext.PersistedGrants
-                    .Where(g => g.SubjectId == userId && g.ClientId != null && g.ClientId != "")
-                    .Select(g => g.ClientId!)
-                    .Distinct()
-                    .ToListAsync(cancellationToken);
-
-                revokedCount = await _persistedGrantDbContext.PersistedGrants
-                    .Where(g => g.SubjectId == userId)
-                    .ExecuteDeleteAsync(cancellationToken);
-
-                await transaction.CommitAsync(cancellationToken);
-            });
-
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                    AuditCategory.User, AuditAction.RevokeUserAccess, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                    userId, targetName,
-                    Details: $"Rotated the security stamp and revoked {revokedCount} persisted grant(s)"),
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.RevokeUserAccess, userId, targetName, ex, cancellationToken);
-            throw;
-        }
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+                AuditCategory.User, AuditAction.RevokeUserAccess, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+                userId, targetName,
+                Details: $"Rotated the security stamp and revoked {revokedCount} persisted grant(s)"),
+            cancellationToken);
 
         // External I/O is deliberately outside both database transactions. A failed client
         // notification cannot roll back the committed security-stamp rotation or grant deletion.

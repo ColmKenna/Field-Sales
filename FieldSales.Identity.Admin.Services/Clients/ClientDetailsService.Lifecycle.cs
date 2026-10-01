@@ -64,75 +64,72 @@ public partial class ClientDetailsService
             AuditAction.SetEnabled,
             clientId.Value,
             clientId.Value,
-            () => ToggleClientStatusCoreAsync(clientId.Value, cancellationToken),
+            audit => ToggleClientStatusCoreAsync(clientId.Value, audit, cancellationToken),
             cancellationToken);
 
-    private async Task<bool> ToggleClientStatusCoreAsync(string clientId, CancellationToken cancellationToken = default)
+    private async Task<bool> ToggleClientStatusCoreAsync(string clientId, AuditOperation audit, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(clientId))
             return false;
 
         string targetName = clientId;
+
         bool found = false;
         bool enabled = false;
         DateTimeOffset now = _timeProvider.GetUtcNow();
-        try
+        audit.TargetName = targetName;
+
+        IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            _configurationDbContext.ChangeTracker.Clear();
+            found = false;
+            await using IDbContextTransaction transaction =
+                await _configurationDbContext.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable, cancellationToken);
+
+            Client? client = await _configurationDbContext.Clients
+                .Include(c => c.Properties)
+                .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+            if (client is null)
             {
-                _configurationDbContext.ChangeTracker.Clear();
-                found = false;
-                await using IDbContextTransaction transaction =
-                    await _configurationDbContext.Database.BeginTransactionAsync(
-                        IsolationLevel.Serializable, cancellationToken);
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
 
-                Client? client = await _configurationDbContext.Clients
-                    .Include(c => c.Properties)
-                    .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
-                if (client is null)
+            found = true;
+            targetName = client.ClientName ?? clientId;
+            audit.TargetName = targetName;
+            client.Enabled = !client.Enabled;
+            enabled = client.Enabled;
+
+            ClientProperty? disabledAtProperty =
+                client.Properties.FirstOrDefault(p => p.Key == DisabledAtPropertyKey);
+            if (client.Enabled)
+            {
+                if (disabledAtProperty is not null) client.Properties.Remove(disabledAtProperty);
+            }
+            else if (disabledAtProperty is null)
+                client.Properties.Add(new ClientProperty
                 {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return;
-                }
+                    Key = DisabledAtPropertyKey,
+                    Value = now.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)
+                });
 
-                found = true;
-                targetName = client.ClientName ?? clientId;
-                client.Enabled = !client.Enabled;
-                enabled = client.Enabled;
+            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
 
-                ClientProperty? disabledAtProperty =
-                    client.Properties.FirstOrDefault(p => p.Key == DisabledAtPropertyKey);
-                if (client.Enabled)
-                {
-                    if (disabledAtProperty is not null) client.Properties.Remove(disabledAtProperty);
-                }
-                else if (disabledAtProperty is null)
-                    client.Properties.Add(new ClientProperty
-                    {
-                        Key = DisabledAtPropertyKey,
-                        Value = now.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)
-                    });
+        if (!found)
+            return await DenyToggleStatusNotFoundAsync(clientId, cancellationToken);
 
-                await _configurationDbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-            });
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.Client, AuditAction.SetEnabled, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            clientId, targetName,
+            Details: $"Client status changed to {(enabled ? "Enabled" : "Disabled")}"), cancellationToken);
 
-            if (!found)
-                return await DenyToggleStatusNotFoundAsync(clientId, cancellationToken);
+        return true;
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Client, AuditAction.SetEnabled, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                clientId, targetName,
-                Details: $"Client status changed to {(enabled ? "Enabled" : "Disabled")}"), cancellationToken);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.SetEnabled, clientId, targetName, ex, cancellationToken);
-            throw;
-        }
     }
 
     private async Task<bool> DenyToggleStatusNotFoundAsync(string clientId, CancellationToken cancellationToken)
@@ -148,73 +145,72 @@ public partial class ClientDetailsService
             AuditAction.Delete,
             clientId.Value,
             clientId.Value,
-            () => DeleteClientCoreAsync(clientId.Value, cancellationToken),
+            audit => DeleteClientCoreAsync(clientId.Value, audit, cancellationToken),
             cancellationToken);
 
     private async Task<ClientDeleteResult> DeleteClientCoreAsync(string clientId,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(clientId))
             return await DenyDeleteClientNotFoundAsync(clientId, cancellationToken);
 
         string clientName = clientId;
+
+        audit.TargetName = clientName;
         var outcome = ClientDeleteResult.Failed(
             "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
         DateTimeOffset now = _timeProvider.GetUtcNow();
-        try
+        audit.TargetName = clientName;
+
+        IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            _configurationDbContext.ChangeTracker.Clear();
+            await using IDbContextTransaction transaction =
+                await _configurationDbContext.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable, cancellationToken);
+
+            Client? client = await _configurationDbContext.Clients
+                .Include(c => c.Properties)
+                .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+            if (client is null)
             {
-                _configurationDbContext.ChangeTracker.Clear();
-                await using IDbContextTransaction transaction =
-                    await _configurationDbContext.Database.BeginTransactionAsync(
-                        IsolationLevel.Serializable, cancellationToken);
+                outcome = ClientDeleteResult.Failed(
+                    "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
 
-                Client? client = await _configurationDbContext.Clients
-                    .Include(c => c.Properties)
-                    .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
-                if (client is null)
-                {
-                    outcome = ClientDeleteResult.Failed(
-                        "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
-                    await transaction.RollbackAsync(cancellationToken);
-                    return;
-                }
+            clientName = client.ClientName ?? client.ClientId;
 
-                clientName = client.ClientName ?? client.ClientId;
-                (bool canDelete, string? deleteBlockReason) = EvaluateDeleteEligibility(client, now);
-                if (!canDelete)
-                {
-                    AuditReasonCode reasonCode = client.Enabled
-                        ? AuditReasonCode.ClientEnabled
-                        : AuditReasonCode.RetentionPeriod;
-                    outcome = ClientDeleteResult.Failed(deleteBlockReason!, reasonCode);
-                    await transaction.RollbackAsync(cancellationToken);
-                    return;
-                }
+            audit.TargetName = clientName;
+            (bool canDelete, string? deleteBlockReason) = EvaluateDeleteEligibility(client, now);
+            if (!canDelete)
+            {
+                AuditReasonCode reasonCode = client.Enabled
+                    ? AuditReasonCode.ClientEnabled
+                    : AuditReasonCode.RetentionPeriod;
+                outcome = ClientDeleteResult.Failed(deleteBlockReason!, reasonCode);
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
 
-                _configurationDbContext.Clients.Remove(client);
-                await _configurationDbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                outcome = ClientDeleteResult.Succeeded();
-            });
+            _configurationDbContext.Clients.Remove(client);
+            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            outcome = ClientDeleteResult.Succeeded();
+        });
 
-            if (!outcome.Success)
-                return await DenyDeleteClientFailedAsync(clientId, clientName, outcome, cancellationToken);
+        if (!outcome.Success)
+            return await DenyDeleteClientFailedAsync(clientId, clientName, outcome, cancellationToken);
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Client, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                clientId, clientName,
-                Details: $"Deleted client '{clientName}'"), cancellationToken);
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.Client, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            clientId, clientName,
+            Details: $"Deleted client '{clientName}'"), cancellationToken);
 
-            return outcome;
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.Delete, clientId, clientName, ex, cancellationToken);
-            throw;
-        }
+        return outcome;
+
     }
 
     private async Task<ClientDeleteResult> DenyDeleteClientNotFoundAsync(string clientId, CancellationToken cancellationToken)
@@ -239,12 +235,12 @@ public partial class ClientDetailsService
             AuditAction.UpdateBasics,
             clientId.Value,
             clientName ?? clientId.Value,
-            () => UpdateClientBasicsCoreAsync(clientId.Value, clientName ?? string.Empty, description,
-                cancellationToken),
+            audit => UpdateClientBasicsCoreAsync(clientId.Value, clientName ?? string.Empty, description,
+                audit, cancellationToken),
             cancellationToken);
 
     private async Task<AdminMutationResult> UpdateClientBasicsCoreAsync(string clientId, string clientName,
-        string? description, CancellationToken cancellationToken = default)
+        string? description, AuditOperation audit, CancellationToken cancellationToken = default)
     {
         clientId = clientId?.Trim() ?? string.Empty;
 
@@ -268,34 +264,29 @@ public partial class ClientDetailsService
         if (client is null)
             return await DenyBasicsClientNotFoundAsync(clientId, trimmedName, cancellationToken);
 
-        try
-        {
-            Duende.IdentityServer.Models.Client proposed = client.ToModel();
-            proposed.ClientName = trimmedName;
-            proposed.Description = trimmedDescription;
-            string? validationError = await ValidateClientAsync(proposed, cancellationToken);
-            if (validationError is not null)
-                return await DenyBasicsInvalidConfigurationAsync(clientId, trimmedName, validationError, cancellationToken);
+        audit.TargetName = trimmedName;
 
-            Client trackedClient = await _configurationDbContext.Clients
-                .FirstAsync(c => c.ClientId == clientId, cancellationToken);
-            trackedClient.ClientName = trimmedName;
-            trackedClient.Description = trimmedDescription;
+        Duende.IdentityServer.Models.Client proposed = client.ToModel();
+        proposed.ClientName = trimmedName;
+        proposed.Description = trimmedDescription;
+        string? validationError = await ValidateClientAsync(proposed, cancellationToken);
+        if (validationError is not null)
+            return await DenyBasicsInvalidConfigurationAsync(clientId, trimmedName, validationError, cancellationToken);
 
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        Client trackedClient = await _configurationDbContext.Clients
+            .FirstAsync(c => c.ClientId == clientId, cancellationToken);
+        trackedClient.ClientName = trimmedName;
+        trackedClient.Description = trimmedDescription;
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Client, AuditAction.UpdateBasics, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                clientId, trimmedName,
-                Details: $"Updated basic settings for client '{trimmedName}'"), cancellationToken);
+        await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            return AdminMutationResult.Success();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.UpdateBasics, clientId, trimmedName, ex, cancellationToken);
-            throw;
-        }
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.Client, AuditAction.UpdateBasics, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            clientId, trimmedName,
+            Details: $"Updated basic settings for client '{trimmedName}'"), cancellationToken);
+
+        return AdminMutationResult.Success();
+
     }
 
     private async Task<AdminMutationResult> DenyBasicsValidationFailureAsync(

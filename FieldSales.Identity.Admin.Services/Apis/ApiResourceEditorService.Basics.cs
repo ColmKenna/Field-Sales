@@ -24,12 +24,12 @@ public partial class ApiResourceEditorService
             command?.OriginalName is null ? AuditAction.Create : AuditAction.UpdateBasics,
             (command?.Name ?? command?.OriginalName)?.Value ?? string.Empty,
             command?.DisplayName ?? (command?.Name ?? command?.OriginalName)?.Value ?? string.Empty,
-            () => SaveBasicsCoreAsync(command!, cancellationToken),
+            audit => SaveBasicsCoreAsync(command!, audit, cancellationToken),
             cancellationToken);
 
     private async Task<SaveApiResourceBasicsResult> SaveBasicsCoreAsync(
         SaveApiResourceBasicsCommand command,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         string? originalName = command.OriginalName?.Value?.Trim();
         string name = command.Name.Value?.Trim() ?? string.Empty;

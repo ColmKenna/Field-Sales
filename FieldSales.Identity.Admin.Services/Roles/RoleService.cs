@@ -24,7 +24,7 @@ public class RoleService(
     public async Task<RoleCreateResult> CreateRoleAsync(RoleCreateInputModel input,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await AuditOperation.RunAsync<RoleCreateResult>(_auditWriter, AuditCategory.Role, AuditAction.Create, null, input.Name, async audit =>
         {
             (RoleCreateOutcome Status, RoleId? RoleId, string? ErrorMessage) outcome =
                 await _store.CreateRoleAsync(input, cancellationToken);
@@ -47,20 +47,16 @@ public class RoleService(
                 Details: "Role created"), cancellationToken);
 
             return RoleCreateResult.Succeeded(outcome.RoleId!.Value);
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.Create, null, input.Name, ex, cancellationToken);
-            throw;
-        }
+        }, cancellationToken);
     }
 
     public async Task<AdminMutationResult> DeleteRoleAsync(RoleId roleId, CancellationToken cancellationToken = default)
     {
-        try
+        return await AuditOperation.RunAsync<AdminMutationResult>(_auditWriter, AuditCategory.Role, AuditAction.Delete, roleId.Value, roleId.Value, async audit =>
         {
             (RoleDeleteOutcome Status, string TargetName) outcome =
                 await _store.DeleteRoleAsync(roleId, ProtectedRoleName, cancellationToken);
+            audit.TargetName = outcome.TargetName;
             switch (outcome.Status)
             {
                 case RoleDeleteOutcome.RoleNotFound:
@@ -88,12 +84,7 @@ public class RoleService(
                 Details: "Role deleted manually by administrator"), cancellationToken);
 
             return AdminMutationResult.Success();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.Delete, roleId, roleId, ex, cancellationToken);
-            throw;
-        }
+        }, cancellationToken);
     }
 
     private Task AuditDeniedAsync(AuditAction action, AuditReasonCode reasonCode, string? targetId, string? targetName,
@@ -102,9 +93,4 @@ public class RoleService(
             AuditCategory.Role, action, AuditOutcome.Denied, reasonCode,
             targetId, targetName, Details: details), cancellationToken);
 
-    private Task AuditFailedAsync(AuditAction action, string? targetId, string? targetName, Exception ex,
-        CancellationToken cancellationToken)
-        => _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Role, action, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
-            targetId, targetName, Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
 }

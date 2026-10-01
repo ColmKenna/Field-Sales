@@ -83,36 +83,13 @@ public partial class ApiResourceEditorService : IApiResourceEditorService
             AuditCategory.ApiResource, action, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
             targetId, targetName, Details: details), cancellationToken);
 
-    private async Task<T> ExecuteAuditedAsync<T>(
+    private Task<T> ExecuteAuditedAsync<T>(
         AuditAction action,
         string targetId,
         string targetName,
-        Func<Task<T>> operation,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await operation();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(action, targetId, targetName, ex, cancellationToken);
-            throw;
-        }
-    }
-
-    private async Task AuditFailedAsync(AuditAction action, string targetId, string targetName, Exception ex,
-        CancellationToken cancellationToken)
-    {
-        const string marker = "FieldSales.Identity.Audit.ApiResource.Failed";
-        if (ex.Data.Contains(marker))
-            return;
-
-        ex.Data[marker] = true;
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.ApiResource, action, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
-            targetId, targetName, Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
-    }
+        Func<AuditOperation, Task<T>> operation,
+        CancellationToken cancellationToken) =>
+        AuditOperation.RunAsync(_auditWriter, AuditCategory.ApiResource, action, targetId, targetName, operation, cancellationToken);
 
     private async Task<AdminMutationResult> DenyResourceNotFoundAsync(AuditAction action, string name, CancellationToken cancellationToken)
     {

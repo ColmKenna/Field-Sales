@@ -14,7 +14,7 @@ public class UserCreateService(
     {
         string userName = input.UserName?.Trim() ?? string.Empty;
 
-        try
+        return await AuditOperation.RunAsync(_auditWriter, AuditCategory.User, AuditAction.Create, userName, userName, async audit =>
         {
             UserCreateOutcome outcome = await _store.CreateUserAsync(input, cancellationToken);
             UserCreateResult result = outcome.Result;
@@ -36,14 +36,6 @@ public class UserCreateService(
                 Details: $"Created user '{userName}'"), cancellationToken);
 
             return result;
-        }
-        catch (Exception ex)
-        {
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.User, AuditAction.Create, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
-                userName, userName,
-                Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
-            throw;
-        }
+        }, cancellationToken);
     }
 }

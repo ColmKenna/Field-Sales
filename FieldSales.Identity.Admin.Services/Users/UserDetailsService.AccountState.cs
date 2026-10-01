@@ -13,16 +13,17 @@ public partial class UserDetailsService
         ExecuteAuditedAsync(
             AuditAction.ResetPassword,
             userId.Value,
-            () => ResetPasswordCoreAsync(userId, newPassword, cancellationToken),
+            audit => ResetPasswordCoreAsync(userId, newPassword, audit, cancellationToken),
             cancellationToken);
 
     private async Task<PasswordResetResult> ResetPasswordCoreAsync(UserId userId, string newPassword,
-        CancellationToken cancellationToken)
+        AuditOperation audit, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(newPassword))
             return await DenyPasswordRequiredAsync(userId, cancellationToken);
 
         PasswordResetOutcome outcome = await _store.ResetPasswordAsync(userId, newPassword, cancellationToken);
+        audit.TargetName = outcome.TargetName;
         switch (outcome.Status)
         {
             case PasswordResetStatus.UserNotFound:
@@ -57,14 +58,15 @@ public partial class UserDetailsService
         ExecuteAuditedAsync(
             AuditAction.SuspendUser,
             context.Target.Value,
-            () => SuspendUserCoreAsync(context, cancellationToken),
+            audit => SuspendUserCoreAsync(context, audit, cancellationToken),
             cancellationToken);
 
     private async Task<UserSuspendResult> SuspendUserCoreAsync(UserActionContext context,
-        CancellationToken cancellationToken)
+        AuditOperation audit, CancellationToken cancellationToken)
     {
         UserId userId = context.Target;
         UserSuspendOutcome outcome = await _store.SuspendUserAsync(context, cancellationToken);
+        audit.TargetName = outcome.TargetName;
         switch (outcome.Status)
         {
             case UserSuspendStatus.UserNotFound:
@@ -93,47 +95,37 @@ public partial class UserDetailsService
     }
 
     public Task<UserUnlockResult> UnlockUserAsync(UserId userId, CancellationToken cancellationToken = default) =>
-        UnlockUserCoreAsync(userId, cancellationToken);
+        ExecuteAuditedAsync(AuditAction.Unlock, userId.Value, audit => UnlockUserCoreAsync(userId, audit, cancellationToken), cancellationToken);
 
-    private async Task<UserUnlockResult> UnlockUserCoreAsync(UserId userId, CancellationToken cancellationToken)
+    private async Task<UserUnlockResult> UnlockUserCoreAsync(UserId userId, AuditOperation audit, CancellationToken cancellationToken)
     {
-        try
+        UserUnlockOutcome outcome = await _store.UnlockUserAsync(userId, cancellationToken);
+        UserUnlockResult result = outcome.Result;
+        string targetName = outcome.TargetName;
+        audit.TargetName = targetName;
+
+        switch (result.Status)
         {
-            UserUnlockOutcome outcome = await _store.UnlockUserAsync(userId, cancellationToken);
-            UserUnlockResult result = outcome.Result;
-            string targetName = outcome.TargetName;
+            case UserUnlockStatus.NotFound:
+                await _auditWriter.WriteAsync(new AdminAuditEvent(
+                    AuditCategory.User, AuditAction.Unlock, AuditOutcome.Denied, AuditReasonCode.NotFound,
+                    userId, targetName, Details: "User not found."), cancellationToken);
+                return result;
 
-            switch (result.Status)
-            {
-                case UserUnlockStatus.NotFound:
-                    await _auditWriter.WriteAsync(new AdminAuditEvent(
-                        AuditCategory.User, AuditAction.Unlock, AuditOutcome.Denied, AuditReasonCode.NotFound,
-                        userId, targetName, Details: "User not found."), cancellationToken);
-                    return result;
-
-                case UserUnlockStatus.Failed:
-                    await _auditWriter.WriteAsync(new AdminAuditEvent(
-                        AuditCategory.User, AuditAction.Unlock, AuditOutcome.Denied, AuditReasonCode.ValidationFailed,
-                        userId, targetName,
-                        Details: string.Join(" ", result.Errors)), cancellationToken);
-                    return result;
-            }
-
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.User, AuditAction.Unlock, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                userId, targetName,
-                Details: $"Unlocked user '{targetName}'"), cancellationToken);
-
-            return result;
+            case UserUnlockStatus.Failed:
+                await _auditWriter.WriteAsync(new AdminAuditEvent(
+                    AuditCategory.User, AuditAction.Unlock, AuditOutcome.Denied, AuditReasonCode.ValidationFailed,
+                    userId, targetName,
+                    Details: string.Join(" ", result.Errors)), cancellationToken);
+                return result;
         }
-        catch (Exception ex)
-        {
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.User, AuditAction.Unlock, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
-                userId, userId,
-                Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
-            throw;
-        }
+
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.User, AuditAction.Unlock, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            userId, targetName,
+            Details: $"Unlocked user '{targetName}'"), cancellationToken);
+
+        return result;
     }
 
     public Task<UserDeleteResult> DeleteUserAsync(UserActionContext context,
@@ -141,14 +133,15 @@ public partial class UserDetailsService
         ExecuteAuditedAsync(
             AuditAction.DeleteUser,
             context.Target.Value,
-            () => DeleteUserCoreAsync(context, cancellationToken),
+            audit => DeleteUserCoreAsync(context, audit, cancellationToken),
             cancellationToken);
 
     private async Task<UserDeleteResult> DeleteUserCoreAsync(UserActionContext context,
-        CancellationToken cancellationToken)
+        AuditOperation audit, CancellationToken cancellationToken)
     {
         UserId userId = context.Target;
         UserDeleteOutcome outcome = await _store.DeleteUserAsync(context, cancellationToken);
+        audit.TargetName = outcome.TargetName;
         switch (outcome.Status)
         {
             case UserDeleteStatus.UserNotFound:

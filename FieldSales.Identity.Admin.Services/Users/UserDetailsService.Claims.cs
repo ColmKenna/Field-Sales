@@ -10,11 +10,11 @@ public partial class UserDetailsService
         ExecuteAuditedAsync(
             AuditAction.AddClaim,
             userId.Value,
-            () => AddClaimCoreAsync(userId, claim.Type ?? string.Empty, claim.Value ?? string.Empty, cancellationToken),
+            audit => AddClaimCoreAsync(userId, claim.Type ?? string.Empty, claim.Value ?? string.Empty, audit, cancellationToken),
             cancellationToken);
 
     private async Task<ClaimChangeResult> AddClaimCoreAsync(UserId userId, string claimType, string claimValue,
-        CancellationToken cancellationToken)
+        AuditOperation audit, CancellationToken cancellationToken)
     {
         string type = ReservedClaimTypePolicy.Normalize(claimType);
         if (type.Length == 0)
@@ -38,6 +38,7 @@ public partial class UserDetailsService
 
         ClaimMutationOutcome outcome = await _store.AddClaimAsync(userId,
             new UserClaim(type, claimValue ?? string.Empty), cancellationToken);
+        audit.TargetName = outcome.TargetName;
         switch (outcome.Status)
         {
             case ClaimMutationStatus.AlreadyExists:
@@ -108,12 +109,12 @@ public partial class UserDetailsService
         ExecuteAuditedAsync(
             AuditAction.RemoveClaim,
             userId.Value,
-            () => RemoveClaimCoreAsync(userId, claim.Type ?? string.Empty, claim.Value ?? string.Empty,
-                cancellationToken),
+            audit => RemoveClaimCoreAsync(userId, claim.Type ?? string.Empty, claim.Value ?? string.Empty,
+                audit, cancellationToken),
             cancellationToken);
 
     private async Task<ClaimChangeResult> RemoveClaimCoreAsync(UserId userId, string claimType, string claimValue,
-        CancellationToken cancellationToken)
+        AuditOperation audit, CancellationToken cancellationToken)
     {
         string type = ReservedClaimTypePolicy.Normalize(claimType);
         if (type.Length == 0)
@@ -123,6 +124,7 @@ public partial class UserDetailsService
         // de-escalates, and reserved claims written before this policy existed need a way out.
         ClaimMutationOutcome outcome = await _store.RemoveClaimAsync(userId,
             new UserClaim(type, claimValue ?? string.Empty), cancellationToken);
+        audit.TargetName = outcome.TargetName;
         switch (outcome.Status)
         {
             case ClaimMutationStatus.UserNotFound:

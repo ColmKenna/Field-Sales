@@ -17,8 +17,8 @@ public partial class ClientDetailsService(
         IClientSecretsService,
         IClientTokenSettingsService
 {
-    private const string GrantTypeAuthorizationCode = "authorization_code";
-    private const string GrantTypeClientCredentials = "client_credentials";
+    private const string GrantTypeAuthorizationCode = Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode;
+    private const string GrantTypeClientCredentials = Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials;
     private const string GrantTypeHybrid = "hybrid";
     private const string GrantTypeImplicit = "implicit";
     private const string GrantTypeDeviceCode = "urn:ietf:params:oauth:grant-type:device_code";
@@ -81,40 +81,12 @@ public partial class ClientDetailsService(
             AuditCategory.Client, action, AuditOutcome.Denied, reasonCode,
             targetId, targetName, Details: details), cancellationToken);
 
-    private async Task<T> ExecuteAuditedAsync<T>(
+    private Task<T> ExecuteAuditedAsync<T>(
         AuditAction action,
         string targetId,
         string targetName,
-        Func<Task<T>> operation,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await operation();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(action, targetId, targetName, ex, cancellationToken);
-            throw;
-        }
-    }
+        Func<AuditOperation, Task<T>> operation,
+        CancellationToken cancellationToken) =>
+        AuditOperation.RunAsync(_auditWriter, AuditCategory.Client, action, targetId, targetName, operation, cancellationToken);
 
-    private async Task AuditFailedAsync(AuditAction action, string targetId, string targetName, Exception ex,
-        CancellationToken cancellationToken)
-    {
-        // Precedence: the innermost catch that knows the client's name wins. This marker lets it
-        // claim the audit event so the outer ExecuteAuditedAsync wrapper - which only has the ID -
-        // does not overwrite a named entry with an unnamed one. The wrapper remains the fallback
-        // for exceptions thrown before the client is loaded. The per-operation catch blocks are
-        // therefore not redundant with the wrapper; removing them downgrades TargetName on every
-        // failure path.
-        const string marker = "FieldSales.Identity.Audit.Client.Failed";
-        if (ex.Data.Contains(marker))
-            return;
-
-        ex.Data[marker] = true;
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, action, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
-            targetId, targetName, Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
-    }
 }

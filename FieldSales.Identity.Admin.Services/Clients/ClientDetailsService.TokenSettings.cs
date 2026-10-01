@@ -46,11 +46,11 @@ public partial class ClientDetailsService
             AuditAction.UpdateTokenSettings,
             clientId.Value,
             clientId.Value,
-            () => UpdateClientTokenSettingsCoreAsync(clientId.Value, input, cancellationToken),
+            audit => UpdateClientTokenSettingsCoreAsync(clientId.Value, input, audit, cancellationToken),
             cancellationToken);
 
     private async Task<AdminMutationResult> UpdateClientTokenSettingsCoreAsync(string clientId,
-        ClientTokenSettingsInputModel input, CancellationToken cancellationToken = default)
+        ClientTokenSettingsInputModel input, AuditOperation audit, CancellationToken cancellationToken = default)
     {
         clientId = clientId?.Trim() ?? string.Empty;
         var errors = new ValidationErrorDictionary();
@@ -68,16 +68,16 @@ public partial class ClientDetailsService
 
             if (input.AllowOfflineAccess)
             {
-                RefreshTokenSettings refresh = input.RefreshToken ?? new RefreshTokenSettings();
-                if (!refresh.IsAbsoluteLifetimeValid)
+                RefreshTokenSettings validatedRefresh = input.RefreshToken ?? new RefreshTokenSettings();
+                if (!validatedRefresh.IsAbsoluteLifetimeValid)
                     errors.AddError("Input.AbsoluteRefreshTokenLifetime",
                         $"Absolute Refresh Token Lifetime must be between {ValidationConstants.MinRefreshTokenLifetime} and {ValidationConstants.MaxAbsoluteRefreshTokenLifetime} seconds.");
 
-                if (!refresh.IsSlidingLifetimeValid)
+                if (!validatedRefresh.IsSlidingLifetimeValid)
                     errors.AddError("Input.SlidingRefreshTokenLifetime",
                         $"Sliding Refresh Token Lifetime must be between {ValidationConstants.MinRefreshTokenLifetime} and {ValidationConstants.MaxSlidingRefreshTokenLifetime} seconds.");
 
-                if (!refresh.IsSlidingValid)
+                if (!validatedRefresh.IsSlidingValid)
                     errors.AddError("Input.SlidingRefreshTokenLifetime",
                         "Sliding Refresh Token Lifetime cannot exceed the Absolute Refresh Token Lifetime.");
             }
@@ -91,29 +91,60 @@ public partial class ClientDetailsService
         if (client is null)
             return await DenyTokenSettingsClientNotFoundAsync(clientId, cancellationToken);
 
-        try
+        audit.TargetName = client.ClientName ?? clientId;
+
+        RefreshTokenSettings refresh = input!.RefreshToken ?? new RefreshTokenSettings();
+        Duende.IdentityServer.Models.Client proposed = client.ToModel();
+        proposed.AccessTokenLifetime = input.AccessTokenLifetime.Seconds;
+        proposed.IdentityTokenLifetime = input.IdentityTokenLifetime.Seconds;
+        proposed.RequireConsent = input.RequireConsent;
+        proposed.AllowOfflineAccess = input.AllowOfflineAccess;
+        if (input.AllowOfflineAccess)
         {
-            RefreshTokenSettings refresh = input!.RefreshToken ?? new RefreshTokenSettings();
-            Duende.IdentityServer.Models.Client proposed = client.ToModel();
-            proposed.AccessTokenLifetime = input.AccessTokenLifetime.Seconds;
-            proposed.IdentityTokenLifetime = input.IdentityTokenLifetime.Seconds;
-            proposed.RequireConsent = input.RequireConsent;
-            proposed.AllowOfflineAccess = input.AllowOfflineAccess;
-            if (input.AllowOfflineAccess)
+            proposed.RefreshTokenUsage = refresh.Usage;
+            proposed.RefreshTokenExpiration = refresh.Expiration;
+            proposed.AbsoluteRefreshTokenLifetime = refresh.AbsoluteLifetime.Seconds;
+            proposed.SlidingRefreshTokenLifetime = refresh.SlidingLifetime.Seconds;
+        }
+
+        string? validationError = await ValidateClientAsync(proposed, cancellationToken);
+        if (validationError is not null)
+            return await DenyTokenSettingsInvalidConfigurationAsync(clientId, client, validationError, cancellationToken);
+
+        Client trackedClient = await _configurationDbContext.Clients
+            .FirstAsync(c => c.ClientId == clientId, cancellationToken);
+        var oldValues = new ClientTokenSettingsAuditValue(
+            TokenLifetime.FromSeconds(trackedClient.AccessTokenLifetime),
+            TokenLifetime.FromSeconds(trackedClient.IdentityTokenLifetime),
+            trackedClient.RequireConsent,
+            trackedClient.AllowOfflineAccess,
+            new RefreshTokenSettings
             {
-                proposed.RefreshTokenUsage = refresh.Usage;
-                proposed.RefreshTokenExpiration = refresh.Expiration;
-                proposed.AbsoluteRefreshTokenLifetime = refresh.AbsoluteLifetime.Seconds;
-                proposed.SlidingRefreshTokenLifetime = refresh.SlidingLifetime.Seconds;
-            }
+                Usage = (TokenUsage)trackedClient.RefreshTokenUsage,
+                Expiration = (TokenExpiration)trackedClient.RefreshTokenExpiration,
+                AbsoluteLifetime = TokenLifetime.FromSeconds(trackedClient.AbsoluteRefreshTokenLifetime),
+                SlidingLifetime = TokenLifetime.FromSeconds(trackedClient.SlidingRefreshTokenLifetime)
+            });
+        trackedClient.AccessTokenLifetime = input.AccessTokenLifetime.Seconds;
+        trackedClient.IdentityTokenLifetime = input.IdentityTokenLifetime.Seconds;
+        trackedClient.RequireConsent = input.RequireConsent;
+        trackedClient.AllowOfflineAccess = input.AllowOfflineAccess;
+        if (input.AllowOfflineAccess)
+        {
+            trackedClient.RefreshTokenUsage = (int)refresh.Usage;
+            trackedClient.RefreshTokenExpiration = (int)refresh.Expiration;
+            trackedClient.AbsoluteRefreshTokenLifetime = refresh.AbsoluteLifetime.Seconds;
+            trackedClient.SlidingRefreshTokenLifetime = refresh.SlidingLifetime.Seconds;
+        }
 
-            string? validationError = await ValidateClientAsync(proposed, cancellationToken);
-            if (validationError is not null)
-                return await DenyTokenSettingsInvalidConfigurationAsync(clientId, client, validationError, cancellationToken);
+        await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            Client trackedClient = await _configurationDbContext.Clients
-                .FirstAsync(c => c.ClientId == clientId, cancellationToken);
-            var oldValues = new ClientTokenSettingsAuditValue(
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.Client, AuditAction.UpdateTokenSettings, AuditOutcome.Succeeded,
+            AuditReasonCode.Succeeded,
+            clientId, client.ClientName ?? clientId,
+            oldValues,
+            new ClientTokenSettingsAuditValue(
                 TokenLifetime.FromSeconds(trackedClient.AccessTokenLifetime),
                 TokenLifetime.FromSeconds(trackedClient.IdentityTokenLifetime),
                 trackedClient.RequireConsent,
@@ -124,49 +155,12 @@ public partial class ClientDetailsService
                     Expiration = (TokenExpiration)trackedClient.RefreshTokenExpiration,
                     AbsoluteLifetime = TokenLifetime.FromSeconds(trackedClient.AbsoluteRefreshTokenLifetime),
                     SlidingLifetime = TokenLifetime.FromSeconds(trackedClient.SlidingRefreshTokenLifetime)
-                });
-            trackedClient.AccessTokenLifetime = input.AccessTokenLifetime.Seconds;
-            trackedClient.IdentityTokenLifetime = input.IdentityTokenLifetime.Seconds;
-            trackedClient.RequireConsent = input.RequireConsent;
-            trackedClient.AllowOfflineAccess = input.AllowOfflineAccess;
-            if (input.AllowOfflineAccess)
-            {
-                trackedClient.RefreshTokenUsage = (int)refresh.Usage;
-                trackedClient.RefreshTokenExpiration = (int)refresh.Expiration;
-                trackedClient.AbsoluteRefreshTokenLifetime = refresh.AbsoluteLifetime.Seconds;
-                trackedClient.SlidingRefreshTokenLifetime = refresh.SlidingLifetime.Seconds;
-            }
+                }
+            ),
+            "Updated token and consent settings"), cancellationToken);
 
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        return AdminMutationResult.Success();
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Client, AuditAction.UpdateTokenSettings, AuditOutcome.Succeeded,
-                AuditReasonCode.Succeeded,
-                clientId, client.ClientName ?? clientId,
-                oldValues,
-                new ClientTokenSettingsAuditValue(
-                    TokenLifetime.FromSeconds(trackedClient.AccessTokenLifetime),
-                    TokenLifetime.FromSeconds(trackedClient.IdentityTokenLifetime),
-                    trackedClient.RequireConsent,
-                    trackedClient.AllowOfflineAccess,
-                    new RefreshTokenSettings
-                    {
-                        Usage = (TokenUsage)trackedClient.RefreshTokenUsage,
-                        Expiration = (TokenExpiration)trackedClient.RefreshTokenExpiration,
-                        AbsoluteLifetime = TokenLifetime.FromSeconds(trackedClient.AbsoluteRefreshTokenLifetime),
-                        SlidingLifetime = TokenLifetime.FromSeconds(trackedClient.SlidingRefreshTokenLifetime)
-                    }
-                ),
-                "Updated token and consent settings"), cancellationToken);
-
-            return AdminMutationResult.Success();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.UpdateTokenSettings, clientId, client.ClientName ?? clientId, ex,
-                cancellationToken);
-            throw;
-        }
     }
 
     private async Task<AdminMutationResult> DenyTokenSettingsValidationFailureAsync(

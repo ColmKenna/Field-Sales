@@ -18,8 +18,9 @@ namespace FieldSales.Identity.Data.Adapters;
 public sealed class EfIdentityUserAdministrationStore(
     ApplicationDbContext dbContext,
     UserManager<ApplicationUser> userManager,
-    RoleManager<IdentityRole> roleManager) : IIdentityUserAdministrationStore
+    RoleManager<IdentityRole> roleManager, TimeProvider? timeProvider = null) : IIdentityUserAdministrationStore
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private readonly ApplicationDbContext _dbContext = dbContext;
     private readonly RoleManager<IdentityRole> _roleManager = roleManager;
     private readonly UserManager<ApplicationUser> _userManager = userManager;
@@ -34,7 +35,7 @@ public sealed class EfIdentityUserAdministrationStore(
 
         int totalCount = await dbQuery.CountAsync(cancellationToken);
 
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = _timeProvider.GetUtcNow();
 
         List<UserListItem> items = await dbQuery
             .OrderBy(u => u.UserName)
@@ -117,7 +118,7 @@ public sealed class EfIdentityUserAdministrationStore(
             user.UserName ?? user.Id,
             user.Email,
             user.FullName,
-            user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow,
+            user.LockoutEnd.HasValue && user.LockoutEnd.Value > _timeProvider.GetUtcNow(),
             user.LockoutEnd,
             assignedRoles,
             allRoles,

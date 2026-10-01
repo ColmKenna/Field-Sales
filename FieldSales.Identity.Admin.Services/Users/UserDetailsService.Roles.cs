@@ -10,13 +10,14 @@ public partial class UserDetailsService
         ExecuteAuditedAsync(
             AuditAction.AddRole,
             userId.Value,
-            () => AddRoleCoreAsync(userId, role ?? string.Empty, cancellationToken),
+            audit => AddRoleCoreAsync(userId, role ?? string.Empty, audit, cancellationToken),
             cancellationToken);
 
     private async Task<RoleChangeResult> AddRoleCoreAsync(UserId userId, string role,
-        CancellationToken cancellationToken)
+        AuditOperation audit, CancellationToken cancellationToken)
     {
         RoleAdditionOutcome outcome = await _store.AddRoleAsync(userId, role, cancellationToken);
+        audit.TargetName = outcome.TargetName;
 
         switch (outcome.Status)
         {
@@ -48,25 +49,26 @@ public partial class UserDetailsService
         return RoleChangeResult.Succeeded();
     }
 
-    public async Task<RoleChangeResult> RemoveRoleAsync(UserId userId, string role,
-        CancellationToken cancellationToken = default)
+    public Task<RoleChangeResult> RemoveRoleAsync(UserId userId, string role,
+        CancellationToken cancellationToken = default) => ExecuteAuditedAsync(AuditAction.RemoveRole, userId.Value,
+            audit => RemoveRoleCoreAsync(userId, role, audit, cancellationToken), cancellationToken);
+
+    private async Task<RoleChangeResult> RemoveRoleCoreAsync(UserId userId, string role, AuditOperation audit,
+        CancellationToken cancellationToken)
     {
         string targetName = userId.Value;
+        audit.TargetName = targetName;
         RoleRemovalOutcome outcome;
 
-        try
-        {
-            var actorId = UserId.Create(AuditActorResolver.Resolve(_httpContextAccessor.HttpContext?.User).SubjectId);
-            outcome = await _store.RemoveRoleAsync(userId, role, ProtectedAdminRoles.SysAdmin, actorId,
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.RemoveRole, userId.Value, targetName, ex, cancellationToken);
-            throw;
-        }
+        audit.TargetName = targetName;
+
+        var actorId = UserId.Create(AuditActorResolver.Resolve(_httpContextAccessor.HttpContext?.User).SubjectId);
+        outcome = await _store.RemoveRoleAsync(userId, role, ProtectedAdminRoles.SysAdmin, actorId,
+            cancellationToken);
 
         targetName = outcome.TargetName;
+
+        audit.TargetName = targetName;
 
         switch (outcome.Status)
         {

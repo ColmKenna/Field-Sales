@@ -16,7 +16,7 @@ public class ClientCreateInputModel
     [StringLength(ValidationConstants.MaxDescriptionLength, ErrorMessage = "Description cannot exceed 1000 characters")]
     public string? Description { get; set; }
 
-    public string SelectedPreset { get; set; } = "web";
+    public string SelectedPreset { get; set; } = ClientPresetIds.Web;
     public bool RequirePkce { get; set; } = true;
     public bool RequireClientSecret { get; set; } = true;
     public List<string> GrantTypes { get; set; } = new();

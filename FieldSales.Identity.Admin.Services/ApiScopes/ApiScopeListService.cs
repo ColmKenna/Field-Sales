@@ -59,7 +59,7 @@ public class ApiScopeListService(
         AuditReasonCode deniedReason = AuditReasonCode.NotFound;
         string? deniedDetails = null;
 
-        try
+        return await AuditOperation.RunAsync(_auditWriter, AuditCategory.ApiScope, AuditAction.Delete, name, targetName, async audit =>
         {
             IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
             await strategy.ExecuteAsync(async () =>
@@ -81,6 +81,7 @@ public class ApiScopeListService(
                 }
 
                 targetName = scope.DisplayName ?? name;
+                audit.TargetName = targetName;
 
                 ScopeUsageCounts referenceCounts = await _scopeUsageService.GetClientReferenceCountsAsync(
                     ScopeSet.FromStrings(new[] { name }), cancellationToken);
@@ -113,14 +114,7 @@ public class ApiScopeListService(
                 name, targetName,
                 Details: $"Deleted API Scope '{name}'"), cancellationToken);
             return ApiScopeDeleteResult.Deleted;
-        }
-        catch (Exception ex)
-        {
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.ApiScope, AuditAction.Delete, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
-                name, targetName, Details: $"Unexpected error ({ex.GetType().Name})"), cancellationToken);
-            throw;
-        }
+        }, cancellationToken);
     }
 
     private static IQueryable<ApiScope> ApplyFilter(IQueryable<ApiScope> query, string? filter)

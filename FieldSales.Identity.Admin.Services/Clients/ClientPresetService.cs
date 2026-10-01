@@ -5,43 +5,43 @@ public class ClientPresetService : IClientPresetService
     private static readonly List<ClientPreset> _presets = new()
     {
         new ClientPreset(
-            "web",
+            ClientPresetIds.Web,
             "Web Application",
             "Server-side web application (e.g., ASP.NET Core MVC).",
             "🌐",
             true,
             true,
-            ["authorization_code"],
+            [Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode],
             ["openid", "profile"]),
 
         new ClientPreset(
-            "spa-bff",
+            ClientPresetIds.SpaBff,
             "Single Page App (BFF)",
             "Single page application using Backend-for-Frontend pattern.",
             "🛡️",
             true,
             true,
-            ["authorization_code"],
+            [Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode],
             ["openid", "profile"]),
 
         new ClientPreset(
-            "spa-nobff",
+            ClientPresetIds.SpaBrowser,
             "Single Page App (Browser)",
             "Single page application running entirely in the browser.",
             "💻",
             true,
             false,
-            ["authorization_code"],
+            [Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode],
             ["openid", "profile"]),
 
         new ClientPreset(
-            "m2m",
+            ClientPresetIds.MachineToMachine,
             "Machine to Machine",
             "Non-interactive application or background service.",
             "⚙️",
             false,
             true,
-            ["client_credentials"],
+            [Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials],
             [])
     };
 

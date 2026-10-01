@@ -60,11 +60,11 @@ public partial class ClientDetailsService
             AuditAction.UpdateAuthentication,
             clientId.Value,
             clientId.Value,
-            () => UpdateClientAuthenticationCoreAsync(clientId.Value, input, cancellationToken),
+            audit => UpdateClientAuthenticationCoreAsync(clientId.Value, input, audit, cancellationToken),
             cancellationToken);
 
     private async Task<AdminMutationResult> UpdateClientAuthenticationCoreAsync(string clientId,
-        ClientAuthenticationInputModel input, CancellationToken cancellationToken = default)
+        ClientAuthenticationInputModel input, AuditOperation audit, CancellationToken cancellationToken = default)
     {
         clientId = clientId?.Trim() ?? string.Empty;
         var errors = new ValidationErrorDictionary();
@@ -146,67 +146,64 @@ public partial class ClientDetailsService
 
         var outcome = AdminMutationResult.NotFoundResult();
         string targetName = clientId;
-        try
+        audit.TargetName = targetName;
+        audit.TargetName = clientId;
+
+        IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            IExecutionStrategy strategy = _configurationDbContext.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            _configurationDbContext.ChangeTracker.Clear();
+            await using IDbContextTransaction transaction =
+                await _configurationDbContext.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable, cancellationToken);
+            Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
+            if (client is null)
             {
-                _configurationDbContext.ChangeTracker.Clear();
-                await using IDbContextTransaction transaction =
-                    await _configurationDbContext.Database.BeginTransactionAsync(
-                        IsolationLevel.Serializable, cancellationToken);
-                Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
-                if (client is null)
-                {
-                    outcome = AdminMutationResult.NotFoundResult();
-                    await transaction.RollbackAsync(cancellationToken);
-                    return;
-                }
+                outcome = AdminMutationResult.NotFoundResult();
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
 
-                targetName = client.ClientName ?? clientId;
-                Duende.IdentityServer.Models.Client proposed = client.ToModel();
-                proposed.RequirePkce = input.RequirePkce;
-                proposed.RequireClientSecret = input.RequireClientSecret;
-                proposed.AllowedGrantTypes = grantTypes;
-                proposed.RedirectUris = redirectUris;
-                proposed.PostLogoutRedirectUris = postLogoutUris;
-                proposed.AllowedCorsOrigins = corsOrigins;
-                proposed.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
-                proposed.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
-                proposed.BackChannelLogoutUri = input.BackChannelLogoutUri;
-                proposed.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
-                string? validationError = await ValidateClientAsync(proposed, cancellationToken);
-                if (validationError is not null)
-                {
-                    outcome = AdminMutationResult.ValidationFailure("Input.GrantTypes", validationError);
-                    await transaction.RollbackAsync(cancellationToken);
-                    return;
-                }
+            targetName = client.ClientName ?? clientId;
 
-                client.RequirePkce = input.RequirePkce;
-                client.RequireClientSecret = input.RequireClientSecret;
-                ReplaceCollection(client.AllowedGrantTypes, grantTypes,
-                    grantType => new ClientGrantType { GrantType = grantType });
-                ReplaceCollection(client.RedirectUris, redirectUris,
-                    uri => new ClientRedirectUri { RedirectUri = uri });
-                ReplaceCollection(client.PostLogoutRedirectUris, postLogoutUris,
-                    uri => new ClientPostLogoutRedirectUri { PostLogoutRedirectUri = uri });
-                ReplaceCollection(client.AllowedCorsOrigins, corsOrigins,
-                    origin => new ClientCorsOrigin { Origin = origin });
-                client.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
-                client.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
-                client.BackChannelLogoutUri = input.BackChannelLogoutUri;
-                client.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
-                await _configurationDbContext.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                outcome = AdminMutationResult.Success();
-            });
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.UpdateAuthentication, clientId, clientId, ex, cancellationToken);
-            throw;
-        }
+            audit.TargetName = targetName;
+            Duende.IdentityServer.Models.Client proposed = client.ToModel();
+            proposed.RequirePkce = input.RequirePkce;
+            proposed.RequireClientSecret = input.RequireClientSecret;
+            proposed.AllowedGrantTypes = grantTypes;
+            proposed.RedirectUris = redirectUris;
+            proposed.PostLogoutRedirectUris = postLogoutUris;
+            proposed.AllowedCorsOrigins = corsOrigins;
+            proposed.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
+            proposed.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
+            proposed.BackChannelLogoutUri = input.BackChannelLogoutUri;
+            proposed.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
+            string? validationError = await ValidateClientAsync(proposed, cancellationToken);
+            if (validationError is not null)
+            {
+                outcome = AdminMutationResult.ValidationFailure("Input.GrantTypes", validationError);
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
+
+            client.RequirePkce = input.RequirePkce;
+            client.RequireClientSecret = input.RequireClientSecret;
+            ReplaceCollection(client.AllowedGrantTypes, grantTypes,
+                grantType => new ClientGrantType { GrantType = grantType });
+            ReplaceCollection(client.RedirectUris, redirectUris,
+                uri => new ClientRedirectUri { RedirectUri = uri });
+            ReplaceCollection(client.PostLogoutRedirectUris, postLogoutUris,
+                uri => new ClientPostLogoutRedirectUri { PostLogoutRedirectUri = uri });
+            ReplaceCollection(client.AllowedCorsOrigins, corsOrigins,
+                origin => new ClientCorsOrigin { Origin = origin });
+            client.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
+            client.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
+            client.BackChannelLogoutUri = input.BackChannelLogoutUri;
+            client.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
+            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            outcome = AdminMutationResult.Success();
+        });
 
         if (!outcome.Succeeded)
             return await DenyAuthenticationFailedAsync(clientId, targetName, outcome, cancellationToken);

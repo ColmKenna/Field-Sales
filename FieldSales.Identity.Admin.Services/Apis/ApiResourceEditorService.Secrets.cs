@@ -17,8 +17,8 @@ public partial class ApiResourceEditorService
             AuditAction.GenerateSecret,
             command?.TargetId ?? string.Empty,
             command?.TargetId ?? string.Empty,
-            () => AddSecretCoreAsync(command?.TargetId ?? string.Empty, command?.Description, command?.ExpirationUtc,
-                cancellationToken),
+            audit => AddSecretCoreAsync(command?.TargetId ?? string.Empty, command?.Description, command?.ExpirationUtc,
+                audit, cancellationToken),
             cancellationToken);
 
     public Task<ApiResourceAddSecretResult> AddSecretAsync(
@@ -30,7 +30,7 @@ public partial class ApiResourceEditorService
         string name,
         string? rawDescription,
         DateTime? expiration,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         name = name?.Trim() ?? string.Empty;
         string? description = NormalizeNullableString(rawDescription);
@@ -61,34 +61,29 @@ public partial class ApiResourceEditorService
             return ApiResourceAddSecretResult.NotFound;
         }
 
-        try
+        audit.TargetName = name;
+
+        string plaintextSecret = CryptoRandom.CreateUniqueId();
+
+        entity.Secrets.Add(new ApiResourceSecret
         {
-            string plaintextSecret = CryptoRandom.CreateUniqueId();
+            Description = description,
+            Value = plaintextSecret.Sha256(),
+            Type = SecretType.SharedSecret.ToSecretTypeValue(),
+            Expiration = expiration,
+            Created = _timeProvider.GetUtcNow().UtcDateTime
+        });
 
-            entity.Secrets.Add(new ApiResourceSecret
-            {
-                Description = description,
-                Value = plaintextSecret.Sha256(),
-                Type = SecretType.SharedSecret.ToSecretTypeValue(),
-                Expiration = expiration,
-                Created = _timeProvider.GetUtcNow().UtcDateTime
-            });
+        await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.ApiResource, AuditAction.GenerateSecret, AuditOutcome.Succeeded,
+            AuditReasonCode.Succeeded,
+            name, name,
+            Details: "Added secret to API Resource"), cancellationToken);
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.ApiResource, AuditAction.GenerateSecret, AuditOutcome.Succeeded,
-                AuditReasonCode.Succeeded,
-                name, name,
-                Details: "Added secret to API Resource"), cancellationToken);
+        return ApiResourceAddSecretResult.Succeeded(plaintextSecret);
 
-            return ApiResourceAddSecretResult.Succeeded(plaintextSecret);
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.GenerateSecret, name, name, ex, cancellationToken);
-            throw;
-        }
     }
 
     public Task<AdminMutationResult> RevokeSecretAsync(ScopeName name, int secretId,
@@ -97,11 +92,11 @@ public partial class ApiResourceEditorService
             AuditAction.RevokeSecret,
             name.Value,
             name.Value,
-            () => RevokeSecretCoreAsync(name.Value, secretId, cancellationToken),
+            audit => RevokeSecretCoreAsync(name.Value, secretId, audit, cancellationToken),
             cancellationToken);
 
     private async Task<AdminMutationResult> RevokeSecretCoreAsync(string name, int secretId,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         name = name?.Trim() ?? string.Empty;
         ApiResource? entity = await LoadResourceAsync(name, false, cancellationToken);
@@ -109,23 +104,18 @@ public partial class ApiResourceEditorService
         if (entity is null || secret is null)
             return await DenyRevokeSecretNotFoundAsync(name, secretId, cancellationToken);
 
-        try
-        {
-            entity.Secrets.Remove(secret);
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        audit.TargetName = name;
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.ApiResource, AuditAction.RevokeSecret, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                name, name,
-                Details: "Revoked secret from API Resource"), cancellationToken);
+        entity.Secrets.Remove(secret);
+        await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            return AdminMutationResult.Success();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.RevokeSecret, name, name, ex, cancellationToken);
-            throw;
-        }
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.ApiResource, AuditAction.RevokeSecret, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            name, name,
+            Details: "Revoked secret from API Resource"), cancellationToken);
+
+        return AdminMutationResult.Success();
+
     }
 
     private async Task<AdminMutationResult> DenyRevokeSecretNotFoundAsync(string name, int secretId, CancellationToken cancellationToken)

@@ -13,11 +13,11 @@ public partial class ApiResourceEditorService
             AuditAction.AddClaim,
             command?.ResourceName.Value ?? string.Empty,
             command?.ResourceName.Value ?? string.Empty,
-            () => AddClaimCoreAsync(command!, cancellationToken),
+            audit => AddClaimCoreAsync(command!, audit, cancellationToken),
             cancellationToken);
 
     private async Task<AdminMutationResult> AddClaimCoreAsync(AddApiResourceClaimCommand command,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         string name = command.ResourceName.Value?.Trim() ?? string.Empty;
         string claimType = command.ClaimType.Value?.Trim() ?? string.Empty;
@@ -37,21 +37,17 @@ public partial class ApiResourceEditorService
             return await DenyResourceNotFoundAsync(AuditAction.AddClaim, name, cancellationToken);
 
         if (entity.UserClaims.All(c => c.Type != claimType))
-            try
-            {
-                entity.UserClaims.Add(new ApiResourceClaim { Type = claimType });
-                await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        {
+            audit.TargetName = name;
+            entity.UserClaims.Add(new ApiResourceClaim { Type = claimType });
+            await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-                await _auditWriter.WriteAsync(new AdminAuditEvent(
-                    AuditCategory.ApiResource, AuditAction.AddClaim, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                    name, name,
-                    Details: $"Added claim '{claimType}' to API Resource"), cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                await AuditFailedAsync(AuditAction.AddClaim, name, name, ex, cancellationToken);
-                throw;
-            }
+            await _auditWriter.WriteAsync(new AdminAuditEvent(
+                AuditCategory.ApiResource, AuditAction.AddClaim, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+                name, name,
+                Details: $"Added claim '{claimType}' to API Resource"), cancellationToken);
+
+        }
 
         return AdminMutationResult.Success();
     }
@@ -70,11 +66,11 @@ public partial class ApiResourceEditorService
             AuditAction.RemoveClaim,
             name.Value,
             name.Value,
-            () => RemoveClaimCoreAsync(name.Value, claimType.Value, cancellationToken),
+            audit => RemoveClaimCoreAsync(name.Value, claimType.Value, audit, cancellationToken),
             cancellationToken);
 
     private async Task<AdminMutationResult> RemoveClaimCoreAsync(string name, string claimType,
-        CancellationToken cancellationToken = default)
+        AuditOperation audit, CancellationToken cancellationToken = default)
     {
         name = name?.Trim() ?? string.Empty;
         claimType = claimType?.Trim() ?? string.Empty;
@@ -84,23 +80,18 @@ public partial class ApiResourceEditorService
         if (entity is null || claim is null)
             return await DenyRemoveClaimNotFoundAsync(name, claimType, cancellationToken);
 
-        try
-        {
-            entity.UserClaims.Remove(claim);
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        audit.TargetName = name;
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.ApiResource, AuditAction.RemoveClaim, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                name, name,
-                Details: $"Removed claim '{claimType}' from API Resource"), cancellationToken);
+        entity.UserClaims.Remove(claim);
+        await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            return AdminMutationResult.Success();
-        }
-        catch (Exception ex)
-        {
-            await AuditFailedAsync(AuditAction.RemoveClaim, name, name, ex, cancellationToken);
-            throw;
-        }
+        await _auditWriter.WriteAsync(new AdminAuditEvent(
+            AuditCategory.ApiResource, AuditAction.RemoveClaim, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
+            name, name,
+            Details: $"Removed claim '{claimType}' from API Resource"), cancellationToken);
+
+        return AdminMutationResult.Success();
+
     }
 
     private async Task<AdminMutationResult> DenyRemoveClaimNotFoundAsync(string name, string claimType, CancellationToken cancellationToken)
