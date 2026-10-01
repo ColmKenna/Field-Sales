@@ -16,45 +16,55 @@ public interface IReferenceListStore
 }
 public enum ReferenceMutationStatus { Saved, Missing, Conflict }
 
-public sealed class BrandListStore(CatalogueDbContext db) : IReferenceListStore
+public class ReferenceListStore<T>(CatalogueDbContext db, ReferenceListDefinition definition,
+    Func<string, T> create) : IReferenceListStore where T : NamedReferenceItem
 {
-    public ReferenceListDefinition Definition { get; } = new("brands", "Brand", "Brands", ["products"]);
+    public ReferenceListDefinition Definition { get; } = definition;
     public async Task<IReadOnlyList<ReferenceStoredItem>> ListAsync(CancellationToken cancellationToken) =>
-        await db.Brands.AsNoTracking().OrderBy(brand => brand.Name)
-            .Select(brand => new ReferenceStoredItem(brand.Id, brand.Name, brand.IsArchived)).ToArrayAsync(cancellationToken);
+        await db.Set<T>().AsNoTracking().OrderBy(item => item.Name)
+            .Select(item => new ReferenceStoredItem(item.Id, item.Name, item.IsArchived)).ToArrayAsync(cancellationToken);
     public async Task<ReferenceStoredItem?> FindAsync(Guid id, CancellationToken cancellationToken) =>
-        await db.Brands.AsNoTracking().Where(brand => brand.Id == id)
-            .Select(brand => new ReferenceStoredItem(brand.Id, brand.Name, brand.IsArchived)).SingleOrDefaultAsync(cancellationToken);
+        await db.Set<T>().AsNoTracking().Where(item => item.Id == id)
+            .Select(item => new ReferenceStoredItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
     public async Task<ReferenceStoredItem?> SaveAsync(Guid? id, string name, CancellationToken cancellationToken)
     {
-        Brand? brand = id is null ? Brand.Create(name) : await db.Brands.SingleOrDefaultAsync(brand => brand.Id == id, cancellationToken);
-        if (brand is null) return null;
-        if (id is null) db.Brands.Add(brand);
-        else brand.Rename(name);
+        T? item = id is null ? create(name) : await db.Set<T>().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (item is null) return null;
+        if (id is null) db.Set<T>().Add(item);
+        else item.Rename(name);
         await db.SaveChangesAsync(cancellationToken);
-        return new(brand.Id, brand.Name, brand.IsArchived);
+        return new(item.Id, item.Name, item.IsArchived);
     }
     public Task<ReferenceMutationStatus> RetireAsync(Guid id, ReferenceAction action,
         IReferenceUsageReader usage, CancellationToken cancellationToken) =>
         db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-            Brand? brand = await db.Brands.SingleOrDefaultAsync(brand => brand.Id == id, cancellationToken);
-            if (brand is null) return ReferenceMutationStatus.Missing;
+            T? item = await db.Set<T>().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+            if (item is null) return ReferenceMutationStatus.Missing;
             var currentUsage = await usage.ReadAsync(new(Definition.Key, id), cancellationToken);
-            if (ReferenceRetirementPolicy.Decide(brand.IsArchived, currentUsage) != action)
+            if (ReferenceRetirementPolicy.Decide(item.IsArchived, currentUsage) != action)
                 return ReferenceMutationStatus.Conflict;
             switch (action)
             {
-                case ReferenceAction.Delete: db.Brands.Remove(brand); break;
-                case ReferenceAction.Archive: brand.Archive(); break;
-                case ReferenceAction.Unarchive: brand.Unarchive(); break;
+                case ReferenceAction.Delete: db.Set<T>().Remove(item); break;
+                case ReferenceAction.Archive: item.Archive(); break;
+                case ReferenceAction.Unarchive: item.Unarchive(); break;
             }
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return ReferenceMutationStatus.Saved;
         });
 }
+
+public sealed class BrandListStore(CatalogueDbContext db)
+    : ReferenceListStore<Brand>(db, new("brands", "Brand", "Brands", ["products"]), Brand.Create);
+public sealed class ProductProfileListStore(CatalogueDbContext db)
+    : ReferenceListStore<ProductProfile>(db, new("profiles", "Product Profile", "Product Profiles", ["products"]), ProductProfile.Create);
+public sealed class AttributeNameListStore(CatalogueDbContext db)
+    : ReferenceListStore<AttributeName>(db, new("attribute-names", "Attribute", "Attribute names", ["products"]), AttributeName.Create);
+public sealed class SupplierListStore(CatalogueDbContext db)
+    : ReferenceListStore<Supplier>(db, new("suppliers", "Supplier", "Suppliers", ["products"]), Supplier.Create);
 
 /// <summary>Storage boundary for the later assignment editor. Reads and writes share one transaction.</summary>
 public sealed class ProductBrandAssignments(CatalogueDbContext db)

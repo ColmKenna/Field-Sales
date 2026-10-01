@@ -14,9 +14,11 @@ public sealed record ProductItem(Guid Id, string Code, string Name, Guid Categor
     decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
 public sealed record ProductBrandItem(Guid Id, string Name, bool IsArchived, bool IsPrimary);
+public sealed record ProductReferenceItem(Guid Id, string Name, bool IsArchived);
 public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
     ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
-    IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null);
+    IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null,
+    ProductReferenceItem? Profile = null, ProductReferenceItem? Supplier = null);
 public sealed record ProductSaveError(string Field, string Error);
 
 public static class ProductEndpoints
@@ -41,6 +43,8 @@ public static class ProductEndpoints
             TimeProvider clock, CancellationToken cancellationToken) =>
         {
             Product? product = await db.Products.AsNoTracking().Include(product => product.BasePrices)
+                .Include(product => product.AttributeValues).ThenInclude(value => value.AttributeName)
+                .AsSplitQuery()
                 .SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
             if (product is null) return Results.NotFound();
             List<Category> categories = await db.Categories.AsNoTracking().ToListAsync(cancellationToken);
@@ -49,12 +53,16 @@ public static class ProductEndpoints
                 || db.ProductAlternativeBrands.Any(link => link.ProductId == id && link.BrandId == brand.Id))
                 .OrderBy(brand => brand.Name).Select(brand => new ProductBrandItem(brand.Id, brand.Name,
                     brand.IsArchived, brand.Id == product.PrimaryBrandId)).ToArrayAsync(cancellationToken);
+            var profile = await db.ProductProfiles.AsNoTracking().Where(item => item.Id == product.ProductProfileId)
+                .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
+            var supplier = await db.Suppliers.AsNoTracking().Where(item => item.Id == product.SupplierId)
+                .Select(item => new ProductReferenceItem(item.Id, item.Name, item.IsArchived)).SingleOrDefaultAsync(cancellationToken);
             return Results.Ok(new ProductDetails(ToItem(product),
                 new CategoryTree(categories).Breadcrumb(product.CategoryId),
                 price is null ? null : new ProductPriceItem(price.EffectiveFrom, price.Amount),
                 product.BasePrices.OrderByDescending(entry => entry.EffectiveFrom)
                     .Select(entry => new ProductPriceItem(entry.EffectiveFrom, entry.Amount)).ToArray(),
-                product.Attributes, brands));
+                product.Attributes, brands, profile, supplier));
         });
 
         products.MapPost("/", CreateAsync);

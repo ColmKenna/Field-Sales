@@ -44,3 +44,21 @@ public sealed class ProductBrandUsageSource(CatalogueDbContext db) : IReferenceU
             product.PrimaryBrandId == item.ItemId || product.AlternativeBrands.Any(link => link.BrandId == item.ItemId),
             cancellationToken));
 }
+
+public sealed class ProductReferenceUsageSource(CatalogueDbContext db) : IReferenceUsageSource
+{
+    public string SourceKey => "products";
+    public bool Supports(string listKey) => listKey is "profiles" or "attribute-names" or "suppliers";
+    public async Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken cancellationToken)
+    {
+        long count = item.ListKey switch
+        {
+            "profiles" => await db.Products.LongCountAsync(product => product.ProductProfileId == item.ItemId, cancellationToken),
+            "suppliers" => await db.Products.LongCountAsync(product => product.SupplierId == item.ItemId, cancellationToken),
+            "attribute-names" => await db.ProductAttributeValues.Where(value => value.AttributeNameId == item.ItemId)
+                .Select(value => value.ProductId).Distinct().LongCountAsync(cancellationToken),
+            _ => throw new ArgumentException("Unknown product reference list.", nameof(item))
+        };
+        return new(SourceKey, "product", "products", count);
+    }
+}

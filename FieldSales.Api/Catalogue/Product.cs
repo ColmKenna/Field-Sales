@@ -2,7 +2,7 @@ using FieldSales.Quantities;
 
 namespace FieldSales.Api.Catalogue;
 
-public sealed record ProductAttribute(string Name, string Value);
+public sealed record ProductAttribute(string Name, string Value, bool IsArchived = false);
 
 public sealed class Product
 {
@@ -11,6 +11,7 @@ public sealed class Product
 
     private readonly List<ProductBasePrice> _basePrices = [];
     private readonly List<ProductAlternativeBrand> _alternativeBrands = [];
+    private readonly List<ProductAttributeValue> _attributeValues = [];
 
     // EF Core materializes persisted products through this constructor.
     private Product() { }
@@ -20,12 +21,17 @@ public sealed class Product
     public string Name { get; private set; } = string.Empty;
     public Guid CategoryId { get; private set; }
     public Guid? PrimaryBrandId { get; private set; }
+    public Guid? ProductProfileId { get; private set; }
+    public Guid? SupplierId { get; private set; }
     public IReadOnlyList<ProductAlternativeBrand> AlternativeBrands => _alternativeBrands.AsReadOnly();
     public string Unit { get; private set; } = "Each";
     public decimal? QuantityStep { get; private set; }
     public decimal? MinimumQuantity { get; private set; }
     public Guid? ParentProductId { get; private set; }
-    public IReadOnlyList<ProductAttribute> Attributes { get; private set; } = [];
+    public IReadOnlyList<ProductAttributeValue> AttributeValues => _attributeValues.AsReadOnly();
+    // Readers load AttributeValues and their AttributeName navigation.
+    public IReadOnlyList<ProductAttribute> Attributes => _attributeValues.OrderBy(value => value.Position)
+        .Select(value => new ProductAttribute(value.AttributeName.Name, value.Value, value.AttributeName.IsArchived)).ToArray();
     public IReadOnlyList<ProductBasePrice> BasePrices => _basePrices.AsReadOnly();
 
     public static Product Create(string code, string name, Guid categoryId,
@@ -63,6 +69,19 @@ public sealed class Product
             throw new InvalidOperationException("The saved product has invalid quantity rules.");
         return rules;
     }
+
+    public void SetClassification(ProductProfile? profile, Supplier? supplier)
+    {
+        if (profile is { IsArchived: true } && ProductProfileId != profile.Id)
+            throw new ArgumentException("Archived product profiles cannot be selected for new references.", nameof(profile));
+        if (supplier is { IsArchived: true } && SupplierId != supplier.Id)
+            throw new ArgumentException("Archived suppliers cannot be selected for new references.", nameof(supplier));
+        ProductProfileId = profile?.Id;
+        SupplierId = supplier?.Id;
+    }
+
+    public void AddAttribute(AttributeName name, string value) => _attributeValues.Add(
+        new ProductAttributeValue(Id, name, value, _attributeValues.Count == 0 ? 0 : _attributeValues.Max(value => value.Position) + 1));
 
     // Caller loads existing links and checks brand state inside the shared transaction.
     public void SetBrands(Brand? primary, IReadOnlyList<Brand> alternatives)
