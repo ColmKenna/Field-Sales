@@ -1,6 +1,6 @@
 # Product reference lists — WI-010
 
-Date: 2026-10-01. Source: T-1.5.2 / PRD-US-008. Status: active; implementation and focused verification complete, full regression pending.
+Date: 2026-10-01. Source: T-1.5.2 / PRD-US-008. Status: complete; all acceptance and regression checks passed.
 
 ## Approved plan and scope
 
@@ -57,7 +57,7 @@ Further evidence:
 - Focused SQL scenarios: 5 passed, none failed or skipped.
 - Complete solution build: zero warnings/errors.
 - JavaScript: all 34 passed (18 identity/admin UI, 11 delivery status, 5 product unit form).
-- Full .NET regression: pending.
+- Full .NET regression: 1,226 passed (87 API, 163 website, 976 identity/admin), none failed or skipped.
 
 Required self-verification: all four criteria demonstrated for all three lists; shared list logic and policy reused without copying; provisional commit messages reconciled with the final diff. Existing Brand scenarios, including concurrent-reference deletion and unavailable usage providers, remain in the full regression suite.
 
@@ -71,3 +71,5 @@ Required self-verification: all four criteria demonstrated for all three lists; 
 - This record and only the WI-010 status entry in `plan_docs/field-sales-delivery/plan-data.js` — decisions, evidence and progress.
 
 Repository, stack and source paths resolve to the existing .NET 10/Razor Pages/BFF/SQL implementation in `D:/repos/Field-Sales`, integration branch `main`. There are no unresolved placeholders or policy decisions. Only the approved slice is implemented; the branch is pushed for review when the full suite is green, and integration remains with the developer.
+
+The authorized status map marks WI-010 done. No console card content changed. The completed feature branch is pushed for review and is not merged. WI-011 — Maintain Restriction Groups, archiving without effect — is next in console order, informational only; it has not been started.
