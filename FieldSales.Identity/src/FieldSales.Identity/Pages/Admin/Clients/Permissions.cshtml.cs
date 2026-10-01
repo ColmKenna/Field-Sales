@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using FieldSales.Identity.Services.Clients;
 using FieldSales.Identity.Services.Scopes;
 using FieldSales.Identity.Services.Validation;
@@ -51,9 +52,7 @@ public class PermissionsModel(IClientPermissionsService clientPermissionsService
 
         if (!result.Succeeded)
         {
-            foreach ((string key, string[] messages) in result.Errors)
-                foreach (string message in messages)
-                    ModelState.AddModelError(key, message);
+            ModelState.AddErrors(result.Errors);
 
             ClientPermissionsModel? permissions =
                 await _clientPermissionsService.GetClientPermissionsAsync(ClientId.Create(Id), cancellationToken);

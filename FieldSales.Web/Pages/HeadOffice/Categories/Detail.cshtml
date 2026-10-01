@@ -3,14 +3,7 @@
 @{
     ViewData["Title"] = Model.Details.Category.Name;
 }
-<nav aria-label="Category path">
-    <a asp-page="Index">Categories</a>
-    @foreach (var segment in Model.Details.Breadcrumb)
-    {
-        <span aria-hidden="true"> / </span>
-        <a asp-page="Detail" asp-route-id="@segment.Id">@segment.Name</a>
-    }
-</nav>
+<partial name="_CategoryBreadcrumb" model="Model.Details.Breadcrumb" />
 <h1>@Model.Details.Category.Name</h1>
 <p>@Model.Details.Category.Beneath products beneath · @Model.Details.Category.Here here</p>
 <a asp-page="Index">Search categories</a>

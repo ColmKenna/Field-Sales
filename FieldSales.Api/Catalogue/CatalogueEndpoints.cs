@@ -36,7 +36,7 @@ public static class CatalogueEndpoints
             CategoryTree tree = new(all);
             return Results.Ok(all.Where(category => category.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
                 .Select(category => new CategorySearchResult(category.Id,
-                    string.Join(" > ", tree.Breadcrumb(category.Id).Select(segment => segment.Name))))
+                    tree.Path(category.Id)))
                 .OrderBy(result => result.Path, StringComparer.OrdinalIgnoreCase).ThenBy(result => result.Id).ToArray());
         });
 
@@ -63,8 +63,7 @@ public static class CatalogueEndpoints
         categories.MapPost("/", async (CreateCategoryRequest request, CatalogueDbContext db,
             CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Name)
-                || request.Name.Trim().Length > Category.MaximumNameLength)
+            if (!NameRules.IsValid(request.Name, Category.MaximumNameLength))
                 return Results.BadRequest(new { Error = "Enter a category name of up to 200 characters." });
 
             List<Category> existing = await db.Categories.AsNoTracking().ToListAsync(cancellationToken);
@@ -100,8 +99,7 @@ public static class CatalogueEndpoints
         categories.MapPut("/{id:guid}/name", async (Guid id, RenameCategoryRequest request,
             CatalogueDbContext db, CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Name)
-                || request.Name.Trim().Length > Category.MaximumNameLength)
+            if (!NameRules.IsValid(request.Name, Category.MaximumNameLength))
                 return Results.BadRequest(new { Error = "Enter a category name of up to 200 characters." });
 
             List<Category> existing = await db.Categories.ToListAsync(cancellationToken);

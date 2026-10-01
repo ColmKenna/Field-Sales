@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using System.ComponentModel.DataAnnotations;
 using FieldSales.Identity.Services.Apis;
 using FieldSales.Identity.Services.Scopes;
@@ -269,11 +270,7 @@ public class EditorModel : PageModel
 
     private void AddErrorsToModelState(IReadOnlyDictionary<string, string[]> errors)
     {
-        IEnumerable<(string Key, string Message)> flattened =
-            errors.SelectMany(error => error.Value.Select(message => (error.Key, message)));
-
-        foreach ((string key, string message) in flattened)
-            ModelState.AddModelError(key, message);
+        ModelState.AddErrors(errors);
     }
 
     private IActionResult RedirectToTabWithError(string tab, string message)
@@ -361,7 +358,7 @@ public class EditorModel : PageModel
         };
 
     private static bool HasConfirmation(string? confirmation, string expected) =>
-        string.Equals(confirmation?.Trim(), expected, StringComparison.Ordinal);
+        FormPresentation.MatchesConfirmation(confirmation, expected);
 
     public class BasicsInputModel
     {

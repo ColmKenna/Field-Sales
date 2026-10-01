@@ -33,10 +33,7 @@
     <partial name="_BackLink" />
 </div>
 
-@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-{
-    <div class="alert alert-error" role="alert">@Model.ErrorMessage</div>
-}
+<partial name="_StatusAlerts" model='(((string?)null), (Model.ErrorMessage), ((string?)null))' />
 
 @if (!string.IsNullOrWhiteSpace(Model.GeneratedSecret))
 {

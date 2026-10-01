@@ -1,3 +1,4 @@
+using FieldSales.Web.Presentation;
 using System.ComponentModel.DataAnnotations;
 using FieldSales.Web.Catalogue;
 using Microsoft.AspNetCore.Mvc;
@@ -26,11 +27,8 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
         if (result.Status == CreateCategoryStatus.Created && result.Category is not null)
             return RedirectToPage("Detail", new { id = result.Category.Id });
         if (result.Status == CreateCategoryStatus.ParentMissing) return NotFound();
-        if (result.Status == CreateCategoryStatus.Duplicate)
-            ModelState.AddModelError(nameof(Name), "A category with this name already exists here.");
-        else if (result.Status == CreateCategoryStatus.Invalid)
-            ModelState.AddModelError(nameof(Name), "Enter a category name of up to 200 characters.");
-        else return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        if (!ModelState.AddCreationError(result.Status, nameof(Name)))
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
         return await ShowAsync(id);
     }
 

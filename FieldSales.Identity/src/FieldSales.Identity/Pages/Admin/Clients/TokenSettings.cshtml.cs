@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using System.ComponentModel.DataAnnotations;
 using Duende.IdentityServer.Models;
 using FieldSales.Identity.Services.Clients;
@@ -70,11 +71,7 @@ public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsS
 
         if (!ModelState.IsValid)
         {
-            ActiveTabIndex = ModelState.Keys.Any(key =>
-                key.StartsWith("Input.RequireConsent", StringComparison.Ordinal) ||
-                key.StartsWith("Input.AllowOfflineAccess", StringComparison.Ordinal))
-                ? 1
-                : 0;
+            ActiveTabIndex = FormPresentation.ValidationTab(ModelState.Where(entry => entry.Value!.Errors.Count > 0).Select(entry => entry.Key), "Input.RequireConsent", "Input.AllowOfflineAccess");
 
             return await ReloadPageAsync(cancellationToken);
         }
@@ -102,11 +99,7 @@ public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsS
         if (!result.Succeeded)
         {
             AddErrorsToModelState(result.Errors);
-            ActiveTabIndex = result.Errors.Keys.Any(key =>
-                key.StartsWith("Input.RequireConsent", StringComparison.Ordinal) ||
-                key.StartsWith("Input.AllowOfflineAccess", StringComparison.Ordinal))
-                ? 1
-                : 0;
+            ActiveTabIndex = FormPresentation.ValidationTab(result.Errors.Keys, "Input.RequireConsent", "Input.AllowOfflineAccess");
             return await ReloadPageAsync(cancellationToken);
         }
 
@@ -140,8 +133,6 @@ public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsS
 
     private void AddErrorsToModelState(IReadOnlyDictionary<string, string[]> errors)
     {
-        foreach ((string key, string[] messages) in errors)
-            foreach (string message in messages)
-                ModelState.AddModelError(key, message);
+        ModelState.AddErrors(errors);
     }
 }

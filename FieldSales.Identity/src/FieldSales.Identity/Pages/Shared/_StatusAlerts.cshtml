@@ -1,0 +1,13 @@
+@model (string? Success, string? Error, string? Warning)
+@if (!string.IsNullOrWhiteSpace(Model.Success))
+{
+    <div class="alert alert-success" role="alert">@Model.Success</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-error" role="alert">@Model.Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Warning))
+{
+    <div class="alert alert-warning" role="alert">@Model.Warning</div>
+}

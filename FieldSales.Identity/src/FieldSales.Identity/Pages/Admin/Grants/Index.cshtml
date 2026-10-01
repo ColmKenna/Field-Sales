@@ -8,15 +8,9 @@
 <page-header title="Persisted Grants" sub="Active user sessions, refresh tokens, and consent grants stored by IdentityServer">
 </page-header>
 
-@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
-{
-    <div class="alert alert-success" role="alert">@Model.SuccessMessage</div>
-}
+<partial name="_StatusAlerts" model='((Model.SuccessMessage), (Model.ErrorMessage), ((string?)null))' />
 
-@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-{
-    <div class="alert alert-error" role="alert">@Model.ErrorMessage</div>
-}
+
 
 <div class="panel">
     <form method="get" class="list-filter" role="search">

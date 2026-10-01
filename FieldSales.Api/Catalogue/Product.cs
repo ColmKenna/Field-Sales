@@ -37,9 +37,9 @@ public sealed class Product
     public static Product Create(string code, string name, Guid categoryId,
         decimal basePrice, DateOnly effectiveFrom, QuantityRules? quantityRules = null)
     {
-        if (string.IsNullOrWhiteSpace(code) || code.Trim().Length > MaximumCodeLength)
+        if (!NameRules.IsValid(code, MaximumCodeLength))
             throw new ArgumentException("Enter a product code of up to 100 characters.", nameof(code));
-        if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > MaximumNameLength)
+        if (!NameRules.IsValid(name, MaximumNameLength))
             throw new ArgumentException("Enter a product name of up to 200 characters.", nameof(name));
         if (categoryId == Guid.Empty)
             throw new ArgumentException("Choose a category", nameof(categoryId));

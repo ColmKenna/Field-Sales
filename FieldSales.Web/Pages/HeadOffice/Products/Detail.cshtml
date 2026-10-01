@@ -7,16 +7,7 @@
 }
 <p><a asp-page="/HeadOffice/Index">Back to catalogue</a></p>
 <h1>@Model.Details.Product.Code · @Model.Details.Product.Name</h1>
-<nav aria-label="Category path">
-    @foreach (var segment in Model.Details.Breadcrumb)
-    {
-        if (segment != Model.Details.Breadcrumb[0])
-        {
-            <span aria-hidden="true"> &gt; </span>
-        }
-        <a asp-page="/HeadOffice/Categories/Detail" asp-route-id="@segment.Id">@segment.Name</a>
-    }
-</nav>
+<partial name="_CategoryBreadcrumb" model="Model.Details.Breadcrumb" />
 <div class="product-record">
     <section aria-labelledby="price-heading">
         <h2 id="price-heading">Base price</h2>

@@ -1,0 +1,9 @@
+@model IReadOnlyList<FieldSales.Web.Catalogue.CategoryBreadcrumbSegment>
+<nav aria-label="Category path">
+    <a asp-page="/HeadOffice/Categories/Index">Categories</a>
+    @foreach (var segment in Model)
+    {
+        <span aria-hidden="true"> / </span>
+        <a asp-page="/HeadOffice/Categories/Detail" asp-route-id="@segment.Id">@segment.Name</a>
+    }
+</nav>

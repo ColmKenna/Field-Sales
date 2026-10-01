@@ -17,18 +17,9 @@
     <partial name="_BackLink" model='new BackLinkModel("./Index", "Back to Users")' />
 </page-header>
 
-@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
-{
-    <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
-}
-@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-{
-    <div class="alert alert-error" role="alert">@Model.ErrorMessage</div>
-}
-@if (!string.IsNullOrWhiteSpace(Model.WarningMessage))
-{
-    <div class="alert alert-warning" role="alert">@Model.WarningMessage</div>
-}
+<partial name="_StatusAlerts" model='((Model.StatusMessage), (Model.ErrorMessage), (Model.WarningMessage))' />
+
+
 
 <ck-tabs id="user-details-tabs" class="user-details-tabs" aria-label="User detail workspace tabs">
     <ck-tab label="Overview" data-tab="overview" active="@(Model.Tab == "overview" ? "active" : null)">

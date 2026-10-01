@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using System.ComponentModel.DataAnnotations;
 using FieldSales.Identity.Services.Clients;
 using FieldSales.Identity.Services.SecretReveals;
@@ -74,9 +75,7 @@ public class SecretsModel(
             if (result.Status == AdminMutationStatus.NotFound)
                 return NotFound();
 
-            foreach ((string field, string[] messages) in result.Errors)
-                foreach (string message in messages)
-                    ModelState.AddModelError(field, message);
+            ModelState.AddErrors(result.Errors);
 
             return await LoadPageAsync(cancellationToken);
         }

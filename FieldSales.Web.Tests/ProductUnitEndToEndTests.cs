@@ -17,6 +17,28 @@ public sealed class ProductUnitEndToEndTests(ProductApplication app) : IClassFix
 {
     private const string CreateUrl = "/HeadOffice/Products/Create";
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CreationEach_IgnoresStaleNonnumericMeasuredFields(bool legacy)
+    {
+        Guid category = await app.ResetAsync();
+        await using StaffWebsiteFactory website = app.CreateWebsite();
+        using HttpClient browser = website.CreateBrowser();
+        await SignInAsync(browser);
+        var fields = Fields(category, "Each");
+        fields["QuantityStep"] = "not a number";
+        fields["MinimumQuantity"] = "not a number";
+        if (legacy) fields.Remove("Unit");
+        using HttpResponseMessage saved = await PostAsync(browser, CreateUrl, await PageAsync(browser, CreateUrl), fields);
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+        await using AsyncServiceScope scope = app.Api.Services.CreateAsyncScope();
+        var product = await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Products.SingleAsync();
+        Assert.Equal("Each", product.Unit);
+        Assert.Null(product.QuantityStep);
+        Assert.Null(product.MinimumQuantity);
+    }
+
     [Fact]
     public async Task Should_KeepEnteredPriceExactAndRejectSave_When_PreviewHasExcessPricePrecision()
     {

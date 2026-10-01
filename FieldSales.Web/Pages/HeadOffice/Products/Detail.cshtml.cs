@@ -1,3 +1,4 @@
+using FieldSales.Web.Presentation;
 using FieldSales.Web.Catalogue;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -31,26 +32,22 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
         if (result.Status == AddProductBasePriceStatus.Missing) return NotFound();
         if (result.Status != AddProductBasePriceStatus.Invalid || result.Errors is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
-        foreach ((string field, string[] errors) in result.Errors)
-            foreach (string error in errors) ModelState.AddModelError(field, error);
+        ModelState.AddErrors(result.Errors);
         return await ShowAsync(id, populate: true);
     }
 
     public Task<IActionResult> OnPostPreviewUnitAsync(Guid id)
     {
-        if (!UnitOfMeasureExtensions.TryParse(Unit, out _))
-            ModelState.AddModelError(nameof(Unit), "Choose Each, kg, litre or metre.");
+        ProductUnitForm.ValidatePreview(ModelState, Unit);
         return ShowAsync(id);
     }
 
     public async Task<IActionResult> OnPostUnitAsync(Guid id)
     {
-        if (Unit == "Each")
-        {
-            QuantityStep = MinimumQuantity = null;
-            ModelState.Remove(nameof(QuantityStep));
-            ModelState.Remove(nameof(MinimumQuantity));
-        }
+        ProductUnitForm normalized = ProductUnitForm.Normalize(ModelState, Unit, QuantityStep, MinimumQuantity);
+        Unit = normalized.Unit;
+        QuantityStep = normalized.Step;
+        MinimumQuantity = normalized.Minimum;
         if (!ModelState.IsValid) return await ShowAsync(id);
         UpdateProductUnitResult result = await catalogue.UpdateProductUnitAsync(id, Unit, QuantityStep,
             MinimumQuantity, HttpContext.RequestAborted);
@@ -58,8 +55,7 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
         if (result.Status == UpdateProductUnitStatus.Missing) return NotFound();
         if (result.Status != UpdateProductUnitStatus.Invalid || result.Errors is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
-        foreach ((string field, string[] errors) in result.Errors)
-            foreach (string error in errors) ModelState.AddModelError(field, error);
+        ModelState.AddErrors(result.Errors);
         return await ShowAsync(id);
     }
 

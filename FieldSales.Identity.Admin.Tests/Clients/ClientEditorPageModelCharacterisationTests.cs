@@ -38,6 +38,7 @@ public class ClientEditorPageModelCharacterisationTests
 
         Assert.IsType<PageResult>(result);
         Assert.Equal("Client One", model.ClientNameDisplay);
+        Assert.Equal(1, model.ActiveTabIndex);
         Assert.Equal("The redirect URI is already assigned to another client.",
             model.ModelState["Input.RedirectUris"]!.Errors.Single().ErrorMessage);
     }

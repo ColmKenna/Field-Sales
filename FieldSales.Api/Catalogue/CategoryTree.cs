@@ -59,11 +59,14 @@ public sealed class CategoryTree
         return segments;
     }
 
+    public string Path(Guid categoryId) =>
+        string.Join(" > ", Breadcrumb(categoryId).Select(segment => segment.Name));
+
     private static string NormalizeName(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         string trimmedName = name.Trim();
-        if (trimmedName.Length > Category.MaximumNameLength)
+        if (!NameRules.IsValid(trimmedName, Category.MaximumNameLength))
             throw new ArgumentException($"A category name cannot exceed {Category.MaximumNameLength} characters.",
                 nameof(name));
         return trimmedName;

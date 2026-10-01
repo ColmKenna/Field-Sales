@@ -12,10 +12,7 @@
     </a>
 </page-header>
 
-@if (!string.IsNullOrWhiteSpace(Model.DeleteErrorMessage))
-{
-    <div class="alert alert-error" role="alert">@Model.DeleteErrorMessage</div>
-}
+<partial name="_StatusAlerts" model='(((string?)null), (Model.DeleteErrorMessage), ((string?)null))' />
 
 <div class="panel">
     <partial name="_ListFilter" model='new ListFilterModel("api-scope-filter", "Filter API scopes", "Filter by name or display name", Model.Filter)' />

@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using System.Text.Json;
 using FieldSales.Identity.Services.Clients;
 using FieldSales.Identity.Services.SecretReveals;
@@ -67,13 +68,7 @@ public class CreateModel(
         ClientCreateResult result = await _clientCreateService.CreateClientAsync(Input, cancellationToken);
         if (!result.Success)
         {
-            foreach ((string field, string[] messages) in result.Errors)
-            {
-                string key = string.IsNullOrEmpty(field) || field.StartsWith("Input.", StringComparison.Ordinal)
-                    ? field
-                    : $"Input.{field}";
-                foreach (string message in messages) ModelState.AddModelError(key, message);
-            }
+            ModelState.AddErrors(result.Errors, "Input");
 
             if (result.Errors.Count == 0)
                 ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Failed to create client.");

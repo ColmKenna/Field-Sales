@@ -35,7 +35,7 @@ public static class ProductEndpoints
             List<Category> all = await db.Categories.AsNoTracking().ToListAsync(cancellationToken);
             CategoryTree tree = new(all);
             return Results.Ok(all.Select(category => new ProductCategoryChoice(category.Id,
-                    string.Join(" > ", tree.Breadcrumb(category.Id).Select(segment => segment.Name))))
+                    tree.Path(category.Id)))
                 .OrderBy(choice => choice.Path).ToArray());
         });
 
@@ -74,9 +74,9 @@ public static class ProductEndpoints
         TimeProvider clock, CancellationToken cancellationToken)
     {
         Dictionary<string, string[]> errors = [];
-        if (string.IsNullOrWhiteSpace(request.Code) || request.Code.Trim().Length > Product.MaximumCodeLength)
+        if (!NameRules.IsValid(request.Code, Product.MaximumCodeLength))
             errors["Code"] = ["Enter a product code of up to 100 characters."];
-        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > Product.MaximumNameLength)
+        if (!NameRules.IsValid(request.Name, Product.MaximumNameLength))
             errors["Name"] = ["Enter a product name of up to 200 characters."];
         if (request.CategoryId is null || request.CategoryId == Guid.Empty
             || !await db.Categories.AnyAsync(category => category.Id == request.CategoryId, cancellationToken))
@@ -85,9 +85,8 @@ public static class ProductEndpoints
             out QuantityRules? rules, out var quantityErrors);
         foreach (var error in quantityErrors) errors[error.Key] = error.Value;
         if (request.BasePrice is null) errors["BasePrice"] = ["Enter a base price."];
-        else if (request.BasePrice < 0 || request.BasePrice > ProductBasePrice.MaximumAmount
-                 || decimal.Round(request.BasePrice.Value, 2) != request.BasePrice.Value)
-            errors["BasePrice"] = ["Enter a non-negative base price with up to two decimal places within the supported amount."];
+        else if (!ProductBasePrice.IsValidAmount(request.BasePrice.Value))
+            errors["BasePrice"] = [ProductBasePrice.InvalidAmountMessage];
         if (errors.Count != 0) return Results.ValidationProblem(errors);
 
         string code = request.Code!.Trim();
@@ -135,9 +134,8 @@ public static class ProductEndpoints
 
         Dictionary<string, string[]> errors = [];
         if (request.BasePrice is null) errors["BasePrice"] = ["Enter a base price."];
-        else if (request.BasePrice < 0 || request.BasePrice > ProductBasePrice.MaximumAmount
-                 || decimal.Round(request.BasePrice.Value, 2) != request.BasePrice.Value)
-            errors["BasePrice"] = ["Enter a non-negative base price with up to two decimal places within the supported amount."];
+        else if (!ProductBasePrice.IsValidAmount(request.BasePrice.Value))
+            errors["BasePrice"] = [ProductBasePrice.InvalidAmountMessage];
         if (request.EffectiveFrom is null) errors["EffectiveFrom"] = ["Enter an effective from date."];
         if (errors.Count != 0) return Results.ValidationProblem(errors);
 

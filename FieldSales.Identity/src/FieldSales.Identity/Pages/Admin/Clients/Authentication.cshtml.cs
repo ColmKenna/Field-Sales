@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using System.ComponentModel.DataAnnotations;
 using FieldSales.Identity.Services.Clients;
 using FieldSales.Identity.Services.Validation;
@@ -72,14 +73,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
 
         if (!ModelState.IsValid)
         {
-            ActiveTabIndex = ModelState.Keys.Any(key =>
-                key.StartsWith("Input.RedirectUris", StringComparison.Ordinal) ||
-                key.StartsWith("Input.PostLogoutRedirectUris", StringComparison.Ordinal) ||
-                key.StartsWith("Input.FrontChannelLogoutUri", StringComparison.Ordinal) ||
-                key.StartsWith("Input.BackChannelLogoutUri", StringComparison.Ordinal) ||
-                key.StartsWith("Input.CorsOrigins", StringComparison.Ordinal))
-                ? 1
-                : 0;
+            ActiveTabIndex = FormPresentation.ValidationTab(ModelState.Where(entry => entry.Value!.Errors.Count > 0).Select(entry => entry.Key), "Input.RedirectUris", "Input.PostLogoutRedirectUris", "Input.FrontChannelLogoutUri", "Input.BackChannelLogoutUri", "Input.CorsOrigins");
 
             return await ReloadPageAsync(cancellationToken);
         }
@@ -106,6 +100,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
         if (!result.Succeeded)
         {
             AddErrorsToModelState(result.Errors);
+            ActiveTabIndex = FormPresentation.ValidationTab(result.Errors.Keys, "Input.RedirectUris", "Input.PostLogoutRedirectUris", "Input.FrontChannelLogoutUri", "Input.BackChannelLogoutUri", "Input.CorsOrigins");
             return await ReloadPageAsync(cancellationToken);
         }
 
@@ -194,8 +189,6 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
 
     private void AddErrorsToModelState(IReadOnlyDictionary<string, string[]> errors)
     {
-        foreach ((string key, string[] messages) in errors)
-            foreach (string message in messages)
-                ModelState.AddModelError(key, message);
+        ModelState.AddErrors(errors);
     }
 }

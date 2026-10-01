@@ -17,14 +17,8 @@
     </a>
 </page-header>
 
-@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
-{
-    <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
-}
-@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-{
-    <div class="alert alert-error" role="alert">@Model.ErrorMessage</div>
-}
+<partial name="_StatusAlerts" model='((Model.StatusMessage), (Model.ErrorMessage), ((string?)null))' />
+
 
 <div class="panel">
     <div class="panel-toolbar">

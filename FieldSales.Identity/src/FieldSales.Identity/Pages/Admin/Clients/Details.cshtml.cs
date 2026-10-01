@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using FieldSales.Identity.Services.Validation;
 using FieldSales.Identity.Services.Clients;
 using Microsoft.AspNetCore.Mvc;
@@ -46,7 +47,7 @@ public class DetailsModel(IClientOverviewService clientOverviewService) : PageMo
         if (string.IsNullOrWhiteSpace(id))
             return NotFound();
 
-        if (!string.Equals(DeleteConfirmation?.Trim(), "DELETE", StringComparison.Ordinal))
+        if (!FormPresentation.MatchesConfirmation(DeleteConfirmation, "DELETE"))
         {
             DeleteBlockedMessage = "Type DELETE exactly to confirm permanent deletion.";
             return RedirectToPage(new { id });

@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using FieldSales.Identity.Services.Validation;
 using System.Security.Claims;
 using FieldSales.Identity.Services.Users;
@@ -206,7 +207,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        if (!string.Equals(DeleteConfirmation?.Trim(), "DELETE", StringComparison.Ordinal))
+        if (!FormPresentation.MatchesConfirmation(DeleteConfirmation, "DELETE"))
         {
             ErrorMessage = "Type DELETE exactly to confirm permanent deletion.";
             return RedirectToUserTab("danger");

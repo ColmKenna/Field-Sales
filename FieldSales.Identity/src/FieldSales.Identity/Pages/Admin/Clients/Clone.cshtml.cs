@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using FieldSales.Identity.Services.Clients;
 using FieldSales.Identity.Services.SecretReveals;
 using Microsoft.AspNetCore.Mvc;
@@ -85,13 +86,6 @@ public class CloneModel(
 
     private void AddErrorsToModelState(IReadOnlyDictionary<string, string[]> errors)
     {
-        foreach ((string field, string[] messages) in errors)
-        {
-            string key = string.IsNullOrEmpty(field) || field.StartsWith("Input.", StringComparison.Ordinal)
-                ? field
-                : $"Input.{field}";
-
-            foreach (string message in messages) ModelState.AddModelError(key, message);
-        }
+        ModelState.AddErrors(errors, "Input");
     }
 }

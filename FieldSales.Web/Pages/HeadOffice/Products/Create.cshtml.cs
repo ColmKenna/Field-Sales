@@ -1,3 +1,4 @@
+using FieldSales.Web.Presentation;
 using FieldSales.Web.Catalogue;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -20,25 +21,16 @@ public sealed class CreateModel(CatalogueApiClient catalogue) : PageModel
 
     public Task<IActionResult> OnPostPreviewAsync()
     {
-        if (!UnitOfMeasureExtensions.TryParse(Unit, out _))
-            ModelState.AddModelError(nameof(Unit), "Choose Each, kg, litre or metre.");
+        ProductUnitForm.ValidatePreview(ModelState, Unit);
         return ShowFormAsync();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        // The predecessor's Each-only form had no posted Unit field.
-        if (!Request.Form.ContainsKey(nameof(Unit)))
-        {
-            Unit = "Each";
-            ModelState.Remove(nameof(Unit));
-        }
-        if (Unit == "Each")
-        {
-            QuantityStep = MinimumQuantity = null;
-            ModelState.Remove(nameof(QuantityStep));
-            ModelState.Remove(nameof(MinimumQuantity));
-        }
+        ProductUnitForm normalized = ProductUnitForm.Normalize(ModelState, Unit, QuantityStep, MinimumQuantity, useLegacyEach: !Request.Form.ContainsKey(nameof(Unit)));
+        Unit = normalized.Unit;
+        QuantityStep = normalized.Step;
+        MinimumQuantity = normalized.Minimum;
         if (!ModelState.IsValid) return await ShowFormAsync();
         CreateProductResult result = await catalogue.CreateProductAsync(Code, Name, CategoryId,
             BasePrice, HttpContext.RequestAborted, Unit, QuantityStep, MinimumQuantity);
@@ -46,8 +38,7 @@ public sealed class CreateModel(CatalogueApiClient catalogue) : PageModel
             return RedirectToPage("Detail", new { id = result.Product.Id });
         if (result.Status != CreateProductStatus.Invalid || result.Errors is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable);
-        foreach ((string field, string[] errors) in result.Errors)
-            foreach (string error in errors) ModelState.AddModelError(field, error);
+        ModelState.AddErrors(result.Errors);
         return await ShowFormAsync();
     }
 

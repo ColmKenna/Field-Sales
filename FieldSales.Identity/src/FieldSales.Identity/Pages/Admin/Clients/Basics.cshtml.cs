@@ -1,3 +1,4 @@
+using FieldSales.Identity.Presentation;
 using System.ComponentModel.DataAnnotations;
 using FieldSales.Identity.Services.Clients;
 using FieldSales.Identity.Services.Validation;
@@ -77,8 +78,6 @@ public class BasicsModel(IClientOverviewService clientOverviewService) : PageMod
 
     private void MapErrors(AdminMutationResult result)
     {
-        foreach ((string key, string[] messages) in result.Errors)
-            foreach (string message in messages)
-                ModelState.AddModelError(key, message);
+        ModelState.AddErrors(result.Errors);
     }
 }

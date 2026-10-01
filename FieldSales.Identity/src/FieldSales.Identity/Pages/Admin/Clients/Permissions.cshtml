@@ -17,7 +17,7 @@
 </page-header>
 
 <form method="post" id="edit-client-permissions-form">
-    <div asp-validation-summary="All" role="alert" class="validation-summary alert-panel alert-danger"></div>
+    <partial name="_ValidationSummary" />
 
     @if (Model.IsInteractive)
     {

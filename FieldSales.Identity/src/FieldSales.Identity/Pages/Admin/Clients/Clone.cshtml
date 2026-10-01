@@ -18,7 +18,7 @@
 </page-header>
 
 <form method="post" id="clone-client-form">
-    <div asp-validation-summary="All" role="alert" class="validation-summary alert-panel alert-danger"></div>
+    <partial name="_ValidationSummary" />
 
     <input type="hidden" asp-for="SourceClientId"/>
 
