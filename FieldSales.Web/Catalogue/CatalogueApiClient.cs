@@ -19,11 +19,13 @@ public sealed record ProductCategoryChoice(Guid Id, string Path);
 public sealed record ProductItem(Guid Id, string Code, string Name, Guid CategoryId, string Unit,
     decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 public sealed record ProductPriceItem(DateOnly EffectiveFrom, decimal Amount);
-public sealed record ProductAttribute(string Name, string Value);
+public sealed record ProductAttribute(string Name, string Value, bool IsArchived = false);
 public sealed record ProductBrandItem(Guid Id, string Name, bool IsArchived, bool IsPrimary);
+public sealed record ProductReferenceItem(Guid Id, string Name, bool IsArchived);
 public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryBreadcrumbSegment> Breadcrumb,
     ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
-    IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null);
+    IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null,
+    ProductReferenceItem? Profile = null, ProductReferenceItem? Supplier = null);
 public enum CreateProductStatus { Created, Invalid, Unavailable }
 public sealed record CreateProductResult(CreateProductStatus Status, ProductItem? Product = null,
     IReadOnlyDictionary<string, string[]>? Errors = null);

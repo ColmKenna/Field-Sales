@@ -1,6 +1,4 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using FieldSales.Quantities;
 
 namespace FieldSales.Api.Catalogue;
@@ -12,17 +10,27 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
     public DbSet<ProductBasePrice> ProductBasePrices => Set<ProductBasePrice>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<ProductAlternativeBrand> ProductAlternativeBrands => Set<ProductAlternativeBrand>();
+    public DbSet<ProductProfile> ProductProfiles => Set<ProductProfile>();
+    public DbSet<AttributeName> AttributeNames => Set<AttributeName>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<ProductAttributeValue> ProductAttributeValues => Set<ProductAttributeValue>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Brand>(entity =>
+        modelBuilder.Ignore<NamedReferenceItem>();
+        ConfigureReference<Brand>(modelBuilder, "Brands");
+        ConfigureReference<ProductProfile>(modelBuilder, "ProductProfiles");
+        ConfigureReference<AttributeName>(modelBuilder, "AttributeNames");
+        ConfigureReference<Supplier>(modelBuilder, "Suppliers");
+        modelBuilder.Entity<ProductAttributeValue>(entity =>
         {
-            entity.ToTable("Brands");
-            entity.HasKey(brand => brand.Id);
-            entity.Property(brand => brand.Name).HasMaxLength(Brand.MaximumNameLength)
-                .UseCollation("Latin1_General_100_CI_AS").IsRequired();
-            entity.HasIndex(brand => brand.Name).IsUnique().HasDatabaseName("UX_Brands_Name");
-            entity.Property(brand => brand.Version).IsRowVersion();
+            entity.ToTable("ProductAttributeValues");
+            entity.HasKey(value => value.Id);
+            entity.Property(value => value.Id).ValueGeneratedNever();
+            entity.Property(value => value.Value).IsRequired();
+            entity.HasIndex(value => new { value.ProductId, value.Position }).IsUnique();
+            entity.HasOne(value => value.AttributeName).WithMany().HasForeignKey(value => value.AttributeNameId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ProductAlternativeBrand>(entity =>
         {
@@ -66,20 +74,21 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Brand>().WithMany().HasForeignKey(product => product.PrimaryBrandId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductProfile>().WithMany().HasForeignKey(product => product.ProductProfileId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Supplier>().WithMany().HasForeignKey(product => product.SupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(product => product.AttributeValues).WithOne().HasForeignKey(value => value.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(product => product.AttributeValues).HasField("_attributeValues")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.HasMany(product => product.AlternativeBrands).WithOne().HasForeignKey(link => link.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.Navigation(product => product.AlternativeBrands).HasField("_alternativeBrands")
                 .UsePropertyAccessMode(PropertyAccessMode.Field);
             entity.HasOne<Product>().WithMany().HasForeignKey(product => product.ParentProductId)
                 .OnDelete(DeleteBehavior.Restrict);
-            entity.Property(product => product.Attributes)
-                .HasConversion(
-                    attributes => JsonSerializer.Serialize(attributes, (JsonSerializerOptions?)null),
-                    json => JsonSerializer.Deserialize<List<ProductAttribute>>(json, (JsonSerializerOptions?)null)!)
-                .Metadata.SetValueComparer(new ValueComparer<IReadOnlyList<ProductAttribute>>(
-                    (left, right) => left != null && right != null && left.SequenceEqual(right),
-                    attributes => attributes.Aggregate(0, (hash, attribute) => HashCode.Combine(hash, attribute)),
-                    attributes => attributes.ToArray()));
+            entity.Ignore(product => product.Attributes);
             entity.HasMany(product => product.BasePrices).WithOne()
                 .HasForeignKey(price => price.ProductId).OnDelete(DeleteBehavior.Restrict);
             entity.Navigation(product => product.BasePrices).HasField("_basePrices")
@@ -94,5 +103,17 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
             entity.Property(price => price.Amount).HasPrecision(18, 2);
             entity.Property(price => price.EffectiveFrom).HasColumnType("date");
         });
+    }
+
+    private static void ConfigureReference<T>(ModelBuilder modelBuilder, string table) where T : NamedReferenceItem
+    {
+        var entity = modelBuilder.Entity<T>();
+        entity.HasBaseType((Type?)null);
+        entity.ToTable(table);
+        entity.HasKey(item => item.Id);
+        entity.Property(item => item.Name).HasMaxLength(NamedReferenceItem.MaximumNameLength)
+            .UseCollation("Latin1_General_100_CI_AS").IsRequired();
+        entity.HasIndex(item => item.Name).IsUnique().HasDatabaseName($"UX_{table}_Name");
+        entity.Property(item => item.Version).IsRowVersion();
     }
 }

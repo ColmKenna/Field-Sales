@@ -10,9 +10,14 @@ builder.AddServiceDefaults();
 builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IReferenceListStore, BrandListStore>();
+builder.Services.AddScoped<IReferenceListStore, ProductProfileListStore>();
+builder.Services.AddScoped<IReferenceListStore, AttributeNameListStore>();
+builder.Services.AddScoped<IReferenceListStore, SupplierListStore>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductBrandUsageSource>();
+builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductReferenceUsageSource>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageReader, ReferenceUsageReader>();
 builder.Services.AddScoped<ProductBrandAssignments>();
+builder.Services.AddScoped<ProductReferenceAssignments>();
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>();
 
 const string roleLookupUnavailableKey = "staff-role-lookup-unavailable";
