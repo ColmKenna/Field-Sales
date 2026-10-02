@@ -1,0 +1,12 @@
+@model FieldSales.Web.Directory.ContactFormPageModel
+<label asp-for="Name">Contact name</label>
+<input asp-for="Name" maxlength="200" required />
+<label asp-for="ContactTypeId">Contact type</label>
+<select asp-for="ContactTypeId" required>
+    <option value="">Choose a contact type</option>
+    @foreach (var type in Model.Types) { <option value="@type.Id">@type.Label</option> }
+</select>
+<label asp-for="Phone">Phone (optional)</label>
+<input asp-for="Phone" type="tel" maxlength="50" />
+<label asp-for="Email">Email (optional)</label>
+<input asp-for="Email" type="email" maxlength="254" />

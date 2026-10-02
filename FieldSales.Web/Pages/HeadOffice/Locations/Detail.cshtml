@@ -9,6 +9,28 @@
     <dt>Eircode</dt><dd>@(Model.Location.Eircode ?? "None entered")</dd>
     <dt>Type</dt><dd>@(Model.Location.Type?.Label ?? "No type")</dd>
 </dl>
+<h2>Contacts</h2>
+@if (TempData["ContactNotice"] is string notice) { <p role="status">@notice</p> }
+<p>Main contact: @(Model.Contacts.MainContact?.Name ?? "None yet")</p>
+<p><a asp-page="/HeadOffice/Contacts/Create" asp-route-locationId="@Model.Location.Id">Create contact</a>
+    | <a asp-page="/HeadOffice/Contacts/Link" asp-route-locationId="@Model.Location.Id">Link existing contact</a></p>
+@if (Model.Contacts.InactiveCount > 0)
+{
+    <p><a asp-page="Detail" asp-route-id="@Model.Location.Id" asp-route-ShowInactive="@(!Model.ShowInactive)">@(Model.ShowInactive ? "Hide inactive" : $"Show inactive ({Model.Contacts.InactiveCount})")</a></p>
+}
+@if (Model.Contacts.Contacts.Count == 0) { <p>No active contacts linked yet.</p> }
+<ul>
+    @foreach (var link in Model.Contacts.Contacts)
+    {
+        <li data-contact-id="@link.Contact.Id">
+            <a asp-page="/HeadOffice/Contacts/Detail" asp-route-id="@link.Contact.Id">@link.Contact.Name</a>
+            — @link.Contact.Type.Label @(link.Contact.Status == FieldSales.Directory.Contracts.ContactStatus.Inactive ? "(inactive)" : "")
+            @if (link.IsMain) { <strong>Main</strong> }
+            else if (link.Contact.Status == FieldSales.Directory.Contracts.ContactStatus.Active)
+            { <a asp-page="/HeadOffice/Contacts/Main" asp-route-id="@Model.Location.Id" asp-route-contactId="@link.Contact.Id">Set Main</a> }
+        </li>
+    }
+</ul>
 <h2>Edit location</h2>
 <form method="post" class="product-form">
     <div asp-validation-summary="All" role="alert"></div>

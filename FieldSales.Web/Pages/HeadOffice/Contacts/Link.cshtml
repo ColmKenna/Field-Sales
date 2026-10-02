@@ -1,0 +1,30 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Contacts.LinkModel
+@{ ViewData["Title"] = "Link contact"; }
+<h1>Link contact</h1>
+@if (Model.LocationId is null)
+{
+    <form method="get" class="product-form">
+        <input asp-for="ContactId" type="hidden" />
+        <label asp-for="LocationId">Location</label>
+        <select asp-for="LocationId" required><option value="">Choose a location</option>
+            @foreach (var location in Model.Locations) { <option value="@location.Id">@location.Label</option> }
+        </select>
+        <button type="submit">Continue</button>
+    </form>
+}
+else
+{
+    <p>@Model.Locations.FirstOrDefault(location => location.Id == Model.LocationId)?.Label</p>
+    <form method="post" class="product-form">
+        <div asp-validation-summary="All" role="alert"></div>
+        <input asp-for="LocationId" type="hidden" />
+        <input asp-for="LocationVersion" type="hidden" />
+        <label asp-for="ContactId">Active contact</label>
+        <select asp-for="ContactId" required><option value="">Choose a contact</option>
+            @foreach (var contact in Model.Contacts) { <option value="@contact.Id">@contact.Name — @contact.Type.Label @(contact.Email ?? contact.Phone)</option> }
+        </select>
+        <button type="submit" class="button" disabled="@(Model.Contacts.Count == 0)">Link contact</button>
+        <a asp-page="/HeadOffice/Locations/Detail" asp-route-id="@Model.LocationId">Cancel and reload</a>
+    </form>
+}

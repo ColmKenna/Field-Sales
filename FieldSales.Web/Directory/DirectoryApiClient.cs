@@ -9,14 +9,34 @@ using Microsoft.AspNetCore.Authentication;
 namespace FieldSales.Web.Directory;
 
 public sealed record DirectoryResult<T>(HttpStatusCode Status, T? Value = default, string? Error = null,
-    string? Field = null, bool RequiresDuplicateConfirmation = false)
+    string? Field = null, bool RequiresDuplicateConfirmation = false, MainContactConfirmation? Confirmation = null)
 {
     public bool Success => (int)Status is >= 200 and < 300 && Value is not null;
 }
 
 public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
+    private sealed record ApiError(string Error, string? Field = null, bool RequiresDuplicateConfirmation = false,
+        MainContactConfirmation? Confirmation = null);
     private const string Root = "/directory/geography";
+    public Task<DirectoryResult<ContactDetails>> ContactAsync(Guid id, CancellationToken ct) =>
+        SendAsync<ContactDetails>(HttpMethod.Get, $"/directory/contacts/{id}", null, ct);
+    public Task<DirectoryResult<ContactChoice[]>> ContactChoicesAsync(CancellationToken ct) =>
+        SendAsync<ContactChoice[]>(HttpMethod.Get, "/directory/contacts/choices", null, ct);
+    public Task<DirectoryResult<DirectoryTypeChoice[]>> ContactTypeChoicesAsync(CancellationToken ct) =>
+        SendAsync<DirectoryTypeChoice[]>(HttpMethod.Get, "/directory/contacts/type-choices", null, ct);
+    public Task<DirectoryResult<ContactLocationChoice[]>> ContactLocationChoicesAsync(CancellationToken ct) =>
+        SendAsync<ContactLocationChoice[]>(HttpMethod.Get, "/directory/contacts/location-choices", null, ct);
+    public Task<DirectoryResult<LocationContactsPage>> LocationContactsAsync(Guid id, bool showInactive, CancellationToken ct) =>
+        SendAsync<LocationContactsPage>(HttpMethod.Get, $"/directory/locations/{id}/contacts?showInactive={showInactive}", null, ct);
+    public Task<DirectoryResult<ContactDetails>> CreateContactAsync(CreateContactRequest request, CancellationToken ct) =>
+        SendAsync<ContactDetails>(HttpMethod.Post, "/directory/contacts", JsonContent.Create(request), ct);
+    public Task<DirectoryResult<ContactDetails>> EditContactAsync(Guid id, EditContactRequest request, CancellationToken ct) =>
+        SendAsync<ContactDetails>(HttpMethod.Put, $"/directory/contacts/{id}", JsonContent.Create(request), ct);
+    public Task<DirectoryResult<ContactMutationResult>> LinkContactAsync(Guid locationId, LinkContactRequest request, CancellationToken ct) =>
+        SendAsync<ContactMutationResult>(HttpMethod.Post, $"/directory/locations/{locationId}/contacts", JsonContent.Create(request), ct);
+    public Task<DirectoryResult<ContactMutationResult>> SetMainContactAsync(Guid locationId, SetMainContactRequest request, CancellationToken ct) =>
+        SendAsync<ContactMutationResult>(HttpMethod.Post, $"/directory/locations/{locationId}/main-contact", JsonContent.Create(request), ct);
     public Task<DirectoryResult<ReferenceListViewModel>> TypeListAsync(string key, bool showArchived, CancellationToken ct) =>
         SendAsync<ReferenceListViewModel>(HttpMethod.Get, $"/directory/reference-data/{Uri.EscapeDataString(key)}?showArchived={showArchived}", null, ct);
     public Task<DirectoryResult<ReferenceListItem>> TypeItemAsync(string key, Guid id, CancellationToken ct) =>
@@ -83,9 +103,11 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
             {
                 if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
                 {
-                    var error = await response.Content.ReadFromJsonAsync<CustomerDirectoryError>(ct);
+                    var error = await response.Content.ReadFromJsonAsync<ApiError>(ct);
                     return new(response.StatusCode, Error: error?.Error ?? "This change could not be saved.",
-                        Field: error?.Field, RequiresDuplicateConfirmation: error?.RequiresDuplicateConfirmation == true);
+                        Field: error?.Field, RequiresDuplicateConfirmation: error?.RequiresDuplicateConfirmation == true,
+                        Confirmation: error?.Confirmation is { } confirmation && ValidContact(confirmation.Outgoing)
+                            && ValidContact(confirmation.Proposed) && confirmation.LocationVersion is not null ? confirmation : null);
                 }
                 return new(response.StatusCode);
             }
@@ -110,6 +132,17 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
                         && (item.Type is null || ValidType(item.Type))),
                 LocationDetails location => location.Name is not null && location.CustomerName is not null && location.CustomerId != Guid.Empty
                     && location.Version is not null && ValidTown(location.Town) && (location.Type is null || ValidType(location.Type)),
+                ContactChoice[] contacts => contacts.All(ValidContact),
+                ContactDetails contact => contact.Id != Guid.Empty && contact.Name is not null && ValidType(contact.Type)
+                    && Enum.IsDefined(contact.Status) && contact.Version is not null && contact.Locations is not null
+                    && contact.Locations.All(link => link is not null && link.LocationId != Guid.Empty && link.Name is not null
+                        && link.CustomerId != Guid.Empty && link.CustomerName is not null && ValidTown(link.Town) && link.LocationVersion is not null),
+                ContactLocationChoice[] locations => locations.All(item => item is not null && item.Id != Guid.Empty
+                    && item.Name is not null && item.CustomerName is not null && item.TownName is not null),
+                LocationContactsPage page => page.LocationId != Guid.Empty && page.LocationName is not null && page.LocationVersion is not null
+                    && page.InactiveCount >= 0 && page.Contacts is not null && page.Contacts.All(item => item is not null && ValidContact(item.Contact))
+                    && (page.MainContact is null || ValidContact(page.MainContact)),
+                ContactMutationResult mutation => mutation.ContactId != Guid.Empty,
                 TownChoice[] towns => towns.All(ValidTown),
                 TownChoice town => ValidTown(town),
                 _ => true
@@ -128,4 +161,6 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
     private static bool ValidTown(TownChoice? town) => town is not null && town.Id != Guid.Empty
         && town.Name is not null && town.Label is not null && town.CountyName is not null && town.RegionName is not null;
     private static bool ValidType(DirectoryTypeChoice? type) => type is not null && type.Id != Guid.Empty && type.Name is not null;
+    private static bool ValidContact(ContactChoice? contact) => contact is not null && contact.Id != Guid.Empty
+        && contact.Name is not null && ValidType(contact.Type) && Enum.IsDefined(contact.Status);
 }

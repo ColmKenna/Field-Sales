@@ -1,0 +1,19 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Contacts.CreateModel
+@{ ViewData["Title"] = "Create contact"; }
+<h1>Create contact</h1>
+<p>Save one person and link them to one or more locations. The first active contact at a location becomes Main automatically.</p>
+<form method="post" class="product-form">
+    <div asp-validation-summary="All" role="alert"></div>
+    <partial name="_ContactFields" model="Model" />
+    <fieldset>
+        <legend>Locations — choose at least one</legend>
+        @foreach (var location in Model.Locations)
+        {
+            <label><input type="checkbox" name="LocationIds" value="@location.Id" checked="@Model.LocationIds.Contains(location.Id)" /> @location.Label</label>
+        }
+    </fieldset>
+    @if (Model.Types.Count == 0) { <p>Add a Contact type in <a asp-page="/HeadOffice/ReferenceData" asp-route-ListKey="contact-types">Reference data</a> first.</p> }
+    <button type="submit" class="button" disabled="@(Model.Types.Count == 0 || Model.Locations.Count == 0)">Save contact</button>
+    <a asp-page="/HeadOffice/Customers/Index">Cancel</a>
+</form>
