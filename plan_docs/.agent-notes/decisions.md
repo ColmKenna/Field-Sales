@@ -172,3 +172,18 @@ The reserved ports are proposals until the item that adds the project confirms t
   effect again".
 - An In Progress order line for such a product (valid when captured) is a WI-043 obligation: no
   orders or tablet exist yet.
+
+## WI-015 geography retirement (2026-10-02, developer, plan approval)
+
+- Archive applies to the selected geography row. An archived County or Region
+  excludes descendant Towns from new choices without rewriting child flags.
+  Existing links/IDs remain; archived children still count as usage.
+- Un-archive restores choices only under an active hierarchy. New children
+  beneath archived geography are rejected. CSV preserves existing archival
+  state; an invalid addition rolls back the entire import.
+- WI-015 delivers reference contracts and the shared archive controls.
+  Production Location storage/forms remain WI-016; the Laragh four-reference
+  scenario uses a test provider. WI-016 must replace the keyed `directory`
+  `EmptyLocationUsageSource` with real Location counts and protect assignments
+  in the same serializable DirectoryDb transaction. See
+  `docs/directory-geography-retirement.md` for the concrete connection steps.

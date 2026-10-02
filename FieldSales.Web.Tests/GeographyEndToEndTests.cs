@@ -8,6 +8,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 using FieldSales.Directory.Contracts;
+using FieldSales.ReferenceData;
 using FieldSales.StaffAccess;
 using FieldSales.Web.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -24,6 +25,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.MsSql;
 using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbContext;
+using EmptyLocationUsageSource = CatalogueApi::FieldSales.Api.Directory.EmptyLocationUsageSource;
 
 namespace FieldSales.Web.Tests;
 
@@ -364,6 +366,7 @@ public sealed class GeographyApplication : IAsyncLifetime
     private static readonly SymmetricSecurityKey Key = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
     private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     public TestStaffRoleLookup Roles { get; } = new();
+    public TestLocationUsageSource Locations { get; } = new();
     public WebApplicationFactory<DirectoryDbContext> Api { get; private set; } = null!;
     private string ConnectionString => new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(_sql.GetConnectionString()) { InitialCatalog = "DirectoryTests" }.ConnectionString;
 
@@ -391,6 +394,10 @@ public sealed class GeographyApplication : IAsyncLifetime
             services.RemoveAll<DirectoryDbContext>();
             services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(ConnectionString).Options));
             services.RemoveAll<IStaffRoleLookup>(); services.AddSingleton<IStaffRoleLookup>(Roles);
+            foreach (var descriptor in services.Where(service => service.IsKeyedService
+                && Equals(service.ServiceKey, "directory") && service.KeyedImplementationType == typeof(EmptyLocationUsageSource)).ToArray())
+                services.Remove(descriptor);
+            services.AddKeyedSingleton<IReferenceUsageSource>("directory", Locations);
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 var configuration = new OpenIdConnectConfiguration { Issuer = Issuer }; configuration.SigningKeys.Add(Key);
@@ -406,6 +413,7 @@ public sealed class GeographyApplication : IAsyncLifetime
     }
     public async Task ResetAsync()
     {
+        Locations.Reset();
         Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
         await using var scope = Api.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
