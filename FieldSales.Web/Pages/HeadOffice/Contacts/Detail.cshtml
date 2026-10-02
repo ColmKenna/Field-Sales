@@ -1,0 +1,30 @@
+@page "{id:guid}"
+@model FieldSales.Web.Pages.HeadOffice.Contacts.DetailModel
+@{ ViewData["Title"] = Model.Contact.Name; }
+<h1>@Model.Contact.Name</h1>
+@if (TempData["ContactNotice"] is string notice) { <p role="status">@notice</p> }
+<dl>
+    <dt>Contact type</dt><dd>@Model.Contact.Type.Label</dd>
+    <dt>Status</dt><dd>@Model.Contact.Status</dd>
+    <dt>Phone</dt><dd>@(Model.Contact.Phone ?? "None entered")</dd>
+    <dt>Email</dt><dd>@(Model.Contact.Email ?? "None entered")</dd>
+</dl>
+<h2>Linked locations</h2>
+<ul>
+    @foreach (var location in Model.Contact.Locations)
+    {
+        <li data-location-id="@location.LocationId"><a asp-page="/HeadOffice/Locations/Detail" asp-route-id="@location.LocationId">@location.Name — @location.CustomerName, @location.Town.Label</a> @(location.IsMain ? "(Main)" : "")</li>
+    }
+</ul>
+<p><a asp-page="Link" asp-route-contactId="@Model.Contact.Id">Link to another location</a></p>
+<h2>Edit contact</h2>
+<form method="post" class="product-form">
+    <div asp-validation-summary="All" role="alert"></div>
+    <input asp-for="Version" type="hidden" />
+    <partial name="_ContactFields" model="Model" />
+    <label asp-for="Status">Status across all locations</label>
+    <select asp-for="Status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+    <p>A contact who is Main at any location needs a replacement before becoming inactive.</p>
+    <button type="submit" class="button">Save changes</button>
+    <a asp-page="Detail" asp-route-id="@Model.Contact.Id">Cancel and reload</a>
+</form>

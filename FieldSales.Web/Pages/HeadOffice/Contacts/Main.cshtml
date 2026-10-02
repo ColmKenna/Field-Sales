@@ -1,0 +1,16 @@
+@page "{id:guid}"
+@model FieldSales.Web.Pages.HeadOffice.Contacts.MainModel
+@{ ViewData["Title"] = "Choose main contact"; }
+<h1>@(Model.Question ?? "Choose main contact")</h1>
+<p>Make @Model.Proposed.Name Main at @Model.Location.LocationName.</p>
+<p>The outgoing contact stays linked. Main choices at other locations stay as they are.</p>
+<form method="post" class="product-form">
+    <div asp-validation-summary="All" role="alert"></div>
+    <input asp-for="ContactId" type="hidden" />
+    <input asp-for="LocationVersion" type="hidden" />
+    <input asp-for="ExpectedMainContactId" type="hidden" />
+    @if (Model.Question is not null) { <button type="submit" asp-page-handler="Confirm" class="button">Confirm replacement</button> }
+    else { <button type="submit" class="button">Set Main</button> }
+    <a asp-page="/HeadOffice/Locations/Detail" asp-route-id="@Model.Location.LocationId">Cancel</a>
+    <a asp-page="Main" asp-route-id="@Model.Location.LocationId" asp-route-contactId="@Model.ContactId">Reload current choice</a>
+</form>

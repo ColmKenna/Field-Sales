@@ -8,6 +8,8 @@ public sealed class DetailModel(DirectoryApiClient directory) : LocationFormPage
 {
     [BindProperty] public string? Version { get; set; }
     public LocationDetails Location { get; private set; } = null!;
+    [BindProperty(SupportsGet = true)] public bool ShowInactive { get; set; }
+    public LocationContactsPage Contacts { get; private set; } = null!;
     public async Task<IActionResult> OnGetAsync(Guid id)
     {
         var result = await Directory.LocationAsync(id, HttpContext.RequestAborted);
@@ -15,7 +17,7 @@ public sealed class DetailModel(DirectoryApiClient directory) : LocationFormPage
         Location = result.Value!;
         Name = Location.Name; TownId = Location.Town.Id; Eircode = Location.Eircode; Version = Location.Version;
         LocationTypeId = Location.Type?.Id;
-        return await FormAsync(Location.Town, Location.Type);
+        return await LoadContactsAsync(id);
     }
     public Task<IActionResult> OnPostAsync(Guid id) => SaveAsync(id, false);
     public Task<IActionResult> OnPostConfirmAsync(Guid id) => SaveAsync(id, true);
@@ -31,6 +33,13 @@ public sealed class DetailModel(DirectoryApiClient directory) : LocationFormPage
         var read = await Directory.LocationAsync(id, HttpContext.RequestAborted);
         if (!read.Success) return StatusCode((int)read.Status);
         Location = read.Value!;
+        return await LoadContactsAsync(id);
+    }
+    private async Task<IActionResult> LoadContactsAsync(Guid id)
+    {
+        var contacts = await Directory.LocationContactsAsync(id, ShowInactive, HttpContext.RequestAborted);
+        if (!contacts.Success) return StatusCode((int)contacts.Status);
+        Contacts = contacts.Value!;
         return await FormAsync(Location.Town, Location.Type);
     }
 }

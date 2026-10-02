@@ -1,8 +1,11 @@
+using FieldSales.Directory.Contracts;
+
 namespace FieldSales.Api.Directory;
 
 public sealed class Location
 {
     public const int MaximumEircodeLength = 20;
+    private readonly List<LocationContact> _contacts = [];
     private Location() { }
 
     public Guid Id { get; private set; }
@@ -12,6 +15,8 @@ public sealed class Location
     public Guid TownId { get; private set; }
     public string? Eircode { get; private set; }
     public Guid? LocationTypeId { get; private set; }
+    public Guid? MainContactId { get; private set; }
+    public IReadOnlyList<LocationContact> Contacts => _contacts.AsReadOnly();
     public byte[] Version { get; private set; } = [];
 
     internal static Location Create(Guid customerId, string? name, Guid? townId, string? eircode)
@@ -39,6 +44,32 @@ public sealed class Location
         Eircode = validEircode;
     }
     internal void SetType(Guid? typeId) => LocationTypeId = typeId;
+
+    // Load the roster before calling these methods; the store locks the Location
+    // and validates its rowversion in the same serializable write transaction.
+    internal bool LinkContact(Contact contact)
+    {
+        if (contact.Status != ContactStatus.Active)
+            throw new CustomerDirectoryValidationException("ContactId", "Choose an active contact.");
+        if (_contacts.Any(link => link.ContactId == contact.Id)) return false;
+        var link = LocationContact.Create(this, contact);
+        _contacts.Add(link); contact.Attach(link);
+        EnsureFirstActiveMain(contact); return true;
+    }
+    internal void EnsureFirstActiveMain(Contact contact)
+    {
+        if (MainContactId is null && contact.Status == ContactStatus.Active
+            && _contacts.Any(link => link.ContactId == contact.Id)) MainContactId = contact.Id;
+    }
+    internal void SetMain(Contact contact, Guid? expectedMainContactId, bool confirmReplacement)
+    {
+        if (MainContactId != expectedMainContactId) throw new MainContactChangedException();
+        if (contact.Status != ContactStatus.Active || !_contacts.Any(link => link.ContactId == contact.Id))
+            throw new CustomerDirectoryValidationException("ContactId", "Choose an active contact linked to this location.");
+        if (MainContactId is Guid outgoing && outgoing != contact.Id && !confirmReplacement)
+            throw new MainContactReplacementRequiredException(outgoing);
+        MainContactId = contact.Id;
+    }
 }
 
 internal static class CustomerDirectoryFields
