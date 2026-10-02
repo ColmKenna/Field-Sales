@@ -1,5 +1,6 @@
 using FieldSales.Web.Data;
 using FieldSales.Web.Catalogue;
+using FieldSales.Web.Directory;
 using FieldSales.Web.Security;
 using FieldSales.StaffAccess;
 using Microsoft.AspNetCore.Authentication;
@@ -39,6 +40,8 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient<CatalogueApiClient>((services, client) =>
     client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>().Required("StaffApi:BaseUrl", "StaffApi:BaseUrl is required.", allowBlank: true))).AddSafeReadResilience();
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>().AddSafeReadResilience();
+builder.Services.AddHttpClient<DirectoryApiClient>((services, client) =>
+    client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>().Required("StaffApi:BaseUrl", "StaffApi:BaseUrl is required.", allowBlank: true))).AddSafeReadResilience();
 builder.Services.AddScoped<StaffCookieEvents>();
 builder.Services.AddHostedService<ExpiredTicketsCleanupService>();
 
