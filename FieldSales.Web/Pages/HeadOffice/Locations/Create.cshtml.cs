@@ -13,7 +13,7 @@ public sealed class CreateModel(DirectoryApiClient directory) : LocationFormPage
     private async Task<IActionResult> SaveAsync(Guid customerId, bool confirmed)
     {
         if (!ModelState.IsValid) return await ShowAsync(customerId);
-        var result = await Directory.AddLocationAsync(customerId, new(Name, TownId, Eircode, confirmed), HttpContext.RequestAborted);
+        var result = await Directory.AddLocationAsync(customerId, new(Name, TownId, Eircode, confirmed, LocationTypeId), HttpContext.RequestAborted);
         if (result.Success) return RedirectToPage("Detail", new { id = result.Value!.Id });
         return AddSaveError(result) ?? await ShowAsync(customerId);
     }

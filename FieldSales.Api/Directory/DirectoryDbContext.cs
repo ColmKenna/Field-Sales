@@ -11,10 +11,16 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
     public DbSet<Town> Towns => Set<Town>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Location> Locations => Set<Location>();
+    public DbSet<LocationType> LocationTypes => Set<LocationType>();
+    public DbSet<ContactType> ContactTypes => Set<ContactType>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Ignore<GeographyEntity>();
+        modelBuilder.Ignore<FieldSales.Api.Catalogue.NamedReferenceItem>();
+        modelBuilder.Ignore<DirectoryType>();
+        ConfigureType<LocationType>(modelBuilder, "LocationTypes");
+        ConfigureType<ContactType>(modelBuilder, "ContactTypes");
         var regions = Configure<Region>(modelBuilder, "Regions");
         regions.HasIndex(item => item.NormalizedName).IsUnique();
         var counties = Configure<County>(modelBuilder, "Counties");
@@ -44,6 +50,16 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
         locations.Property(item => item.Version).IsRowVersion();
         locations.HasIndex(item => new { item.CustomerId, item.NormalizedName });
         locations.HasOne<Town>().WithMany().HasForeignKey(item => item.TownId).OnDelete(DeleteBehavior.Restrict);
+        locations.HasOne<LocationType>().WithMany().HasForeignKey(item => item.LocationTypeId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureType<T>(ModelBuilder modelBuilder, string table) where T : DirectoryType
+    {
+        var entity = modelBuilder.Entity<T>(); entity.HasBaseType((Type?)null); entity.ToTable(table);
+        entity.HasKey(item => item.Id); entity.Property(item => item.Id).ValueGeneratedNever();
+        entity.Property(item => item.Name).HasMaxLength(200).UseCollation("Latin1_General_100_CI_AS").IsRequired();
+        entity.HasIndex(item => item.Name).IsUnique(); entity.Property(item => item.Description).HasMaxLength(2000);
+        entity.Property(item => item.Version).IsRowVersion();
     }
 
     private static EntityTypeBuilder<T> Configure<T>(ModelBuilder modelBuilder, string table) where T : GeographyEntity

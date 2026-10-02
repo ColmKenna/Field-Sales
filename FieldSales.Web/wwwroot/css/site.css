@@ -86,3 +86,5 @@ p { line-height: 1.6; }
 .directory-table table { width: 100%; border-collapse: collapse; background: #fff; }
 .directory-table caption { text-align: left; padding-block: 1rem; }
 .directory-table th, .directory-table td { text-align: left; padding: .8rem; border-bottom: 1px solid #d7dee6; }
+.reference-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reference-item textarea, .reference-add textarea { display: block; width: min(100%, 36rem); padding: .6rem; font: inherit; }

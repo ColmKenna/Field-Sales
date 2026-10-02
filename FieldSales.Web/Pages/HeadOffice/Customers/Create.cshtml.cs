@@ -11,7 +11,7 @@ public sealed class CreateModel(DirectoryApiClient directory) : LocationFormPage
     public async Task<IActionResult> OnPostAsync()
     {
         if (!ModelState.IsValid) return await FormAsync();
-        var result = await Directory.CreateCustomerAsync(new(CustomerName, new(Name, TownId, Eircode)), HttpContext.RequestAborted);
+        var result = await Directory.CreateCustomerAsync(new(CustomerName, new(Name, TownId, Eircode, LocationTypeId: LocationTypeId)), HttpContext.RequestAborted);
         if (result.Success) return RedirectToPage("Detail", new { id = result.Value!.Id });
         var failure = AddSaveError(result, field => field?.StartsWith("FirstLocation.", StringComparison.Ordinal) == true
             ? field["FirstLocation.".Length..] : field == "Name" ? nameof(CustomerName) : string.Empty);

@@ -1,10 +1,13 @@
 using System.Data;
+using System.Text.Json.Serialization;
 using FieldSales.ReferenceData;
 using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.Catalogue;
 
-public sealed record ReferenceStoredItem(Guid Id, string Name, bool IsArchived);
+public sealed record ReferenceStoredItem(Guid Id, string Name, bool IsArchived,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Description = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Version = null);
 public interface IReferenceListStore
 {
     ReferenceListDefinition Definition { get; }

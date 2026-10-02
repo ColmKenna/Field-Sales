@@ -11,6 +11,7 @@ public sealed class Location
     public string NormalizedName { get; private set; } = string.Empty;
     public Guid TownId { get; private set; }
     public string? Eircode { get; private set; }
+    public Guid? LocationTypeId { get; private set; }
     public byte[] Version { get; private set; } = [];
 
     internal static Location Create(Guid customerId, string? name, Guid? townId, string? eircode)
@@ -37,6 +38,7 @@ public sealed class Location
         TownId = townId.Value;
         Eircode = validEircode;
     }
+    internal void SetType(Guid? typeId) => LocationTypeId = typeId;
 }
 
 internal static class CustomerDirectoryFields

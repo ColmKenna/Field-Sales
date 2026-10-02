@@ -93,7 +93,9 @@ public sealed record ReferenceListDefinition(string Key, string SingularLabel, s
         (ActionNotes ?? []).Where(note => note.Action == action)
             .Select(note => note.Describe(usage)).OfType<string>().ToArray();
 }
-public sealed record ReferenceListItem(Guid Id, string Name, bool IsArchived, ReferenceUsage Usage);
+public sealed record ReferenceListItem(Guid Id, string Name, bool IsArchived, ReferenceUsage Usage,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Description = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Version = null);
 public sealed record ReferenceListViewModel(ReferenceListDefinition SelectedList,
     IReadOnlyList<ReferenceListDefinition> AvailableLists, IReadOnlyList<ReferenceListItem> Items,
     int ArchivedCount, bool ShowArchived);

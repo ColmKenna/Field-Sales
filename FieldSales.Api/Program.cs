@@ -16,6 +16,14 @@ builder.Services.AddScoped<GeographyUsageReader>();
 builder.Services.AddKeyedScoped<FieldSales.ReferenceData.IReferenceUsageSource, CountyRegionUsageSource>("directory");
 builder.Services.AddKeyedScoped<FieldSales.ReferenceData.IReferenceUsageSource, TownCountyUsageSource>("directory");
 builder.Services.AddKeyedScoped<FieldSales.ReferenceData.IReferenceUsageSource, LocationTownUsageSource>("directory");
+builder.Services.AddKeyedScoped<IReferenceListStore, LocationTypeListStore>(DirectoryTypeEndpoints.ServicesKey);
+builder.Services.AddKeyedScoped<IReferenceListStore, ContactTypeListStore>(DirectoryTypeEndpoints.ServicesKey);
+builder.Services.AddKeyedScoped<FieldSales.ReferenceData.IReferenceUsageSource, LocationTypeUsageSource>(DirectoryTypeEndpoints.ServicesKey);
+builder.Services.AddKeyedScoped<FieldSales.ReferenceData.IReferenceUsageSource, EmptyContactTypeUsageSource>(DirectoryTypeEndpoints.ServicesKey);
+builder.Services.AddKeyedScoped<ReferenceCatalogueRegistry>(DirectoryTypeEndpoints.ServicesKey, (services, key) => new(
+    services.GetKeyedServices<IReferenceListStore>(key), services.GetKeyedServices<FieldSales.ReferenceData.IReferenceUsageSource>(key)));
+builder.Services.AddKeyedScoped<FieldSales.ReferenceData.IReferenceUsageReader>(DirectoryTypeEndpoints.ServicesKey, (services, key) =>
+    new ReferenceUsageReader(services.GetRequiredKeyedService<ReferenceCatalogueRegistry>(key)));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IReferenceListStore, BrandListStore>();
 builder.Services.AddScoped<IReferenceListStore, ProductProfileListStore>();
@@ -127,6 +135,7 @@ app.MapProductEndpoints();
 app.MapReferenceListEndpoints();
 app.MapGeographyEndpoints();
 app.MapCustomerEndpoints();
+app.MapDirectoryTypeEndpoints();
 app.MapDefaultEndpoints();
 app.Run();
 

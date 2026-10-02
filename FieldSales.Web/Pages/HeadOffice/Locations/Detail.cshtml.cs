@@ -14,7 +14,8 @@ public sealed class DetailModel(DirectoryApiClient directory) : LocationFormPage
         if (!result.Success) return StatusCode((int)result.Status);
         Location = result.Value!;
         Name = Location.Name; TownId = Location.Town.Id; Eircode = Location.Eircode; Version = Location.Version;
-        return await FormAsync(Location.Town);
+        LocationTypeId = Location.Type?.Id;
+        return await FormAsync(Location.Town, Location.Type);
     }
     public Task<IActionResult> OnPostAsync(Guid id) => SaveAsync(id, false);
     public Task<IActionResult> OnPostConfirmAsync(Guid id) => SaveAsync(id, true);
@@ -22,7 +23,7 @@ public sealed class DetailModel(DirectoryApiClient directory) : LocationFormPage
     {
         if (ModelState.IsValid)
         {
-            var result = await Directory.EditLocationAsync(id, new(Name, TownId, Eircode, Version, confirmed), HttpContext.RequestAborted);
+            var result = await Directory.EditLocationAsync(id, new(Name, TownId, Eircode, Version, confirmed, LocationTypeId), HttpContext.RequestAborted);
             if (result.Success) return RedirectToPage(new { id });
             var failure = AddSaveError(result);
             if (failure is not null) return failure;
@@ -30,6 +31,6 @@ public sealed class DetailModel(DirectoryApiClient directory) : LocationFormPage
         var read = await Directory.LocationAsync(id, HttpContext.RequestAborted);
         if (!read.Success) return StatusCode((int)read.Status);
         Location = read.Value!;
-        return await FormAsync(Location.Town);
+        return await FormAsync(Location.Town, Location.Type);
     }
 }

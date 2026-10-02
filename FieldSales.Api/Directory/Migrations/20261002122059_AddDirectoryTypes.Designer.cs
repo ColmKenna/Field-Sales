@@ -4,6 +4,7 @@ using FieldSales.Api.Directory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FieldSales.Api.Directory.Migrations
 {
     [DbContext(typeof(DirectoryDbContext))]
-    partial class DirectoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002122059_AddDirectoryTypes")]
+    partial class AddDirectoryTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

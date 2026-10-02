@@ -378,7 +378,10 @@ public class GeographyApplication : IAsyncLifetime
         Api = NewApi();
         await using var scope = Api.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
+        await InitializeAdditionalAsync();
     }
+    protected virtual Task InitializeAdditionalAsync() => Task.CompletedTask;
+    protected virtual void ConfigureAdditionalServices(IServiceCollection services, string connectionString) { }
     public async Task DisposeAsync() { await Api.DisposeAsync(); await _sql.DisposeAsync(); }
     private WebApplicationFactory<DirectoryDbContext> NewApi() => new WebApplicationFactory<DirectoryDbContext>().WithWebHostBuilder(builder =>
     {
@@ -402,6 +405,7 @@ public class GeographyApplication : IAsyncLifetime
                     services.Remove(descriptor);
                 services.AddKeyedSingleton<IReferenceUsageSource>("directory", Locations);
             }
+            ConfigureAdditionalServices(services, ConnectionString);
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 var configuration = new OpenIdConnectConfiguration { Issuer = Issuer }; configuration.SigningKeys.Add(Key);
@@ -422,6 +426,7 @@ public class GeographyApplication : IAsyncLifetime
         await using var scope = Api.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
         await db.Locations.ExecuteDeleteAsync(); await db.Customers.ExecuteDeleteAsync();
+        await db.LocationTypes.ExecuteDeleteAsync(); await db.ContactTypes.ExecuteDeleteAsync();
         await db.Towns.ExecuteDeleteAsync(); await db.Counties.ExecuteDeleteAsync(); await db.Regions.ExecuteDeleteAsync();
     }
     public async Task<(int, int, int)> CountsAsync()
