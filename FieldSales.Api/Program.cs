@@ -12,6 +12,7 @@ builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
 builder.AddSqlServerDbContext<DirectoryDbContext>("DirectoryDb");
 builder.Services.AddScoped<GeographyStore>();
 builder.Services.AddScoped<CustomerStore>();
+builder.Services.AddLocationCoordinates(builder.Configuration);
 builder.Services.AddScoped<ContactStore>();
 builder.Services.AddScoped<GeographyUsageReader>();
 builder.Services.AddKeyedScoped<FieldSales.ReferenceData.IReferenceUsageSource, CountyRegionUsageSource>("directory");

@@ -163,7 +163,13 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
         Assert.Equal(0m, location.Latitude); Assert.Equal(0m, location.Longitude); Assert.Empty(location.PositionHistory);
     }
 
-    private static CustomerStore Store(DirectoryDbContext db) => new(db, new GeographyStore(db, new GeographyUsageReader([])));
+    private static CustomerStore Store(DirectoryDbContext db) => new(db, new GeographyStore(db, new GeographyUsageReader([])),
+        new LocationPositionResolver(db, new UnusedLookup()), TimeProvider.System);
+    private sealed class UnusedLookup : IEircodeLookup
+    {
+        public Task<EircodeLookupResult> LookupAsync(string eircode, CancellationToken ct) =>
+            throw new InvalidOperationException("Read-only persistence assertions must not perform lookups.");
+    }
 
     private static async Task<Guid> SeedAsync(DirectoryDbContext db)
     {

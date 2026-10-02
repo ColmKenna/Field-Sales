@@ -1,8 +1,9 @@
-# WI-019 coordinate storage and Town maintenance checkpoints
+# WI-019 coordinate storage, Town maintenance and defaulting checkpoints
 
 The user approved the implementation plan and 12 Scenario Review cases on
-2026-10-02, then said Continue to proceed from storage to Town maintenance.
-The complete Town-first feature is still in progress.
+2026-10-02, then authorized each increment in turn: storage, Town maintenance
+and Location defaulting. The Head Office Location position display is still to
+come, so the complete Town-first feature is still in progress.
 
 ## Accepted behaviour
 
@@ -107,18 +108,63 @@ Check-constraint SQL for Towns, Locations and position history is normalized
 to LF line endings in the model. The model then matches the migration
 snapshot on Windows and Linux checkouts alike; a model test guards this.
 
+## Location defaulting and optional Eircode lookup
+
+Creating a Customer's first Location, adding a Location and changing a
+Location's Town or Eircode now set its position automatically:
+
+1. A position Confirmed on site is kept. No lookup runs and no history is added.
+2. If the Location's Town has coordinates, the Location uses them with Town
+   precision. No external lookup runs, even when an Eircode is entered.
+3. If the Town has no coordinates and an Eircode is entered, the optional
+   Eircode lookup may supply a position with Eircode precision.
+4. Otherwise the Location saves with no position (Position needed). Lookup
+   disabled, unavailable, timed out, not found or returning invalid data all
+   end here. The Customer and Location are still saved together.
+
+Name-only, Type-only and unchanged edits do not recalculate, look anything up
+or add history. Replacing or clearing an automatic position keeps the previous
+position, with its original Town/Eircode source, in history. Changing Town
+coordinates later still does not move existing Locations; they update on their
+next Town or Eircode change.
+
+The store validates the request first, then resolves the position outside the
+database transaction. Inside the transaction it re-reads the Location and Town,
+and saves only if the Location's version, Town, Eircode and the Town's version
+all still match what was resolved. Otherwise the save returns a conflict, and
+nothing is written, including history. A slow lookup therefore cannot
+overwrite another user's edit, a newly confirmed position or a Main Contact
+change.
+
+### Postcoder adapter (disabled)
+
+`LocationCoordinates:Postcoder:Enabled` is `false` in appsettings, and no API
+key is configured. While disabled or keyless, the adapter makes no request and
+reports Unavailable. When enabled it:
+
+- sends one request to Postcoder's Irish position endpoint, with a 5-second
+  overall limit and a 3-second connect limit, no redirects and no retries;
+- skips the request for input that cannot be an Eircode (not 7 letters/digits
+  after removing spaces);
+- accepts only a single result with a valid coordinate pair. Empty, ambiguous,
+  partial or out-of-range results count as not found. Other provider errors,
+  oversized or malformed responses and timeouts count as unavailable;
+- removes HTTP logging and suppresses tracing, because Postcoder puts the API
+  key in the URL path.
+
+Live enablement remains blocked on MI-07: confirm the account's Eircode feature,
+coverage and the right to store returned coordinates. Then supply
+`LocationCoordinates__Postcoder__ApiKey` as an AppHost secret parameter
+(`AddParameter(..., secret: true)`, like the existing secrets), never in
+appsettings, and set `Enabled` to `true`. No provider was contacted or
+purchased.
+
 ## Review and next increment
 
-Review the Town form and the file format above. No business question remains
-open. The next increment connects Town-first defaulting and the optional
-disabled-by-default Eircode adapter to Location creation/address edits.
+Review the defaulting rules and the lookup behaviour above. No business
+question remains open. The final increment shows the stored position, its
+precision and Position needed on the Head Office Location detail page. It then
+runs the complete verification and checks both acceptance criteria.
 
-The later resolver must run external requests outside long SQL transactions,
-then recheck Location and Town versions/inputs before applying a result. It must
-call the common defaulting method, preserve confirmed pins and skip unrelated
-edits. WI-143 must add a separate authenticated confirmation operation; there is
-no confirmation writer or GPS endpoint in this increment.
-
-Defaulting on Location creation/address edits, external lookup and the Head
-Office Location position display remain to be implemented. The full work-item
-acceptance criteria have not yet been met.
+WI-143 must add a separate authenticated confirmation operation; there is no
+confirmation writer or GPS endpoint in this work item.
