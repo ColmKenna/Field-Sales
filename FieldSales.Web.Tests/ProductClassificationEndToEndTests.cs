@@ -49,7 +49,7 @@ public sealed class ProductClassificationEndToEndTests(ProductApplication app) :
             string? output = Environment.GetEnvironmentVariable("WI012_LAYOUT_DIR");
             if (!string.IsNullOrWhiteSpace(output))
             {
-                Directory.CreateDirectory(output);
+                System.IO.Directory.CreateDirectory(output);
                 string preview = Regex.Replace(checkpoint, "href=\"/css/site.css[^\"]*\"", "href=\"site.css\"");
                 preview = Regex.Replace(preview, "src=\"/js/product-unit-form.js[^\"]*\"", "src=\"product-unit-form.js\"");
                 await File.WriteAllTextAsync(System.IO.Path.Combine(output, "index.html"), preview);

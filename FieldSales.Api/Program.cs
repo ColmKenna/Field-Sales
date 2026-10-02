@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FieldSales.StaffAccess;
 using FieldSales.Api.Catalogue;
+using FieldSales.Api.Directory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
+builder.AddSqlServerDbContext<DirectoryDbContext>("DirectoryDb");
+builder.Services.AddScoped<GeographyStore>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IReferenceListStore, BrandListStore>();
 builder.Services.AddScoped<IReferenceListStore, ProductProfileListStore>();
@@ -86,6 +89,10 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.HeadOfficeUser)
         .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
+    options.AddPolicy("HeadOfficeDirectory", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(BusinessRoles.HeadOfficeUser)
+        .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
     options.AddPolicy("StaffApi", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.All)
@@ -101,6 +108,8 @@ if (!app.Environment.IsEnvironment("Testing"))
 }
 await DatabaseStartup.EnsureSchemaAsync<CatalogueDbContext>(app.Services, app.Environment, "CatalogueDb",
     context => context.Database.MigrateAsync(), context => context.Database.GetPendingMigrationsAsync());
+await DatabaseStartup.EnsureSchemaAsync<DirectoryDbContext>(app.Services, app.Environment, "DirectoryDb",
+    context => context.Database.MigrateAsync(), context => context.Database.GetPendingMigrationsAsync());
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -111,6 +120,7 @@ app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new StaffSessi
 app.MapCatalogueEndpoints();
 app.MapProductEndpoints();
 app.MapReferenceListEndpoints();
+app.MapGeographyEndpoints();
 app.MapDefaultEndpoints();
 app.Run();
 

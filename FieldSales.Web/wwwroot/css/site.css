@@ -74,3 +74,11 @@ p { line-height: 1.6; }
 .product-result-title strong { color: #155b84; }
 .product-result-title span { color: #35485c; }
 .product-result-price { font-weight: 600; }
+.geography-errors.validation-summary-valid { display: none; }
+.geography-list { display: grid; gap: .75rem; padding: 0; list-style: none; }
+.geography-list > li { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 1rem; padding: 1.25rem; border: 1px solid #d7dee6; border-radius: .6rem; background: #fff; overflow-wrap: anywhere; }
+.geography-rename { max-width: 100%; }
+.geography-rename summary, .geography-import summary { cursor: pointer; padding-block: .5rem; }
+.geography-form { margin-top: .75rem; width: min(100%, 30rem); }
+.geography-import { margin-block: 2rem; }
+.geography-import pre { overflow-x: auto; }
