@@ -21,7 +21,7 @@ public static class LocationPositionModelConfiguration
                OR ([PositionPrecision] = 1 AND [PositionSourceTownId] IS NOT NULL
                    AND [PositionSourceEircode] IS NOT NULL AND LEN([PositionSourceEircode]) > 0)
                OR ([PositionPrecision] = 2 AND [PositionSourceTownId] IS NULL AND [PositionSourceEircode] IS NULL)))
-            """));
+            """.ReplaceLineEndings("\n")));
         locations.HasMany(item => item.PositionHistory).WithOne().HasForeignKey(item => item.LocationId)
             .OnDelete(DeleteBehavior.Restrict);
         locations.Navigation(item => item.PositionHistory).HasField("_positionHistory")
@@ -33,7 +33,7 @@ public static class LocationPositionModelConfiguration
             (([Precision] = 0 AND [SourceTownId] IS NOT NULL AND [SourceEircode] IS NULL)
              OR ([Precision] = 1 AND [SourceTownId] IS NOT NULL AND [SourceEircode] IS NOT NULL AND LEN([SourceEircode]) > 0)
              OR ([Precision] = 2 AND [SourceTownId] IS NULL AND [SourceEircode] IS NULL))
-            """));
+            """.ReplaceLineEndings("\n")));
         history.HasKey(item => item.Id);
         history.Property(item => item.Id).ValueGeneratedNever();
         history.Property(item => item.Latitude).HasPrecision(10, 7);

@@ -36,6 +36,19 @@ public sealed class Town : GeographyEntity
     private Town() { }
     internal Town(Guid countyId, string name) { Id = Guid.NewGuid(); CountyId = countyId; Rename(name); }
     public Guid CountyId { get; private set; }
+    public decimal? Latitude { get; private set; }
+    public decimal? Longitude { get; private set; }
+
+    internal bool SetCoordinates(decimal? latitude, decimal? longitude)
+    {
+        Coordinates? coordinates;
+        try { coordinates = Coordinates.FromPair(latitude, longitude); }
+        catch (CustomerDirectoryValidationException exception) { throw new GeographyValidationException(exception.Message); }
+        if (Latitude == coordinates?.Latitude && Longitude == coordinates?.Longitude) return false;
+        Latitude = coordinates?.Latitude;
+        Longitude = coordinates?.Longitude;
+        return true;
+    }
 }
 
 public static class GeographyNames

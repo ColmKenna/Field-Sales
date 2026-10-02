@@ -32,6 +32,13 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
         counties.HasIndex(item => new { item.RegionId, item.NormalizedName }).IsUnique();
         counties.HasOne<Region>().WithMany().HasForeignKey(item => item.RegionId).OnDelete(DeleteBehavior.Restrict);
         var towns = Configure<Town>(modelBuilder, "Towns");
+        towns.Property(item => item.Latitude).HasPrecision(10, 7);
+        towns.Property(item => item.Longitude).HasPrecision(10, 7);
+        towns.ToTable("Towns", table => table.HasCheckConstraint("CK_Towns_Coordinates", """
+            ([Latitude] IS NULL AND [Longitude] IS NULL) OR
+            ([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL
+              AND [Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)
+            """.ReplaceLineEndings("\n")));
         towns.HasIndex(item => new { item.CountyId, item.NormalizedName }).IsUnique();
         towns.HasOne<County>().WithMany().HasForeignKey(item => item.CountyId).OnDelete(DeleteBehavior.Restrict);
 

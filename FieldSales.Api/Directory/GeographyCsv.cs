@@ -1,9 +1,10 @@
 using System.Text;
+using System.Globalization;
 using FieldSales.Directory.Contracts;
 
 namespace FieldSales.Api.Directory;
 
-public sealed record GeographySeedRow(string Region, string County, string Town);
+public sealed record GeographySeedRow(string Region, string County, string Town, Coordinates? Coordinates = null);
 
 public static class GeographyCsv
 {
@@ -13,6 +14,7 @@ public static class GeographyCsv
             throw new GeographyValidationException("The CSV file must be 1 MiB or smaller.");
         List<GeographySeedRow> result = [];
         bool headerSeen = false;
+        int columns = 3;
         int row = 0;
         foreach (string[] fields in Records(text.TrimStart('\uFEFF')))
         {
@@ -20,26 +22,38 @@ public static class GeographyCsv
             if (fields.All(string.IsNullOrWhiteSpace)) continue;
             if (!headerSeen)
             {
-                if (!fields.SequenceEqual(new[] { "Region", "County", "Town" }))
-                    throw new GeographyValidationException("The CSV header must be Region,County,Town.");
+                if (fields.SequenceEqual(new[] { "Region", "County", "Town", "Latitude", "Longitude" })) columns = 5;
+                else if (!fields.SequenceEqual(new[] { "Region", "County", "Town" }))
+                    throw new GeographyValidationException("The CSV header must be Region,County,Town or Region,County,Town,Latitude,Longitude.");
                 headerSeen = true;
                 continue;
             }
             if (result.Count >= GeographyImportLimits.MaximumRows)
                 throw new GeographyValidationException("The CSV file must contain at most 10,000 town records.");
-            if (fields.Length != 3)
-                throw new GeographyValidationException($"Row {row}: enter exactly Region, County and Town.");
+            if (fields.Length != columns)
+                throw new GeographyValidationException($"Row {row}: enter exactly {columns} columns to match the header.");
             try
             {
-                result.Add(new(GeographyNames.Validate(fields[0]), GeographyNames.Validate(fields[1]), GeographyNames.Validate(fields[2])));
+                Coordinates? coordinates = columns == 5 ? Coordinates.FromPair(Number(fields[3], "latitude"), Number(fields[4], "longitude")) : null;
+                result.Add(new(GeographyNames.Validate(fields[0]), GeographyNames.Validate(fields[1]), GeographyNames.Validate(fields[2]), coordinates));
             }
             catch (GeographyValidationException exception)
             {
                 throw new GeographyValidationException($"Row {row}: {exception.Message}");
             }
+            catch (CustomerDirectoryValidationException exception)
+            { throw new GeographyValidationException($"Row {row}: {exception.Message}"); }
         }
         if (result.Count == 0) throw new GeographyValidationException("The CSV file contains no towns.");
         return result;
+    }
+
+    private static decimal? Number(string text, string label)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (!decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal number))
+            throw new GeographyValidationException($"Enter {label} as a decimal number with a dot, for example 52.92.");
+        return number;
     }
 
     private static IEnumerable<string[]> Records(string text)

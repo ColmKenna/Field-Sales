@@ -79,8 +79,11 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
     public Task<DirectoryResult<GeographyMutationResult>> RetireAsync(string level, Guid id,
         FieldSales.ReferenceData.ReferenceAction action, string? version, CancellationToken ct) =>
         SendAsync<GeographyMutationResult>(HttpMethod.Post, $"{Root}/{level}/{id}/retire", JsonContent.Create(new RetireGeographyRequest(action, version)), ct);
-    public Task<DirectoryResult<GeographyItem>> CreateAsync(string level, string? name, Guid? parentId, CancellationToken ct) =>
-        SendAsync<GeographyItem>(HttpMethod.Post, $"{Root}/{level}", JsonContent.Create(new CreateGeographyRequest(name, parentId)), ct);
+    public Task<DirectoryResult<GeographyItem>> CreateAsync(string level, string? name, Guid? parentId, CancellationToken ct,
+        decimal? latitude = null, decimal? longitude = null) =>
+        SendAsync<GeographyItem>(HttpMethod.Post, $"{Root}/{level}", JsonContent.Create(new CreateGeographyRequest(name, parentId, latitude, longitude)), ct);
+    public Task<DirectoryResult<GeographyItem>> SetTownCoordinatesAsync(Guid id, SetTownCoordinatesRequest request, CancellationToken ct) =>
+        SendAsync<GeographyItem>(HttpMethod.Put, $"{Root}/towns/{id}/coordinates", JsonContent.Create(request), ct);
     public Task<DirectoryResult<GeographyItem>> RenameAsync(string level, Guid id, string? name, string? version, CancellationToken ct) =>
         SendAsync<GeographyItem>(HttpMethod.Put, $"{Root}/{level}/{id}/name", JsonContent.Create(new RenameGeographyRequest(name, version)), ct);
     public Task<DirectoryResult<GeographyImportResult>> ImportAsync(byte[] csv, CancellationToken ct)

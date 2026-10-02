@@ -64,11 +64,12 @@ public sealed class GeographyStore(DirectoryDbContext db, GeographyUsageReader u
             join region in db.Regions on county.RegionId equals region.Id
             select new { Town = town.Id, TownName = town.Name, County = county.Id, CountyName = county.Name,
                 Region = region.Id, RegionName = region.Name, TownArchived = town.IsArchived,
-                CountyArchived = county.IsArchived, RegionArchived = region.IsArchived }).ToArrayAsync(ct);
+                CountyArchived = county.IsArchived, RegionArchived = region.IsArchived,
+                town.Latitude, town.Longitude }).ToArrayAsync(ct);
         static string Label(string name, bool archived) => name + (archived ? " (archived)" : "");
         return rows.Select(row => new TownChoice(row.Town, row.TownName, row.County, row.CountyName, row.Region, row.RegionName,
             $"{Label(row.TownName, row.TownArchived)} — {Label(row.CountyName, row.CountyArchived)}, {Label(row.RegionName, row.RegionArchived)}",
-            row.TownArchived, row.CountyArchived, row.RegionArchived))
+            row.TownArchived, row.CountyArchived, row.RegionArchived, row.Latitude, row.Longitude))
             .OrderBy(item => item.Label, StringComparer.OrdinalIgnoreCase).ThenBy(item => item.Id).ToArray();
     }
 
@@ -77,6 +78,21 @@ public sealed class GeographyStore(DirectoryDbContext db, GeographyUsageReader u
         var item = await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, ct);
         return item is null ? null : Item(item, ParentId(item)) with { Usage = await usage.ReadAsync(new(level, id), ct) };
     }
+
+    public Task<GeographyItem?> SetTownCoordinatesAsync(Guid id, SetTownCoordinatesRequest request, CancellationToken ct) =>
+        GeographyTransactions.RunAsync(db, async () =>
+        {
+            var town = await db.Towns.SingleOrDefaultAsync(item => item.Id == id, ct);
+            if (town is null) return null;
+            byte[] version;
+            try { version = Convert.FromBase64String(request.Version ?? string.Empty); }
+            catch (FormatException) { throw new GeographyValidationException("Reload this town before saving coordinates."); }
+            if (version.Length != 8) throw new GeographyValidationException("Reload this town before saving coordinates.");
+            if (!town.Version.SequenceEqual(version)) throw new DbUpdateConcurrencyException();
+            town.SetCoordinates(request.Latitude, request.Longitude);
+            await db.SaveChangesAsync(ct);
+            return Item(town, town.CountyId);
+        }, ct);
 
     public Task<ReferenceMutationStatus> RetireAsync<T>(Guid id, string level, RetireGeographyRequest request, CancellationToken ct)
         where T : GeographyEntity => GeographyTransactions.RunAsync(db, async () =>
@@ -124,8 +140,9 @@ public sealed class GeographyStore(DirectoryDbContext db, GeographyUsageReader u
             Dictionary<string, Region> regions = (await db.Regions.ToListAsync(ct)).ToDictionary(item => item.NormalizedName);
             Dictionary<(Guid, string), County> counties = (await db.Counties.ToListAsync(ct)).ToDictionary(item => (item.RegionId, item.NormalizedName));
             Dictionary<(Guid, string), Town> towns = (await db.Towns.ToListAsync(ct)).ToDictionary(item => (item.CountyId, item.NormalizedName));
-            int regionsAdded = 0, countiesAdded = 0, townsAdded = 0, alreadyPresent = 0;
+            int regionsAdded = 0, countiesAdded = 0, townsAdded = 0, alreadyPresent = 0, coordinatesUpdated = 0;
             HashSet<(Guid, string)> seen = [];
+            Dictionary<(Guid, string), Coordinates> coordinateValues = [];
             foreach (var row in rows)
             {
                 string regionName = row.Region.ToUpperInvariant();
@@ -140,20 +157,35 @@ public sealed class GeographyStore(DirectoryDbContext db, GeographyUsageReader u
                     county = new(region.Id, row.County); counties.Add(countyKey, county); db.Counties.Add(county); countiesAdded++;
                 }
                 var townKey = (county.Id, row.Town.ToUpperInvariant());
-                if (!seen.Add(townKey)) continue;
-                if (towns.ContainsKey(townKey)) { alreadyPresent++; continue; }
+                if (row.Coordinates is { } supplied)
+                {
+                    if (coordinateValues.TryGetValue(townKey, out var previous) && previous != supplied)
+                        throw new GeographyValidationException("The CSV contains conflicting coordinates for the same town. No changes were saved.");
+                    coordinateValues[townKey] = supplied;
+                }
+                bool first = seen.Add(townKey);
+                if (towns.TryGetValue(townKey, out var existing))
+                {
+                    if (first) alreadyPresent++;
+                    if (row.Coordinates is { } coordinates && existing.SetCoordinates(coordinates.Latitude, coordinates.Longitude)
+                        && db.Entry(existing).State != EntityState.Added) coordinatesUpdated++;
+                    continue;
+                }
                 if (region.IsArchived || county.IsArchived)
                     throw new GeographyValidationException("Cannot add a town under archived geography. No changes were saved.");
-                Town town = new(county.Id, row.Town); towns.Add(townKey, town); db.Towns.Add(town); townsAdded++;
+                Town town = new(county.Id, row.Town);
+                if (row.Coordinates is { } pin) town.SetCoordinates(pin.Latitude, pin.Longitude);
+                towns.Add(townKey, town); db.Towns.Add(town); townsAdded++;
             }
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            return new GeographyImportResult(regionsAdded, countiesAdded, townsAdded, alreadyPresent);
+            return new GeographyImportResult(regionsAdded, countiesAdded, townsAdded, alreadyPresent, coordinatesUpdated);
         });
     }
 
     public static GeographyItem Item(GeographyEntity entity, Guid? parentId = null) =>
-        new(entity.Id, entity.Name, parentId, Convert.ToBase64String(entity.Version), entity.IsArchived);
+        new(entity.Id, entity.Name, parentId, Convert.ToBase64String(entity.Version), entity.IsArchived,
+            Latitude: (entity as Town)?.Latitude, Longitude: (entity as Town)?.Longitude);
 
     private static Guid? ParentId(GeographyEntity entity) => entity switch
     { County county => county.RegionId, Town town => town.CountyId, _ => null };

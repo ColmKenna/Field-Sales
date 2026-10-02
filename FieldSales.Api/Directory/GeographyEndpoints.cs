@@ -33,8 +33,13 @@ public static class GeographyEndpoints
         {
             if (request.ParentId is not Guid id || !await db.Counties.AnyAsync(item => item.Id == id, ct))
                 throw new GeographyValidationException("Choose a county");
-            return new Town(id, request.Name!);
+            Town town = new(id, request.Name!);
+            town.SetCoordinates(request.Latitude, request.Longitude);
+            return town;
         });
+        group.MapPut("/towns/{id:guid}/coordinates", (Guid id, SetTownCoordinatesRequest request, GeographyStore store, CancellationToken ct) =>
+            GuardAsync(async () => await store.SetTownCoordinatesAsync(id, request, ct) is { } town ? Results.Ok(town) : Results.NotFound(),
+                "This town changed. Reload before saving coordinates."));
         group.MapPost("/import", (HttpRequest request, GeographyStore store, CancellationToken ct) => GuardAsync(async () =>
         {
             if (!string.Equals(request.ContentType?.Split(';')[0].Trim(), "text/csv", StringComparison.OrdinalIgnoreCase))
@@ -68,6 +73,8 @@ public static class GeographyEndpoints
         group.MapPost($"/{level}", (CreateGeographyRequest request, DirectoryDbContext db, GeographyStore store, CancellationToken ct) =>
             GuardAsync(() => GeographyTransactions.RunAsync<IResult>(db, async () =>
         {
+            if (typeof(T) != typeof(Town) && (request.Latitude is not null || request.Longitude is not null))
+                throw new GeographyValidationException("Coordinates can only be entered for a town.");
             T entity = await create(request, db, ct);
             await store.EnsureActiveParentAsync(level, request.ParentId, ct);
             db.Set<T>().Add(entity);
@@ -104,14 +111,15 @@ public static class GeographyEndpoints
     private static GeographyItem ToItem(GeographyEntity entity) => GeographyStore.Item(entity,
         entity switch { County county => county.RegionId, Town town => town.CountyId, _ => null });
 
-    private static async Task<IResult> GuardAsync(Func<Task<IResult>> operation)
+    private static async Task<IResult> GuardAsync(Func<Task<IResult>> operation,
+        string concurrencyMessage = "This record changed. Reload before renaming.")
     {
         try { return await operation(); }
         catch (GeographyValidationException exception) { return Results.BadRequest(new GeographyError(exception.Message)); }
         catch (ReferenceUsageUnavailableException) { return Results.StatusCode(503); }
         catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
         { return Results.BadRequest(new GeographyError("The CSV file must be 1 MiB or smaller.")); }
-        catch (DbUpdateConcurrencyException) { return Results.Conflict(new GeographyError("This record changed. Reload before renaming.")); }
+        catch (DbUpdateConcurrencyException) { return Results.Conflict(new GeographyError(concurrencyMessage)); }
         catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
         { return Results.Conflict(new GeographyError("A name like this already exists here. No changes were saved.")); }
         // EF can wrap deadlocks in InvalidOperationException when a provider has no retry policy.

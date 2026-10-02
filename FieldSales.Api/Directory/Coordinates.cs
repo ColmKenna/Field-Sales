@@ -6,6 +6,14 @@ public sealed record Coordinates
     public decimal Latitude { get; }
     public decimal Longitude { get; }
 
+    public static Coordinates? FromPair(decimal? latitude, decimal? longitude)
+    {
+        if (latitude is null && longitude is null) return null;
+        if (latitude is null || longitude is null)
+            throw new CustomerDirectoryValidationException("Position", "Enter both latitude and longitude, or leave both blank.");
+        return new(latitude.Value, longitude.Value);
+    }
+
     public Coordinates(decimal latitude, decimal longitude)
     {
         if (latitude is < -90m or > 90m)

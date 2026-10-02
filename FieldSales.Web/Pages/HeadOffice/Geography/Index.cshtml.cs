@@ -1,4 +1,5 @@
 using System.Net;
+using System.Globalization;
 using FieldSales.Directory.Contracts;
 using FieldSales.ReferenceData;
 using FieldSales.Web.Directory;
@@ -21,6 +22,9 @@ public sealed class IndexModel(DirectoryApiClient directory) : PageModel
     [BindProperty] public Guid? RenameId { get; set; }
     [BindProperty] public string? RenameName { get; set; }
     [BindProperty] public string? Version { get; set; }
+    [BindProperty] public Guid? CoordinatesId { get; set; }
+    [BindProperty] public string? Latitude { get; set; }
+    [BindProperty] public string? Longitude { get; set; }
     [BindProperty] public IFormFile? Upload { get; set; }
     [TempData] public string? Notice { get; set; }
     public GeographyPage Geography { get; private set; } = null!;
@@ -60,8 +64,20 @@ public sealed class IndexModel(DirectoryApiClient directory) : PageModel
         IActionResult page = await ShowAsync();
         if (page is not PageResult) return page;
         if (!ModelState.IsValid) return Page();
-        var result = await directory.CreateAsync(Geography.Level, Name, Geography.ParentId, HttpContext.RequestAborted);
+        decimal? latitude = null, longitude = null;
+        if (Geography.Level == "towns" && !ParseCoordinates(out latitude, out longitude)) return Page();
+        var result = await directory.CreateAsync(Geography.Level, Name, Geography.ParentId, HttpContext.RequestAborted, latitude, longitude);
         return await SavedAsync(result, nameof(Name));
+    }
+    public async Task<IActionResult> OnPostCoordinatesAsync()
+    {
+        IActionResult page = await ShowAsync();
+        if (page is not PageResult) return page;
+        if (Geography.Level != "towns" || CoordinatesId is not Guid id
+            || !Geography.Items.Any(item => item.Id == id)) return BadRequest();
+        if (!ModelState.IsValid || !ParseCoordinates(out var latitude, out var longitude)) return Page();
+        var result = await directory.SetTownCoordinatesAsync(id, new(latitude, longitude, Version), HttpContext.RequestAborted);
+        return await SavedAsync(result, nameof(Latitude));
     }
     public async Task<IActionResult> OnPostRenameAsync()
     {
@@ -94,6 +110,8 @@ public sealed class IndexModel(DirectoryApiClient directory) : PageModel
             Notice = $"Added {Places(summary.RegionsAdded, "region", "regions")}, "
                 + $"{Places(summary.CountiesAdded, "county", "counties")} and {Places(summary.TownsAdded, "town", "towns")}. "
                 + $"{summary.TownsAlreadyPresent} {(summary.TownsAlreadyPresent == 1 ? "town was" : "towns were")} already present.";
+            if (summary.TownCoordinatesUpdated > 0)
+                Notice += $" Updated coordinates for {Places(summary.TownCoordinatesUpdated, "town", "towns")}.";
             return RedirectToPage(new { RegionId, CountyId, ShowArchived });
         }
         return await SavedAsync(result, nameof(Upload));
@@ -117,4 +135,19 @@ public sealed class IndexModel(DirectoryApiClient directory) : PageModel
         return Page();
     }
     private static string Places(int count, string singular, string plural) => $"{count} {(count == 1 ? singular : plural)}";
+    private bool ParseCoordinates(out decimal? latitude, out decimal? longitude)
+    {
+        latitude = Number(Latitude, nameof(Latitude));
+        longitude = Number(Longitude, nameof(Longitude));
+        if (ModelState.IsValid && (latitude is null) != (longitude is null))
+            ModelState.AddModelError(nameof(Latitude), "Enter both latitude and longitude, or leave both blank.");
+        return ModelState.IsValid;
+    }
+    private decimal? Number(string? text, string field)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)) return number;
+        ModelState.AddModelError(field, "Enter a decimal number with a dot, for example 52.92.");
+        return null;
+    }
 }
