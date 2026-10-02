@@ -82,3 +82,7 @@ p { line-height: 1.6; }
 .geography-form { margin-top: .75rem; width: min(100%, 30rem); }
 .geography-import { margin-block: 2rem; }
 .geography-import pre { overflow-x: auto; }
+.directory-table { overflow-x: auto; }
+.directory-table table { width: 100%; border-collapse: collapse; background: #fff; }
+.directory-table caption { text-align: left; padding-block: 1rem; }
+.directory-table th, .directory-table td { text-align: left; padding: .8rem; border-bottom: 1px solid #d7dee6; }

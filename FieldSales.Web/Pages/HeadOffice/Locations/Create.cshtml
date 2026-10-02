@@ -1,0 +1,17 @@
+@page "{customerId:guid}"
+@model FieldSales.Web.Pages.HeadOffice.Locations.CreateModel
+@{ ViewData["Title"] = "Add location"; }
+<p><a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Customer.Id">Back to @Model.Customer.Name</a></p>
+<h1>Add location</h1>
+<p>Customer: @Model.Customer.Name</p>
+<form method="post" class="product-form">
+    <div asp-validation-summary="All" role="alert"></div>
+    <partial name="_LocationFields" model="Model" />
+    @if (Model.DuplicateWarning)
+    {
+        <p>Change the name, or save another location with this name.</p>
+        <button type="submit" asp-page-handler="Confirm">Save anyway</button>
+    }
+    <button type="submit" class="button" disabled="@(Model.Towns.Count == 0)">Save location</button>
+    <a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Customer.Id">Cancel</a>
+</form>

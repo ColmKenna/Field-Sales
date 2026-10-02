@@ -1,0 +1,16 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Customers.CreateModel
+@{ ViewData["Title"] = "Create customer"; }
+<p><a asp-page="Index">Back to customers</a></p>
+<h1>Create customer</h1>
+<p>Add the customer and its first location together.</p>
+<form method="post" class="product-form">
+    <div asp-validation-summary="All" role="alert"></div>
+    <label asp-for="CustomerName">Customer name</label>
+    <input asp-for="CustomerName" maxlength="200" required />
+    <span asp-validation-for="CustomerName"></span>
+    <h2>First location</h2>
+    <partial name="_LocationFields" model="Model" />
+    <button type="submit" class="button" disabled="@(Model.Towns.Count == 0)">Save customer and location</button>
+    <a asp-page="Index">Cancel</a>
+</form>
