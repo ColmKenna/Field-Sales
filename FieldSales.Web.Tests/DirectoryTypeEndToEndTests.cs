@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbContext;
 using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext;
-using EmptyContactTypeUsageSource = CatalogueApi::FieldSales.Api.Directory.EmptyContactTypeUsageSource;
+using ContactTypeUsageSource = CatalogueApi::FieldSales.Api.Directory.ContactTypeUsageSource;
 
 namespace FieldSales.Web.Tests;
 
@@ -26,7 +26,7 @@ public sealed class DirectoryTypeApplication : GeographyApplication
     protected override void ConfigureAdditionalServices(IServiceCollection services, string connectionString)
     {
         foreach (var descriptor in services.Where(service => service.IsKeyedService
-            && Equals(service.ServiceKey, "directory-types") && service.KeyedImplementationType == typeof(EmptyContactTypeUsageSource)).ToArray())
+            && Equals(service.ServiceKey, "directory-types") && service.KeyedImplementationType == typeof(ContactTypeUsageSource)).ToArray())
             services.Remove(descriptor);
         if (Registration != "missing") services.AddKeyedSingleton<IReferenceUsageSource>("directory-types", Contacts);
         if (Registration == "duplicate") services.AddKeyedSingleton<IReferenceUsageSource>("directory-types", new DirectoryTypeTestContacts());

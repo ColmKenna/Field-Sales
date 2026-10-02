@@ -2,8 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.Directory;
 
-// Checkpoint mapping: invoke after Continue T-2.4.1, then generate the migration
-// and install the guards written in docs/contact-location-storage.sql.
+// Reviewed mapping. The additive migration also installs the SQL business guards.
 public static class ContactModelConfiguration
 {
     public static void Configure(ModelBuilder modelBuilder)

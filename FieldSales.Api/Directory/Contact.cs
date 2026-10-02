@@ -43,7 +43,7 @@ public sealed class Contact
     }
 
     // Load all linked Locations, not just the shop whose screen initiated the edit.
-    // The planned database guard independently protects against partial loading/bypass.
+    // The database guard independently protects against partial loading/bypass.
     internal void SetStatus(ContactStatus status)
     {
         if (!Enum.IsDefined(status))

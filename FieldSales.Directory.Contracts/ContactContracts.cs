@@ -9,6 +9,10 @@ public sealed record ContactLocationSummary(Guid LocationId, string Name, Guid C
 public sealed record ContactDetails(Guid Id, string Name, DirectoryTypeChoice Type, ContactStatus Status,
     string? Phone, string? Email, string Version, IReadOnlyList<ContactLocationSummary> Locations);
 public sealed record LocationContactSummary(ContactChoice Contact, bool IsMain);
+public sealed record ContactLocationChoice(Guid Id, string Name, string CustomerName, string TownName)
+{
+    public string Label => $"{Name} — {CustomerName}, {TownName}";
+}
 public sealed record LocationContactsPage(Guid LocationId, string LocationName, string LocationVersion,
     ContactChoice? MainContact, IReadOnlyList<LocationContactSummary> Contacts, int InactiveCount, bool ShowInactive);
 
@@ -26,5 +30,6 @@ public sealed record MainContactConfirmation(ContactChoice Outgoing, ContactChoi
 }
 public sealed record ContactMutationResult(Guid ContactId, Guid? LocationId = null,
     bool AlreadyLinked = false, bool AutomaticallyMadeMain = false);
+public sealed record SetMainContactResult(ContactMutationResult? Mutation, MainContactConfirmation? Confirmation = null);
 public sealed record ContactDirectoryError(string Error, string? Field = null,
     MainContactConfirmation? Confirmation = null);

@@ -13,17 +13,15 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<LocationType> LocationTypes => Set<LocationType>();
     public DbSet<ContactType> ContactTypes => Set<ContactType>();
+    public DbSet<Contact> Contacts => Set<Contact>();
+    public DbSet<LocationContact> LocationContacts => Set<LocationContact>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Ignore<GeographyEntity>();
         modelBuilder.Ignore<FieldSales.Api.Catalogue.NamedReferenceItem>();
         modelBuilder.Ignore<DirectoryType>();
-        // WI-018 checkpoint only. Activate ContactModelConfiguration after review;
-        // the current database model and migrations must remain unchanged until then.
-        modelBuilder.Ignore<Contact>();
-        modelBuilder.Ignore<LocationContact>();
-        modelBuilder.Entity<Location>().Ignore(location => location.MainContactId).Ignore(location => location.Contacts);
+        ContactModelConfiguration.Configure(modelBuilder);
         ConfigureType<LocationType>(modelBuilder, "LocationTypes");
         ConfigureType<ContactType>(modelBuilder, "ContactTypes");
         var regions = Configure<Region>(modelBuilder, "Regions");

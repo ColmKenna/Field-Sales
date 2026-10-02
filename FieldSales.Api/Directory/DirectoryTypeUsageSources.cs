@@ -18,13 +18,18 @@ public sealed class LocationTypeUsageSource(DirectoryDbContext db) : IReferenceU
     }
 }
 
-/// <summary>WI-018 must replace this keyed provider with persisted Contact counts,
-/// including Inactive Contacts, using the same scoped DirectoryDb transaction.</summary>
-public sealed class EmptyContactTypeUsageSource : IReferenceUsageSource
+/// <summary>Counts people, including Inactive Contacts, not their Location links.
+/// Retirement uses the same scoped DirectoryDb transaction as these reads.</summary>
+public sealed class ContactTypeUsageSource(DirectoryDbContext db) : IReferenceUsageSource
 {
     public string SourceKey => "contacts";
     public bool Supports(string listKey) => listKey == ReferenceListKeys.ContactTypes;
-    public Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken ct) => Task.FromResult(new ReferenceCount(SourceKey, "contact", "contacts", 0));
-    public Task<IReadOnlyDictionary<Guid, ReferenceCount>> CountManyAsync(string listKey, IReadOnlyList<Guid> ids, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyDictionary<Guid, ReferenceCount>>(ids.Distinct().ToDictionary(id => id, _ => new ReferenceCount(SourceKey, "contact", "contacts", 0)));
+    public async Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken ct) =>
+        new(SourceKey, "contact", "contacts", await db.Contacts.LongCountAsync(contact => contact.ContactTypeId == item.ItemId, ct));
+    public async Task<IReadOnlyDictionary<Guid, ReferenceCount>> CountManyAsync(string listKey, IReadOnlyList<Guid> ids, CancellationToken ct)
+    {
+        var counts = await db.Contacts.Where(contact => ids.Contains(contact.ContactTypeId)).GroupBy(contact => contact.ContactTypeId)
+            .Select(group => new { Id = group.Key, Count = group.LongCount() }).ToDictionaryAsync(row => row.Id, row => row.Count, ct);
+        return ids.Distinct().ToDictionary(id => id, id => new ReferenceCount(SourceKey, "contact", "contacts", counts.GetValueOrDefault(id)));
+    }
 }
