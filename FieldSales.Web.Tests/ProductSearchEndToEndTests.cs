@@ -44,7 +44,7 @@ public sealed class ProductSearchEndToEndTests(ProductApplication app) : IClassF
         string? output = Environment.GetEnvironmentVariable("WI013_LAYOUT_DIR");
         if (!string.IsNullOrWhiteSpace(output))
         {
-            Directory.CreateDirectory(output);
+            System.IO.Directory.CreateDirectory(output);
             using var rendered = await browser.GetAsync("/HeadOffice/Products?query=SPF30");
             string preview = Regex.Replace(await rendered.Content.ReadAsStringAsync(), "href=\"/css/site.css[^\"]*\"", "href=\"site.css\"");
             await File.WriteAllTextAsync(System.IO.Path.Combine(output, "index.html"), preview);
