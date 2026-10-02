@@ -1,9 +1,9 @@
-# WI-019 coordinate storage, Town maintenance and defaulting checkpoints
+# WI-019 Location coordinates: delivery record
 
 The user approved the implementation plan and 12 Scenario Review cases on
-2026-10-02, then authorized each increment in turn: storage, Town maintenance
-and Location defaulting. The Head Office Location position display is still to
-come, so the complete Town-first feature is still in progress.
+2026-10-02, then authorized each increment in turn: storage, Town maintenance,
+Location defaulting and the Head Office Location display. All five increments
+are complete; see the acceptance criteria and verification at the end.
 
 ## Accepted behaviour
 
@@ -159,12 +159,76 @@ coverage and the right to store returned coordinates. Then supply
 appsettings, and set `Enabled` to `true`. No provider was contacted or
 purchased.
 
-## Review and next increment
+## Location record display (H-26)
 
-Review the defaulting rules and the lookup behaviour above. No business
-question remains open. The final increment shows the stored position, its
-precision and Position needed on the Head Office Location detail page. It then
-runs the complete verification and checks both acceptance criteria.
+The Head Office Location detail page shows the stored position below Type:
+
+| Stored position | Map position | Precision |
+|---|---|---|
+| Town | `52.9234568, -6.2912346` | Town — approximate: the Town's position, not the shop's · set on 2 Oct 2026 |
+| Eircode | `52.9387654, -6.2312345` | Eircode — from the Eircode lookup · set on 2 Oct 2026 |
+| Confirmed on site | `53.1000000, -6.1000000` | Confirmed on site · set on 2 Oct 2026 |
+| None | **Position needed**. No map position has been set for this location yet. A position is taken from the Town's coordinates, or failing that the Eircode, when the location is created or its Town or Eircode changes. | (row omitted) |
+
+The coordinates above are test fixture values, not surveyed positions.
+The page only reads the stored value through the existing BFF client; it has
+no coordinate inputs, and edit requests still carry no coordinates. The
+"Position needed" wording makes no claim about the Town, because Locations
+created before WI-019 stay unpositioned even when their Town has coordinates.
 
 WI-143 must add a separate authenticated confirmation operation; there is no
 confirmation writer or GPS endpoint in this work item.
+
+## Acceptance criteria and verification
+
+> A Location with Eircode A67 X123 gets coordinates from the Eircode with
+> Precision "Eircode" (S1)
+
+Met as amended by the user's Town-first decision, which supersedes the
+Eircode-first wording. Through the Head Office website, creating Hickey's
+Pharmacies with Hickey's Rathdrum (Town Rathdrum, Eircode A67 X123, Type
+Pharmacy) saves both records together. When Rathdrum has no coordinates, the
+lookup is asked for exactly "A67 X123" outside any transaction, and the
+Location saves its result with Precision Eircode, shown on the record. When
+Rathdrum has coordinates, the Location uses them with Precision Town and no
+lookup runs. Test: `Should_SaveTownDefaultOrOptionalEircodeFallback_When_FirstLocationIsCreated`
+(both cases), using a lookup test double. The live Postcoder adapter stays
+disabled until MI-07 is resolved. S1's No Visit Schedule and Unassigned lists
+belong to other work items.
+
+> A Location in Laragh with no Eircode gets coordinates from Laragh with
+> Precision "Town" (S3)
+
+Met. Adding a Location in Laragh with a blank Eircode through the add-location
+page saves Laragh's coordinates with Precision Town, makes no lookup, and the
+record shows "Town — approximate". Test:
+`Should_SaveTownPrecision_When_LocationHasNoEircode`.
+
+Every approved scenario has tests: 1–2 and 5 (defaulting and Position needed),
+3–4 (unavailable/not found), 6 (recalculation and history), 7 (confirmed
+protection), 8 (no noise on unrelated edits), 9 (Town entry and CSV),
+10 (stale lookups), 11 (upgrade and restart) and 12 (access, antiforgery,
+server-only credentials and no logged secret).
+
+Final verification on 2026-10-03, after a `--no-incremental -warnaserror` build
+with zero warnings and errors:
+
+| Suite | Result |
+|---|---|
+| API | 192 / 192 |
+| Web (`-- xUnit.MaxParallelThreads=4`) | 405 / 405 |
+| Identity Admin | 1,046 / 1,046 |
+| JavaScript (admin UI, console status, product unit form) | 34 / 34 |
+
+No existing test was weakened, skipped or removed. The Web suite needs limited
+parallelism on this machine: at the default it intermittently fails because
+SQL Server test containers exit during start-up, before any test runs.
+
+Open follow-ups, not blocking:
+
+- Locations created before WI-019, and Locations saved as Position needed,
+  only pick up Town coordinates added later when their Town or Eircode
+  changes. If Head Office needs a way to refresh these, a per-Location
+  "Update position" action is the smallest addition.
+- Enabling the Postcoder lookup needs MI-07 resolved and an AppHost secret
+  parameter for the API key.

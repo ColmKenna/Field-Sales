@@ -1,8 +1,11 @@
 extern alias CatalogueApi;
 
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using FieldSales.Directory.Contracts;
+using FieldSales.Web.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -198,6 +201,86 @@ public sealed class LocationCoordinateEndToEndTests(LocationCoordinateApplicatio
         Assert.Equal(main, (await db.Locations.SingleAsync()).MainContactId); Assert.Empty(await db.LocationPositionHistory.ToArrayAsync());
     }
 
+    // Acceptance criterion S1 as amended by the Town-first decision. Coordinates are fixture values.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Should_SaveTownDefaultOrOptionalEircodeFallback_When_FirstLocationIsCreated(bool rathdrumHasPin)
+    {
+        await app.ResetCoordinatesAsync(); using var api = app.CreateApiClient();
+        var rathdrum = await TownAsync(api, rathdrumHasPin ? 52.9312345m : null, rathdrumHasPin ? -6.2245678m : null, "Rathdrum");
+        Guid pharmacy = await LocationTypeAsync("Pharmacy");
+        List<string> requested = [];
+        app.Probe.Handler = (code, _) =>
+        {
+            lock (requested) requested.Add(code);
+            return Task.FromResult(new EircodeLookupResult(EircodeLookupStatus.Found, new(52.9387654m, -6.2312345m)));
+        };
+        await using var website = app.CreateWebsite(); using var browser = website.CreateBrowser(); await SignInAsync(browser);
+        string form = await HtmlAsync(browser, "/HeadOffice/Customers/Create");
+        using var saved = await PostAsync(browser, "/HeadOffice/Customers/Create", form, new()
+        {
+            ["CustomerName"] = "Hickey's Pharmacies", ["Name"] = "Hickey's Rathdrum", ["TownId"] = rathdrum.Id.ToString(),
+            ["Eircode"] = "A67 X123", ["LocationTypeId"] = pharmacy.ToString()
+        });
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+        var summary = Assert.Single((await api.GetFromJsonAsync<CustomerSummary[]>("/directory/customers"))!);
+        var customer = (await api.GetFromJsonAsync<CustomerDetails>("/directory/customers/" + summary.Id))!;
+        var location = Assert.Single(customer.Locations);
+        Assert.Equal(("Hickey's Pharmacies", "Hickey's Rathdrum", "A67 X123", (Guid?)pharmacy),
+            (customer.Name, location.Name, location.Eircode, location.Type?.Id));
+        var expected = rathdrumHasPin ? (52.9312345m, -6.2245678m, LocationPositionPrecision.Town)
+            : (52.9387654m, -6.2312345m, LocationPositionPrecision.Eircode);
+        Assert.Equal(expected, (location.Position!.Latitude, location.Position.Longitude, location.Position.Precision));
+        string[] lookups = rathdrumHasPin ? [] : ["A67 X123"];
+        Assert.Equal(lookups, requested); Assert.False(app.Probe.SawTransaction);
+        string detail = await HtmlAsync(browser, "/HeadOffice/Locations/Detail/" + location.Id);
+        Assert.Contains(Shown(expected.Item1, expected.Item2), detail);
+        Assert.Contains(rathdrumHasPin ? "Town — approximate: the Town's position, not the shop's" : "Eircode — from the Eircode lookup", detail);
+        Assert.DoesNotContain("Position needed", detail);
+    }
+
+    // Acceptance criterion S3: a Location added in Laragh without an Eircode.
+    [Fact]
+    public async Task Should_SaveTownPrecision_When_LocationHasNoEircode()
+    {
+        await app.ResetCoordinatesAsync(); using var api = app.CreateApiClient();
+        var laragh = await TownAsync(api, 52.9234568m, -6.2912346m);
+        app.Probe.Handler = (_, _) => throw new InvalidOperationException("A Town position needs no lookup");
+        var customer = await CreateAsync(api, laragh.Id, null);
+        await using var website = app.CreateWebsite(); using var browser = website.CreateBrowser(); await SignInAsync(browser);
+        string page = "/HeadOffice/Locations/Create/" + customer.Id;
+        using var saved = await PostAsync(browser, page, await HtmlAsync(browser, page), new()
+        { ["Name"] = "Laragh village shop", ["TownId"] = laragh.Id.ToString(), ["Eircode"] = "" });
+        Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
+        var added = (await api.GetFromJsonAsync<CustomerDetails>("/directory/customers/" + customer.Id))!
+            .Locations.Single(item => item.Name == "Laragh village shop");
+        Assert.Null(added.Eircode);
+        Assert.Equal((52.9234568m, -6.2912346m, LocationPositionPrecision.Town),
+            (added.Position!.Latitude, added.Position.Longitude, added.Position.Precision));
+        string detail = await HtmlAsync(browser, "/HeadOffice/Locations/Detail/" + added.Id);
+        Assert.Contains(Shown(52.9234568m, -6.2912346m), detail);
+        Assert.Contains("Town — approximate: the Town's position, not the shop's · set on", detail);
+        Assert.Equal(0, app.Probe.Calls);
+    }
+
+    [Fact]
+    public async Task Should_ShowPositionNeededThenConfirmedOnSite_When_NoDefaultExistsAndAPositionIsLaterConfirmed()
+    {
+        await app.ResetCoordinatesAsync(); using var api = app.CreateApiClient(); var town = await TownAsync(api);
+        var customer = await CreateAsync(api, town.Id, "A67 X123"); Guid id = customer.Locations[0].Id;
+        Assert.Null(customer.Locations[0].Position); Assert.Equal(1, app.Probe.Calls);
+        await using var website = app.CreateWebsite(); using var browser = website.CreateBrowser(); await SignInAsync(browser);
+        string needed = await HtmlAsync(browser, "/HeadOffice/Locations/Detail/" + id);
+        Assert.Contains("<strong>Position needed</strong>. No map position has been set for this location yet.", needed);
+        Assert.DoesNotContain("Precision", needed);
+        await ConfirmAsync(id);
+        string confirmed = await HtmlAsync(browser, "/HeadOffice/Locations/Detail/" + id);
+        var position = (await LocationAsync(api, id)).Position!;
+        Assert.Contains(Shown(position.Latitude, position.Longitude), confirmed);
+        Assert.Contains("Confirmed on site · set on", confirmed); Assert.DoesNotContain("Position needed", confirmed);
+    }
+
     private (TaskCompletionSource Entered, TaskCompletionSource Release) DelayLookup()
     {
         TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously), release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -219,13 +302,36 @@ public sealed class LocationCoordinateEndToEndTests(LocationCoordinateApplicatio
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO LocationContacts (LocationId,ContactId) VALUES ({id},{contact})");
         return contact;
     }
-    private static async Task<GeographyItem> TownAsync(HttpClient api, decimal? latitude = null, decimal? longitude = null)
+    private async Task<Guid> LocationTypeAsync(string name)
+    {
+        await using var scope = app.Api.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
+        Guid id = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO LocationTypes (Id,Name,IsArchived) VALUES ({id},{name},0)");
+        return id;
+    }
+    private static string Shown(decimal latitude, decimal longitude) =>
+        latitude.ToString(CultureInfo.InvariantCulture) + ", " + longitude.ToString(CultureInfo.InvariantCulture);
+    private static async Task SignInAsync(HttpClient browser) => Assert.Equal(HttpStatusCode.NoContent,
+        (await browser.GetAsync("/__test/sign-in?subject=niamh&roles=" + Uri.EscapeDataString(StaffRoles.HeadOfficeUser))).StatusCode);
+    private static async Task<string> HtmlAsync(HttpClient browser, string url)
+    {
+        using var response = await browser.GetAsync(url); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
+    }
+    private static string Field(string html, string name) => WebUtility.HtmlDecode(Regex.Match(html,
+        "name=\"" + Regex.Escape(name) + "\"[^>]*value=\"([^\"]*)\"").Groups[1].Value);
+    private static Task<HttpResponseMessage> PostAsync(HttpClient browser, string url, string html, Dictionary<string, string> fields)
+    {
+        Dictionary<string, string> body = new(fields) { ["__RequestVerificationToken"] = Field(html, "__RequestVerificationToken") };
+        return browser.PostAsync(url, new FormUrlEncodedContent(body));
+    }
+    private static async Task<GeographyItem> TownAsync(HttpClient api, decimal? latitude = null, decimal? longitude = null, string name = "Laragh")
     {
         using var regionResponse = await api.PostAsJsonAsync("/directory/geography/regions", new CreateGeographyRequest("Leinster"));
         var region = (await regionResponse.Content.ReadFromJsonAsync<GeographyItem>())!;
         using var countyResponse = await api.PostAsJsonAsync("/directory/geography/counties", new CreateGeographyRequest("Wicklow", region.Id));
         var county = (await countyResponse.Content.ReadFromJsonAsync<GeographyItem>())!;
-        using var townResponse = await api.PostAsJsonAsync("/directory/geography/towns", new CreateGeographyRequest("Laragh", county.Id, latitude, longitude));
+        using var townResponse = await api.PostAsJsonAsync("/directory/geography/towns", new CreateGeographyRequest(name, county.Id, latitude, longitude));
         Assert.Equal(HttpStatusCode.Created, townResponse.StatusCode); return (await townResponse.Content.ReadFromJsonAsync<GeographyItem>())!;
     }
     private static async Task<CustomerDetails> CreateAsync(HttpClient api, Guid town, string? eircode)
