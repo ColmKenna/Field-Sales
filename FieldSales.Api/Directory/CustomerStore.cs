@@ -16,14 +16,14 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         var locations = await LocationRows(customerId: id).ToArrayAsync(ct);
         return new(customer.Id, customer.Name, Convert.ToBase64String(customer.Version),
             locations.Select(location => new LocationSummary(location.Id, location.Name, Town(location),
-                location.Eircode, Convert.ToBase64String(location.Version), Type(location))).ToArray());
+                location.Eircode, Convert.ToBase64String(location.Version), Type(location), Position(location))).ToArray());
     }
 
     public async Task<LocationDetails?> FindLocationAsync(Guid id, CancellationToken ct)
     {
         var row = await LocationRows(locationId: id).SingleOrDefaultAsync(ct);
         return row is null ? null : new(row.Id, row.CustomerId, row.CustomerName, row.Name, Town(row),
-            row.Eircode, Convert.ToBase64String(row.Version), Type(row));
+            row.Eircode, Convert.ToBase64String(row.Version), Type(row), Position(row));
     }
 
     public Task<CustomerDetails> CreateAsync(CreateCustomerRequest request, CancellationToken ct) =>
@@ -116,7 +116,8 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         select new LocationRow(location.Id, location.CustomerId, customer.Name, location.Name, location.Eircode, location.Version,
             town.Id, town.Name, town.IsArchived, county.Id, county.Name, county.IsArchived, region.Id, region.Name, region.IsArchived,
             type == null ? null : (Guid?)type.Id, type == null ? null : type.Name, type == null ? null : type.Description,
-            type == null ? null : (bool?)type.IsArchived);
+            type == null ? null : (bool?)type.IsArchived,
+            location.Latitude, location.Longitude, location.PositionPrecision, location.PositionedAt);
 
     private static TownChoice Town(LocationRow row)
     {
@@ -128,7 +129,11 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
 
     private sealed record LocationRow(Guid Id, Guid CustomerId, string CustomerName, string Name, string? Eircode, byte[] Version,
         Guid TownId, string TownName, bool TownArchived, Guid CountyId, string CountyName, bool CountyArchived,
-        Guid RegionId, string RegionName, bool RegionArchived, Guid? TypeId, string? TypeName, string? TypeDescription, bool? TypeArchived);
+        Guid RegionId, string RegionName, bool RegionArchived, Guid? TypeId, string? TypeName, string? TypeDescription, bool? TypeArchived,
+        decimal? Latitude, decimal? Longitude, LocationPositionPrecision? PositionPrecision, DateTimeOffset? PositionedAt);
+
+    private static LocationPosition? Position(LocationRow row) => row.Latitude is decimal latitude
+        ? new(latitude, row.Longitude!.Value, row.PositionPrecision!.Value, row.PositionedAt!.Value) : null;
 
     private static DirectoryTypeChoice? Type(LocationRow row) => row.TypeId is Guid id
         ? new(id, row.TypeName!, row.TypeDescription, row.TypeArchived == true) : null;

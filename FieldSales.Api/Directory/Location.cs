@@ -6,6 +6,7 @@ public sealed class Location
 {
     public const int MaximumEircodeLength = 20;
     private readonly List<LocationContact> _contacts = [];
+    private readonly List<LocationPositionHistory> _positionHistory = [];
     private Location() { }
 
     public Guid Id { get; private set; }
@@ -18,6 +19,40 @@ public sealed class Location
     public Guid? MainContactId { get; private set; }
     public IReadOnlyList<LocationContact> Contacts => _contacts.AsReadOnly();
     public byte[] Version { get; private set; } = [];
+    public decimal? Latitude { get; private set; }
+    public decimal? Longitude { get; private set; }
+    public LocationPositionPrecision? PositionPrecision { get; private set; }
+    public Guid? PositionSourceTownId { get; private set; }
+    public string? PositionSourceEircode { get; private set; }
+    public DateTimeOffset? PositionedAt { get; private set; }
+    public IReadOnlyList<LocationPositionHistory> PositionHistory => _positionHistory.AsReadOnly();
+
+    // The store resolves the approved source and rechecks inputs/rowversion before
+    // calling this. Automatic defaulting can never replace a confirmed position.
+    // A future WI-143 confirmation command must be separate from this method.
+    public bool ApplyDefaultPosition(Coordinates? coordinates, LocationPositionPrecision? precision, DateTimeOffset now)
+    {
+        if (PositionPrecision == LocationPositionPrecision.ConfirmedOnSite) return false;
+        if ((coordinates is null) != (precision is null)
+            || precision is not (null or LocationPositionPrecision.Town or LocationPositionPrecision.Eircode))
+            throw new CustomerDirectoryValidationException("Position", "Choose a valid default position and precision.");
+        if (precision == LocationPositionPrecision.Eircode && Eircode is null)
+            throw new CustomerDirectoryValidationException("Eircode", "An Eircode position requires an Eircode.");
+        Guid? sourceTown = coordinates is null ? null : TownId;
+        string? sourceEircode = precision == LocationPositionPrecision.Eircode ? Eircode : null;
+        if (Latitude == coordinates?.Latitude && Longitude == coordinates?.Longitude
+            && PositionPrecision == precision && PositionSourceTownId == sourceTown
+            && PositionSourceEircode == sourceEircode) return false;
+
+        if (Latitude is not null) _positionHistory.Add(LocationPositionHistory.Capture(this, now));
+        Latitude = coordinates?.Latitude;
+        Longitude = coordinates?.Longitude;
+        PositionPrecision = precision;
+        PositionSourceTownId = sourceTown;
+        PositionSourceEircode = sourceEircode;
+        PositionedAt = coordinates is null ? null : now;
+        return true;
+    }
 
     internal static Location Create(Guid customerId, string? name, Guid? townId, string? eircode)
     {

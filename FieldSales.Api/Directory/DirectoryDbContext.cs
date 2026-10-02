@@ -15,6 +15,7 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
     public DbSet<ContactType> ContactTypes => Set<ContactType>();
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<LocationContact> LocationContacts => Set<LocationContact>();
+    public DbSet<LocationPositionHistory> LocationPositionHistory => Set<LocationPositionHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,7 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
         modelBuilder.Ignore<FieldSales.Api.Catalogue.NamedReferenceItem>();
         modelBuilder.Ignore<DirectoryType>();
         ContactModelConfiguration.Configure(modelBuilder);
+        LocationPositionModelConfiguration.Configure(modelBuilder);
         ConfigureType<LocationType>(modelBuilder, "LocationTypes");
         ConfigureType<ContactType>(modelBuilder, "ContactTypes");
         var regions = Configure<Region>(modelBuilder, "Regions");
