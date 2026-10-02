@@ -11,7 +11,7 @@
 {
     <partial name="_ReferenceConfirmation" model="@(new FieldSales.Web.ReferenceData.ReferenceConfirmationModel(item,
         Model.List.SelectedList, Url.Page("Index", "Retire")!, Url.Page("Index", new { Model.ListKey, Model.ShowArchived })!,
-        new Dictionary<string, string> { ["ListKey"] = Model.ListKey, ["ShowArchived"] = Model.ShowArchived.ToString(), ["Id"] = item.Id.ToString() }))" />
+        new Dictionary<string, string> { ["ListKey"] = Model.ListKey, ["ShowArchived"] = Model.ShowArchived.ToString(), ["Id"] = item.Id.ToString(), ["Version"] = item.Version ?? string.Empty }))" />
 }
 else
 {
@@ -20,6 +20,11 @@ else
         <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />
         <label asp-for="Name">New @Model.List.SelectedList.SingularLabel.ToLowerInvariant() name</label>
         <input asp-for="Name" maxlength="200" required />
+        @if (Model.IsTypeList)
+        {
+            <label asp-for="Description">Description (optional)</label>
+            <textarea asp-for="Description" maxlength="2000" rows="3"></textarea>
+        }
         <button type="submit">Add @Model.List.SelectedList.SingularLabel.ToLowerInvariant()</button>
     </form>
     <partial name="_ReferenceList" model="Model.List" />

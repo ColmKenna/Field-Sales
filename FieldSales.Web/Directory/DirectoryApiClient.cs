@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FieldSales.Directory.Contracts;
+using FieldSales.ReferenceData;
 using Microsoft.AspNetCore.Authentication;
 
 namespace FieldSales.Web.Directory;
@@ -16,6 +17,18 @@ public sealed record DirectoryResult<T>(HttpStatusCode Status, T? Value = defaul
 public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
     private const string Root = "/directory/geography";
+    public Task<DirectoryResult<ReferenceListViewModel>> TypeListAsync(string key, bool showArchived, CancellationToken ct) =>
+        SendAsync<ReferenceListViewModel>(HttpMethod.Get, $"/directory/reference-data/{Uri.EscapeDataString(key)}?showArchived={showArchived}", null, ct);
+    public Task<DirectoryResult<ReferenceListItem>> TypeItemAsync(string key, Guid id, CancellationToken ct) =>
+        SendAsync<ReferenceListItem>(HttpMethod.Get, $"/directory/reference-data/{Uri.EscapeDataString(key)}/{id}", null, ct);
+    public Task<DirectoryResult<DirectoryTypeChoice[]>> LocationTypeChoicesAsync(CancellationToken ct) =>
+        SendAsync<DirectoryTypeChoice[]>(HttpMethod.Get, "/directory/reference-data/location-types/choices", null, ct);
+    public Task<DirectoryResult<DirectoryTypeChoice>> SaveTypeAsync(string key, Guid? id, SaveDirectoryTypeRequest request, CancellationToken ct) =>
+        SendAsync<DirectoryTypeChoice>(id is null ? HttpMethod.Post : HttpMethod.Put,
+            $"/directory/reference-data/{Uri.EscapeDataString(key)}" + (id is Guid value ? $"/{value}" : ""), JsonContent.Create(request), ct);
+    public Task<DirectoryResult<DirectoryTypeMutationResult>> RetireTypeAsync(string key, Guid id, ReferenceAction action, string? version, CancellationToken ct) =>
+        SendAsync<DirectoryTypeMutationResult>(HttpMethod.Post, $"/directory/reference-data/{Uri.EscapeDataString(key)}/{id}/retire",
+            JsonContent.Create(new RetireDirectoryTypeRequest(action, version)), ct);
     public Task<DirectoryResult<CustomerSummary[]>> CustomersAsync(CancellationToken ct) =>
         SendAsync<CustomerSummary[]>(HttpMethod.Get, "/directory/customers", null, ct);
     public Task<DirectoryResult<CustomerDetails>> CustomerAsync(Guid id, CancellationToken ct) =>
@@ -85,11 +98,18 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
                     && page.Path.All(item => item is not null && item.Name is not null),
                 GeographyItem item => item.Name is not null && item.Version is not null,
                 GeographyMutationResult result => result.Saved,
+                DirectoryTypeMutationResult result => result.Saved,
+                DirectoryTypeChoice[] types => types.All(ValidType),
+                DirectoryTypeChoice type => ValidType(type),
+                ReferenceListViewModel list => list.SelectedList is not null && list.AvailableLists is not null && list.Items is not null
+                    && list.Items.All(item => item is not null && item.Name is not null && item.Version is not null && item.Usage is not null),
+                ReferenceListItem item => item.Name is not null && item.Version is not null && item.Usage is not null,
                 CustomerSummary[] customers => customers.All(item => item is not null && item.Name is not null && item.LocationCount >= 1),
                 CustomerDetails customer => customer.Name is not null && customer.Version is not null && customer.Locations is { Count: > 0 }
-                    && customer.Locations.All(item => item is not null && item.Name is not null && item.Version is not null && ValidTown(item.Town)),
+                    && customer.Locations.All(item => item is not null && item.Name is not null && item.Version is not null && ValidTown(item.Town)
+                        && (item.Type is null || ValidType(item.Type))),
                 LocationDetails location => location.Name is not null && location.CustomerName is not null && location.CustomerId != Guid.Empty
-                    && location.Version is not null && ValidTown(location.Town),
+                    && location.Version is not null && ValidTown(location.Town) && (location.Type is null || ValidType(location.Type)),
                 TownChoice[] towns => towns.All(ValidTown),
                 TownChoice town => ValidTown(town),
                 _ => true
@@ -97,6 +117,7 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
             return valid ? new(response.StatusCode, value) : new(HttpStatusCode.ServiceUnavailable);
         }
         catch (JsonException) { return new(HttpStatusCode.ServiceUnavailable); }
+        catch (ArgumentException) { return new(HttpStatusCode.ServiceUnavailable); }
         catch (NotSupportedException) { return new(HttpStatusCode.ServiceUnavailable); }
         catch (HttpRequestException) { return new(HttpStatusCode.ServiceUnavailable); }
         catch (Polly.Timeout.TimeoutRejectedException) { return new(HttpStatusCode.ServiceUnavailable); }
@@ -106,4 +127,5 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
 
     private static bool ValidTown(TownChoice? town) => town is not null && town.Id != Guid.Empty
         && town.Name is not null && town.Label is not null && town.CountyName is not null && town.RegionName is not null;
+    private static bool ValidType(DirectoryTypeChoice? type) => type is not null && type.Id != Guid.Empty && type.Name is not null;
 }

@@ -7,6 +7,7 @@
     <dt>Customer</dt><dd><a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Location.CustomerId">@Model.Location.CustomerName</a></dd>
     <dt>Town</dt><dd>@Model.Location.Town.Label</dd>
     <dt>Eircode</dt><dd>@(Model.Location.Eircode ?? "None entered")</dd>
+    <dt>Type</dt><dd>@(Model.Location.Type?.Label ?? "No type")</dd>
 </dl>
 <h2>Edit location</h2>
 <form method="post" class="product-form">

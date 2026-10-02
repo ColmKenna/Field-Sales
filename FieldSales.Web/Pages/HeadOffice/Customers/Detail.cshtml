@@ -15,7 +15,7 @@
             {
                 <tr data-location-id="@location.Id">
                     <td><a asp-page="/HeadOffice/Locations/Detail" asp-route-id="@location.Id">@location.Name</a></td>
-                    <td>@location.Town.Label</td><td></td><td></td><td></td>
+                    <td>@location.Town.Label</td><td>@location.Type?.Label</td><td></td><td></td>
                 </tr>
             }
             </tbody>

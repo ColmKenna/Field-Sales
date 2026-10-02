@@ -18,3 +18,12 @@
 <label asp-for="Eircode">Eircode (optional)</label>
 <input asp-for="Eircode" maxlength="20" />
 <span asp-validation-for="Eircode"></span>
+<label asp-for="LocationTypeId">Type (optional)</label>
+<select asp-for="LocationTypeId">
+    <option value="">No type</option>
+    @foreach (var type in Model.Types)
+    {
+        <option value="@type.Id">@type.Label</option>
+    }
+</select>
+<span asp-validation-for="LocationTypeId"></span>

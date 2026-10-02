@@ -20,15 +20,22 @@
 {
     <section class="reference-item" data-reference-id="@item.Id">
         <h3>@item.Name@(item.IsArchived ? " (archived)" : "")</h3>
+        @if (item.Description is not null) { <p class="reference-description">@item.Description</p> }
         <partial name="_ReferenceRetirement" model="@(new FieldSales.Web.ReferenceData.ReferenceRetirementModel(item,
             Url.Page("/HeadOffice/ReferenceData/Index", "Confirm", new { id = item.Id, listKey = Model.SelectedList.Key, showArchived = Model.ShowArchived })!))" />
         <form method="post" asp-page-handler="Save">
             <input type="hidden" name="ListKey" value="@Model.SelectedList.Key" />
             <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />
             <input type="hidden" name="Id" value="@item.Id" />
+            @if (item.Version is not null) { <input type="hidden" name="Version" value="@item.Version" /> }
             <label for="name-@item.Id">Name</label>
             <input id="name-@item.Id" name="Name" value="@item.Name" maxlength="200" required />
-            <button type="submit">Save name</button>
+            @if (ReferenceListKeys.IsDirectoryType(Model.SelectedList.Key))
+            {
+                <label for="description-@item.Id">Description (optional)</label>
+                <textarea id="description-@item.Id" name="Description" maxlength="2000" rows="3">@item.Description</textarea>
+            }
+            <button type="submit">@(ReferenceListKeys.IsDirectoryType(Model.SelectedList.Key) ? "Save type" : "Save name")</button>
         </form>
     </section>
 }
