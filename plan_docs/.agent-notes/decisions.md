@@ -201,3 +201,7 @@ The reserved ports are proposals until the item that adds the project confirms t
 - The model checkpoint remains required before persistence/UI implementation;
   resume trigger `Continue T-2.3.1`. The reviewed artifact is
   `docs/customer-location-checkpoint.md`.
+  The developer accepted it with that exact trigger on 2026-10-02, authorizing
+  the remaining implementation and verification plan without another routine
+  approval pause. Feature-branch delivery includes its push; main integration
+  remains a separate request.

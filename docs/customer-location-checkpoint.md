@@ -4,6 +4,10 @@ The developer approved the implementation plan and Scenario Review matrix on
 2026-10-02. They explicitly require a first Location when creating a Customer.
 This document is the T-2.3.1 model review, before persistence and UI changes.
 
+The user accepted this checkpoint with `Continue T-2.3.1` on 2026-10-02.
+The text below preserves the reviewed model snapshot. Current implementation
+and verification evidence are in [customer-location-delivery.md](customer-location-delivery.md).
+
 ## Review question
 
 Can each later area attach its data to a stable Location without replacing its
