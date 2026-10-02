@@ -7,7 +7,8 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace FieldSales.Web.Directory;
 
-public sealed record DirectoryResult<T>(HttpStatusCode Status, T? Value = default, string? Error = null)
+public sealed record DirectoryResult<T>(HttpStatusCode Status, T? Value = default, string? Error = null,
+    string? Field = null, bool RequiresDuplicateConfirmation = false)
 {
     public bool Success => (int)Status is >= 200 and < 300 && Value is not null;
 }
@@ -15,6 +16,18 @@ public sealed record DirectoryResult<T>(HttpStatusCode Status, T? Value = defaul
 public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
     private const string Root = "/directory/geography";
+    public Task<DirectoryResult<CustomerSummary[]>> CustomersAsync(CancellationToken ct) =>
+        SendAsync<CustomerSummary[]>(HttpMethod.Get, "/directory/customers", null, ct);
+    public Task<DirectoryResult<CustomerDetails>> CustomerAsync(Guid id, CancellationToken ct) =>
+        SendAsync<CustomerDetails>(HttpMethod.Get, $"/directory/customers/{id}", null, ct);
+    public Task<DirectoryResult<CustomerDetails>> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken ct) =>
+        SendAsync<CustomerDetails>(HttpMethod.Post, "/directory/customers", JsonContent.Create(request), ct);
+    public Task<DirectoryResult<LocationDetails>> LocationAsync(Guid id, CancellationToken ct) =>
+        SendAsync<LocationDetails>(HttpMethod.Get, $"/directory/locations/{id}", null, ct);
+    public Task<DirectoryResult<LocationDetails>> AddLocationAsync(Guid customerId, CreateLocationRequest request, CancellationToken ct) =>
+        SendAsync<LocationDetails>(HttpMethod.Post, $"/directory/customers/{customerId}/locations", JsonContent.Create(request), ct);
+    public Task<DirectoryResult<LocationDetails>> EditLocationAsync(Guid id, EditLocationRequest request, CancellationToken ct) =>
+        SendAsync<LocationDetails>(HttpMethod.Put, $"/directory/locations/{id}", JsonContent.Create(request), ct);
     public Task<DirectoryResult<GeographyPage>> PageAsync(Guid? regionId, Guid? countyId, CancellationToken ct, bool showArchived = false)
     {
         List<string> parameters = [];
@@ -56,8 +69,11 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
-                    return new(response.StatusCode, Error: (await response.Content.ReadFromJsonAsync<GeographyError>(ct))?.Error
-                        ?? "This change could not be saved.");
+                {
+                    var error = await response.Content.ReadFromJsonAsync<CustomerDirectoryError>(ct);
+                    return new(response.StatusCode, Error: error?.Error ?? "This change could not be saved.",
+                        Field: error?.Field, RequiresDuplicateConfirmation: error?.RequiresDuplicateConfirmation == true);
+                }
                 return new(response.StatusCode);
             }
             T? value = await response.Content.ReadFromJsonAsync<T>(ct);
@@ -69,6 +85,13 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
                     && page.Path.All(item => item is not null && item.Name is not null),
                 GeographyItem item => item.Name is not null && item.Version is not null,
                 GeographyMutationResult result => result.Saved,
+                CustomerSummary[] customers => customers.All(item => item is not null && item.Name is not null && item.LocationCount >= 1),
+                CustomerDetails customer => customer.Name is not null && customer.Version is not null && customer.Locations is { Count: > 0 }
+                    && customer.Locations.All(item => item is not null && item.Name is not null && item.Version is not null && ValidTown(item.Town)),
+                LocationDetails location => location.Name is not null && location.CustomerName is not null && location.CustomerId != Guid.Empty
+                    && location.Version is not null && ValidTown(location.Town),
+                TownChoice[] towns => towns.All(ValidTown),
+                TownChoice town => ValidTown(town),
                 _ => true
             };
             return valid ? new(response.StatusCode, value) : new(HttpStatusCode.ServiceUnavailable);
@@ -80,4 +103,7 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
         catch (Polly.CircuitBreaker.BrokenCircuitException) { return new(HttpStatusCode.ServiceUnavailable); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return new(HttpStatusCode.ServiceUnavailable); }
     }
+
+    private static bool ValidTown(TownChoice? town) => town is not null && town.Id != Guid.Empty
+        && town.Name is not null && town.Label is not null && town.CountyName is not null && town.RegionName is not null;
 }

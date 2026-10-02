@@ -187,3 +187,21 @@ The reserved ports are proposals until the item that adds the project confirms t
   `EmptyLocationUsageSource` with real Location counts and protect assignments
   in the same serializable DirectoryDb transaction. See
   `docs/directory-geography-retirement.md` for the concrete connection steps.
+
+## WI-016 first Location requirement (2026-10-02, developer)
+
+- The developer chose **Require a first Location when creating a Customer**,
+  then approved the implementation plan and Scenario Review matrix.
+- Customer and first Location must save in one transaction. A missing or
+  invalid first Location saves neither record; additional Locations can be
+  added from the Customer record afterwards.
+- Customer names are nonunique. Required names are trimmed and capped at 200
+  characters. Same-Customer Location duplicate warnings ignore case and apply
+  to both creation and renaming, with proceed/rename allowed.
+- The model checkpoint remains required before persistence/UI implementation;
+  resume trigger `Continue T-2.3.1`. The reviewed artifact is
+  `docs/customer-location-checkpoint.md`.
+  The developer accepted it with that exact trigger on 2026-10-02, authorizing
+  the remaining implementation and verification plan without another routine
+  approval pause. Feature-branch delivery includes its push; main integration
+  remains a separate request.

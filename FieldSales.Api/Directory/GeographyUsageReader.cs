@@ -79,15 +79,16 @@ public sealed class TownCountyUsageSource(DirectoryDbContext db) : IReferenceUsa
     }
 }
 
-/// <summary>WI-016 must replace this registration when Location storage is introduced.
-/// There are no production Location records in WI-015; tests substitute a referencing-record source.</summary>
-public sealed class EmptyLocationUsageSource : IReferenceUsageSource
+public sealed class LocationTownUsageSource(DirectoryDbContext db) : IReferenceUsageSource
 {
     public string SourceKey => "locations";
     public bool Supports(string listKey) => listKey == "towns";
-    public Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken ct) =>
-        Task.FromResult(new ReferenceCount(SourceKey, "location", "locations", 0));
-    public Task<IReadOnlyDictionary<Guid, ReferenceCount>> CountManyAsync(string listKey, IReadOnlyList<Guid> ids, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyDictionary<Guid, ReferenceCount>>(ids.Distinct().ToDictionary(id => id,
-            _ => new ReferenceCount(SourceKey, "location", "locations", 0)));
+    public async Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken ct) =>
+        new(SourceKey, "location", "locations", await db.Locations.LongCountAsync(location => location.TownId == item.ItemId, ct));
+    public async Task<IReadOnlyDictionary<Guid, ReferenceCount>> CountManyAsync(string listKey, IReadOnlyList<Guid> ids, CancellationToken ct)
+    {
+        var counts = await db.Locations.Where(location => ids.Contains(location.TownId)).GroupBy(location => location.TownId)
+            .Select(group => new { Id = group.Key, Count = group.LongCount() }).ToDictionaryAsync(row => row.Id, row => row.Count, ct);
+        return ids.Distinct().ToDictionary(id => id, id => new ReferenceCount(SourceKey, "location", "locations", counts.GetValueOrDefault(id)));
+    }
 }

@@ -1,0 +1,23 @@
+@page "{id:guid}"
+@model FieldSales.Web.Pages.HeadOffice.Locations.DetailModel
+@{ ViewData["Title"] = Model.Location.Name; }
+<p><a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Location.CustomerId">Back to @Model.Location.CustomerName</a></p>
+<h1>@Model.Location.Name</h1>
+<dl>
+    <dt>Customer</dt><dd><a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Location.CustomerId">@Model.Location.CustomerName</a></dd>
+    <dt>Town</dt><dd>@Model.Location.Town.Label</dd>
+    <dt>Eircode</dt><dd>@(Model.Location.Eircode ?? "None entered")</dd>
+</dl>
+<h2>Edit location</h2>
+<form method="post" class="product-form">
+    <div asp-validation-summary="All" role="alert"></div>
+    <input asp-for="Version" type="hidden" />
+    <partial name="_LocationFields" model="Model" />
+    @if (Model.DuplicateWarning)
+    {
+        <p>Change the name, or keep the same name as another location.</p>
+        <button type="submit" asp-page-handler="Confirm">Save anyway</button>
+    }
+    <button type="submit" class="button">Save changes</button>
+    <a asp-page="Detail" asp-route-id="@Model.Location.Id">Cancel and reload</a>
+</form>

@@ -1,0 +1,17 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Customers.IndexModel
+@{ ViewData["Title"] = "Customers"; }
+<p><a asp-page="/HeadOffice/Index">Back to head office</a></p>
+<h1>Customers</h1>
+<p><a asp-page="Create">Create customer</a></p>
+@if (Model.Customers.Count == 0) { <p>No customers yet.</p> }
+else
+{
+    <ul class="geography-list">
+        @foreach (var customer in Model.Customers)
+        {
+            <li><a asp-page="Detail" asp-route-id="@customer.Id">@customer.Name</a>
+                <span>@customer.LocationCount @(customer.LocationCount == 1 ? "location" : "locations")</span></li>
+        }
+    </ul>
+}

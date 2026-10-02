@@ -50,12 +50,15 @@ non-null flags defaulting to false; it preserves predecessor records.
 
 ## WI-016 connection required
 
-No production Location records exist yet. `EmptyLocationUsageSource` is the
-explicit pre-Location provider, required under source key `locations`. The
-four-Location acceptance fixture replaces it with a test provider containing
-four distinct referencing records. This does not fabricate production usage.
+At WI-015 delivery, `EmptyLocationUsageSource` was the explicit pre-Location
+provider, required under source key `locations`. Its four-Location acceptance
+fixture substitutes four distinct referencing records. WI-016 now connects
+real Location storage through keyed `LocationTownUsageSource`, the shared save
+transaction and the restrictive Town foreign key. See
+[WI-016 delivery evidence](customer-location-delivery.md) for the actual
+four-Location and Customer/Location screen scenarios.
 
-When WI-016 introduces Location storage it must:
+The WI-016 connection implements these requirements:
 
 1. Replace the keyed `EmptyLocationUsageSource` registration with a real
    source named `locations`, counting distinct records via the same scoped
@@ -95,7 +98,7 @@ and `.artifacts/wi015-full` (local ignored artifacts).
 WI-015 is marked done in the authorized status map; no card content changed.
 The three scoped commits complete domain/contracts, shared UI, then verification
 and handover. Feature branch: `feature/wi-015-archive-town-that-is-use`.
-Integration is separate. WI-016 — Create a customer with its locations — is next;
-it has not been started.
+Integration is separate. WI-016's production Location connection is described
+in `customer-location-delivery.md`.
 
 No moving/territory/Location forms are added.

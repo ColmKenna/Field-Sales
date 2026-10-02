@@ -1,0 +1,20 @@
+@model FieldSales.Web.Directory.LocationFormPageModel
+@if (Model.Towns.Count == 0)
+{
+    <p role="status">Add a town before saving a location. <a asp-page="/HeadOffice/Geography/Index">Manage geography</a></p>
+}
+<label asp-for="Name">Location name</label>
+<input asp-for="Name" maxlength="200" required />
+<span asp-validation-for="Name"></span>
+<label asp-for="TownId">Town</label>
+<select asp-for="TownId" required>
+    <option value="">Choose a town</option>
+    @foreach (var town in Model.Towns)
+    {
+        <option value="@town.Id">@town.Label</option>
+    }
+</select>
+<span asp-validation-for="TownId"></span>
+<label asp-for="Eircode">Eircode (optional)</label>
+<input asp-for="Eircode" maxlength="20" />
+<span asp-validation-for="Eircode"></span>

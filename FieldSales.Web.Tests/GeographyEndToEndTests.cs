@@ -25,7 +25,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Testcontainers.MsSql;
 using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbContext;
-using EmptyLocationUsageSource = CatalogueApi::FieldSales.Api.Directory.EmptyLocationUsageSource;
+using LocationTownUsageSource = CatalogueApi::FieldSales.Api.Directory.LocationTownUsageSource;
 
 namespace FieldSales.Web.Tests;
 
@@ -360,13 +360,14 @@ public sealed class GeographyEndToEndTests(GeographyApplication app) : IClassFix
     }
 }
 
-public sealed class GeographyApplication : IAsyncLifetime
+public class GeographyApplication : IAsyncLifetime
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey Key = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
     private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     public TestStaffRoleLookup Roles { get; } = new();
     public TestLocationUsageSource Locations { get; } = new();
+    protected virtual bool UseTestLocationUsage => true;
     public WebApplicationFactory<DirectoryDbContext> Api { get; private set; } = null!;
     private string ConnectionString => new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(_sql.GetConnectionString()) { InitialCatalog = "DirectoryTests" }.ConnectionString;
 
@@ -394,10 +395,13 @@ public sealed class GeographyApplication : IAsyncLifetime
             services.RemoveAll<DirectoryDbContext>();
             services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(ConnectionString).Options));
             services.RemoveAll<IStaffRoleLookup>(); services.AddSingleton<IStaffRoleLookup>(Roles);
-            foreach (var descriptor in services.Where(service => service.IsKeyedService
-                && Equals(service.ServiceKey, "directory") && service.KeyedImplementationType == typeof(EmptyLocationUsageSource)).ToArray())
-                services.Remove(descriptor);
-            services.AddKeyedSingleton<IReferenceUsageSource>("directory", Locations);
+            if (UseTestLocationUsage)
+            {
+                foreach (var descriptor in services.Where(service => service.IsKeyedService
+                    && Equals(service.ServiceKey, "directory") && service.KeyedImplementationType == typeof(LocationTownUsageSource)).ToArray())
+                    services.Remove(descriptor);
+                services.AddKeyedSingleton<IReferenceUsageSource>("directory", Locations);
+            }
             services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 var configuration = new OpenIdConnectConfiguration { Issuer = Issuer }; configuration.SigningKeys.Add(Key);
@@ -417,6 +421,7 @@ public sealed class GeographyApplication : IAsyncLifetime
         Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
         await using var scope = Api.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
+        await db.Locations.ExecuteDeleteAsync(); await db.Customers.ExecuteDeleteAsync();
         await db.Towns.ExecuteDeleteAsync(); await db.Counties.ExecuteDeleteAsync(); await db.Regions.ExecuteDeleteAsync();
     }
     public async Task<(int, int, int)> CountsAsync()
@@ -426,10 +431,10 @@ public sealed class GeographyApplication : IAsyncLifetime
         return (await db.Regions.CountAsync(), await db.Counties.CountAsync(), await db.Towns.CountAsync());
     }
     public async Task RestartAsync() { await Api.DisposeAsync(); Api = NewApi(); _ = Api.Server; }
-    public string Token(string role = StaffRoles.HeadOfficeUser)
+    public string Token(string role = StaffRoles.HeadOfficeUser, string scope = "fieldsales.api")
     {
         var token = new JwtSecurityToken(Issuer, "fieldsales-api",
-            [new("sub", "niamh"), new("scope", "fieldsales.api"), new("role", role)],
+            [new("sub", "niamh"), new("scope", scope), new("role", role)],
             DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddHours(1), new SigningCredentials(Key, SecurityAlgorithms.HmacSha256));
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
