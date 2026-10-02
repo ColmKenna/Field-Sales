@@ -15,16 +15,24 @@ public sealed record DirectoryResult<T>(HttpStatusCode Status, T? Value = defaul
 public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
     private const string Root = "/directory/geography";
-    public Task<DirectoryResult<GeographyPage>> PageAsync(Guid? regionId, Guid? countyId, CancellationToken ct)
+    public Task<DirectoryResult<GeographyPage>> PageAsync(Guid? regionId, Guid? countyId, CancellationToken ct, bool showArchived = false)
     {
         List<string> parameters = [];
         if (regionId is Guid region) parameters.Add($"regionId={region}");
         if (countyId is Guid county) parameters.Add($"countyId={county}");
+        if (showArchived) parameters.Add("showArchived=true");
         string query = parameters.Count == 0 ? string.Empty : "?" + string.Join('&', parameters);
         return SendAsync<GeographyPage>(HttpMethod.Get, Root + "/" + query, null, ct);
     }
     public Task<DirectoryResult<TownChoice[]>> TownChoicesAsync(CancellationToken ct) =>
         SendAsync<TownChoice[]>(HttpMethod.Get, $"{Root}/town-choices", null, ct);
+    public Task<DirectoryResult<TownChoice>> TownReferenceAsync(Guid id, CancellationToken ct) =>
+        SendAsync<TownChoice>(HttpMethod.Get, $"{Root}/towns/{id}/reference", null, ct);
+    public Task<DirectoryResult<GeographyItem>> FindAsync(string level, Guid id, CancellationToken ct) =>
+        SendAsync<GeographyItem>(HttpMethod.Get, $"{Root}/{level}/{id}", null, ct);
+    public Task<DirectoryResult<GeographyMutationResult>> RetireAsync(string level, Guid id,
+        FieldSales.ReferenceData.ReferenceAction action, string? version, CancellationToken ct) =>
+        SendAsync<GeographyMutationResult>(HttpMethod.Post, $"{Root}/{level}/{id}/retire", JsonContent.Create(new RetireGeographyRequest(action, version)), ct);
     public Task<DirectoryResult<GeographyItem>> CreateAsync(string level, string? name, Guid? parentId, CancellationToken ct) =>
         SendAsync<GeographyItem>(HttpMethod.Post, $"{Root}/{level}", JsonContent.Create(new CreateGeographyRequest(name, parentId)), ct);
     public Task<DirectoryResult<GeographyItem>> RenameAsync(string level, Guid id, string? name, string? version, CancellationToken ct) =>
@@ -57,9 +65,10 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
             {
                 null => false,
                 GeographyPage page => page.Path is not null && page.Items is not null && page.Level is "regions" or "counties" or "towns"
-                    && page.Items.All(item => item is not null && item.Name is not null && item.Version is not null)
+                    && page.Items.All(item => item is not null && item.Name is not null && item.Version is not null && item.Usage is not null)
                     && page.Path.All(item => item is not null && item.Name is not null),
                 GeographyItem item => item.Name is not null && item.Version is not null,
+                GeographyMutationResult result => result.Saved,
                 _ => true
             };
             return valid ? new(response.StatusCode, value) : new(HttpStatusCode.ServiceUnavailable);

@@ -1,0 +1,31 @@
+@model FieldSales.Web.ReferenceData.ReferenceConfirmationModel
+@using FieldSales.ReferenceData
+<section class="reference-confirmation" aria-labelledby="confirmation-heading">
+    <h2 id="confirmation-heading">@Model.Action.ToLabel() "@Model.Item.Name"?</h2>
+    <p>@Model.Item.Usage.Description</p>
+    @if (Model.Action == ReferenceAction.Archive)
+    {
+        <p>It stays on existing records and stops appearing in new selections.</p>
+    }
+    else if (Model.Action == ReferenceAction.Delete)
+    {
+        <p>This permanently removes the @Model.Definition.SingularLabel.ToLowerInvariant().</p>
+    }
+    else
+    {
+        <p>@Model.UnarchiveExplanation</p>
+    }
+    @foreach (var note in Model.Definition.NotesFor(Model.Action, Model.Item.Usage))
+    {
+        <p>@note</p>
+    }
+    <form method="post" action="@Model.ConfirmUrl" asp-antiforgery="true">
+        @foreach (var field in Model.Fields)
+        {
+            <input type="hidden" name="@field.Key" value="@field.Value" />
+        }
+        <input type="hidden" name="Action" value="@((int)Model.Action)" />
+        <button type="submit">Confirm @Model.Action.ToLabel()</button>
+        <a href="@Model.CancelUrl">Cancel</a>
+    </form>
+</section>

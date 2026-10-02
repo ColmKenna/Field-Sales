@@ -6,6 +6,10 @@ public abstract class GeographyEntity
     public string Name { get; private set; } = string.Empty;
     public string NormalizedName { get; private set; } = string.Empty;
     public byte[] Version { get; private set; } = [];
+    public bool IsArchived { get; private set; }
+
+    internal void Archive() => IsArchived = true;
+    internal void Unarchive() => IsArchived = false;
 
     internal void Rename(string name)
     {

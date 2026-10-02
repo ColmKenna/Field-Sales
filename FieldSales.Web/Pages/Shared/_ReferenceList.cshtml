@@ -18,10 +18,10 @@
 }
 @foreach (var item in Model.Items)
 {
-    var action = ReferenceRetirementPolicy.Decide(item.IsArchived, item.Usage);
     <section class="reference-item" data-reference-id="@item.Id">
         <h3>@item.Name@(item.IsArchived ? " (archived)" : "")</h3>
-        <p>@item.Usage.Description</p>
+        <partial name="_ReferenceRetirement" model="@(new FieldSales.Web.ReferenceData.ReferenceRetirementModel(item,
+            Url.Page("/HeadOffice/ReferenceData/Index", "Confirm", new { id = item.Id, listKey = Model.SelectedList.Key, showArchived = Model.ShowArchived })!))" />
         <form method="post" asp-page-handler="Save">
             <input type="hidden" name="ListKey" value="@Model.SelectedList.Key" />
             <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />
@@ -30,7 +30,5 @@
             <input id="name-@item.Id" name="Name" value="@item.Name" maxlength="200" required />
             <button type="submit">Save name</button>
         </form>
-        <a asp-page="/HeadOffice/ReferenceData/Index" asp-page-handler="Confirm" asp-route-id="@item.Id"
-           asp-route-listKey="@Model.SelectedList.Key" asp-route-showArchived="@Model.ShowArchived">@action.ToLabel()</a>
     </section>
 }

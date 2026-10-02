@@ -1,5 +1,6 @@
 @page
 @model FieldSales.Web.Pages.HeadOffice.Geography.IndexModel
+@using FieldSales.ReferenceData
 @{
     ViewData["Title"] = "Geography";
 }
@@ -11,11 +12,11 @@
         <span aria-hidden="true"> › </span>
         @if (part.Level == "regions")
         {
-            <a asp-page="Index" asp-route-regionId="@part.Id">@part.Name</a>
+            <a asp-page="Index" asp-route-regionId="@part.Id" asp-route-showArchived="@Model.ShowArchived">@part.Name@(part.IsArchived ? " (archived)" : "")</a>
         }
         else
         {
-            <a asp-page="Index" asp-route-countyId="@part.Id">@part.Name</a>
+            <a asp-page="Index" asp-route-countyId="@part.Id" asp-route-showArchived="@Model.ShowArchived">@part.Name@(part.IsArchived ? " (archived)" : "")</a>
         }
     }
 </nav>
@@ -24,32 +25,47 @@
     <p role="status">@Model.Notice</p>
 }
 <div class="geography-errors" asp-validation-summary="All" role="alert"></div>
+@if (Model.ConfirmationPanel is { } confirmation)
+{
+    <partial name="_ReferenceConfirmation" model="confirmation" />
+}
+else
+{
+<form method="get" class="reference-filter">
+    @if (Model.RegionId is not null) { <input type="hidden" name="RegionId" value="@Model.RegionId" /> }
+    @if (Model.CountyId is not null) { <input type="hidden" name="CountyId" value="@Model.CountyId" /> }
+    <label><input type="checkbox" name="ShowArchived" value="true" checked="@Model.ShowArchived" /> Show archived (@Model.Geography.ArchivedCount)</label>
+    <button type="submit">Show list</button>
+</form>
 <h2>@Model.Plural</h2>
 @if (Model.Geography.Items.Count == 0)
 {
-    <p>No @Model.Geography.Level yet.</p>
+    <p>@(Model.Geography.ArchivedCount > 0 ? $"No active {Model.Geography.Level} to show." : $"No {Model.Geography.Level} yet.")</p>
 }
 else
 {
     <ul class="geography-list">
     @foreach (var item in Model.Geography.Items)
     {
-        <li>
+        <li data-reference-id="@item.Id">
             @if (Model.Geography.Level == "regions")
             {
-                <a asp-page="Index" asp-route-regionId="@item.Id">@item.Name</a>
+                <a asp-page="Index" asp-route-regionId="@item.Id" asp-route-showArchived="@Model.ShowArchived">@item.Name@(item.IsArchived ? " (archived)" : "")</a>
             }
             else if (Model.Geography.Level == "counties")
             {
-                <a asp-page="Index" asp-route-countyId="@item.Id">@item.Name</a>
+                <a asp-page="Index" asp-route-countyId="@item.Id" asp-route-showArchived="@Model.ShowArchived">@item.Name@(item.IsArchived ? " (archived)" : "")</a>
             }
             else
             {
-                <span>@item.Name — @Model.Geography.Path.Last().Name</span>
+                <span>@item.Name@(item.IsArchived ? " (archived)" : "") — @Model.Geography.Path.Last().Name</span>
             }
+            <partial name="_ReferenceRetirement" model="@(new FieldSales.Web.ReferenceData.ReferenceRetirementModel(
+                new ReferenceListItem(item.Id, item.Name, item.IsArchived, item.Usage!),
+                Url.Page("Index", "Confirm", new { id = item.Id, Model.RegionId, Model.CountyId, Model.ShowArchived })!))" />
             <details class="geography-rename" open="@(Model.RenameId == item.Id && !ViewData.ModelState.IsValid ? "open" : null)">
                 <summary>Rename @item.Name</summary>
-                <form class="product-form geography-form" method="post" asp-page-handler="Rename" asp-route-regionId="@Model.RegionId" asp-route-countyId="@Model.CountyId">
+                <form class="product-form geography-form" method="post" asp-page-handler="Rename" asp-route-regionId="@Model.RegionId" asp-route-countyId="@Model.CountyId" asp-route-showArchived="@Model.ShowArchived">
                     <input type="hidden" name="RenameId" value="@item.Id" />
                     <input type="hidden" name="Version" value="@(Model.RenameId == item.Id && !ViewData.ModelState.IsValid ? Model.Version : item.Version)" />
                     <label for="rename-@item.Id">@Model.Singular name</label>
@@ -61,23 +77,32 @@ else
     }
     </ul>
 }
+@if (Model.CanAdd)
+{
 <h2>Add @Model.Singular.ToLowerInvariant()</h2>
-<form class="product-form" method="post" asp-page-handler="Create" asp-route-regionId="@Model.RegionId" asp-route-countyId="@Model.CountyId">
+<form class="product-form" method="post" asp-page-handler="Create" asp-route-regionId="@Model.RegionId" asp-route-countyId="@Model.CountyId" asp-route-showArchived="@Model.ShowArchived">
     <label asp-for="Name">@Model.Singular name</label>
     <input asp-for="Name" maxlength="200" />
     <span asp-validation-for="Name"></span>
     <button class="button" type="submit">Add @Model.Singular.ToLowerInvariant()</button>
 </form>
+}
+else
+{
+    <p>Un-archive the parent geography before adding places here.</p>
+}
 <details class="geography-import">
     <summary>Import towns from CSV</summary>
     <p>You can enter geography manually or import a CSV with the columns Region, County, Town.</p>
     <p>Import adds missing places and keeps existing ones. Maximum file size: 1 MiB; maximum towns: 10,000.</p>
+    <p>Archived places stay archived. New places cannot be added beneath archived geography.</p>
     <pre>Region,County,Town
 Leinster,Wicklow,Rathdrum</pre>
-    <form class="product-form" method="post" enctype="multipart/form-data" asp-page-handler="Import" asp-route-regionId="@Model.RegionId" asp-route-countyId="@Model.CountyId">
+    <form class="product-form" method="post" enctype="multipart/form-data" asp-page-handler="Import" asp-route-regionId="@Model.RegionId" asp-route-countyId="@Model.CountyId" asp-route-showArchived="@Model.ShowArchived">
         <label asp-for="Upload">CSV file</label>
         <input asp-for="Upload" type="file" accept=".csv,text/csv" />
         <span asp-validation-for="Upload"></span>
         <button class="button" type="submit">Import geography</button>
     </form>
 </details>
+}

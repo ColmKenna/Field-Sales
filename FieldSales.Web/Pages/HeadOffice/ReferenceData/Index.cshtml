@@ -9,34 +9,9 @@
 <div asp-validation-summary="All" role="alert"></div>
 @if (Model.Confirmation is { } item)
 {
-    <section class="reference-confirmation" aria-labelledby="confirmation-heading">
-        <h2 id="confirmation-heading">@Model.Action.ToLabel() "@item.Name"?</h2>
-        <p>@item.Usage.Description</p>
-        @if (Model.Action == ReferenceAction.Archive)
-        {
-            <p>It stays on existing records and stops appearing in new selections.</p>
-        }
-        else if (Model.Action == ReferenceAction.Delete)
-        {
-            <p>This permanently removes the @Model.List.SelectedList.SingularLabel.ToLowerInvariant().</p>
-        }
-        else
-        {
-            <p>It will be offered again for new selections.</p>
-        }
-        @foreach (var note in Model.List.SelectedList.NotesFor(Model.Action, item.Usage))
-        {
-            <p>@note</p>
-        }
-        <form method="post" asp-page-handler="Retire">
-            <input type="hidden" name="ListKey" value="@Model.ListKey" />
-            <input type="hidden" name="ShowArchived" value="@Model.ShowArchived" />
-            <input type="hidden" name="Id" value="@item.Id" />
-            <input type="hidden" name="Action" value="@((int)Model.Action)" />
-            <button type="submit">Confirm @Model.Action.ToLabel()</button>
-            <a asp-page="Index" asp-route-listKey="@Model.ListKey" asp-route-showArchived="@Model.ShowArchived">Cancel</a>
-        </form>
-    </section>
+    <partial name="_ReferenceConfirmation" model="@(new FieldSales.Web.ReferenceData.ReferenceConfirmationModel(item,
+        Model.List.SelectedList, Url.Page("Index", "Retire")!, Url.Page("Index", new { Model.ListKey, Model.ShowArchived })!,
+        new Dictionary<string, string> { ["ListKey"] = Model.ListKey, ["ShowArchived"] = Model.ShowArchived.ToString(), ["Id"] = item.Id.ToString() }))" />
 }
 else
 {

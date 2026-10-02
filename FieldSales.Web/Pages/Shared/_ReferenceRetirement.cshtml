@@ -1,0 +1,4 @@
+@model FieldSales.Web.ReferenceData.ReferenceRetirementModel
+@using FieldSales.ReferenceData
+<p>@Model.Item.Usage.Description</p>
+<a href="@Model.ConfirmationUrl">@ReferenceRetirementPolicy.Decide(Model.Item.IsArchived, Model.Item.Usage).ToLabel()</a>

@@ -1,6 +1,8 @@
 using System.Text;
 using FieldSales.Api.Catalogue;
 using FieldSales.Directory.Contracts;
+using FieldSales.ReferenceData;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,9 +13,11 @@ public static class GeographyEndpoints
     public static void MapGeographyEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/directory/geography").RequireAuthorization("HeadOfficeDirectory");
-        group.MapGet("/", async (Guid? regionId, Guid? countyId, GeographyStore store, CancellationToken ct) =>
-            await store.PageAsync(regionId, countyId, ct) is { } page ? Results.Ok(page) : Results.NotFound());
+        group.MapGet("/", (Guid? regionId, Guid? countyId, bool? showArchived, GeographyStore store, CancellationToken ct) =>
+            GuardAsync(async () => await store.PageAsync(regionId, countyId, ct, showArchived == true) is { } page ? Results.Ok(page) : Results.NotFound()));
         group.MapGet("/town-choices", async (GeographyStore store, CancellationToken ct) => Results.Ok(await store.ChoicesAsync(ct)));
+        group.MapGet("/towns/{id:guid}/reference", async (Guid id, GeographyStore store, CancellationToken ct) =>
+            await store.TownReferenceAsync(id, ct) is { } town ? Results.Ok(town) : Results.NotFound());
         MapNames<Region>(group, "regions", (request, db, ct) =>
         {
             if (request.ParentId is not null) throw new GeographyValidationException("Regions cannot have a parent.");
@@ -59,16 +63,17 @@ public static class GeographyEndpoints
     private static void MapNames<T>(RouteGroupBuilder group, string level,
         Func<CreateGeographyRequest, DirectoryDbContext, CancellationToken, Task<T>> create) where T : GeographyEntity
     {
-        group.MapGet($"/{level}/{{id:guid}}", async (Guid id, DirectoryDbContext db, CancellationToken ct) =>
-            await db.Set<T>().AsNoTracking().SingleOrDefaultAsync(item => item.Id == id, ct) is { } item
-                ? Results.Ok(ToItem(item)) : Results.NotFound());
-        group.MapPost($"/{level}", (CreateGeographyRequest request, DirectoryDbContext db, CancellationToken ct) => GuardAsync(async () =>
+        group.MapGet($"/{level}/{{id:guid}}", (Guid id, GeographyStore store, CancellationToken ct) => GuardAsync(async () =>
+            await store.FindAsync<T>(id, level, ct) is { } item ? Results.Ok(item) : Results.NotFound()));
+        group.MapPost($"/{level}", (CreateGeographyRequest request, DirectoryDbContext db, GeographyStore store, CancellationToken ct) =>
+            GuardAsync(() => GeographyTransactions.RunAsync<IResult>(db, async () =>
         {
             T entity = await create(request, db, ct);
+            await store.EnsureActiveParentAsync(level, request.ParentId, ct);
             db.Set<T>().Add(entity);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/directory/geography/{level}/{entity.Id}", ToItem(entity));
-        }));
+        }, ct)));
         group.MapPut($"/{level}/{{id:guid}}/name", (Guid id, RenameGeographyRequest request, DirectoryDbContext db, CancellationToken ct) => GuardAsync(async () =>
         {
             T? entity = await db.Set<T>().SingleOrDefaultAsync(item => item.Id == id, ct);
@@ -84,6 +89,16 @@ public static class GeographyEndpoints
             await db.SaveChangesAsync(ct);
             return Results.Ok(ToItem(entity));
         }));
+        group.MapPost($"/{level}/{{id:guid}}/retire", (Guid id, RetireGeographyRequest request, GeographyStore store, CancellationToken ct) => GuardAsync(async () =>
+        {
+            if (!Enum.IsDefined(request.Action)) return Results.BadRequest(new GeographyError("Choose a valid action."));
+            return await store.RetireAsync<T>(id, level, request, ct) switch
+            {
+                ReferenceMutationStatus.Saved => Results.Ok(new GeographyMutationResult(true)),
+                ReferenceMutationStatus.Missing => Results.NotFound(),
+                _ => RetirementConflict()
+            };
+        }));
     }
 
     private static GeographyItem ToItem(GeographyEntity entity) => GeographyStore.Item(entity,
@@ -93,10 +108,17 @@ public static class GeographyEndpoints
     {
         try { return await operation(); }
         catch (GeographyValidationException exception) { return Results.BadRequest(new GeographyError(exception.Message)); }
+        catch (ReferenceUsageUnavailableException) { return Results.StatusCode(503); }
         catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
         { return Results.BadRequest(new GeographyError("The CSV file must be 1 MiB or smaller.")); }
         catch (DbUpdateConcurrencyException) { return Results.Conflict(new GeographyError("This record changed. Reload before renaming.")); }
         catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
         { return Results.Conflict(new GeographyError("A name like this already exists here. No changes were saved.")); }
+        // EF can wrap deadlocks in InvalidOperationException when a provider has no retry policy.
+        catch (Exception exception) when (exception.GetBaseException() is SqlException { Number: 547 or 1205 })
+        { return RetirementConflict(); }
     }
+
+    private static IResult RetirementConflict() => Results.Conflict(new GeographyError(
+        "This place changed or is now in use. Reload it before continuing."));
 }
