@@ -5,6 +5,11 @@ and 14 Scenario Review intents on 2026-10-02. This is the required model and
 written storage-constraint checkpoint, before migration, handlers or screens.
 Starting main: `1476def`; branch `feature/wi-018-link-contacts-locations-one-main`.
 
+**Accepted 2026-10-02:** the user answered the review question “yes”, approving
+continuation. This document preserves the pre-implementation checkpoint state
+below. The activated migration, screens and verification are recorded in
+`contact-location-delivery.md`.
+
 ## Review question
 
 Can a person be Main at several shops while each shop has one Active Main,
