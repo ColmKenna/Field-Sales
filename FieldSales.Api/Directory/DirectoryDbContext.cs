@@ -9,6 +9,8 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
     public DbSet<Region> Regions => Set<Region>();
     public DbSet<County> Counties => Set<County>();
     public DbSet<Town> Towns => Set<Town>();
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Location> Locations => Set<Location>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,6 +23,27 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
         var towns = Configure<Town>(modelBuilder, "Towns");
         towns.HasIndex(item => new { item.CountyId, item.NormalizedName }).IsUnique();
         towns.HasOne<County>().WithMany().HasForeignKey(item => item.CountyId).OnDelete(DeleteBehavior.Restrict);
+
+        var customers = modelBuilder.Entity<Customer>();
+        customers.ToTable("Customers");
+        customers.HasKey(item => item.Id);
+        customers.Property(item => item.Id).ValueGeneratedNever();
+        customers.Property(item => item.Name).HasMaxLength(CustomerDirectoryFields.MaximumNameLength).IsRequired();
+        customers.Property(item => item.Version).IsRowVersion();
+        customers.HasMany(item => item.Locations).WithOne().HasForeignKey(item => item.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        customers.Navigation(item => item.Locations).HasField("_locations").UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        var locations = modelBuilder.Entity<Location>();
+        locations.ToTable("Locations");
+        locations.HasKey(item => item.Id);
+        locations.Property(item => item.Id).ValueGeneratedNever();
+        locations.Property(item => item.Name).HasMaxLength(CustomerDirectoryFields.MaximumNameLength).IsRequired();
+        locations.Property(item => item.NormalizedName).HasMaxLength(CustomerDirectoryFields.MaximumNameLength)
+            .UseCollation("Latin1_General_100_BIN2").IsRequired();
+        locations.Property(item => item.Eircode).HasMaxLength(Location.MaximumEircodeLength);
+        locations.Property(item => item.Version).IsRowVersion();
+        locations.HasIndex(item => new { item.CustomerId, item.NormalizedName });
+        locations.HasOne<Town>().WithMany().HasForeignKey(item => item.TownId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static EntityTypeBuilder<T> Configure<T>(ModelBuilder modelBuilder, string table) where T : GeographyEntity
