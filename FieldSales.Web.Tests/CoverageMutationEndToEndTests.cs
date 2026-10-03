@@ -191,7 +191,7 @@ public sealed class CoverageMutationEndToEndTests(CoverageReadApplication app) :
         var previous = removal ? await AssignAsync(api, "colm", TerritoryLevel.County, seed.County.Id) : null;
         app.Failures.FailAfterHistorySave = true;
         Task<HttpResponseMessage> SaveAsync() => removal
-            ? api.PostAsJsonAsync($"{Root}/assignments/{previous!.Id}/remove", new RemoveTerritoryAssignmentRequest(previous.Version))
+            ? RemoveRequestAsync(api, previous!)
             : AddAsync(api, "colm", TerritoryLevel.County, seed.County.Id);
         await Assert.ThrowsAsync<InvalidOperationException>(SaveAsync); Assert.True(app.Failures.DidFailAfterSave);
         Assert.Equal(removal ? 1 : 0, await AssignmentCountAsync()); Assert.Equal(removal ? 1 : 0, await HistoryCountAsync());
@@ -376,8 +376,22 @@ public sealed class CoverageMutationEndToEndTests(CoverageReadApplication app) :
         using var response = await api.PostAsJsonAsync("/directory/geography/" + level, new CreateGeographyRequest(name, parent));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode); return (await response.Content.ReadFromJsonAsync<GeographyItem>())!;
     }
-    private static Task<HttpResponseMessage> AddAsync(HttpClient api, string rep, TerritoryLevel level, Guid id) =>
-        api.PostAsJsonAsync(Root + "/assignments", new AddTerritoryAssignmentRequest(rep, new(level, id)));
+    private static async Task<HttpResponseMessage> AddAsync(HttpClient api, string rep, TerritoryLevel level, Guid id)
+    {
+        var request = new AddTerritoryAssignmentRequest(rep, new(level, id));
+        var preview = await api.PostAsJsonAsync(Root + "/assignments/preview", request);
+        if (!preview.IsSuccessStatusCode) return preview;
+        var impact = (await preview.Content.ReadFromJsonAsync<AssignmentImpactDetails>())!; preview.Dispose();
+        return await api.PostAsJsonAsync(Root + "/assignments", request with { PreviewProof = impact.Proof, Confirmed = true });
+    }
+    private static async Task<HttpResponseMessage> RemoveRequestAsync(HttpClient api, TerritoryAssignmentDetails assignment)
+    {
+        var request = new RemoveTerritoryAssignmentRequest(assignment.Version);
+        var preview = await api.PostAsJsonAsync($"{Root}/assignments/{assignment.Id}/remove/preview", request);
+        if (!preview.IsSuccessStatusCode) return preview;
+        var impact = (await preview.Content.ReadFromJsonAsync<AssignmentImpactDetails>())!; preview.Dispose();
+        return await api.PostAsJsonAsync($"{Root}/assignments/{assignment.Id}/remove", request with { PreviewProof = impact.Proof, Confirmed = true });
+    }
     private static async Task<TerritoryAssignmentDetails> AssignAsync(HttpClient api, string rep, TerritoryLevel level, Guid id)
     {
         using var response = await AddAsync(api, rep, level, id); Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -385,7 +399,7 @@ public sealed class CoverageMutationEndToEndTests(CoverageReadApplication app) :
     }
     private static async Task<CoverageMutationResult> RemoveAsync(HttpClient api, TerritoryAssignmentDetails assignment)
     {
-        using var response = await api.PostAsJsonAsync($"{Root}/assignments/{assignment.Id}/remove", new RemoveTerritoryAssignmentRequest(assignment.Version));
+        using var response = await RemoveRequestAsync(api, assignment);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode); return (await response.Content.ReadFromJsonAsync<CoverageMutationResult>())!;
     }
     private static async Task<LocationCoverageDetails> OwnerAsync(HttpClient api, Guid id) => (await api.GetFromJsonAsync<LocationCoverageDetails>($"{Root}/locations/{id}/owner"))!;

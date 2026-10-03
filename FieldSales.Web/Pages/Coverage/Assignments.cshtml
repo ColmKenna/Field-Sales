@@ -1,0 +1,81 @@
+@page
+@model FieldSales.Web.Pages.Coverage.AssignmentsModel
+@{
+    ViewData["Title"] = "Review an assignment change";
+}
+<h1>Review an assignment change</h1>
+<p>See which Locations change owner before saving.</p>
+<div asp-validation-summary="All" role="alert"></div>
+@if (TempData["AssignmentNotice"] is string saved) { <p role="status">@saved</p> }
+@if (Model.Notice is { } notice) { <p role="alert">@notice Nothing was saved.</p> }
+@if (Model.Preview is { } preview)
+{
+    <section aria-labelledby="impact-heading">
+        <h2 id="impact-heading">@(preview.Action == "Add" ? $"Assign {preview.TargetName} to {preview.RepName}?" : $"Remove {preview.RepName}'s {preview.TargetName} assignment?")</h2>
+        <partial name="_AssignmentImpact" model="preview" />
+        <form method="post" asp-page-handler="Save">
+            <input asp-for="RepSubject" type="hidden" />
+            <input asp-for="TargetKey" type="hidden" />
+            <input asp-for="AssignmentId" type="hidden" />
+            <input asp-for="Version" type="hidden" />
+            <input asp-for="Reason" type="hidden" />
+            <input asp-for="Action" type="hidden" />
+            <input asp-for="PreviewProof" type="hidden" />
+            <button type="submit" name="Confirmed" value="true">@(preview.Action == "Add" ? "Assign " + preview.TargetName + " to " + preview.RepName : "Remove assignment")</button>
+            <a asp-page="./Assignments" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+        </form>
+    </section>
+}
+else
+{
+    @if (Model.Options.Reps.Count == 0) { <p>No active field salespeople are available for your team.</p> }
+    else
+    {
+        <form method="get">
+            <label for="choose-rep">Field salesperson</label>
+            <select id="choose-rep" name="RepSubject">
+                <option value="">Choose a field salesperson</option>
+                @foreach (var rep in Model.Options.Reps) { <option value="@rep.Subject" selected="@(rep.Subject == Model.RepSubject)">@rep.Name</option> }
+            </select>
+            <button type="submit">View assignments</button>
+        </form>
+    }
+    @if (Model.RepName is { } repName)
+    {
+        <h2>Add an assignment for @repName</h2>
+        @if (Model.Options.Targets.Count == 0) { <p>No active territories or Locations are available.</p> }
+        else
+        {
+            <form method="post" asp-page-handler="Preview">
+                <input asp-for="RepSubject" type="hidden" />
+                <input name="Action" value="Add" type="hidden" />
+                <label asp-for="TargetKey">Territory or Location</label>
+                <select asp-for="TargetKey" required>
+                    <option value="">Choose a territory or Location</option>
+                    @foreach (var target in Model.Options.Targets) { <option value="@(target.Target.Level + ":" + target.Target.UnitId)">@target.Label</option> }
+                </select>
+                <label asp-for="Reason">Reason (optional)</label>
+                <input asp-for="Reason" maxlength="1000" />
+                <button type="submit">Review assignment</button>
+            </form>
+        }
+        <h2>Current assignments</h2>
+        @if (Model.Options.Assignments.Count == 0) { <p>@repName has no territory assignments.</p> }
+        else
+        {
+            @foreach (var row in Model.Options.Assignments)
+            {
+                <form method="post" asp-page-handler="Preview">
+                    <p>@row.Name (@row.Assignment.Target.Level)</p>
+                    <input name="RepSubject" value="@Model.RepSubject" type="hidden" />
+                    <input name="Action" value="Remove" type="hidden" />
+                    <input name="AssignmentId" value="@row.Assignment.Id" type="hidden" />
+                    <input name="Version" value="@row.Assignment.Version" type="hidden" />
+                    <label for="reason-@row.Assignment.Id">Reason (optional)</label>
+                    <input id="reason-@row.Assignment.Id" name="Reason" maxlength="1000" />
+                    <button type="submit">Review removal of @row.Name</button>
+                </form>
+            }
+        }
+    }
+}

@@ -12,6 +12,14 @@ public static class CoverageEndpoints
         var group = app.MapGroup("/coverage").RequireAuthorization("ManageCoverage");
         group.MapGet("/reps", (ClaimsPrincipal user, ReportingLineStore store, CancellationToken ct) =>
             GuardAsync(async () => Results.Ok(await store.RepsAsync(user, ct))));
+        group.MapGet("/assignment-options", (string? repSubject, ClaimsPrincipal user, AssignmentReviewStore store, CancellationToken ct) =>
+            GuardAsync(async () => Results.Ok(await store.OptionsAsync(user, repSubject, ct))));
+        group.MapPost("/assignments/preview", (AddTerritoryAssignmentRequest request, ClaimsPrincipal user,
+            TerritoryAssignmentStore store, CancellationToken ct) => GuardAsync(async () =>
+                Results.Ok(await store.PreviewAddAsync(user, request, ct))));
+        group.MapPost("/assignments/{id:guid}/remove/preview", (Guid id, RemoveTerritoryAssignmentRequest request, ClaimsPrincipal user,
+            TerritoryAssignmentStore store, CancellationToken ct) => GuardAsync(async () =>
+                await store.PreviewRemoveAsync(user, id, request, ct) is { } preview ? Results.Ok(preview) : Results.NotFound()));
         group.MapPost("/assignments", (AddTerritoryAssignmentRequest request, ClaimsPrincipal user,
             TerritoryAssignmentStore store, CancellationToken ct) => GuardAsync(async () =>
             {
@@ -49,6 +57,7 @@ public static class CoverageEndpoints
         try { return await operation(); }
         catch (CoverageReadForbiddenException) { return Results.Forbid(); }
         catch (CoverageValidationException exception) { return Results.BadRequest(new CoverageError(exception.Message, exception.Field)); }
+        catch (CoveragePreviewChangedException exception) { return Results.Conflict(new CoverageError(exception.Message, Preview: exception.Preview)); }
         catch (CoverageConflictException exception) { return Results.Conflict(new CoverageError(exception.Message)); }
         catch (CoverageIdentityUnavailableException exception)
         { return Results.Json(new CoverageError(exception.Message), statusCode: StatusCodes.Status503ServiceUnavailable); }
