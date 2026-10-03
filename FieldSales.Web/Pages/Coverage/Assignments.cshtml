@@ -4,6 +4,10 @@
     ViewData["Title"] = "Review an assignment change";
 }
 <h1>Review an assignment change</h1>
+@if (Model.ReturnToTerritory && Model.RepName is { } territoryRep)
+{
+    <p><a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">@territoryRep · Territory</a></p>
+}
 <p>See which Locations change owner before saving.</p>
 <div asp-validation-summary="All" role="alert"></div>
 @if (TempData["AssignmentNotice"] is string saved) { <p role="status">@saved</p> }
@@ -15,6 +19,7 @@
         <partial name="_AssignmentImpact" model="preview" />
         <form method="post" asp-page-handler="Save">
             <input asp-for="RepSubject" type="hidden" />
+            <input asp-for="ReturnToTerritory" type="hidden" />
             <input asp-for="TargetKey" type="hidden" />
             <input asp-for="AssignmentId" type="hidden" />
             <input asp-for="Version" type="hidden" />
@@ -22,7 +27,7 @@
             <input asp-for="Action" type="hidden" />
             <input asp-for="PreviewProof" type="hidden" />
             <button type="submit" name="Confirmed" value="true">@(preview.Action == "Add" ? "Assign " + preview.TargetName + " to " + preview.RepName : "Remove assignment")</button>
-            <a asp-page="./Assignments" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+            <a asp-page="@(Model.ReturnToTerritory ? "./Territory" : "./Assignments")" asp-route-repSubject="@Model.RepSubject">Cancel</a>
         </form>
     </section>
 }
@@ -48,6 +53,7 @@ else
         {
             <form method="post" asp-page-handler="Preview">
                 <input asp-for="RepSubject" type="hidden" />
+                <input asp-for="ReturnToTerritory" type="hidden" />
                 <input name="Action" value="Add" type="hidden" />
                 <label asp-for="TargetKey">Territory or Location</label>
                 <select asp-for="TargetKey" required>
@@ -68,6 +74,7 @@ else
                 <form method="post" asp-page-handler="Preview">
                     <p>@row.Name (@row.Assignment.Target.Level)</p>
                     <input name="RepSubject" value="@Model.RepSubject" type="hidden" />
+                    <input asp-for="ReturnToTerritory" type="hidden" />
                     <input name="Action" value="Remove" type="hidden" />
                     <input name="AssignmentId" value="@row.Assignment.Id" type="hidden" />
                     <input name="Version" value="@row.Assignment.Version" type="hidden" />

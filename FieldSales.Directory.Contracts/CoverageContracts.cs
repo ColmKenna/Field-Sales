@@ -44,3 +44,11 @@ public sealed record AssignmentImpactDetails(string Proof, string Action, string
 public sealed record CoverageTargetChoice(TerritoryTarget Target, string Name, string Label);
 public sealed record AssignmentReviewOptions(IReadOnlyList<StaffChoice> Reps, IReadOnlyList<CoverageTargetChoice> Targets,
     IReadOnlyList<AssignedTerritoryDetails> Assignments);
+
+public sealed record TerritoryCarveOut(StaffChoice Rep, int Locations);
+public sealed record TerritoryTown(Guid Id, string Name, bool Archived, int Locations,
+    StaffChoice? AssignedTo, IReadOnlyList<TerritoryCarveOut> CarveOuts);
+public sealed record RepTerritoryAssignment(AssignedTerritoryDetails Assignment, string Context, bool Archived,
+    int Locations, IReadOnlyList<TerritoryCarveOut> CarveOuts, IReadOnlyList<TerritoryTown> Towns);
+public sealed record RepTerritoryPage(StaffChoice Rep, StaffChoice? Manager, int PrimaryLocations,
+    IReadOnlyList<RepTerritoryAssignment> Assignments);

@@ -9,6 +9,7 @@ namespace FieldSales.Web.Pages.Coverage;
 public sealed class AssignmentsModel(CoverageApiClient coverage) : PageModel
 {
     [BindProperty(SupportsGet = true)] public string? RepSubject { get; set; }
+    [BindProperty(SupportsGet = true)] public bool ReturnToTerritory { get; set; }
     [BindProperty] public string? TargetKey { get; set; }
     [BindProperty] public Guid? AssignmentId { get; set; }
     [BindProperty] public string? Version { get; set; }
@@ -25,6 +26,7 @@ public sealed class AssignmentsModel(CoverageApiClient coverage) : PageModel
 
     public async Task<IActionResult> OnPostPreviewAsync()
     {
+        if (await LoadAsync() is { } denied) return denied;
         if (!ValidateCommand()) return await LoadAsync() ?? Page();
         if (Action == "Add")
         {
@@ -45,12 +47,14 @@ public sealed class AssignmentsModel(CoverageApiClient coverage) : PageModel
 
     public async Task<IActionResult> OnPostSaveAsync()
     {
+        if (await LoadAsync() is { } denied) return denied;
         if (!ValidateCommand()) return await LoadAsync() ?? Page();
         var result = Action == "Add" ? await coverage.SaveAddAsync(AddRequest(), HttpContext.RequestAborted)
             : await coverage.SaveRemoveAsync(AssignmentId!.Value, RemoveRequest(), HttpContext.RequestAborted);
         if (result.Success && result.Value?.Saved == true)
         {
             TempData["AssignmentNotice"] = "Assignment change saved.";
+            if (ReturnToTerritory) return RedirectToPage("./Territory", new { repSubject = RepSubject });
             return RedirectToPage(new { repSubject = RepSubject });
         }
         if (result.Value?.Preview is { } refreshed)
@@ -77,6 +81,8 @@ public sealed class AssignmentsModel(CoverageApiClient coverage) : PageModel
         if (string.IsNullOrWhiteSpace(RepSubject)) ModelState.AddModelError(nameof(RepSubject), "Choose a field salesperson.");
         if (Action == "Add" && Target() is null) ModelState.AddModelError(nameof(TargetKey), "Choose a territory or location.");
         if (Action == "Remove" && (AssignmentId is null || AssignmentId == Guid.Empty)) ModelState.AddModelError(nameof(AssignmentId), "Choose an assignment.");
+        if (Action == "Remove" && AssignmentId is { } id && !Options.Assignments.Any(row => row.Assignment.Id == id))
+            ModelState.AddModelError(nameof(AssignmentId), "Reload the rep's assignments before reviewing this removal.");
         return ModelState.IsValid;
     }
     private TerritoryTarget? Target()

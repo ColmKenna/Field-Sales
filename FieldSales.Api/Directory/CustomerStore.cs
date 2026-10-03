@@ -35,7 +35,7 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         var candidate = Customer.Create(request.Name, first.Name, first.TownId, first.Eircode).Locations[0];
         await CheckTownAsync(candidate.TownId, null, "FirstLocation.TownId", ct);
         await SetTypeAsync(candidate, first.LocationTypeId, null, "FirstLocation.LocationTypeId", ct);
-        var resolved = await positions.ResolveAsync(candidate, ct);
+        var resolved = await positions.ResolveAsync(candidate, ct, "FirstLocation.TownId");
         var staff = await history.PrepareAsync([await ownership.ResolveAsync(candidate, ct, "FirstLocation.TownId")], ct);
         var operationId = Guid.NewGuid();
         return await GeographyTransactions.RunAsync(db, async () =>
