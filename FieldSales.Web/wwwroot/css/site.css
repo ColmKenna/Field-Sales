@@ -88,3 +88,19 @@ p { line-height: 1.6; }
 .directory-table th, .directory-table td { text-align: left; padding: .8rem; border-bottom: 1px solid #d7dee6; }
 .reference-description { white-space: pre-wrap; overflow-wrap: anywhere; }
 .reference-item textarea, .reference-add textarea { display: block; width: min(100%, 36rem); padding: .6rem; font: inherit; }
+
+.coverage-navigation { margin-block: 1.25rem; }
+.territory-heading, .territory-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.territory-summary { padding: 1rem; border: 1px solid #d7dee6; border-radius: .6rem; background: #fff; }
+.territory-assignment { margin-block: 1rem; padding: 1.25rem; border: 1px solid #d7dee6; border-radius: .6rem; background: #fff; overflow-wrap: anywhere; }
+.territory-assignment details { overflow-x: auto; }
+.territory-assignment summary { cursor: pointer; padding-block: .5rem; }
+.territory-assignment summary strong { margin-right: 1rem; }
+.territory-assignment summary:focus-visible { outline: 3px solid #e48f2b; outline-offset: 2px; }
+.territory-towns { width: 100%; border-collapse: collapse; }
+.territory-towns caption { text-align: left; padding-block: .75rem; }
+.territory-towns th, .territory-towns td { text-align: left; padding: .7rem; border-bottom: 1px solid #d7dee6; }
+.territory-carve-out { display: block; }
+.territory-context { color: #35485c; }
+.territory-remove { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.territory-remove input { max-width: 100%; }

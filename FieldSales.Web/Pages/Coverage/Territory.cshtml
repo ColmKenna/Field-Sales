@@ -1,0 +1,92 @@
+@page
+@model FieldSales.Web.Pages.Coverage.TerritoryModel
+@{
+    ViewData["Title"] = Model.Territory is { } title ? title.Rep.Name + " · Territory" : "Coverage";
+}
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a></nav>
+@if (Model.Territory is not { } territory)
+{
+    <h1>Coverage</h1>
+    @if (Model.Reps.Count == 0) { <p>No active field salespeople are available for your team.</p> }
+    else
+    {
+        <ul class="geography-list">
+        @foreach (var rep in Model.Reps)
+        {
+            <li><a asp-page="./Territory" asp-route-repSubject="@rep.Subject">@rep.Name</a></li>
+        }
+        </ul>
+    }
+}
+else
+{
+    <div class="territory-heading">
+        <h1>@territory.Rep.Name</h1>
+        <p>Reports to: @(territory.Manager?.Name ?? "Not set")</p>
+    </div>
+    @if (TempData["AssignmentNotice"] is string notice) { <p role="status">@notice</p> }
+    <section class="territory-summary" aria-label="Territory summary">
+        <p><strong>@territory.PrimaryLocations @(territory.PrimaryLocations == 1 ? "Location" : "Locations") as Primary</strong></p>
+        <a class="button" asp-page="./Assignments" asp-route-repSubject="@territory.Rep.Subject" asp-route-returnToTerritory="true">Add assignment</a>
+    </section>
+    <section aria-labelledby="assignments-heading">
+        <h2 id="assignments-heading">Assignments</h2>
+        <form method="get" class="reference-filter">
+            <input asp-for="RepSubject" type="hidden" />
+            <label asp-for="Filter">Town or area</label>
+            <input asp-for="Filter" placeholder="Town or area…" />
+            <button type="submit">Filter</button>
+            @if (!string.IsNullOrWhiteSpace(Model.Filter)) { <a asp-page="./Territory" asp-route-repSubject="@territory.Rep.Subject">Clear filter</a> }
+        </form>
+        @if (territory.Assignments.Count == 0) { <p>@territory.Rep.Name has no territory assignments.</p> }
+        else if (Model.VisibleAssignments.Count == 0) { <p>No assignments match this filter.</p> }
+        @foreach (var row in Model.VisibleAssignments)
+        {
+            <article class="territory-assignment" aria-label="@row.Assignment.Name (@row.Assignment.Assignment.Target.Level)">
+                @if (row.Assignment.Assignment.Target.Level == FieldSales.Directory.Contracts.TerritoryLevel.County)
+                {
+                    <details open="@(!string.IsNullOrWhiteSpace(Model.Filter))">
+                        <summary>
+                            <strong>@row.Assignment.Name (County)</strong>
+                            <span>@row.Locations @(row.Locations == 1 ? "Location" : "Locations")</span>
+                            @if (row.CarveOuts.Count > 0) { <span>· @row.CarveOuts.Sum(item => item.Locations) carved out → @string.Join(", ", row.CarveOuts.Select(item => item.Rep.Name))</span> }
+                        </summary>
+                        <table class="territory-towns">
+                            <caption>Towns in @row.Assignment.Name</caption>
+                            <thead><tr><th scope="col">Town</th><th scope="col">Locations</th><th scope="col">Carve-outs</th></tr></thead>
+                            <tbody>
+                            @foreach (var town in row.Towns)
+                            {
+                                <tr><th scope="row">@town.Name @if (town.Archived) { <span>· Archived</span> }</th><td>@town.Locations</td><td>
+                                    @if (town.AssignedTo is { } other) { <span>carved out → @other.Name</span> }
+                                    @foreach (var carveOut in town.CarveOuts.Where(item => item.Rep.Subject != town.AssignedTo?.Subject))
+                                    { <span class="territory-carve-out">@carveOut.Locations @(carveOut.Locations == 1 ? "Location" : "Locations") carved out → @carveOut.Rep.Name</span> }
+                                </td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </details>
+                }
+                else
+                {
+                    <h3>@row.Assignment.Name (@row.Assignment.Assignment.Target.Level)</h3>
+                    <p>@row.Locations @(row.Locations == 1 ? "Location" : "Locations")
+                    @if (row.Assignment.Assignment.Target.Level == FieldSales.Directory.Contracts.TerritoryLevel.Location) { <span>· assigned directly</span> }
+                    @foreach (var carveOut in row.CarveOuts) { <span class="territory-carve-out">· @carveOut.Locations carved out → @carveOut.Rep.Name</span> }
+                    </p>
+                }
+                <p class="territory-context">@row.Context @if (row.Archived) { <span>· Archived</span> }</p>
+                <form method="post" asp-page="./Assignments" asp-page-handler="Preview" class="territory-remove">
+                    <input name="RepSubject" value="@territory.Rep.Subject" type="hidden" />
+                    <input name="ReturnToTerritory" value="true" type="hidden" />
+                    <input name="Action" value="Remove" type="hidden" />
+                    <input name="AssignmentId" value="@row.Assignment.Assignment.Id" type="hidden" />
+                    <input name="Version" value="@row.Assignment.Assignment.Version" type="hidden" />
+                    <label for="reason-@row.Assignment.Assignment.Id">Reason (optional)</label>
+                    <input id="reason-@row.Assignment.Assignment.Id" name="Reason" maxlength="1000" />
+                    <button type="submit" class="button secondary">Review removal of @row.Assignment.Name</button>
+                </form>
+            </article>
+        }
+    </section>
+}

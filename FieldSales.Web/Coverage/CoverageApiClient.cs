@@ -10,6 +10,11 @@ namespace FieldSales.Web.Coverage;
 
 public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
+    public async Task<DirectoryResult<RepTerritoryPage>> TerritoryAsync(string rep, CancellationToken ct)
+    {
+        var result = await SendAsync<RepTerritoryPage>(HttpMethod.Get, "/coverage/reps/" + Uri.EscapeDataString(rep) + "/territory", null, ct);
+        return result.Success && result.Value!.Rep.Subject != rep ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
     public Task<DirectoryResult<ReportingLinesPage>> ReportingLinesAsync(CancellationToken ct) =>
         SendAsync<ReportingLinesPage>(HttpMethod.Get, "/coverage/reporting-lines", null, ct);
     public Task<DirectoryResult<RepReportingLineDetails>> SetReportingLineAsync(string rep, SetRepReportingLineRequest value, CancellationToken ct) =>
@@ -73,6 +78,7 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
             var result = await response.Content.ReadFromJsonAsync<T>(ct);
             bool valid = result switch
             {
+                RepTerritoryPage territory => ValidTerritory(territory),
                 ReportingLinesPage page => page.Reps is not null && page.Managers is not null && page.Lines is not null
                     && page.Reps.All(ValidChoice) && page.Managers.All(ValidChoice)
                     && page.Lines.All(row => row is not null && ValidLine(row.Line) && !string.IsNullOrWhiteSpace(row.RepName)
@@ -102,6 +108,25 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
                 && !string.IsNullOrWhiteSpace(row.Name) && ValidOwner(row.PreviousOwner) && ValidOwner(row.NewOwner)))
         && value.Groups.Sum(group => group.Locations.Count) == value.ChangedLocations
         && value.Groups.SelectMany(group => group.Locations).Select(row => row.LocationId).Distinct().Count() == value.ChangedLocations;
+    private static bool ValidTerritory(RepTerritoryPage value) => ValidChoice(value.Rep)
+        && (value.Manager is null || ValidChoice(value.Manager)) && value.PrimaryLocations >= 0 && value.Assignments is not null
+        && value.Assignments.All(row => row is not null && row.Assignment is not null && row.Assignment.Assignment is { } assignment
+            && assignment.Id != Guid.Empty && assignment.RepSubject == value.Rep.Subject && !string.IsNullOrWhiteSpace(assignment.Version)
+            && assignment.Target is not null && Enum.IsDefined(assignment.Target.Level) && assignment.Target.UnitId != Guid.Empty
+            && !string.IsNullOrWhiteSpace(row.Assignment.Name) && row.Context is not null && row.Locations >= 0
+            && ValidCarveOuts(row.CarveOuts, value.Rep.Subject, row.Locations) && row.Towns is not null
+            && (assignment.Target.Level == TerritoryLevel.County || row.Towns.Count == 0)
+            && row.Towns.All(town => town is not null && town.Id != Guid.Empty && !string.IsNullOrWhiteSpace(town.Name)
+                && town.Locations >= 0 && (town.AssignedTo is null || ValidChoice(town.AssignedTo) && town.AssignedTo.Subject != value.Rep.Subject)
+                && ValidCarveOuts(town.CarveOuts, value.Rep.Subject, town.Locations))
+            && row.Towns.Select(town => town.Id).Distinct().Count() == row.Towns.Count
+            && (assignment.Target.Level != TerritoryLevel.County || row.Towns.Sum(town => (long)town.Locations) == row.Locations))
+        && value.Assignments.Select(row => row.Assignment.Assignment.Id).Distinct().Count() == value.Assignments.Count
+        && value.PrimaryLocations <= value.Assignments.Sum(row => (long)row.Locations);
+    private static bool ValidCarveOuts(IReadOnlyList<TerritoryCarveOut>? rows, string rep, int count) => rows is not null
+        && rows.All(row => row is not null && ValidChoice(row.Rep) && row.Rep.Subject != rep && row.Locations > 0)
+        && rows.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == rows.Count
+        && rows.Sum(row => (long)row.Locations) <= count;
     private static bool ValidOwner(ImpactOwnerDetails? owner) => owner is null || ValidChoice(owner.Rep)
         && owner.Source is not null && Enum.IsDefined(owner.Source.Level) && owner.Source.UnitId != Guid.Empty && !string.IsNullOrWhiteSpace(owner.SourceName);
     private static bool ValidChoice(StaffChoice? value) => value is not null && !string.IsNullOrWhiteSpace(value.Subject) && !string.IsNullOrWhiteSpace(value.Name);
