@@ -3,6 +3,19 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-019 Town-first coordinates (2026-10-02, developer)
+
+- Town coordinates are the first default. Keep Eircode lookup optional and
+  disabled initially; all lookups and credentials remain server-side.
+- Allow saving with Position needed when no coordinates are available. Head
+  Office supplies Town coordinates through CSV or manual entry.
+- Changed Town/Eircode recalculates only unconfirmed positions and retains
+  history. Automatic defaulting always preserves Confirmed on site positions.
+- These decisions supersede the source's Eircode-first and guaranteed-position
+  assumptions. The complete WI-019 plan and 12 Scenario Review cases are approved;
+  Human Tight-Loop increment reviews still apply. See WI-019.md and
+  docs/location-coordinate-delivery.md.
+
 ## Placeholders resolved (2026-09-28, developer, during WI-001)
 
 | Placeholder | Value |

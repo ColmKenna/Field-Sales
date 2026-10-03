@@ -1,5 +1,7 @@
 @page "{id:guid}"
 @model FieldSales.Web.Pages.HeadOffice.Locations.DetailModel
+@using System.Globalization
+@using FieldSales.Directory.Contracts
 @{ ViewData["Title"] = Model.Location.Name; }
 <p><a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Location.CustomerId">Back to @Model.Location.CustomerName</a></p>
 <h1>@Model.Location.Name</h1>
@@ -8,6 +10,23 @@
     <dt>Town</dt><dd>@Model.Location.Town.Label</dd>
     <dt>Eircode</dt><dd>@(Model.Location.Eircode ?? "None entered")</dd>
     <dt>Type</dt><dd>@(Model.Location.Type?.Label ?? "No type")</dd>
+    <dt>Map position</dt>
+    @if (Model.Location.Position is { } position)
+    {
+        <dd class="location-position">@position.Latitude.ToString(CultureInfo.InvariantCulture), @position.Longitude.ToString(CultureInfo.InvariantCulture)</dd>
+        <dt>Precision</dt>
+        <dd class="location-precision">@(position.Precision switch
+            {
+                LocationPositionPrecision.Town => "Town — approximate: the Town's position, not the shop's",
+                LocationPositionPrecision.Eircode => "Eircode — from the Eircode lookup",
+                _ => "Confirmed on site"
+            }) · set on <time datetime="@position.PositionedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@position.PositionedAt.ToString("d MMM yyyy", CultureInfo.InvariantCulture)</time></dd>
+    }
+    else
+    {
+        <dd class="location-position"><strong>Position needed</strong>. No map position has been set for this location yet.
+            A position is taken from the Town's coordinates, or failing that the Eircode, when the location is created or its Town or Eircode changes.</dd>
+    }
 </dl>
 <h2>Contacts</h2>
 @if (TempData["ContactNotice"] is string notice) { <p role="status">@notice</p> }

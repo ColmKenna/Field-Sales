@@ -3,7 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.Directory;
 
-public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geography)
+public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geography,
+    LocationPositionResolver positions, TimeProvider clock)
 {
     public Task<CustomerSummary[]> ListAsync(CancellationToken ct) => db.Customers.AsNoTracking()
         .OrderBy(customer => customer.Name).ThenBy(customer => customer.Id)
@@ -16,65 +17,102 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         var locations = await LocationRows(customerId: id).ToArrayAsync(ct);
         return new(customer.Id, customer.Name, Convert.ToBase64String(customer.Version),
             locations.Select(location => new LocationSummary(location.Id, location.Name, Town(location),
-                location.Eircode, Convert.ToBase64String(location.Version), Type(location))).ToArray());
+                location.Eircode, Convert.ToBase64String(location.Version), Type(location), Position(location))).ToArray());
     }
 
     public async Task<LocationDetails?> FindLocationAsync(Guid id, CancellationToken ct)
     {
         var row = await LocationRows(locationId: id).SingleOrDefaultAsync(ct);
         return row is null ? null : new(row.Id, row.CustomerId, row.CustomerName, row.Name, Town(row),
-            row.Eircode, Convert.ToBase64String(row.Version), Type(row));
+            row.Eircode, Convert.ToBase64String(row.Version), Type(row), Position(row));
     }
 
-    public Task<CustomerDetails> CreateAsync(CreateCustomerRequest request, CancellationToken ct) =>
-        GeographyTransactions.RunAsync(db, async () =>
+    public async Task<CustomerDetails> CreateAsync(CreateCustomerRequest request, CancellationToken ct)
+    {
+        if (request.FirstLocation is not { } first)
+            throw new CustomerDirectoryValidationException("FirstLocation", "Add the first location before saving this customer.");
+        var candidate = Customer.Create(request.Name, first.Name, first.TownId, first.Eircode).Locations[0];
+        await CheckTownAsync(candidate.TownId, null, "FirstLocation.TownId", ct);
+        await SetTypeAsync(candidate, first.LocationTypeId, null, "FirstLocation.LocationTypeId", ct);
+        var resolved = await positions.ResolveAsync(candidate, ct);
+        return await GeographyTransactions.RunAsync(db, async () =>
         {
-            if (request.FirstLocation is not { } first)
-                throw new CustomerDirectoryValidationException("FirstLocation", "Add the first location before saving this customer.");
             Customer customer = Customer.Create(request.Name, first.Name, first.TownId, first.Eircode);
             await CheckTownAsync(customer.Locations[0].TownId, null, "FirstLocation.TownId", ct);
             await SetTypeAsync(customer.Locations[0], first.LocationTypeId, null, "FirstLocation.LocationTypeId", ct);
+            await positions.ApplyAsync(customer.Locations[0], resolved, clock.GetUtcNow(), ct);
             db.Customers.Add(customer);
             await db.SaveChangesAsync(ct);
             return (await FindCustomerAsync(customer.Id, ct))!;
         }, ct);
+    }
 
-    public Task<LocationDetails?> AddLocationAsync(Guid customerId, CreateLocationRequest request, CancellationToken ct) =>
-        GeographyTransactions.RunAsync(db, async () =>
+    public async Task<LocationDetails?> AddLocationAsync(Guid customerId, CreateLocationRequest request, CancellationToken ct)
+    {
+        if (!await db.Customers.AnyAsync(customer => customer.Id == customerId, ct)) return null;
+        var candidate = Location.Create(customerId, request.Name, request.TownId, request.Eircode);
+        await CheckTownAsync(candidate.TownId, null, "TownId", ct);
+        await SetTypeAsync(candidate, request.LocationTypeId, null, "LocationTypeId", ct);
+        await CheckDuplicateAsync(candidate, request.ConfirmDuplicateName, ct);
+        var resolved = await positions.ResolveAsync(candidate, ct);
+        return await GeographyTransactions.RunAsync(db, async () =>
         {
             if (!await db.Customers.AnyAsync(customer => customer.Id == customerId, ct)) return null;
             Location location = Location.Create(customerId, request.Name, request.TownId, request.Eircode);
             await CheckTownAsync(location.TownId, null, "TownId", ct);
             await SetTypeAsync(location, request.LocationTypeId, null, "LocationTypeId", ct);
             await CheckDuplicateAsync(location, request.ConfirmDuplicateName, ct);
+            await positions.ApplyAsync(location, resolved, clock.GetUtcNow(), ct);
             db.Locations.Add(location);
             await db.SaveChangesAsync(ct);
             return await FindLocationAsync(location.Id, ct);
         }, ct);
+    }
 
-    public Task<LocationDetails?> EditLocationAsync(Guid id, EditLocationRequest request, CancellationToken ct) =>
-        GeographyTransactions.RunAsync(db, async () =>
+    public async Task<LocationDetails?> EditLocationAsync(Guid id, EditLocationRequest request, CancellationToken ct)
+    {
+        var candidate = await db.Locations.AsNoTracking().SingleOrDefaultAsync(location => location.Id == id, ct);
+        if (candidate is null) return null;
+        MatchVersion(candidate, request.Version);
+        Guid previousTown = candidate.TownId;
+        string? previousEircode = candidate.Eircode;
+        candidate.Edit(request.Name, request.TownId, request.Eircode);
+        await CheckTownAsync(candidate.TownId, previousTown, "TownId", ct);
+        await SetTypeAsync(candidate, request.LocationTypeId, candidate.LocationTypeId, "LocationTypeId", ct);
+        await CheckDuplicateAsync(candidate, request.ConfirmDuplicateName, ct);
+        bool addressChanged = previousTown != candidate.TownId || previousEircode != candidate.Eircode;
+        var resolved = addressChanged && candidate.PositionPrecision != LocationPositionPrecision.ConfirmedOnSite
+            ? await positions.ResolveAsync(candidate, ct) : null;
+        return await GeographyTransactions.RunAsync(db, async () =>
         {
             var location = await db.Locations.SingleOrDefaultAsync(location => location.Id == id, ct);
             if (location is null) return null;
-            byte[] version;
-            try { version = Convert.FromBase64String(request.Version ?? string.Empty); }
-            catch (FormatException) { throw new CustomerDirectoryValidationException("Version", "Reload this location before saving."); }
-            if (version.Length != 8)
-                throw new CustomerDirectoryValidationException("Version", "Reload this location before saving.");
-            if (!location.Version.SequenceEqual(version)) throw new DbUpdateConcurrencyException();
+            byte[] version = MatchVersion(location, request.Version);
             Guid existingTownId = location.TownId;
             Guid? existingTypeId = location.LocationTypeId;
             location.Edit(request.Name, request.TownId, request.Eircode);
             await CheckTownAsync(location.TownId, existingTownId, "TownId", ct);
             await SetTypeAsync(location, request.LocationTypeId, existingTypeId, "LocationTypeId", ct);
             await CheckDuplicateAsync(location, request.ConfirmDuplicateName, ct);
+            if (resolved is not null) await positions.ApplyAsync(location, resolved, clock.GetUtcNow(), ct);
             db.Entry(location).Property(item => item.Version).OriginalValue = version;
             // An unchanged form must still validate its version and advance it on save.
             db.Entry(location).Property(item => item.Name).IsModified = true;
             await db.SaveChangesAsync(ct);
             return await FindLocationAsync(id, ct);
         }, ct);
+    }
+
+    private static byte[] MatchVersion(Location location, string? expected)
+    {
+        byte[] version;
+        try { version = Convert.FromBase64String(expected ?? string.Empty); }
+        catch (FormatException) { throw new CustomerDirectoryValidationException("Version", "Reload this location before saving."); }
+        if (version.Length != 8)
+            throw new CustomerDirectoryValidationException("Version", "Reload this location before saving.");
+        if (!location.Version.SequenceEqual(version)) throw new DbUpdateConcurrencyException();
+        return version;
+    }
 
     private async Task CheckTownAsync(Guid id, Guid? existingId, string field, CancellationToken ct)
     {
@@ -116,7 +154,8 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         select new LocationRow(location.Id, location.CustomerId, customer.Name, location.Name, location.Eircode, location.Version,
             town.Id, town.Name, town.IsArchived, county.Id, county.Name, county.IsArchived, region.Id, region.Name, region.IsArchived,
             type == null ? null : (Guid?)type.Id, type == null ? null : type.Name, type == null ? null : type.Description,
-            type == null ? null : (bool?)type.IsArchived);
+            type == null ? null : (bool?)type.IsArchived,
+            location.Latitude, location.Longitude, location.PositionPrecision, location.PositionedAt);
 
     private static TownChoice Town(LocationRow row)
     {
@@ -128,7 +167,11 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
 
     private sealed record LocationRow(Guid Id, Guid CustomerId, string CustomerName, string Name, string? Eircode, byte[] Version,
         Guid TownId, string TownName, bool TownArchived, Guid CountyId, string CountyName, bool CountyArchived,
-        Guid RegionId, string RegionName, bool RegionArchived, Guid? TypeId, string? TypeName, string? TypeDescription, bool? TypeArchived);
+        Guid RegionId, string RegionName, bool RegionArchived, Guid? TypeId, string? TypeName, string? TypeDescription, bool? TypeArchived,
+        decimal? Latitude, decimal? Longitude, LocationPositionPrecision? PositionPrecision, DateTimeOffset? PositionedAt);
+
+    private static LocationPosition? Position(LocationRow row) => row.Latitude is decimal latitude
+        ? new(latitude, row.Longitude!.Value, row.PositionPrecision!.Value, row.PositionedAt!.Value) : null;
 
     private static DirectoryTypeChoice? Type(LocationRow row) => row.TypeId is Guid id
         ? new(id, row.TypeName!, row.TypeDescription, row.TypeArchived == true) : null;

@@ -4,6 +4,7 @@ using FieldSales.Api.Directory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FieldSales.Api.Directory.Migrations
 {
     [DbContext(typeof(DirectoryDbContext))]
-    partial class DirectoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002152415_AddLocationPositions")]
+    partial class AddLocationPositions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -376,14 +379,6 @@ namespace FieldSales.Api.Directory.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("bit");
 
-                    b.Property<decimal?>("Latitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("decimal(10,7)");
-
-                    b.Property<decimal?>("Longitude")
-                        .HasPrecision(10, 7)
-                        .HasColumnType("decimal(10,7)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -406,10 +401,7 @@ namespace FieldSales.Api.Directory.Migrations
                     b.HasIndex("CountyId", "NormalizedName")
                         .IsUnique();
 
-                    b.ToTable("Towns", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Towns_Coordinates", "([Latitude] IS NULL AND [Longitude] IS NULL) OR\n([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL\n  AND [Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)");
-                        });
+                    b.ToTable("Towns", (string)null);
                 });
 
             modelBuilder.Entity("FieldSales.Api.Directory.Contact", b =>
