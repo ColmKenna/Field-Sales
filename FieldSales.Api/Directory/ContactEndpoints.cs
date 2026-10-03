@@ -20,6 +20,11 @@ public static class ContactEndpoints
         }));
         group.MapPut("/contacts/{id:guid}", (Guid id, EditContactRequest request, ContactStore store, CancellationToken ct) => GuardAsync(async () =>
             await store.EditAsync(id, request, ct) is { } contact ? Results.Ok(contact) : Results.NotFound()));
+        group.MapPost("/contacts/{id:guid}/retire", (Guid id, RetireMainContactRequest request, ContactStore store, CancellationToken ct) => GuardAsync(async () =>
+            await store.RetireAsync(id, request, ct) is { } result ? Results.Ok(result) : Results.NotFound()));
+        group.MapPost("/locations/{locationId:guid}/contacts/{contactId:guid}/remove", (Guid locationId, Guid contactId,
+            RemoveLocationContactRequest request, ContactStore store, CancellationToken ct) => GuardAsync(async () =>
+                await store.RemoveAsync(locationId, contactId, request, ct) is { } result ? Results.Ok(result) : Results.NotFound()));
         group.MapGet("/locations/{id:guid}/contacts", async (Guid id, bool? showInactive, ContactStore store, CancellationToken ct) =>
             await store.AtLocationAsync(id, showInactive == true, ct) is { } page ? Results.Ok(page) : Results.NotFound());
         group.MapPost("/locations/{id:guid}/contacts", (Guid id, LinkContactRequest request, ContactStore store, CancellationToken ct) => GuardAsync(async () =>
@@ -39,7 +44,7 @@ public static class ContactEndpoints
         catch (MainContactChangedException exception) { return Results.Conflict(new ContactDirectoryError(exception.Message)); }
         catch (DbUpdateConcurrencyException) { return Conflict(); }
         catch (Exception exception) when (exception.GetBaseException() is SqlException { Number: 547 or 1205 or 2601 or 2627 }) { return Conflict(); }
-        catch (Exception exception) when (exception.GetBaseException() is SqlException { Number: >= 51001 and <= 51003 } error)
+        catch (Exception exception) when (exception.GetBaseException() is SqlException { Number: >= 51001 and <= 51004 } error)
         { return Results.BadRequest(new ContactDirectoryError(error.Message)); }
     }
     private static IResult Conflict() => Results.Conflict(new ContactDirectoryError("This contact or location changed. Reload before continuing."));

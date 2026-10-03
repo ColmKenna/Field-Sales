@@ -33,6 +33,11 @@ public static class ContactModelConfiguration
         locations.ToTable("Locations", table =>
         { table.HasTrigger("TR_Locations_MainGuard"); table.UseSqlOutputClause(false); });
         locations.Property(location => location.MainContactId);
+        locations.Property(location => location.RetiredMainContactId);
+        locations.Ignore(location => location.MainContactReplacementNeeded);
+        locations.HasIndex(location => location.RetiredMainContactId);
+        locations.ToTable("Locations", table => table.HasCheckConstraint("CK_Locations_MainOrRetired",
+            "[MainContactId] IS NULL OR [RetiredMainContactId] IS NULL"));
         locations.HasIndex(location => location.MainContactId);
         locations.HasMany(location => location.Contacts).WithOne(link => link.Location)
             .HasForeignKey(link => link.LocationId).OnDelete(DeleteBehavior.Restrict);
@@ -42,5 +47,9 @@ public static class ContactModelConfiguration
             .HasForeignKey(location => new { location.Id, location.MainContactId })
             .HasPrincipalKey(link => new { link.LocationId, link.ContactId })
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Locations_MainContactLink");
+        locations.HasOne<LocationContact>().WithMany()
+            .HasForeignKey(location => new { location.Id, location.RetiredMainContactId })
+            .HasPrincipalKey(link => new { link.LocationId, link.ContactId })
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Locations_RetiredMainContactLink");
     }
 }

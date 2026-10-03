@@ -21,13 +21,14 @@ public sealed class ContactStore(DirectoryDbContext db, CustomerStore customers)
         byte[] version = await db.Contacts.AsNoTracking().Where(contact => contact.Id == id).Select(contact => contact.Version).SingleAsync(ct);
         var links = await db.LocationContacts.AsNoTracking().Where(link => link.ContactId == id)
             .OrderBy(link => link.Location.Name).ThenBy(link => link.LocationId)
-            .Select(link => new { link.LocationId, link.Location.MainContactId }).ToArrayAsync(ct);
+            .Select(link => new { link.LocationId, link.Location.MainContactId, link.Location.RetiredMainContactId }).ToArrayAsync(ct);
         List<ContactLocationSummary> locations = [];
         foreach (var link in links)
         {
             var location = (await customers.FindLocationAsync(link.LocationId, ct))!;
             locations.Add(new(location.Id, location.Name, location.CustomerId, location.CustomerName,
-                location.Town, link.MainContactId == id, location.Version));
+                location.Town, link.MainContactId == id, location.Version,
+                link.RetiredMainContactId is not null, link.RetiredMainContactId == id));
         }
         return new(choice.Id, choice.Name, choice.Type, choice.Status, choice.Phone, choice.Email, Convert.ToBase64String(version), locations);
     }
@@ -39,7 +40,8 @@ public sealed class ContactStore(DirectoryDbContext db, CustomerStore customers)
         return new(id, location.Name, Convert.ToBase64String(location.Version), all.SingleOrDefault(contact => contact.Id == location.MainContactId),
             all.Where(contact => showInactive || contact.Status == ContactStatus.Active)
                 .Select(contact => new LocationContactSummary(contact, contact.Id == location.MainContactId)).ToArray(),
-            all.Count(contact => contact.Status == ContactStatus.Inactive), showInactive);
+            all.Count(contact => contact.Status == ContactStatus.Inactive), showInactive,
+            location.MainContactReplacementNeeded, all.SingleOrDefault(contact => contact.Id == location.RetiredMainContactId));
     }
 
     public Task<ContactDetails> CreateAsync(CreateContactRequest request, CancellationToken ct) => GeographyTransactions.RunAsync(db, async () =>
@@ -107,6 +109,98 @@ public sealed class ContactStore(DirectoryDbContext db, CustomerStore customers)
         await db.SaveChangesAsync(ct);
         return new SetMainContactResult(new(contact.Id, location.Id));
     }, ct);
+
+    public Task<MainContactRetirementResult?> RetireAsync(Guid id, RetireMainContactRequest request, CancellationToken ct) =>
+        GeographyTransactions.RunAsync(db, async () =>
+        {
+            var contact = await LockContactAsync(id, ct);
+            if (contact is null) return null;
+            CheckVersion(contact.Version, request.ContactVersion);
+            var locations = await LinkedRostersAsync(id, ct);
+            CheckAffectedVersions(locations, request.AffectedLocations);
+            return await RetireLoadedAsync(contact, locations, ct);
+        }, ct);
+
+    public Task<ContactMutationResult?> RemoveAsync(Guid locationId, Guid contactId, RemoveLocationContactRequest request, CancellationToken ct) =>
+        GeographyTransactions.RunAsync(db, async () =>
+        {
+            var contact = await LockContactAsync(contactId, ct);
+            if (contact is null) return null;
+            CheckVersion(contact.Version, request.ContactVersion);
+            // Global retirement locks every linked shop in stable order, including non-Main shops.
+            var locations = await LinkedRostersAsync(contactId, ct);
+            var location = locations.SingleOrDefault(item => item.Id == locationId);
+            if (location is null) return null;
+            CheckVersion(location.Version, request.LocationVersion);
+            int choices = (request.ReplacementContactId is null ? 0 : 1) + (request.NewContact is null ? 0 : 1)
+                + (request.NoReplacementYet ? 1 : 0);
+            bool outgoing = location.MainContactId == contactId || location.RetiredMainContactId == contactId;
+            if ((outgoing && choices != 1) || (!outgoing && choices != 0))
+                throw new CustomerDirectoryValidationException("ReplacementContactId", "Choose a replacement, add a new contact, or choose No replacement yet.");
+            if (request.NoReplacementYet)
+            {
+                CheckAffectedVersions(locations, request.AffectedLocations);
+                await RetireLoadedAsync(contact, locations, ct);
+                return new ContactMutationResult(contactId, locationId);
+            }
+            if (outgoing)
+            {
+                Contact replacement;
+                if (request.NewContact is { } details)
+                {
+                    replacement = Contact.Create(details.Name, await TypeAsync(details.ContactTypeId, ct),
+                        details.Phone, details.Email, [location]);
+                    db.Contacts.Add(replacement);
+                    // The new link must exist before Main can refer to it. Gap repair is suppressed by design.
+                    SuppressMainWrites([location]);
+                    await db.SaveChangesAsync(ct);
+                    await db.Entry(location).ReloadAsync(ct);
+                }
+                else
+                    replacement = location.Contacts.SingleOrDefault(link => link.ContactId == request.ReplacementContactId)?.Contact
+                        ?? throw new CustomerDirectoryValidationException("ReplacementContactId", "Choose an active contact linked to this location.");
+                if (replacement.Id == contactId)
+                    throw new CustomerDirectoryValidationException("ReplacementContactId", "Choose a different contact as replacement.");
+                location.SetMain(replacement, location.MainContactId, confirmReplacement: true);
+                // Break the Main/link FK dependency before deleting the outgoing link, within this transaction.
+                await db.SaveChangesAsync(ct);
+            }
+            db.LocationContacts.Remove(location.UnlinkContact(contact));
+            db.Entry(location).Property(item => item.Name).IsModified = true;
+            // Advance Contact version too: stale global-impact confirmations must see link removal.
+            db.Entry(contact).Property(item => item.Name).IsModified = true;
+            await db.SaveChangesAsync(ct);
+            return new ContactMutationResult(contactId, locationId);
+        }, ct);
+
+    private Task<Contact?> LockContactAsync(Guid id, CancellationToken ct) => db.Contacts
+        .FromSqlInterpolated($"SELECT * FROM [Contacts] WITH (UPDLOCK,HOLDLOCK) WHERE [Id]={id}").SingleOrDefaultAsync(ct);
+    private async Task<List<Location>> LinkedRostersAsync(Guid contactId, CancellationToken ct)
+    {
+        Guid[] ids = await db.LocationContacts.Where(link => link.ContactId == contactId)
+            .Select(link => link.LocationId).OrderBy(id => id).ToArrayAsync(ct);
+        List<Location> locations = [];
+        foreach (var id in ids) locations.Add((await RosterAsync(id, ct))!);
+        return locations;
+    }
+    private static void CheckAffectedVersions(IReadOnlyList<Location> locations, IReadOnlyList<ContactLocationVersion>? supplied)
+    {
+        if (supplied is null || supplied.Any(item => item is null) || supplied.Count != locations.Count || supplied.Select(item => item.LocationId).Distinct().Count() != supplied.Count
+            || supplied.Any(item => locations.All(location => location.Id != item.LocationId)))
+            throw new DbUpdateConcurrencyException();
+        foreach (var location in locations) CheckVersion(location.Version, supplied.Single(item => item.LocationId == location.Id).Version);
+    }
+    private async Task<MainContactRetirementResult> RetireLoadedAsync(Contact contact, IReadOnlyList<Location> locations, CancellationToken ct)
+    {
+        foreach (var location in locations) location.RetireMain(contact);
+        // Persist the flagged exception before changing global status. Both saves share the transaction.
+        await db.SaveChangesAsync(ct);
+        contact.SetStatus(ContactStatus.Inactive);
+        db.Entry(contact).Property(item => item.Name).IsModified = true;
+        await db.SaveChangesAsync(ct);
+        await AdvanceRostersAsync(locations, ct);
+        return new(contact.Id, locations.Where(location => location.RetiredMainContactId == contact.Id).Select(location => location.Id).ToArray());
+    }
 
     private IQueryable<ContactChoice> Choices(Guid? id = null, Guid? locationId = null, bool activeOnly = false) =>
         from contact in db.Contacts.AsNoTracking()
