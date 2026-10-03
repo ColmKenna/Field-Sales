@@ -106,5 +106,15 @@ history are written for those failures. Later coordinate-version conflicts keep
 409 and their existing rollback behavior; existing assertions remain unchanged.
 
 Corrected full verification passed 1860/1860; focused customer/coordinate tests
-passed 70/70. Final-head CI must still succeed before merge. The failed CI run
+passed 70/70. Final-head CI succeeded before merge (run 37159772774, job 111310620311). The failed CI run
 37158239416 (job 111306041082) is excluded from successful evidence.
+
+## Integration
+
+[PR #4](https://github.com/ColmKenna/Field-Sales/pull/4) merged as
+`8fd5654eb46ae170f26ad584883de629968b5be3` after
+[final-head CI](https://github.com/ColmKenna/Field-Sales/actions/runs/37159772774)
+passed on `b87a7f4f50b0a1cdd0928b95ac0b644fbfdc4c36`. CI confirms all 1860 tests,
+including the original retirement race and both deterministic regression cases.
+Local main was synchronized to the merge; the feature branch is preserved.
+This integration handover changes documentation only.
