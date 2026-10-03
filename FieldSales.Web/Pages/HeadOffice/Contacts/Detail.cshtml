@@ -13,10 +13,77 @@
 <ul>
     @foreach (var location in Model.Contact.Locations)
     {
-        <li data-location-id="@location.LocationId"><a asp-page="/HeadOffice/Locations/Detail" asp-route-id="@location.LocationId">@location.Name — @location.CustomerName, @location.Town.Label</a> @(location.IsMain ? "(Main)" : "")</li>
+        <li data-location-id="@location.LocationId"><a asp-page="/HeadOffice/Locations/Detail" asp-route-id="@location.LocationId">@location.Name — @location.CustomerName, @location.Town.Label</a> @(location.IsMain ? "(Main)" : "")
+            @if (location.IsRetiredMain) { <strong>Replacement needed</strong> }
+            <a asp-page="Detail" asp-route-id="@Model.Contact.Id" asp-route-UnlinkLocationId="@location.LocationId">Unlink</a>
+        </li>
     }
 </ul>
 <p><a asp-page="Link" asp-route-contactId="@Model.Contact.Id">Link to another location</a></p>
+@if (Model.UnlinkLocation is { } unlink)
+{
+    <section aria-labelledby="replacement-question">
+        <h2 id="replacement-question">@(unlink.IsMain || unlink.IsRetiredMain ? $"Who is {unlink.Name}'s main contact now?" : $"Unlink {Model.Contact.Name} from {unlink.Name}?")</h2>
+        @* Only the chosen option is validated server-side; unused new-contact fields must not block another choice. *@
+        <form method="post" asp-page-handler="Remove" class="product-form" novalidate>
+            <div asp-validation-summary="All" role="alert"></div>
+            <input asp-for="UnlinkLocationId" type="hidden" />
+            <input asp-for="RemoveContactVersion" type="hidden" />
+            <input asp-for="LocationVersion" type="hidden" />
+            @for (int i = 0; i < Model.AffectedLocations.Count; i++)
+            {
+                <input asp-for="AffectedLocations[i].LocationId" type="hidden" />
+                <input asp-for="AffectedLocations[i].Version" type="hidden" />
+            }
+            @if (unlink.IsMain || unlink.IsRetiredMain)
+            {
+                <fieldset>
+                    <legend>Choose a replacement option</legend>
+                    <label><input type="radio" asp-for="ReplacementChoice" value="existing" /> An existing contact</label>
+                    <label asp-for="ReplacementContactId">Replacement contact</label>
+                    <select asp-for="ReplacementContactId"><option value="">Choose an active contact</option>
+                        @foreach (var person in Model.Replacements) { <option value="@person.Id">@person.Name</option> }
+                    </select>
+                    <label><input type="radio" asp-for="ReplacementChoice" value="new" /> Add a new contact</label>
+                    <label asp-for="NewName">New contact name</label><input asp-for="NewName" maxlength="200" />
+                    <label asp-for="NewContactTypeId">New contact type</label>
+                    <select asp-for="NewContactTypeId"><option value="">Choose a contact type</option>
+                        @foreach (var type in Model.Types.Where(type => !type.IsArchived)) { <option value="@type.Id">@type.Label</option> }
+                    </select>
+                    <label asp-for="NewPhone">Phone (optional)</label><input asp-for="NewPhone" type="tel" maxlength="50" />
+                    <label asp-for="NewEmail">Email (optional)</label><input asp-for="NewEmail" type="email" maxlength="254" />
+                    <label><input type="radio" asp-for="ReplacementChoice" value="none" /> No replacement yet — mark @Model.Contact.Name inactive</label>
+                    <p>This makes @Model.Contact.Name inactive at all linked locations and keeps their links.
+                        Replacement needed at: @string.Join(", ", Model.Contact.Locations.Where(location => location.IsMain || location.IsRetiredMain).Select(location => location.Name)).</p>
+                </fieldset>
+            }
+            <button type="submit" class="button">Confirm</button>
+            <a asp-page="Detail" asp-route-id="@Model.Contact.Id">Cancel</a>
+        </form>
+    </section>
+}
+@if (Model.Contact.Status == FieldSales.Directory.Contracts.ContactStatus.Active)
+{
+    <p><a asp-page="Detail" asp-route-id="@Model.Contact.Id" asp-route-Retire="true">Mark inactive across all locations</a></p>
+}
+@if (Model.Retire)
+{
+    <section aria-labelledby="retirement-question">
+        <h2 id="retirement-question">Mark @Model.Contact.Name inactive at every linked location?</h2>
+        <p>The contact stays linked. Replacement needed at: @string.Join(", ", Model.Contact.Locations.Where(location => location.IsMain || location.IsRetiredMain).Select(location => location.Name)).</p>
+        <form method="post" asp-page-handler="Retire">
+            <div asp-validation-summary="All" role="alert"></div>
+            <input asp-for="RemoveContactVersion" type="hidden" />
+            @for (int i = 0; i < Model.AffectedLocations.Count; i++)
+            {
+                <input asp-for="AffectedLocations[i].LocationId" type="hidden" />
+                <input asp-for="AffectedLocations[i].Version" type="hidden" />
+            }
+            <button type="submit">Mark inactive and flag affected locations</button>
+            <a asp-page="Detail" asp-route-id="@Model.Contact.Id">Cancel</a>
+        </form>
+    </section>
+}
 <h2>Edit contact</h2>
 <form method="post" class="product-form">
     <div asp-validation-summary="All" role="alert"></div>
@@ -24,7 +91,7 @@
     <partial name="_ContactFields" model="Model" />
     <label asp-for="Status">Status across all locations</label>
     <select asp-for="Status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
-    <p>A contact who is Main at any location needs a replacement before becoming inactive.</p>
+    <p>To retire a Main contact, use Unlink and choose a replacement, or use Mark inactive across all locations to flag the gaps.</p>
     <button type="submit" class="button">Save changes</button>
     <a asp-page="Detail" asp-route-id="@Model.Contact.Id">Cancel and reload</a>
 </form>

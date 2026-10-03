@@ -33,6 +33,10 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
         SendAsync<ContactDetails>(HttpMethod.Post, "/directory/contacts", JsonContent.Create(request), ct);
     public Task<DirectoryResult<ContactDetails>> EditContactAsync(Guid id, EditContactRequest request, CancellationToken ct) =>
         SendAsync<ContactDetails>(HttpMethod.Put, $"/directory/contacts/{id}", JsonContent.Create(request), ct);
+    public Task<DirectoryResult<ContactMutationResult>> RemoveContactAsync(Guid locationId, Guid contactId, RemoveLocationContactRequest request, CancellationToken ct) =>
+        SendAsync<ContactMutationResult>(HttpMethod.Post, $"/directory/locations/{locationId}/contacts/{contactId}/remove", JsonContent.Create(request), ct);
+    public Task<DirectoryResult<MainContactRetirementResult>> RetireContactAsync(Guid id, RetireMainContactRequest request, CancellationToken ct) =>
+        SendAsync<MainContactRetirementResult>(HttpMethod.Post, $"/directory/contacts/{id}/retire", JsonContent.Create(request), ct);
     public Task<DirectoryResult<ContactMutationResult>> LinkContactAsync(Guid locationId, LinkContactRequest request, CancellationToken ct) =>
         SendAsync<ContactMutationResult>(HttpMethod.Post, $"/directory/locations/{locationId}/contacts", JsonContent.Create(request), ct);
     public Task<DirectoryResult<ContactMutationResult>> SetMainContactAsync(Guid locationId, SetMainContactRequest request, CancellationToken ct) =>

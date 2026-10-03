@@ -39,11 +39,14 @@ public sealed class ContactApplication : GeographyApplication
             // Test cleanup breaks the intentional Main/link FK cycle, then restores
             // its trusted constraint before any scenario can run.
             await db.Database.ExecuteSqlRawAsync("""
+                DISABLE TRIGGER [TR_Locations_MainGuard] ON [Locations];
+                UPDATE [Locations] SET RetiredMainContactId=NULL;
                 ALTER TABLE [Locations] NOCHECK CONSTRAINT [FK_Locations_MainContactLink];
                 DELETE FROM [LocationContacts];
                 UPDATE [Locations] SET MainContactId=NULL;
                 ALTER TABLE [Locations] WITH CHECK CHECK CONSTRAINT [FK_Locations_MainContactLink];
                 DELETE FROM [Contacts];
+                ENABLE TRIGGER [TR_Locations_MainGuard] ON [Locations];
                 """);
         }
         await ResetAsync();

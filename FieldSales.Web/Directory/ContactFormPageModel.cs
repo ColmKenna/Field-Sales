@@ -21,10 +21,11 @@ public abstract class ContactFormPageModel(DirectoryApiClient directory) : PageM
             ? result.Value!.Append(existingType).ToArray() : result.Value!;
         return Page();
     }
-    protected IActionResult? AddSaveError<T>(DirectoryResult<T> result)
+    protected IActionResult? AddSaveError<T>(DirectoryResult<T> result, Func<string?, string?>? fieldMap = null)
     {
         if (result.Status is not (HttpStatusCode.BadRequest or HttpStatusCode.Conflict)) return StatusCode((int)result.Status);
-        ModelState.AddModelError(result.Field ?? string.Empty, result.Error ?? "This change could not be saved.");
+        ModelState.AddModelError((fieldMap is null ? result.Field : fieldMap(result.Field)) ?? string.Empty,
+            result.Error ?? "This change could not be saved.");
         return null;
     }
 }

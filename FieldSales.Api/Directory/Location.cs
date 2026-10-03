@@ -17,6 +17,8 @@ public sealed class Location
     public string? Eircode { get; private set; }
     public Guid? LocationTypeId { get; private set; }
     public Guid? MainContactId { get; private set; }
+    public Guid? RetiredMainContactId { get; private set; }
+    public bool MainContactReplacementNeeded => RetiredMainContactId is not null;
     public IReadOnlyList<LocationContact> Contacts => _contacts.AsReadOnly();
     public byte[] Version { get; private set; } = [];
     public decimal? Latitude { get; private set; }
@@ -93,7 +95,7 @@ public sealed class Location
     }
     internal void EnsureFirstActiveMain(Contact contact)
     {
-        if (MainContactId is null && contact.Status == ContactStatus.Active
+        if (MainContactId is null && !MainContactReplacementNeeded && contact.Status == ContactStatus.Active
             && _contacts.Any(link => link.ContactId == contact.Id)) MainContactId = contact.Id;
     }
     internal void SetMain(Contact contact, Guid? expectedMainContactId, bool confirmReplacement)
@@ -104,6 +106,22 @@ public sealed class Location
         if (MainContactId is Guid outgoing && outgoing != contact.Id && !confirmReplacement)
             throw new MainContactReplacementRequiredException(outgoing);
         MainContactId = contact.Id;
+        RetiredMainContactId = null;
+    }
+    internal void RetireMain(Contact contact)
+    {
+        if (MainContactId != contact.Id) return;
+        RetiredMainContactId = contact.Id;
+        MainContactId = null;
+    }
+    internal LocationContact UnlinkContact(Contact contact)
+    {
+        if (MainContactId == contact.Id || RetiredMainContactId == contact.Id)
+            throw new CustomerDirectoryValidationException("ReplacementContactId", "Choose a replacement before unlinking this contact.");
+        var link = _contacts.Single(item => item.ContactId == contact.Id);
+        _contacts.Remove(link);
+        contact.Detach(link);
+        return link;
     }
 }
 

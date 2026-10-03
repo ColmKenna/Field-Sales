@@ -30,7 +30,17 @@
 </dl>
 <h2>Contacts</h2>
 @if (TempData["ContactNotice"] is string notice) { <p role="status">@notice</p> }
-<p>Main contact: @(Model.Contacts.MainContact?.Name ?? "None yet")</p>
+@if (Model.Contacts.ReplacementNeeded)
+{
+    <p class="main-contact-gap" role="status">
+        @if (Model.Contacts.RetiredMainContact is { Status: FieldSales.Directory.Contracts.ContactStatus.Inactive } outgoing)
+        { <span>Main contact: @outgoing.Name (inactive) — replacement needed</span><br /><strong>Main contact inactive — replacement needed</strong> }
+        else
+        { <strong>Main contact replacement needed</strong><span>. Choose an Active contact as Main; reactivation does not fill this gap.</span> }
+    </p>
+}
+else
+{ <p>Main contact: @(Model.Contacts.MainContact?.Name ?? "None yet")</p> }
 <p><a asp-page="/HeadOffice/Contacts/Create" asp-route-locationId="@Model.Location.Id">Create contact</a>
     | <a asp-page="/HeadOffice/Contacts/Link" asp-route-locationId="@Model.Location.Id">Link existing contact</a></p>
 @if (Model.Contacts.InactiveCount > 0)

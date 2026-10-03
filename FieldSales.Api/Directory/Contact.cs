@@ -59,6 +59,7 @@ public sealed class Contact
     }
 
     internal void Attach(LocationContact link) => _locations.Add(link);
+    internal void Detach(LocationContact link) => _locations.Remove(link);
     private static string? Detail(string? value, int maximum, string field, ValidationAttribute format)
     {
         string? trimmed = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
