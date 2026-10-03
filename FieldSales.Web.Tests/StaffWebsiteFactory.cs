@@ -73,6 +73,8 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
                 .ConfigurePrimaryHttpMessageHandler(() => _catalogueHandler ?? Catalogue);
             services.AddHttpClient<FieldSales.Web.Directory.DirectoryApiClient>()
                 .ConfigurePrimaryHttpMessageHandler(() => _catalogueHandler ?? Catalogue);
+            services.AddHttpClient<FieldSales.Web.Coverage.CoverageApiClient>()
+                .ConfigurePrimaryHttpMessageHandler(() => _catalogueHandler ?? Catalogue);
             services.RemoveAll<IStaffRoleLookup>();
             services.AddSingleton(Roles);
             services.AddSingleton<IStaffRoleLookup>(Roles);

@@ -1,0 +1,64 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Coverage.ReportingLinesModel
+@{
+    ViewData["Title"] = "Rep reporting lines";
+}
+<h1>Rep reporting lines</h1>
+<p>Choose the Sales Manager responsible for each field salesperson.</p>
+<p><a asp-page="/HeadOffice/Index">Back to Head Office</a></p>
+@if (TempData["CoverageNotice"] is string notice) { <p role="status">@notice</p> }
+@if (Model.Data.Reps.Count == 0)
+{
+    <p>No active field salespeople are available.</p>
+}
+else
+{
+    <form method="get">
+        <label for="choose-rep">Field salesperson</label>
+        <select id="choose-rep" name="repSubject">
+            <option value="">Choose a field salesperson</option>
+            @foreach (var rep in Model.Data.Reps)
+            { <option value="@rep.Subject" selected="@(rep.Subject == Model.RepSubject)">@rep.Name</option> }
+        </select>
+        <button type="submit">View reporting line</button>
+    </form>
+}
+@if (Model.RepName is { } repName)
+{
+    <h2>Reporting line for @repName</h2>
+    @if (Model.Data.Managers.Count == 0) { <p>No active Sales Managers are available.</p> }
+    else
+    {
+        <form method="post">
+            <div asp-validation-summary="All" role="alert"></div>
+            <input asp-for="RepSubject" type="hidden" />
+            <input asp-for="Version" type="hidden" />
+            <label asp-for="ManagerSubject">Sales Manager</label>
+            <select asp-for="ManagerSubject" required>
+                <option value="">Choose a Sales Manager</option>
+                @foreach (var manager in Model.Data.Managers) { <option value="@manager.Subject">@manager.Name</option> }
+            </select>
+            <span asp-validation-for="ManagerSubject"></span>
+            <button type="submit">Save reporting line</button>
+        </form>
+        <p><a asp-page="./ReportingLines" asp-route-repSubject="@Model.RepSubject">Reload reporting line</a></p>
+    }
+}
+else if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" role="alert"></div>
+}
+<h2>Current reporting lines</h2>
+@if (Model.Data.Lines.Count == 0) { <p>No reporting lines have been saved.</p> }
+else
+{
+    <table>
+        <thead><tr><th scope="col">Field salesperson</th><th scope="col">Sales Manager</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+            @foreach (var row in Model.Data.Lines)
+            {
+                <tr><td>@row.RepName</td><td>@row.ManagerName</td><td><a asp-page="./ReportingLines" asp-route-repSubject="@row.Line.RepSubject">View @row.RepName</a></td></tr>
+            }
+        </tbody>
+    </table>
+}

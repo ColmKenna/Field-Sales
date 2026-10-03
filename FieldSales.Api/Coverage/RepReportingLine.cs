@@ -15,7 +15,7 @@ public sealed class RepReportingLine
         ManagerSubject = CoverageSubjects.Validate(managerSubject, "ManagerSubject")
     };
 
-    // The future Head Office handler verifies current staff eligibility before calling this.
+    // The Head Office handler verifies current staff eligibility before calling this.
     public void SetManager(string? managerSubject) =>
         ManagerSubject = CoverageSubjects.Validate(managerSubject, "ManagerSubject");
 }

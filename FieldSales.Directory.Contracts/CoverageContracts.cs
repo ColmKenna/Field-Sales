@@ -26,7 +26,12 @@ public sealed record AssignmentHistoryDetails(Guid Id, long Sequence, Guid Opera
     HistoryOwnerDetails? NewOwner, OwnershipChangeCause Cause, string? Reason, string Display);
 
 // Current actor and team authority always come from server-side staff data.
-public sealed record AddTerritoryAssignmentRequest(string? RepSubject, TerritoryTarget? Target);
-public sealed record RemoveTerritoryAssignmentRequest(string? Version);
+public sealed record AddTerritoryAssignmentRequest(string? RepSubject, TerritoryTarget? Target, string? Reason = null);
+public sealed record RemoveTerritoryAssignmentRequest(string? Version, string? Reason = null);
 public sealed record SetRepReportingLineRequest(string? ManagerSubject, string? Version);
 public sealed record CoverageError(string Error, string? Field = null);
+public sealed record CoverageMutationResult(bool Saved, int ChangedLocations);
+public sealed record StaffChoice(string Subject, string Name);
+public sealed record NamedRepReportingLine(RepReportingLineDetails Line, string RepName, string ManagerName);
+public sealed record ReportingLinesPage(IReadOnlyList<StaffChoice> Reps, IReadOnlyList<StaffChoice> Managers,
+    IReadOnlyList<NamedRepReportingLine> Lines);

@@ -88,6 +88,7 @@ public sealed class CoverageReadApplication : GeographyApplication
             Entries.Add("colm", new("colm", "Colm", [BusinessRoles.FieldSalesperson], true));
             Entries.Add("aoife", new("aoife", "Aoife", [BusinessRoles.FieldSalesperson], true));
             Entries.Add("brian", new("brian", "Brian", [BusinessRoles.FieldSalesperson], true));
+            Entries.Add("another-manager", new("another-manager", "Other Manager", [BusinessRoles.SalesManager], true));
         }
     }
 

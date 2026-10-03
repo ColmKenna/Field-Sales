@@ -43,6 +43,8 @@ builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>().AddSafeR
 builder.Services.AddHttpClient<DirectoryApiClient>((services, client) =>
     client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>().Required("StaffApi:BaseUrl", "StaffApi:BaseUrl is required.", allowBlank: true))).AddSafeReadResilience();
 builder.Services.AddScoped<StaffCookieEvents>();
+builder.Services.AddHttpClient<FieldSales.Web.Coverage.CoverageApiClient>((services, client) =>
+    client.BaseAddress = new Uri(services.GetRequiredService<IConfiguration>().Required("StaffApi:BaseUrl", "StaffApi:BaseUrl is required.", allowBlank: true))).AddSafeReadResilience();
 builder.Services.AddHostedService<ExpiredTicketsCleanupService>();
 
 builder.Services.AddAuthentication(options =>
