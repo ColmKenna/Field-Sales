@@ -14,6 +14,7 @@ builder.AddSqlServerDbContext<DirectoryDbContext>("DirectoryDb");
 builder.Services.AddScoped<GeographyStore>();
 builder.Services.AddScoped<CustomerStore>();
 builder.Services.AddScoped<CoverageReadStore>();
+builder.Services.AddScoped<RepTerritoryReader>();
 builder.Services.AddScoped<CoverageOwnershipReader>();
 builder.Services.AddScoped<AssignmentHistoryWriter>();
 builder.Services.AddScoped<AssignmentHistoryReadStore>();
