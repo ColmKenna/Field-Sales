@@ -104,7 +104,8 @@ WI-020 is complete; all six scoped acceptance criteria pass. The only console
 content change is WI-020's status, first active then done. Checkpoint 43ade53,
 domain/storage be1b3f0 and website/scenarios 93c6345 are on
 feature/wi-020-replace-retire-main-contact-without, followed by the completion record.
-Main integration is a separate user action. Next by console order is WI-021:
+Main integration was explicitly authorized and completed through PR #1.
+Next by console order is WI-021:
 Assign territories and resolve each shop's owner with its source.
 
 ## Integration verification
@@ -114,4 +115,9 @@ https://github.com/ColmKenna/Field-Sales/pull/1. Its first Linux run exposed an
 existing identity-test encoding defect also present on main: raw Windows-1252
 0x95 in ClientsDetailsIntegrationTests was read as an invalid UTF-8 character.
 The assertion now uses C# \u2022, preserving the expected bullet and Active text.
-All 13 focused client-detail tests pass locally. Full PR CI must pass before merge.
+All 13 focused client-detail tests pass locally. Correction commit 3df828b passed
+the full Linux build and all 1,672 .NET tests in GitHub run 37119930502.
+PR #1 merged on 2026-10-03 as 172d2ff723aa796235a4cca235790e94faed86cc.
+The merge tree matches the tested feature head exactly; local main is synchronized
+with GitHub. The feature branch is retained. This integration record adds only
+documentation after the merge.
