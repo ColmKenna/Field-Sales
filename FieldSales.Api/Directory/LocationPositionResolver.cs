@@ -10,10 +10,12 @@ public sealed class LocationPositionResolver(DirectoryDbContext db, IEircodeLook
 {
     // Called before the write transaction. Capture exactly which Town/input
     // supplied the result so even a delayed lookup cannot silently win a race.
-    public async Task<ResolvedLocationPosition> ResolveAsync(Location location, CancellationToken ct)
+    public async Task<ResolvedLocationPosition> ResolveAsync(Location location, CancellationToken ct, string townField = "TownId")
     {
         var town = await db.Towns.AsNoTracking().SingleOrDefaultAsync(item => item.Id == location.TownId, ct)
-            ?? throw new DbUpdateConcurrencyException();
+            // Retirement can win after eligibility validation, before this
+            // preflight read. Preserve the invalid-Town response and its field.
+            ?? throw new CustomerDirectoryValidationException(townField, "Choose a town");
         Coordinates? coordinates = Coordinates.FromPair(town.Latitude, town.Longitude);
         LocationPositionPrecision? precision = coordinates is null ? null : LocationPositionPrecision.Town;
         if (coordinates is null && location.Eircode is { } eircode)
