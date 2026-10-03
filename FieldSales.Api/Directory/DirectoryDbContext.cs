@@ -1,3 +1,4 @@
+using FieldSales.Api.Coverage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Design;
@@ -16,6 +17,8 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<LocationContact> LocationContacts => Set<LocationContact>();
     public DbSet<LocationPositionHistory> LocationPositionHistory => Set<LocationPositionHistory>();
+    public DbSet<TerritoryAssignment> TerritoryAssignments => Set<TerritoryAssignment>();
+    public DbSet<RepReportingLine> RepReportingLines => Set<RepReportingLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,6 +27,7 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
         modelBuilder.Ignore<DirectoryType>();
         ContactModelConfiguration.Configure(modelBuilder);
         LocationPositionModelConfiguration.Configure(modelBuilder);
+        CoverageModelConfiguration.Configure(modelBuilder);
         ConfigureType<LocationType>(modelBuilder, "LocationTypes");
         ConfigureType<ContactType>(modelBuilder, "ContactTypes");
         var regions = Configure<Region>(modelBuilder, "Regions");
