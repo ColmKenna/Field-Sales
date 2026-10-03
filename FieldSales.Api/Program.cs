@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FieldSales.StaffAccess;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Directory;
+using FieldSales.Api.Coverage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
 builder.AddSqlServerDbContext<DirectoryDbContext>("DirectoryDb");
 builder.Services.AddScoped<GeographyStore>();
 builder.Services.AddScoped<CustomerStore>();
+builder.Services.AddScoped<CoverageReadStore>();
 builder.Services.AddLocationCoordinates(builder.Configuration);
 builder.Services.AddScoped<ContactStore>();
 builder.Services.AddScoped<GeographyUsageReader>();
@@ -112,6 +114,10 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.All)
         .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
+    options.AddPolicy("ManageCoverage", policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(BusinessRoles.SalesManager, BusinessRoles.HeadOfficeUser)
+        .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
     options.FallbackPolicy = options.GetPolicy("StaffApi");
 });
 
@@ -137,6 +143,7 @@ app.MapProductEndpoints();
 app.MapReferenceListEndpoints();
 app.MapGeographyEndpoints();
 app.MapCustomerEndpoints();
+app.MapCoverageEndpoints();
 app.MapDirectoryTypeEndpoints();
 app.MapContactEndpoints();
 app.MapDefaultEndpoints();
