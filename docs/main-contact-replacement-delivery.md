@@ -106,3 +106,12 @@ domain/storage be1b3f0 and website/scenarios 93c6345 are on
 feature/wi-020-replace-retire-main-contact-without, followed by the completion record.
 Main integration is a separate user action. Next by console order is WI-021:
 Assign territories and resolve each shop's owner with its source.
+
+## Integration verification
+
+The user authorized PR creation and merge on 2026-10-03. PR #1 is
+https://github.com/ColmKenna/Field-Sales/pull/1. Its first Linux run exposed an
+existing identity-test encoding defect also present on main: raw Windows-1252
+0x95 in ClientsDetailsIntegrationTests was read as an invalid UTF-8 character.
+The assertion now uses C# \u2022, preserving the expected bullet and Active text.
+All 13 focused client-detail tests pass locally. Full PR CI must pass before merge.

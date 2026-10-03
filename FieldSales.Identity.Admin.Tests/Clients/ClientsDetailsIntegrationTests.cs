@@ -150,7 +150,7 @@ public class ClientsDetailsIntegrationTests : IDisposable
 
         IElement? statusBadge = document.QuerySelector("span.status-badge");
         Assert.NotNull(statusBadge);
-        Assert.Contains("• Active", statusBadge!.TextContent);
+        Assert.Contains("\u2022 Active", statusBadge!.TextContent);
 
         IElement? backLink = document.QuerySelector("a.back-link");
         Assert.NotNull(backLink);
