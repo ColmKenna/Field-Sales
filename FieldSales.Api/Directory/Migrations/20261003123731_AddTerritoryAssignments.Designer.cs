@@ -4,6 +4,7 @@ using FieldSales.Api.Directory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FieldSales.Api.Directory.Migrations
 {
     [DbContext(typeof(DirectoryDbContext))]
-    partial class DirectoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261003123731_AddTerritoryAssignments")]
+    partial class AddTerritoryAssignments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,121 +24,6 @@ namespace FieldSales.Api.Directory.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("FieldSales.Api.Coverage.AssignmentHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ActorName")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<string>("ActorSubject")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)")
-                        .UseCollation("Latin1_General_100_BIN2");
-
-                    b.Property<int>("Cause")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("LocationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("LocationName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid?>("NewAssignmentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int?>("NewLevel")
-                        .HasColumnType("int");
-
-                    b.Property<string>("NewRepName")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<string>("NewRepSubject")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)")
-                        .UseCollation("Latin1_General_100_BIN2");
-
-                    b.Property<string>("NewSourceName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid?>("NewUnitId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("OperationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("PreviousAssignmentId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int?>("PreviousLevel")
-                        .HasColumnType("int");
-
-                    b.Property<string>("PreviousRepName")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<string>("PreviousRepSubject")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)")
-                        .UseCollation("Latin1_General_100_BIN2");
-
-                    b.Property<string>("PreviousSourceName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid?>("PreviousUnitId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<long>("Sequence")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Sequence"));
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Sequence")
-                        .IsUnique();
-
-                    b.HasIndex("LocationId", "Sequence");
-
-                    b.HasIndex("NewRepSubject", "Sequence");
-
-                    b.HasIndex("OperationId", "LocationId")
-                        .IsUnique();
-
-                    b.HasIndex("PreviousRepSubject", "Sequence");
-
-                    b.ToTable("AssignmentHistory", null, t =>
-                        {
-                            t.HasTrigger("TR_AssignmentHistory_AppendOnly");
-
-                            t.HasCheckConstraint("CK_AssignmentHistory_Change", "[Id] <> '00000000-0000-0000-0000-000000000000'\nAND [OperationId] <> '00000000-0000-0000-0000-000000000000'\nAND [LocationId] <> '00000000-0000-0000-0000-000000000000'\nAND LEN([LocationName]) > 0 AND LEN([ActorSubject]) > 0 AND LEN([ActorName]) > 0\nAND [Cause] IN (0, 1, 2) AND DATEPART(TZOFFSET, [ChangedAt]) = 0\nAND ([PreviousRepSubject] IS NOT NULL OR [NewRepSubject] IS NOT NULL)\nAND ([PreviousRepSubject] IS NULL OR [NewRepSubject] IS NULL OR [PreviousRepSubject] <> [NewRepSubject])");
-
-                            t.HasCheckConstraint("CK_AssignmentHistory_NewOwner", "([NewRepSubject] IS NULL AND [NewRepName] IS NULL AND [NewAssignmentId] IS NULL\n  AND [NewLevel] IS NULL AND [NewUnitId] IS NULL AND [NewSourceName] IS NULL)\nOR\n([NewRepSubject] IS NOT NULL AND LEN([NewRepSubject]) > 0\n  AND [NewRepName] IS NOT NULL AND LEN([NewRepName]) > 0\n  AND [NewAssignmentId] IS NOT NULL AND [NewAssignmentId] <> '00000000-0000-0000-0000-000000000000'\n  AND [NewLevel] IS NOT NULL AND [NewLevel] IN (0, 1, 2, 3)\n  AND [NewUnitId] IS NOT NULL AND [NewUnitId] <> '00000000-0000-0000-0000-000000000000'\n  AND [NewSourceName] IS NOT NULL AND LEN([NewSourceName]) > 0)");
-
-                            t.HasCheckConstraint("CK_AssignmentHistory_PreviousOwner", "([PreviousRepSubject] IS NULL AND [PreviousRepName] IS NULL AND [PreviousAssignmentId] IS NULL\n  AND [PreviousLevel] IS NULL AND [PreviousUnitId] IS NULL AND [PreviousSourceName] IS NULL)\nOR\n([PreviousRepSubject] IS NOT NULL AND LEN([PreviousRepSubject]) > 0\n  AND [PreviousRepName] IS NOT NULL AND LEN([PreviousRepName]) > 0\n  AND [PreviousAssignmentId] IS NOT NULL AND [PreviousAssignmentId] <> '00000000-0000-0000-0000-000000000000'\n  AND [PreviousLevel] IS NOT NULL AND [PreviousLevel] IN (0, 1, 2, 3)\n  AND [PreviousUnitId] IS NOT NULL AND [PreviousUnitId] <> '00000000-0000-0000-0000-000000000000'\n  AND [PreviousSourceName] IS NOT NULL AND LEN([PreviousSourceName]) > 0)");
-                        });
-
-                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
-                });
 
             modelBuilder.Entity("FieldSales.Api.Coverage.RepReportingLine", b =>
                 {
@@ -618,15 +506,6 @@ namespace FieldSales.Api.Directory.Migrations
                         {
                             t.HasCheckConstraint("CK_Towns_Coordinates", "([Latitude] IS NULL AND [Longitude] IS NULL) OR\n([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL\n  AND [Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)");
                         });
-                });
-
-            modelBuilder.Entity("FieldSales.Api.Coverage.AssignmentHistory", b =>
-                {
-                    b.HasOne("FieldSales.Api.Directory.Location", null)
-                        .WithMany()
-                        .HasForeignKey("LocationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("FieldSales.Api.Coverage.TerritoryAssignment", b =>

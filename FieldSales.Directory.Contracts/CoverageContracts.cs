@@ -1,0 +1,37 @@
+namespace FieldSales.Directory.Contracts;
+
+public enum TerritoryLevel { Region, County, Town, Location }
+
+public static class CoverageFields
+{
+    // Matches the identity store's subject-key limit; subjects remain opaque and case-sensitive.
+    public const int MaximumSubjectLength = 450;
+}
+
+public sealed record TerritoryTarget(TerritoryLevel Level, Guid UnitId);
+public sealed record TerritoryAssignmentDetails(Guid Id, string RepSubject, TerritoryTarget Target, string Version);
+public sealed record RepReportingLineDetails(string RepSubject, string ManagerSubject, string Version);
+
+public sealed record AssignedTerritoryDetails(TerritoryAssignmentDetails Assignment, string Name);
+public sealed record CoverageSourceDetails(Guid AssignmentId, TerritoryTarget Target, string Name);
+public sealed record EffectiveOwnerDetails(string RepSubject, CoverageSourceDetails Source);
+// Null Owner explicitly means Unassigned, rather than a missing Location.
+public sealed record LocationCoverageDetails(Guid LocationId, string Name, EffectiveOwnerDetails? Owner);
+
+public enum OwnershipChangeCause { DirectLocationAssignment, TerritoryAssignment, GeographyChange }
+public sealed record HistoryIdentityDetails(string Subject, string DisplayName);
+public sealed record HistoryOwnerDetails(HistoryIdentityDetails Rep, CoverageSourceDetails Source);
+public sealed record AssignmentHistoryDetails(Guid Id, long Sequence, Guid OperationId, Guid LocationId,
+    string LocationName, DateTimeOffset ChangedAt, HistoryIdentityDetails Actor, HistoryOwnerDetails? PreviousOwner,
+    HistoryOwnerDetails? NewOwner, OwnershipChangeCause Cause, string? Reason, string Display);
+
+// Current actor and team authority always come from server-side staff data.
+public sealed record AddTerritoryAssignmentRequest(string? RepSubject, TerritoryTarget? Target, string? Reason = null);
+public sealed record RemoveTerritoryAssignmentRequest(string? Version, string? Reason = null);
+public sealed record SetRepReportingLineRequest(string? ManagerSubject, string? Version);
+public sealed record CoverageError(string Error, string? Field = null);
+public sealed record CoverageMutationResult(bool Saved, int ChangedLocations);
+public sealed record StaffChoice(string Subject, string Name);
+public sealed record NamedRepReportingLine(RepReportingLineDetails Line, string RepName, string ManagerName);
+public sealed record ReportingLinesPage(IReadOnlyList<StaffChoice> Reps, IReadOnlyList<StaffChoice> Managers,
+    IReadOnlyList<NamedRepReportingLine> Lines);

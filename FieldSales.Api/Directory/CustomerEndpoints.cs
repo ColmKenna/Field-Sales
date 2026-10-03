@@ -1,4 +1,5 @@
 using FieldSales.Directory.Contracts;
+using FieldSales.Api.Coverage;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -33,6 +34,8 @@ public static class CustomerEndpoints
         { return Results.BadRequest(new CustomerDirectoryError(exception.Message, exception.Field)); }
         catch (DuplicateLocationNameException exception)
         { return Results.Conflict(new CustomerDirectoryError(exception.Message, "Name", RequiresDuplicateConfirmation: true)); }
+        catch (CoverageIdentityUnavailableException exception)
+        { return Results.Json(new CustomerDirectoryError(exception.Message), statusCode: StatusCodes.Status503ServiceUnavailable); }
         catch (DbUpdateConcurrencyException)
         { return Results.Conflict(new CustomerDirectoryError("This location changed. Reload it before saving.", "Version")); }
         catch (Exception exception) when (exception.GetBaseException() is SqlException { Number: 547 or 1205 })

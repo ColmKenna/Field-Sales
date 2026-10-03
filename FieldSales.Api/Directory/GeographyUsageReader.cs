@@ -8,9 +8,9 @@ public static class GeographyLists
 {
     public static ReferenceListDefinition Definition(string level) => level switch
     {
-        "regions" => new(level, "Region", "Regions", ["counties"]),
-        "counties" => new(level, "County", "Counties", ["towns"]),
-        "towns" => new(level, "Town", "Towns", ["locations"]),
+        "regions" => new(level, "Region", "Regions", ["counties", "territory-assignments"]),
+        "counties" => new(level, "County", "Counties", ["towns", "territory-assignments"]),
+        "towns" => new(level, "Town", "Towns", ["locations", "territory-assignments"]),
         _ => throw new GeographyValidationException("Choose a geography level.")
     };
 }
@@ -44,7 +44,14 @@ public sealed class GeographyUsageReader([FromKeyedServices("directory")] IEnume
                     pair.Value.Add(count);
                 }
             }
-            return counts.ToDictionary(pair => pair.Key, pair => new ReferenceUsage(pair.Value));
+            // Keep existing public usage rows unchanged when no assignment exists.
+            // The additional source is still required and fully validated above.
+            return counts.ToDictionary(pair => pair.Key, pair =>
+            {
+                var validated = new ReferenceUsage(pair.Value);
+                return new ReferenceUsage(validated.Counts
+                    .Where(count => count.SourceKey != TerritoryGeographyUsageSource.Key || count.Count != 0).ToArray());
+            });
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         { throw new ReferenceUsageUnavailableException("Geography usage could not be checked.", exception); }
@@ -90,5 +97,27 @@ public sealed class LocationTownUsageSource(DirectoryDbContext db) : IReferenceU
         var counts = await db.Locations.Where(location => ids.Contains(location.TownId)).GroupBy(location => location.TownId)
             .Select(group => new { Id = group.Key, Count = group.LongCount() }).ToDictionaryAsync(row => row.Id, row => row.Count, ct);
         return ids.Distinct().ToDictionary(id => id, id => new ReferenceCount(SourceKey, "location", "locations", counts.GetValueOrDefault(id)));
+    }
+}
+
+public sealed class TerritoryGeographyUsageSource(DirectoryDbContext db) : IReferenceUsageSource
+{
+    public const string Key = "territory-assignments";
+    public string SourceKey => Key;
+    public bool Supports(string listKey) => listKey is "regions" or "counties" or "towns";
+    public async Task<ReferenceCount> CountAsync(ReferenceItemKey item, CancellationToken ct) =>
+        (await CountManyAsync(item.ListKey, [item.ItemId], ct))[item.ItemId];
+    public async Task<IReadOnlyDictionary<Guid, ReferenceCount>> CountManyAsync(string listKey, IReadOnlyList<Guid> ids, CancellationToken ct)
+    {
+        var query = listKey switch
+        {
+            "regions" => db.TerritoryAssignments.Where(row => row.RegionId != null).Select(row => row.RegionId!.Value),
+            "counties" => db.TerritoryAssignments.Where(row => row.CountyId != null).Select(row => row.CountyId!.Value),
+            "towns" => db.TerritoryAssignments.Where(row => row.TownId != null).Select(row => row.TownId!.Value),
+            _ => throw new InvalidOperationException("Choose a geography level.")
+        };
+        var counts = await query.Where(id => ids.Contains(id)).GroupBy(id => id)
+            .Select(group => new { Id = group.Key, Count = group.LongCount() }).ToDictionaryAsync(row => row.Id, row => row.Count, ct);
+        return ids.Distinct().ToDictionary(id => id, id => new ReferenceCount(SourceKey, "territory assignment", "territory assignments", counts.GetValueOrDefault(id)));
     }
 }

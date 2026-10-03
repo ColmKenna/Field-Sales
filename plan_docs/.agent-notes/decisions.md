@@ -3,6 +3,34 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-021 reporting-line source (2026-10-03, developer, planning)
+
+- The developer selected **Store reporting lines in Field Sales business data,
+  managed by Head Office** in response to the WI-021 source question.
+- This settles the source of rep → Sales Manager relationships. Identity
+  administration remains responsible for accounts and roles.
+- The developer then replied **Approved** on 2026-10-03, accepting the concrete
+  reporting-line integration, ownership/history policies and Human-Led scenario
+  matrix in `WI-021.md`. That approval authorizes increment 1 only.
+- Compute effective owners on read through a single pure resolver. Assigned new
+  Locations receive initial Unassigned → inherited-owner history atomically;
+  unassigned creation writes no ownership entry. Source-only changes with an
+  unchanged rep write no ownership-change entry. Preserve historical labels and
+  reserve the `geography change` cause for ownership changes through geography.
+
+## WI-021 trusted history labels — sequencing amendment (2026-10-03, developer)
+
+- The developer replied **Approved** to
+  `docs/territory-history-plan-amendment.md` after checkpoint `65695b6`.
+- Bring the trusted read-only staff directory contract, Identity lookup and API
+  client forward from increment 5 into increment 4, so history captures real
+  actor/rep display labels. Use existing account data and current bearer/role
+  authorization; keep identity network reads outside the business transaction.
+- Missing or invalid required identity data fails the write. History reads retain
+  captured labels through account/geography renames and need no identity lookup.
+  Assignment/reporting management and final acceptance remain increment 5;
+  the mandatory increment review stops still apply.
+
 ## WI-019 Town-first coordinates (2026-10-02, developer)
 
 - Town coordinates are the first default. Keep Eircode lookup optional and

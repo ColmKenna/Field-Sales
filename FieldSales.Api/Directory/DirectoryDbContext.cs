@@ -1,3 +1,4 @@
+using FieldSales.Api.Coverage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Design;
@@ -16,6 +17,9 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<LocationContact> LocationContacts => Set<LocationContact>();
     public DbSet<LocationPositionHistory> LocationPositionHistory => Set<LocationPositionHistory>();
+    public DbSet<TerritoryAssignment> TerritoryAssignments => Set<TerritoryAssignment>();
+    public DbSet<RepReportingLine> RepReportingLines => Set<RepReportingLine>();
+    public DbSet<AssignmentHistory> AssignmentHistory => Set<AssignmentHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,6 +28,8 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
         modelBuilder.Ignore<DirectoryType>();
         ContactModelConfiguration.Configure(modelBuilder);
         LocationPositionModelConfiguration.Configure(modelBuilder);
+        CoverageModelConfiguration.Configure(modelBuilder);
+        AssignmentHistoryModelConfiguration.Configure(modelBuilder);
         ConfigureType<LocationType>(modelBuilder, "LocationTypes");
         ConfigureType<ContactType>(modelBuilder, "ContactTypes");
         var regions = Configure<Region>(modelBuilder, "Regions");
@@ -63,6 +69,24 @@ public sealed class DirectoryDbContext(DbContextOptions<DirectoryDbContext> opti
         locations.HasIndex(item => new { item.CustomerId, item.NormalizedName });
         locations.HasOne<Town>().WithMany().HasForeignKey(item => item.TownId).OnDelete(DeleteBehavior.Restrict);
         locations.HasOne<LocationType>().WithMany().HasForeignKey(item => item.LocationTypeId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        GuardHistory();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        GuardHistory();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void GuardHistory()
+    {
+        if (ChangeTracker.Entries<AssignmentHistory>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Assignment history is append-only.");
     }
 
     private static void ConfigureType<T>(ModelBuilder modelBuilder, string table) where T : DirectoryType
