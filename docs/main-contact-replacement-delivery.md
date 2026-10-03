@@ -88,12 +88,21 @@ Before domain changes: 26 predecessor contact cases and 2 new characterisation
 cases passed. After implementation: 53 focused cases passed; the final suite also
 adds global-retirement website and late-failure rollback checks.
 Warning-as-error solution build: zero warnings/errors.
-API: 192/192; website: 434/434; JavaScript: 34/34. Identity results pending.
+API: 192/192; website: 434/434; Identity Admin: 1,046/1,046; JavaScript: 34/34.
+All 1,672 .NET cases passed with no failures/skips. Final TRX evidence:
+
+- wi020-api_net10.0_20261003115931.trx
+- wi020-web-verified_net10.0_20261003121718.trx
+- wi020-identity_net10.0_20261003122002.trx
+
 Results are under .artifacts/wi020/. No tests were weakened, skipped or deleted.
 The old contact fixture changed only cleanup for the new guarded FK cycle, restoring
 the SQL guard before each scenario. Two initial new-test assumptions were corrected:
 HTML attribute order for antiforgery extraction, and affected-shop display order.
 
-WI-020 remains active until the final regression results are green and recorded.
+WI-020 is complete; all six scoped acceptance criteria pass. The only console
+content change is WI-020's status, first active then done. Checkpoint 43ade53,
+domain/storage be1b3f0 and website/scenarios 93c6345 are on
+feature/wi-020-replace-retire-main-contact-without, followed by the completion record.
 Main integration is a separate user action. Next by console order is WI-021:
 Assign territories and resolve each shop's owner with its source.
