@@ -1,0 +1,25 @@
+@model FieldSales.Directory.Contracts.AssignmentImpactDetails
+@if (Model.ChangedLocations == 0)
+{
+    <p>No Locations change owner. @(Model.Action == "Add" ? "This assignment can affect future matching Locations." : "Removing this assignment can affect future matching Locations.")</p>
+}
+@foreach (var group in Model.Groups)
+{
+    <details>
+        <summary>@group.Sentence</summary>
+        <table>
+            <thead><tr><th scope="col">Location</th><th scope="col">Previous owner</th><th scope="col">New owner</th></tr></thead>
+            <tbody>
+                @foreach (var location in group.Locations)
+                {
+                    <tr><td>@location.Name</td><td>@(location.PreviousOwner is { } old ? $"{old.Rep.Name} (via {old.SourceName})" : "Unassigned")</td>
+                        <td>@(location.NewOwner is { } next ? $"{next.Rep.Name} (via {next.SourceName})" : "Unassigned")</td></tr>
+                }
+            </tbody>
+        </table>
+    </details>
+}
+@if (Model.Groups.Any(group => group.NewRepSubject is null))
+{
+    <p>These Locations will have no responsible rep. Save only after reviewing the Unassigned Locations.</p>
+}

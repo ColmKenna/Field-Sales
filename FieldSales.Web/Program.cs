@@ -93,6 +93,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(StaffRoles.FieldSalesperson, policy => policy.RequireRole(StaffRoles.FieldSalesperson));
     options.AddPolicy(StaffRoles.SalesManager, policy => policy.RequireRole(StaffRoles.SalesManager));
     options.AddPolicy(StaffRoles.HeadOfficeUser, policy => policy.RequireRole(StaffRoles.HeadOfficeUser));
+    options.AddPolicy("ManageCoverage", policy => policy.RequireRole(StaffRoles.SalesManager, StaffRoles.HeadOfficeUser));
     options.AddPolicy("StaffMember", policy => policy.RequireRole(StaffRoles.All));
     options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
 });
@@ -101,6 +102,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/Staff", "StaffMember");
     options.Conventions.AuthorizePage("/Rep/Index", StaffRoles.FieldSalesperson);
     options.Conventions.AuthorizePage("/Manager/Index", StaffRoles.SalesManager);
+    options.Conventions.AuthorizeFolder("/Coverage", "ManageCoverage");
     options.Conventions.AuthorizeFolder("/HeadOffice", StaffRoles.HeadOfficeUser);
 });
 

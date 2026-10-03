@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using FieldSales.Api.Directory;
 using FieldSales.Directory.Contracts;
 using FieldSales.StaffAccess;
@@ -7,54 +8,77 @@ using Microsoft.EntityFrameworkCore;
 namespace FieldSales.Api.Coverage;
 
 public sealed class TerritoryAssignmentStore(DirectoryDbContext db, CoverageReadStore access,
-    CoverageOwnershipReader ownership, CoverageStaffProvider staff, AssignmentHistoryWriter history, TimeProvider clock)
+    CoverageOwnershipReader ownership, CoverageStaffProvider staff, AssignmentHistoryWriter history, TimeProvider clock, AssignmentPreviewProofs proofs)
 {
+    public async Task<AssignmentImpactDetails> PreviewAddAsync(ClaimsPrincipal actor, AddTerritoryAssignmentRequest request, CancellationToken ct)
+    {
+        var (candidate, identities) = await PrepareAddAsync(actor, request, ct);
+        return await GeographyTransactions.RunAsync(db, async () =>
+        {
+            await ValidateAddAsync(actor, candidate, ct);
+            var inputs = await AssignmentImpactInputs.ReadAsync(db, ownership, ct);
+            return await PreviewAsync(actor, inputs, identities, candidate, true, AddCommand(request), ct);
+        }, ct);
+    }
+
+    public async Task<AssignmentImpactDetails?> PreviewRemoveAsync(ClaimsPrincipal actor, Guid id, RemoveTerritoryAssignmentRequest request, CancellationToken ct)
+    {
+        var prepared = await PrepareRemoveAsync(actor, id, request, ct);
+        if (prepared is null) return null;
+        return await GeographyTransactions.RunAsync<AssignmentImpactDetails?>(db, async () =>
+        {
+            var assignment = await db.TerritoryAssignments.SingleOrDefaultAsync(row => row.Id == id, ct);
+            if (assignment is null) return null;
+            await access.RequireRepAccessAsync(actor, assignment.RepSubject, ct);
+            if (!assignment.Version.SequenceEqual(Version(request.Version))) throw new DbUpdateConcurrencyException();
+            var inputs = await AssignmentImpactInputs.ReadAsync(db, ownership, ct);
+            return await PreviewAsync(actor, inputs, prepared, assignment, false, RemoveCommand(id, request.Version, request.Reason), ct);
+        }, ct);
+    }
+
     public async Task<TerritoryAssignmentDetails> AddAsync(ClaimsPrincipal actor, AddTerritoryAssignmentRequest request, CancellationToken ct)
     {
-        if (request.Target is null) throw new CoverageValidationException("Target", "Choose a territory or location.");
-        var candidate = TerritoryAssignment.Create(request.RepSubject, request.Target);
-        ValidateReason(request.Reason);
-        var identities = await PrepareAsync(candidate.Target, candidate.RepSubject, actor, ct);
-        CoverageStaffProvider.RequireEligible(identities, candidate.RepSubject, BusinessRoles.FieldSalesperson, "RepSubject");
+        var (candidate, identities) = await PrepareAddAsync(actor, request, ct);
         Guid operation = Guid.NewGuid();
         return await GeographyTransactions.RunAsync(db, async () =>
         {
-            await access.RequireRepAccessAsync(actor, candidate.RepSubject, ct);
-            await RequireActiveTargetAsync(candidate.Target, ct);
-            var existing = await ForTarget(candidate.Target).SingleOrDefaultAsync(ct);
-            if (existing is not null)
-            {
-                await access.RequireRepAccessAsync(actor, existing.RepSubject, ct);
-                throw new CoverageConflictException("This unit already has an assignment. Remove it before assigning another rep.");
-            }
-            var before = await ownership.ReadAllAsync(ct);
-            var assignment = TerritoryAssignment.Create(candidate.RepSubject, candidate.Target);
-            db.TerritoryAssignments.Add(assignment);
+            await ValidateAddAsync(actor, candidate, ct);
+            var inputs = await AssignmentImpactInputs.ReadAsync(db, ownership, ct);
+            string command = AddCommand(request);
+            if (!proofs.Matches(request.PreviewProof, request.Confirmed, actor.GetStaffSubject()!, command, Fingerprint(inputs, identities, actor)))
+                throw new CoveragePreviewChangedException(await PreviewAsync(actor, inputs, identities, candidate, true, command, ct));
+            var before = inputs.Owners();
+            db.TerritoryAssignments.Add(candidate);
             await db.SaveChangesAsync(ct);
             var after = await ownership.ReadAllAsync(ct);
             history.AppendChanges(before, after, new(actor.GetStaffSubject()!, identities.Values), operation,
                 Cause(candidate.Target), clock.GetUtcNow(), request.Reason);
             await db.SaveChangesAsync(ct);
-            return new TerritoryAssignmentDetails(assignment.Id, assignment.RepSubject, assignment.Target, Convert.ToBase64String(assignment.Version));
+            return new TerritoryAssignmentDetails(candidate.Id, candidate.RepSubject, candidate.Target, Convert.ToBase64String(candidate.Version));
         }, ct);
     }
 
     public async Task<CoverageMutationResult?> RemoveAsync(ClaimsPrincipal actor, Guid id, RemoveTerritoryAssignmentRequest request, CancellationToken ct)
     {
-        var candidate = await db.TerritoryAssignments.AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, ct);
-        if (candidate is null) return null;
-        ValidateReason(request.Reason);
+        var identities = await PrepareRemoveAsync(actor, id, request, ct);
+        if (identities is null) return null;
         var version = Version(request.Version);
-        var identities = await PrepareAsync(candidate.Target, candidate.RepSubject, actor, ct);
-        CoverageStaffProvider.RequireEligible(identities, candidate.RepSubject, BusinessRoles.FieldSalesperson, "RepSubject");
         Guid operation = Guid.NewGuid();
         return await GeographyTransactions.RunAsync<CoverageMutationResult?>(db, async () =>
         {
             var assignment = await db.TerritoryAssignments.SingleOrDefaultAsync(row => row.Id == id, ct);
             if (assignment is null) return null;
             await access.RequireRepAccessAsync(actor, assignment.RepSubject, ct);
+            // Preserve malformed/stale rowversion denial; a valid reviewed stale
+            // removal can instead return its refreshed version and impact.
+            if (!assignment.Version.SequenceEqual(version) && request.PreviewProof is null) throw new DbUpdateConcurrencyException();
+            var inputs = await AssignmentImpactInputs.ReadAsync(db, ownership, ct);
+            if (!proofs.Matches(request.PreviewProof, request.Confirmed, actor.GetStaffSubject()!, RemoveCommand(id, request.Version, request.Reason),
+                Fingerprint(inputs, identities, actor)))
+                throw new CoveragePreviewChangedException(await PreviewAsync(actor, inputs, identities, assignment, false,
+                    RemoveCommand(id, Convert.ToBase64String(assignment.Version), request.Reason), ct));
             if (!assignment.Version.SequenceEqual(version)) throw new DbUpdateConcurrencyException();
-            var before = await ownership.ReadAllAsync(ct);
+            var before = inputs.Owners();
             db.TerritoryAssignments.Remove(assignment);
             await db.SaveChangesAsync(ct);
             var after = await ownership.ReadAllAsync(ct);
@@ -64,6 +88,79 @@ public sealed class TerritoryAssignmentStore(DirectoryDbContext db, CoverageRead
             return new(true, changed);
         }, ct);
     }
+
+    private async Task<(TerritoryAssignment Candidate, IReadOnlyDictionary<string, StaffDirectoryEntry> Identities)> PrepareAddAsync(
+        ClaimsPrincipal actor, AddTerritoryAssignmentRequest request, CancellationToken ct)
+    {
+        if (request.Target is null) throw new CoverageValidationException("Target", "Choose a territory or location.");
+        var candidate = TerritoryAssignment.Create(request.RepSubject, request.Target);
+        ValidateReason(request.Reason);
+        var identities = await PrepareAsync(candidate.Target, candidate.RepSubject, actor, ct);
+        CoverageStaffProvider.RequireEligible(identities, candidate.RepSubject, BusinessRoles.FieldSalesperson, "RepSubject");
+        return (candidate, identities);
+    }
+
+    private async Task<IReadOnlyDictionary<string, StaffDirectoryEntry>?> PrepareRemoveAsync(ClaimsPrincipal actor,
+        Guid id, RemoveTerritoryAssignmentRequest request, CancellationToken ct)
+    {
+        var candidate = await db.TerritoryAssignments.AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, ct);
+        if (candidate is null) return null;
+        ValidateReason(request.Reason); Version(request.Version);
+        var identities = await PrepareAsync(candidate.Target, candidate.RepSubject, actor, ct);
+        CoverageStaffProvider.RequireEligible(identities, candidate.RepSubject, BusinessRoles.FieldSalesperson, "RepSubject");
+        return identities;
+    }
+
+    private async Task ValidateAddAsync(ClaimsPrincipal actor, TerritoryAssignment candidate, CancellationToken ct)
+    {
+        await access.RequireRepAccessAsync(actor, candidate.RepSubject, ct);
+        await RequireActiveTargetAsync(candidate.Target, ct);
+        var existing = await ForTarget(candidate.Target).SingleOrDefaultAsync(ct);
+        if (existing is not null)
+        {
+            await access.RequireRepAccessAsync(actor, existing.RepSubject, ct);
+            throw new CoverageConflictException("This unit already has an assignment. Remove it before assigning another rep.");
+        }
+    }
+
+    private async Task<AssignmentImpactDetails> PreviewAsync(ClaimsPrincipal actor, AssignmentImpactInputs inputs,
+        IReadOnlyDictionary<string, StaffDirectoryEntry> identities, TerritoryAssignment assignment, bool adding, string command, CancellationToken ct)
+    {
+        var proposed = adding ? inputs.Assignments.Append(assignment) : inputs.Assignments.Where(row => row.Id != assignment.Id);
+        var changes = AssignmentImpactPreview.Calculate(inputs.Locations, inputs.Assignments, proposed);
+        ImpactOwnerDetails? Owner(EffectiveOwner? value) => value is null ? null
+            : new(new(value.RepSubject, CoverageStaffProvider.Find(identities, value.RepSubject).DisplayName), value.Source.Target, value.Source.Name);
+        var groups = changes.GroupBy(change => (Previous: change.Previous?.RepSubject, Next: change.Next?.RepSubject))
+            .Select(group =>
+            {
+                var locations = group.Select(change => new ImpactLocationDetails(change.Location.LocationId,
+                    change.Location.LocationName, Owner(change.Previous), Owner(change.Next))).ToArray();
+                string count = locations.Length == 1 ? "1 Location" : $"{locations.Length} Locations";
+                string become = locations.Length == 1 ? "becomes" : "become";
+                string move = locations.Length == 1 ? "moves" : "move";
+                string sentence = group.Key.Next is null ? $"{count} {become} Unassigned"
+                    : group.Key.Previous is null ? $"{count} {become} {locations[0].NewOwner!.Rep.Name}'s"
+                    : $"{count} {move} from {locations[0].PreviousOwner!.Rep.Name} to {locations[0].NewOwner!.Rep.Name}";
+                return new AssignmentImpactGroup(group.Key.Previous, group.Key.Next, sentence, locations);
+            }).OrderByDescending(group => group.Locations.Count).ThenBy(group => group.Sentence, StringComparer.Ordinal).ToArray();
+        string name = assignment.Target.Level switch
+        {
+            TerritoryLevel.Region => await db.Regions.Where(row => row.Id == assignment.Target.UnitId).Select(row => row.Name).SingleAsync(ct),
+            TerritoryLevel.County => await db.Counties.Where(row => row.Id == assignment.Target.UnitId).Select(row => row.Name).SingleAsync(ct),
+            TerritoryLevel.Town => await db.Towns.Where(row => row.Id == assignment.Target.UnitId).Select(row => row.Name).SingleAsync(ct),
+            _ => await db.Locations.Where(row => row.Id == assignment.Target.UnitId).Select(row => row.Name).SingleAsync(ct)
+        };
+        return new(proofs.Issue(actor.GetStaffSubject()!, command, Fingerprint(inputs, identities, actor)), adding ? "Add" : "Remove", name,
+            CoverageStaffProvider.Find(identities, assignment.RepSubject).DisplayName, changes.Count, groups,
+            adding ? null : Convert.ToBase64String(assignment.Version));
+    }
+
+    private static string Fingerprint(AssignmentImpactInputs inputs, IReadOnlyDictionary<string, StaffDirectoryEntry> identities, ClaimsPrincipal actor) =>
+        inputs.Fingerprint(identities, actor.IsInRole(BusinessRoles.HeadOfficeUser) ? BusinessRoles.HeadOfficeUser : BusinessRoles.SalesManager);
+    private static string AddCommand(AddTerritoryAssignmentRequest request) => JsonSerializer.Serialize(new
+        { Action = "Add", request.RepSubject, request.Target, Reason = request.Reason?.Trim() });
+    private static string RemoveCommand(Guid id, string? version, string? reason) => JsonSerializer.Serialize(new
+        { Action = "Remove", Id = id, Version = version, Reason = reason?.Trim() });
 
     private async Task<IReadOnlyDictionary<string, StaffDirectoryEntry>> PrepareAsync(TerritoryTarget target, string rep,
         ClaimsPrincipal actor, CancellationToken ct)

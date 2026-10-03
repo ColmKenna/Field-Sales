@@ -436,10 +436,10 @@ public class GeographyApplication : IAsyncLifetime
         return (await db.Regions.CountAsync(), await db.Counties.CountAsync(), await db.Towns.CountAsync());
     }
     public async Task RestartAsync() { await Api.DisposeAsync(); Api = NewApi(); _ = Api.Server; }
-    public string Token(string role = StaffRoles.HeadOfficeUser, string scope = "fieldsales.api")
+    public string Token(string role = StaffRoles.HeadOfficeUser, string scope = "fieldsales.api", string subject = "niamh")
     {
         var token = new JwtSecurityToken(Issuer, "fieldsales-api",
-            [new("sub", "niamh"), new("scope", scope), new("role", role)],
+            [new("sub", subject), new("scope", scope), new("role", role)],
             DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddHours(1), new SigningCredentials(Key, SecurityAlgorithms.HmacSha256));
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
