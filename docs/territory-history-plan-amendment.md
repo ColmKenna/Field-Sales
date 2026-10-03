@@ -4,6 +4,9 @@ The developer's **Continue** approves the published read checkpoint and
 authorizes increment 4. Preparing its history integration exposed one dependency
 scheduled too late in the original plan.
 
+The developer accepted this amendment with **Approved** after its documentation
+checkpoint `65695b6`. It now governs increment 4 only.
+
 ## Confirmed dependency
 
 The approved history policy requires immutable display-label snapshots for the
@@ -16,7 +19,7 @@ The original plan introduces the trusted read-only staff directory in increment
 5, after increment 4 must write these snapshots on assigned Location creation
 and Town changes. Implementing history first would leave its name source absent.
 
-## Proposed targeted amendment
+## Approved targeted amendment
 
 Move only the trusted read-only staff directory contract, identity endpoint and
 API lookup client/registration from increment 5 into increment 4. Use the existing
@@ -57,11 +60,12 @@ geography behavior before modifying their paths. Run the focused checks, clean
 solution build, full .NET regression and existing JavaScript suites before the
 history checkpoint is committed and pushed.
 
-## Approval boundary
+## Proposal checkpoint and acceptance
 
-No increment 4 production or test code has been changed. WI-021 remains active
-and the console is unchanged. Reply **Approved** to accept this sequencing
-amendment and continue increment 4 only.
+No increment 4 production or test code had changed when this amendment was
+presented. The developer's subsequent **Approved** accepts the sequencing change
+and authorizes amended increment 4. WI-021 remains active and the console is
+unchanged. Increment 5 and main integration require separate authorization.
 
 The `console-delivery-next-item` skill requires: “If implementation reveals the
 plan was wrong in a material way, stop, explain the divergence, and propose a

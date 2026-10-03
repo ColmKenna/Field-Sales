@@ -14,6 +14,10 @@ builder.AddSqlServerDbContext<DirectoryDbContext>("DirectoryDb");
 builder.Services.AddScoped<GeographyStore>();
 builder.Services.AddScoped<CustomerStore>();
 builder.Services.AddScoped<CoverageReadStore>();
+builder.Services.AddScoped<CoverageOwnershipReader>();
+builder.Services.AddScoped<AssignmentHistoryWriter>();
+builder.Services.AddScoped<AssignmentHistoryReadStore>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddLocationCoordinates(builder.Configuration);
 builder.Services.AddScoped<ContactStore>();
 builder.Services.AddScoped<GeographyUsageReader>();
@@ -41,6 +45,7 @@ builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageReader, Refer
 builder.Services.AddScoped<ProductBrandAssignments>();
 builder.Services.AddScoped<ProductReferenceAssignments>();
 builder.Services.AddHttpClient<IStaffRoleLookup, HttpStaffRoleLookup>().AddSafeReadResilience();
+builder.Services.AddHttpClient<IStaffDirectory, HttpStaffDirectory>().AddSafeReadResilience();
 
 const string roleLookupUnavailableKey = StaffApiContract.LookupUnavailableKey;
 

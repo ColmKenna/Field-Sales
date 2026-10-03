@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.Coverage;
 
-public sealed class CoverageReadStore(DirectoryDbContext db)
+public sealed class CoverageReadStore(DirectoryDbContext db, CoverageOwnershipReader ownership)
 {
     public Task<IReadOnlyList<AssignedTerritoryDetails>> ListAssignmentsAsync(
         ClaimsPrincipal actor, string repSubject, CancellationToken ct = default) =>
@@ -40,7 +40,7 @@ public sealed class CoverageReadStore(DirectoryDbContext db)
             await RequireRepAccessAsync(actor, repSubject, ct);
             // Include every rep's assignments: a narrower assignment belonging to
             // another rep must still carve its Locations out of this rep's list.
-            var paths = await LocationPaths().ToArrayAsync(ct);
+            var paths = await ownership.Paths().ToArrayAsync(ct);
             var assignments = await db.TerritoryAssignments.AsNoTracking().ToArrayAsync(ct);
             var resolver = new EffectiveOwnerResolver(assignments);
             return paths.Select(path => Details(path, resolver.Resolve(path)))
@@ -51,25 +51,27 @@ public sealed class CoverageReadStore(DirectoryDbContext db)
 
     public Task<LocationCoverageDetails?> FindLocationAsync(
         ClaimsPrincipal actor, Guid id, CancellationToken ct = default) =>
-        GeographyTransactions.RunAsync<LocationCoverageDetails?>(db, async () =>
+        GeographyTransactions.RunAsync(db, () => FindLocationInTransactionAsync(actor, id, ct), ct);
+
+    internal async Task<LocationCoverageDetails?> FindLocationInTransactionAsync(ClaimsPrincipal actor, Guid id, CancellationToken ct)
+    {
+        var path = await ownership.Paths(id).SingleOrDefaultAsync(ct);
+        if (path is null) return null;
+        var assignments = await db.TerritoryAssignments.AsNoTracking().Where(assignment =>
+            assignment.LocationId == path.LocationId || assignment.TownId == path.TownId
+            || assignment.CountyId == path.CountyId || assignment.RegionId == path.RegionId).ToArrayAsync(ct);
+        var owner = new EffectiveOwnerResolver(assignments).Resolve(path);
+        if (owner is null)
         {
-            var path = await LocationPaths(id).SingleOrDefaultAsync(ct);
-            if (path is null) return null;
-            var assignments = await db.TerritoryAssignments.AsNoTracking().Where(assignment =>
-                assignment.LocationId == path.LocationId || assignment.TownId == path.TownId
-                || assignment.CountyId == path.CountyId || assignment.RegionId == path.RegionId).ToArrayAsync(ct);
-            var owner = new EffectiveOwnerResolver(assignments).Resolve(path);
-            if (owner is null)
-            {
-                if (!IsHeadOffice(actor)) throw new CoverageReadForbiddenException();
-            }
-            else await RequireRepAccessAsync(actor, owner.RepSubject, ct);
-            return Details(path, owner);
-        }, ct);
+            if (!IsHeadOffice(actor)) throw new CoverageReadForbiddenException();
+        }
+        else await RequireRepAccessAsync(actor, owner.RepSubject, ct);
+        return Details(path, owner);
+    }
 
     // Both the team check and the coverage snapshot run in the same serializable
     // transaction. Reporting-line changes take effect on the next request.
-    private async Task RequireRepAccessAsync(ClaimsPrincipal actor, string repSubject, CancellationToken ct)
+    internal async Task RequireRepAccessAsync(ClaimsPrincipal actor, string repSubject, CancellationToken ct)
     {
         if (IsHeadOffice(actor)) return;
         string? subject = actor.GetStaffSubject();
@@ -81,16 +83,6 @@ public sealed class CoverageReadStore(DirectoryDbContext db)
 
     private static bool IsHeadOffice(ClaimsPrincipal actor) =>
         !string.IsNullOrWhiteSpace(actor.GetStaffSubject()) && actor.IsInRole(BusinessRoles.HeadOfficeUser);
-
-    // Archived hierarchy links remain authoritative for existing Locations.
-    private IQueryable<LocationOwnershipPath> LocationPaths(Guid? id = null) =>
-        from location in db.Locations.AsNoTracking()
-        where id == null || location.Id == id
-        join town in db.Towns on location.TownId equals town.Id
-        join county in db.Counties on town.CountyId equals county.Id
-        join region in db.Regions on county.RegionId equals region.Id
-        select new LocationOwnershipPath(location.Id, location.Name, town.Id, town.Name,
-            county.Id, county.Name, region.Id, region.Name);
 
     private static LocationCoverageDetails Details(LocationOwnershipPath path, EffectiveOwner? owner) =>
         new(path.LocationId, path.LocationName, owner is null ? null

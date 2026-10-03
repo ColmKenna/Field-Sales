@@ -335,6 +335,7 @@ app.MapGet("/staff/current-roles", async (ClaimsPrincipal principal,
     .RequireAuthorization("StaffRoleLookup");
 
 app.MapRazorPages();
+app.MapStaffDirectoryEndpoints();
 app.MapDefaultEndpoints();
 
 app.Run();

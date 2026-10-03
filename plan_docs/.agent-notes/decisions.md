@@ -18,6 +18,19 @@ and where it came up. Don't change an entry without a new human decision; add a 
   unchanged rep write no ownership-change entry. Preserve historical labels and
   reserve the `geography change` cause for ownership changes through geography.
 
+## WI-021 trusted history labels — sequencing amendment (2026-10-03, developer)
+
+- The developer replied **Approved** to
+  `docs/territory-history-plan-amendment.md` after checkpoint `65695b6`.
+- Bring the trusted read-only staff directory contract, Identity lookup and API
+  client forward from increment 5 into increment 4, so history captures real
+  actor/rep display labels. Use existing account data and current bearer/role
+  authorization; keep identity network reads outside the business transaction.
+- Missing or invalid required identity data fails the write. History reads retain
+  captured labels through account/geography renames and need no identity lookup.
+  Assignment/reporting management and final acceptance remain increment 5;
+  the mandatory increment review stops still apply.
+
 ## WI-019 Town-first coordinates (2026-10-02, developer)
 
 - Town coordinates are the first default. Keep Eircode lookup optional and

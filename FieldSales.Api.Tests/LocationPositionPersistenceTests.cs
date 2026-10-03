@@ -1,5 +1,8 @@
 using FieldSales.Api.Directory;
+using FieldSales.Api.Coverage;
 using FieldSales.Directory.Contracts;
+using FieldSales.StaffAccess;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -164,7 +167,15 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
     }
 
     private static CustomerStore Store(DirectoryDbContext db) => new(db, new GeographyStore(db, new GeographyUsageReader([])),
-        new LocationPositionResolver(db, new UnusedLookup()), TimeProvider.System);
+        new LocationPositionResolver(db, new UnusedLookup()), TimeProvider.System,
+        new CoverageOwnershipReader(db), new AssignmentHistoryWriter(db, new UnusedStaffDirectory(), new HttpContextAccessor()));
+    private sealed class UnusedStaffDirectory : IStaffDirectory
+    {
+        public Task<IReadOnlyList<StaffDirectoryEntry>> ListAsync(string accessToken, CancellationToken ct) =>
+            throw new InvalidOperationException("Read-only persistence assertions must not perform staff lookups.");
+        public Task<IReadOnlyList<StaffDirectoryEntry>> LookupAsync(string accessToken, IReadOnlyCollection<string> subjects, CancellationToken ct) =>
+            throw new InvalidOperationException("Read-only persistence assertions must not perform staff lookups.");
+    }
     private sealed class UnusedLookup : IEircodeLookup
     {
         public Task<EircodeLookupResult> LookupAsync(string eircode, CancellationToken ct) =>

@@ -1,10 +1,11 @@
 using FieldSales.Directory.Contracts;
+using FieldSales.Api.Coverage;
 using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.Directory;
 
 public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geography,
-    LocationPositionResolver positions, TimeProvider clock)
+    LocationPositionResolver positions, TimeProvider clock, CoverageOwnershipReader ownership, AssignmentHistoryWriter history)
 {
     public Task<CustomerSummary[]> ListAsync(CancellationToken ct) => db.Customers.AsNoTracking()
         .OrderBy(customer => customer.Name).ThenBy(customer => customer.Id)
@@ -35,6 +36,8 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         await CheckTownAsync(candidate.TownId, null, "FirstLocation.TownId", ct);
         await SetTypeAsync(candidate, first.LocationTypeId, null, "FirstLocation.LocationTypeId", ct);
         var resolved = await positions.ResolveAsync(candidate, ct);
+        var staff = await history.PrepareAsync([await ownership.ResolveAsync(candidate, ct, "FirstLocation.TownId")], ct);
+        var operationId = Guid.NewGuid();
         return await GeographyTransactions.RunAsync(db, async () =>
         {
             Customer customer = Customer.Create(request.Name, first.Name, first.TownId, first.Eircode);
@@ -42,6 +45,9 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
             await SetTypeAsync(customer.Locations[0], first.LocationTypeId, null, "FirstLocation.LocationTypeId", ct);
             await positions.ApplyAsync(customer.Locations[0], resolved, clock.GetUtcNow(), ct);
             db.Customers.Add(customer);
+            var firstLocation = customer.Locations[0];
+            history.Append(firstLocation.Id, firstLocation.Name, null, await ownership.ResolveAsync(firstLocation, ct, "FirstLocation.TownId"),
+                staff, operationId, OwnershipChangeCause.TerritoryAssignment, clock.GetUtcNow());
             await db.SaveChangesAsync(ct);
             return (await FindCustomerAsync(customer.Id, ct))!;
         }, ct);
@@ -55,6 +61,8 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         await SetTypeAsync(candidate, request.LocationTypeId, null, "LocationTypeId", ct);
         await CheckDuplicateAsync(candidate, request.ConfirmDuplicateName, ct);
         var resolved = await positions.ResolveAsync(candidate, ct);
+        var staff = await history.PrepareAsync([await ownership.ResolveAsync(candidate, ct)], ct);
+        var operationId = Guid.NewGuid();
         return await GeographyTransactions.RunAsync(db, async () =>
         {
             if (!await db.Customers.AnyAsync(customer => customer.Id == customerId, ct)) return null;
@@ -64,6 +72,8 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
             await CheckDuplicateAsync(location, request.ConfirmDuplicateName, ct);
             await positions.ApplyAsync(location, resolved, clock.GetUtcNow(), ct);
             db.Locations.Add(location);
+            history.Append(location.Id, location.Name, null, await ownership.ResolveAsync(location, ct),
+                staff, operationId, OwnershipChangeCause.TerritoryAssignment, clock.GetUtcNow());
             await db.SaveChangesAsync(ct);
             return await FindLocationAsync(location.Id, ct);
         }, ct);
@@ -74,6 +84,7 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         var candidate = await db.Locations.AsNoTracking().SingleOrDefaultAsync(location => location.Id == id, ct);
         if (candidate is null) return null;
         MatchVersion(candidate, request.Version);
+        var previousOwner = await ownership.ResolveAsync(candidate, ct);
         Guid previousTown = candidate.TownId;
         string? previousEircode = candidate.Eircode;
         candidate.Edit(request.Name, request.TownId, request.Eircode);
@@ -83,11 +94,16 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
         bool addressChanged = previousTown != candidate.TownId || previousEircode != candidate.Eircode;
         var resolved = addressChanged && candidate.PositionPrecision != LocationPositionPrecision.ConfirmedOnSite
             ? await positions.ResolveAsync(candidate, ct) : null;
+        var proposedOwner = await ownership.ResolveAsync(candidate, ct);
+        var staff = string.Equals(previousOwner?.RepSubject, proposedOwner?.RepSubject, StringComparison.Ordinal)
+            ? null : await history.PrepareAsync([previousOwner, proposedOwner], ct);
+        var operationId = Guid.NewGuid();
         return await GeographyTransactions.RunAsync(db, async () =>
         {
             var location = await db.Locations.SingleOrDefaultAsync(location => location.Id == id, ct);
             if (location is null) return null;
             byte[] version = MatchVersion(location, request.Version);
+            var before = await ownership.ResolveAsync(location, ct);
             Guid existingTownId = location.TownId;
             Guid? existingTypeId = location.LocationTypeId;
             location.Edit(request.Name, request.TownId, request.Eircode);
@@ -98,6 +114,8 @@ public sealed class CustomerStore(DirectoryDbContext db, GeographyStore geograph
             db.Entry(location).Property(item => item.Version).OriginalValue = version;
             // An unchanged form must still validate its version and advance it on save.
             db.Entry(location).Property(item => item.Name).IsModified = true;
+            history.Append(location.Id, location.Name, before, await ownership.ResolveAsync(location, ct),
+                staff, operationId, OwnershipChangeCause.GeographyChange, clock.GetUtcNow());
             await db.SaveChangesAsync(ct);
             return await FindLocationAsync(id, ct);
         }, ct);

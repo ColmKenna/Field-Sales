@@ -17,6 +17,12 @@ public static class CoverageEndpoints
             CoverageReadStore store, CancellationToken ct) => GuardAsync(async () =>
                 await store.FindLocationAsync(user, id, ct) is { } location
                     ? Results.Ok(location) : Results.NotFound()));
+        group.MapGet("/locations/{id:guid}/history", (Guid id, ClaimsPrincipal user,
+            AssignmentHistoryReadStore store, CancellationToken ct) => GuardAsync(async () =>
+                await store.ForLocationAsync(user, id, ct) is { } entries ? Results.Ok(entries) : Results.NotFound()));
+        group.MapGet("/reps/{repSubject}/history", (string repSubject, ClaimsPrincipal user,
+            AssignmentHistoryReadStore store, CancellationToken ct) => GuardAsync(async () =>
+                Results.Ok(await store.ForRepAsync(user, repSubject, ct))));
     }
 
     private static async Task<IResult> GuardAsync(Func<Task<IResult>> operation)

@@ -18,6 +18,13 @@ public sealed record EffectiveOwnerDetails(string RepSubject, CoverageSourceDeta
 // Null Owner explicitly means Unassigned, rather than a missing Location.
 public sealed record LocationCoverageDetails(Guid LocationId, string Name, EffectiveOwnerDetails? Owner);
 
+public enum OwnershipChangeCause { DirectLocationAssignment, TerritoryAssignment, GeographyChange }
+public sealed record HistoryIdentityDetails(string Subject, string DisplayName);
+public sealed record HistoryOwnerDetails(HistoryIdentityDetails Rep, CoverageSourceDetails Source);
+public sealed record AssignmentHistoryDetails(Guid Id, long Sequence, Guid OperationId, Guid LocationId,
+    string LocationName, DateTimeOffset ChangedAt, HistoryIdentityDetails Actor, HistoryOwnerDetails? PreviousOwner,
+    HistoryOwnerDetails? NewOwner, OwnershipChangeCause Cause, string? Reason, string Display);
+
 // Current actor and team authority always come from server-side staff data.
 public sealed record AddTerritoryAssignmentRequest(string? RepSubject, TerritoryTarget? Target);
 public sealed record RemoveTerritoryAssignmentRequest(string? Version);
