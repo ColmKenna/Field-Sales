@@ -68,10 +68,13 @@ the County, named Town carve-out and direct Location checkpoint.
   scenarios and 10 API-response boundary cases).
 - JavaScript: 34/34, using cached Node and identity test copies verified byte-for-
   byte against repository sources; no test changes or skips.
-- Full .NET regression: **1858/1858** (API 256, Identity 1049, Web 553), no
-  failures or skips. All three TRX summaries are Completed; every individual
-  result is Passed with zero abort/error/timeout/unexecuted outcomes. Evidence:
-  `.artifacts/wi023/regression/`. No source/test changes after the final build.
+- Final full .NET regression after the prerequisite correction: **1860/1860**
+  (API 256, Identity 1049, Web 555), no failures or skips. All three TRX summaries
+  are Completed; every individual result is Passed with zero abort/error/timeout/
+  unexecuted outcomes. Evidence: `.artifacts/wi023/regression-corrected/`.
+  No application/test changes after the corrected warning-free build.
+- Customer/coordinate regression: **70/70**, including both deterministic
+  preflight cases and the unchanged late-coordinate conflict assertions.
 
 Focused evidence: `.artifacts/wi023/focused-final/`. Rendered real Razor responses
 and desktop/narrow screenshots: `.artifacts/wi023/rendered/`. These test-only
@@ -88,3 +91,20 @@ excluded from passing evidence; its authorized rerun completed successfully.
 All five acceptance criteria pass. The scoped layout matches M-06; the actual
 changes are reflected in the committed read-model and page summaries. WI-024 is
 next by console order and has not been started.
+
+## CI prerequisite correction
+
+PR #4's final-head CI exposed a pre-existing customer creation/deletion race:
+when a Town disappeared between eligibility validation and the position
+preflight read, a missing Town was reported as 409 rather than the existing
+invalid-Town 400. The unchanged concurrent-retirement test caught that response.
+
+Two deterministic real-SQL/API cases reproduced the failure for first/additional
+Locations before the source fix. Position preflight now raises the existing Town
+validation exception with `FirstLocation.TownId` or `TownId`. No records or
+history are written for those failures. Later coordinate-version conflicts keep
+409 and their existing rollback behavior; existing assertions remain unchanged.
+
+Corrected full verification passed 1860/1860; focused customer/coordinate tests
+passed 70/70. Final-head CI must still succeed before merge. The failed CI run
+37158239416 (job 111306041082) is excluded from successful evidence.
