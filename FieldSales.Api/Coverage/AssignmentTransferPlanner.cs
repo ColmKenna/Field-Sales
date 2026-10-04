@@ -50,7 +50,7 @@ public static class AssignmentTransferPlanner
                 // Stable planned IDs make repeated dry runs deterministic. The source assignment
                 // and child scope uniquely identify a new carve-out; target uniqueness is enforced in SQL.
                 var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{parent.Id:D}/{selection.Target.Level}/{selection.Target.UnitId:D}"));
-                var candidate = TerritoryAssignment.Create(recipient, selection.Target).CopyForTransfer(recipient, new Guid(bytes.AsSpan(0, 16)));
+                var candidate = TerritoryAssignment.CreateForTransfer(new Guid(bytes.AsSpan(0, 16)), recipient, selection.Target);
                 result.Add(candidate.Id, candidate);
             }
         }

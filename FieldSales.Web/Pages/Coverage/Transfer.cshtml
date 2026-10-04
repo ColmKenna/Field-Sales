@@ -1,0 +1,81 @@
+@page
+@model FieldSales.Web.Pages.Coverage.TransferModel
+@using FieldSales.Web.Pages.Coverage
+@{
+    ViewData["Title"] = "Transfer assignments · " + Model.Review.SourceRep.Name;
+}
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">@Model.Review.SourceRep.Name · Territory</a></nav>
+<h1>Transfer from @Model.Review.SourceRep.Name</h1>
+<div asp-validation-summary="All" role="alert"></div>
+@if (Model.Notice is not null) { <p role="status">@Model.Notice</p> }
+@if (Model.Preview is { } preview)
+{
+    <h2>Review transfer to @preview.RepName</h2>
+    @foreach (var notice in preview.TransferNotices!) { <p class="transfer-rollup"><strong>@notice</strong></p> }
+    <ul>@foreach (var assignment in preview.TransferredAssignments!) { <li>@assignment → @preview.RepName</li> }</ul>
+    <partial name="_AssignmentImpact" model="preview" />
+    <form method="post" asp-page-handler="Save">
+        <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
+        <input asp-for="ReceivingRepSubject" type="hidden" /><input asp-for="Reason" type="hidden" />
+        <input asp-for="PreviewProof" type="hidden" />
+        @foreach (var key in Model.Selected) { <input name="Selected" value="@key" type="hidden" /> }
+        @foreach (var key in Model.ReviewedSelections) { <input name="ReviewedSelections" value="@key" type="hidden" /> }
+        <button type="submit" name="Confirmed" value="true">Confirm transfer</button>
+        <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+    </form>
+}
+else if (Model.ChoosingRecipient)
+{
+    <h2>Choose the receiving rep</h2>
+    <p>The impact preview will show the assignments moving and every Location changing owner.</p>
+    <form method="post" asp-page-handler="Preview">
+        <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
+        @foreach (var key in Model.Selected) { <input name="Selected" value="@key" type="hidden" /> }
+        <label asp-for="ReceivingRepSubject">Receiving rep</label>
+        <select asp-for="ReceivingRepSubject" required>
+            <option value="">Choose a rep</option>
+            @foreach (var rep in Model.Review.ReceivingReps) { <option value="@rep.Subject">@rep.Name</option> }
+        </select>
+        <label asp-for="Reason">Reason (optional)</label><input asp-for="Reason" maxlength="1000" />
+        <button type="submit">Preview transfer</button>
+        <a asp-page="./Transfer" asp-route-repSubject="@Model.RepSubject" asp-route-filter="@Model.Filter">Change selection</a>
+        <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+    </form>
+}
+else
+{
+    <p>Every matching assignment is selected. Remove any areas to keep with @Model.Review.SourceRep.Name, then choose the receiving rep.</p>
+    @if (!string.IsNullOrWhiteSpace(Model.Filter)) { <p>Filter: <strong>@Model.Filter</strong></p> }
+    @if (Model.Visible.Count == 0) { <p>No assignments match this filter.</p> }
+    <form method="post" asp-page-handler="Choose" class="transfer-selection">
+        <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
+        @foreach (var row in Model.Visible)
+        {
+            <fieldset class="transfer-scope">
+                <legend>
+                    <label><input type="checkbox" name="Selected" value="@TransferModel.Key(row)" checked="@Model.Selected.Contains(TransferModel.Key(row))" data-transfer-parent /> @row.Name (@row.Selection.Target.Level)</label>
+                </legend>
+                <p>@row.Context · @row.Locations Locations @if (row.Archived) { <span>· Archived</span> }</p>
+                @if (row.Children.Count > 0)
+                {
+                    <details open>
+                        <summary>@(row.Selection.Target.Level == FieldSales.Directory.Contracts.TerritoryLevel.Region ? "Counties" : "Towns") in @row.Name</summary>
+                        @foreach (var child in row.Children)
+                        {
+                            <div class="transfer-child">
+                                @if (child.AssignedTo is { } owner)
+                                { <span>@child.Name · @child.Locations Locations · assigned separately to @owner.Name</span> }
+                                else
+                                { <label><input type="checkbox" name="Selected" value="@TransferModel.Key(child)" checked="@Model.Selected.Contains(TransferModel.Key(child))" data-transfer-child /> @child.Name · @child.Locations Locations</label> }
+                                @if (child.Archived) { <span>· Archived</span> }
+                            </div>
+                        }
+                    </details>
+                }
+            </fieldset>
+        }
+        <button type="submit">Choose receiving rep</button>
+        <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+    </form>
+}
+<script src="~/js/assignment-transfer.js" asp-append-version="true" defer></script>

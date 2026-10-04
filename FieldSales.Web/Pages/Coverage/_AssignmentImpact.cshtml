@@ -1,7 +1,7 @@
 @model FieldSales.Directory.Contracts.AssignmentImpactDetails
 @if (Model.ChangedLocations == 0)
 {
-    <p>No Locations change owner. @(Model.Action == "Add" ? "This assignment can affect future matching Locations." : "Removing this assignment can affect future matching Locations.")</p>
+    <p>No Locations change owner. @(Model.Action == "Transfer" ? "Future matching Locations follow the transferred assignments." : Model.Action == "Add" ? "This assignment can affect future matching Locations." : "Removing this assignment can affect future matching Locations.")</p>
 }
 @foreach (var group in Model.Groups)
 {

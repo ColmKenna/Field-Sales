@@ -23,13 +23,15 @@ public sealed class TerritoryAssignment
 
     public void TransferTo(string repSubject) => RepSubject = CoverageSubjects.Validate(repSubject, "ReceivingRepSubject");
 
-    public TerritoryAssignment CopyForTransfer(string repSubject, Guid? id = null) => new()
+    internal TerritoryAssignment CopyForTransfer(string repSubject) => new()
     {
-        Id = id ?? Id, RepSubject = CoverageSubjects.Validate(repSubject, "ReceivingRepSubject"),
+        Id = Id, RepSubject = CoverageSubjects.Validate(repSubject, "ReceivingRepSubject"),
         RegionId = RegionId, CountyId = CountyId, TownId = TownId, LocationId = LocationId, Version = Version.ToArray()
     };
 
-    public static TerritoryAssignment Create(string? repSubject, TerritoryTarget target)
+    public static TerritoryAssignment Create(string? repSubject, TerritoryTarget target) => CreateForTransfer(Guid.NewGuid(), repSubject, target);
+
+    internal static TerritoryAssignment CreateForTransfer(Guid id, string? repSubject, TerritoryTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
         if (!Enum.IsDefined(target.Level))
@@ -38,7 +40,7 @@ public sealed class TerritoryAssignment
             throw new CoverageValidationException("Target.UnitId", "Choose a territory or location.");
         var assignment = new TerritoryAssignment
         {
-            Id = Guid.NewGuid(), RepSubject = CoverageSubjects.Validate(repSubject, "RepSubject")
+            Id = id, RepSubject = CoverageSubjects.Validate(repSubject, "RepSubject")
         };
         switch (target.Level)
         {
