@@ -6,7 +6,7 @@
 }
 <nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">@Model.Review.SourceRep.Name · Territory</a></nav>
 <h1>Transfer from @Model.Review.SourceRep.Name</h1>
-<div asp-validation-summary="All" role="alert"></div>
+@if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
 @if (Model.Notice is not null) { <p role="status">@Model.Notice</p> }
 @if (Model.Preview is { } preview)
 {
@@ -14,13 +14,13 @@
     @foreach (var notice in preview.TransferNotices!) { <p class="transfer-rollup"><strong>@notice</strong></p> }
     <ul>@foreach (var assignment in preview.TransferredAssignments!) { <li>@assignment → @preview.RepName</li> }</ul>
     <partial name="_AssignmentImpact" model="preview" />
-    <form method="post" asp-page-handler="Save">
+    <form method="post" asp-page-handler="Save" class="reference-filter">
         <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
         <input asp-for="ReceivingRepSubject" type="hidden" /><input asp-for="Reason" type="hidden" />
         <input asp-for="PreviewProof" type="hidden" />
         @foreach (var key in Model.Selected) { <input name="Selected" value="@key" type="hidden" /> }
         @foreach (var key in Model.ReviewedSelections) { <input name="ReviewedSelections" value="@key" type="hidden" /> }
-        <button type="submit" name="Confirmed" value="true">Confirm transfer</button>
+        <button class="button" type="submit" name="Confirmed" value="true">Confirm transfer</button>
         <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
     </form>
 }
@@ -28,7 +28,7 @@ else if (Model.ChoosingRecipient)
 {
     <h2>Choose the receiving rep</h2>
     <p>The impact preview will show the assignments moving and every Location changing owner.</p>
-    <form method="post" asp-page-handler="Preview">
+    <form method="post" asp-page-handler="Preview" class="product-form">
         <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
         @foreach (var key in Model.Selected) { <input name="Selected" value="@key" type="hidden" /> }
         <label asp-for="ReceivingRepSubject">Receiving rep</label>
@@ -37,7 +37,7 @@ else if (Model.ChoosingRecipient)
             @foreach (var rep in Model.Review.ReceivingReps) { <option value="@rep.Subject">@rep.Name</option> }
         </select>
         <label asp-for="Reason">Reason (optional)</label><input asp-for="Reason" maxlength="1000" />
-        <button type="submit">Preview transfer</button>
+        <button class="button" type="submit">Preview transfer</button>
         <a asp-page="./Transfer" asp-route-repSubject="@Model.RepSubject" asp-route-filter="@Model.Filter">Change selection</a>
         <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
     </form>
@@ -74,7 +74,7 @@ else
                 }
             </fieldset>
         }
-        <button type="submit">Choose receiving rep</button>
+        <button class="button" type="submit">Choose receiving rep</button>
         <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
     </form>
 }

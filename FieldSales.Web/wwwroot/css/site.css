@@ -111,3 +111,5 @@ p { line-height: 1.6; }
 .transfer-scope input[type="checkbox"] { width: auto; margin-right: .5rem; }
 .transfer-child { margin: .75rem 0 .75rem 1rem; }
 .transfer-rollup { padding: .75rem; border-left: 4px solid #2563eb; background: #eff6ff; }
+
+.transfer-scope input:focus-visible { outline: 3px solid #e48f2b; outline-offset: 3px; }

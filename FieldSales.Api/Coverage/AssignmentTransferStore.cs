@@ -19,8 +19,10 @@ public sealed class AssignmentTransferStore(DirectoryDbContext db, CoverageReadS
         {
             await access.RequireRepAccessAsync(actor, source, ct);
             StaffChoice Person(string subject) => new(subject, CoverageStaffProvider.Find(identities, subject).DisplayName);
-            var team = await db.RepReportingLines.Where(row => row.ManagerSubject == actor.GetStaffSubject()).Select(row => row.RepSubject).ToArrayAsync(ct);
+            var lines = await db.RepReportingLines.AsNoTracking().ToArrayAsync(ct);
+            var team = lines.Where(row => row.ManagerSubject == actor.GetStaffSubject()).Select(row => row.RepSubject).ToArray();
             var recipients = identities.Values.Where(row => row.Subject != source && row.Available && row.Roles.Contains(BusinessRoles.FieldSalesperson)
+                && lines.Any(line => line.RepSubject == row.Subject)
                 && (actor.IsInRole(BusinessRoles.HeadOfficeUser) || team.Contains(row.Subject)))
                 .Select(row => Person(row.Subject)).OrderBy(row => row.Name, StringComparer.OrdinalIgnoreCase).ToArray();
             var assignments = await db.TerritoryAssignments.AsNoTracking().ToArrayAsync(ct);
@@ -69,6 +71,8 @@ public sealed class AssignmentTransferStore(DirectoryDbContext db, CoverageReadS
         return await GeographyTransactions.RunAsync(db, async () =>
         {
             await access.RequireRepAccessAsync(actor, source, ct); await access.RequireRepAccessAsync(actor, recipient, ct);
+            if (!await db.RepReportingLines.AnyAsync(row => row.RepSubject == recipient, ct))
+                throw new CoverageValidationException("ReceivingRepSubject", "Set this rep's reporting line before transferring assignments.");
             var inputs = await AssignmentImpactInputs.ReadAsync(db, ownership, ct);
             var geography = await GeographyAsync(ct);
             var plan = AssignmentTransferPlanner.Calculate(geography, inputs.Assignments, source, recipient, selections,

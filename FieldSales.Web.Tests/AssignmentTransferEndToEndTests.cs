@@ -60,6 +60,16 @@ public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app)
     public async Task I1_PartialRegionThenLastCountyMovesRegion()
     {
         var seed=await SeedAsync(); using var api=app.CreateApiClient(); var region=await AssignAsync("colm",TerritoryLevel.Region,seed.Region.Id);
+        await using (var website=app.CreateWebsite())
+        {
+            using var browser=website.CreateBrowser();
+            using var signedIn=await browser.GetAsync("/__test/sign-in?subject=niamh&roles="+Uri.EscapeDataString(BusinessRoles.HeadOfficeUser));
+            string territory=await HtmlAsync(browser,"/Coverage/Territory?repSubject=colm&filter=Wexford");
+            Assert.Contains("Matching Counties: Wexford",territory); Assert.DoesNotContain("No assignments match",territory);
+            string reviewHtml=await HtmlAsync(browser,Page+"?repSubject=colm&filter=Wexford");
+            var selected=Assert.Single(Inputs(reviewHtml),pair=>pair.Key=="Selected");
+            Assert.Contains(seed.OtherCounty.Id.ToString(),selected.Value); SaveRender("region-review",reviewHtml);
+        }
         var first=Command("ciara",new TransferSelection(region.Id,new(TerritoryLevel.County,seed.County.Id)));
         await SaveAndAssertAsync(api,first,await PreviewAsync(api,first));
         var last=Command("ciara",new TransferSelection(region.Id,new(TerritoryLevel.County,seed.OtherCounty.Id)));
@@ -86,17 +96,19 @@ public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app)
         Assert.Equal("colm",(await AssignmentsAsync()).Single(row=>row.Id==county.Id).RepSubject);
     }
 
-    [Fact]
-    public async Task I1_MixedWholeAndDirectTransferRecordsBothCausesOnce()
+    [Theory]
+    [InlineData(true)] [InlineData(false)]
+    public async Task I1_WholeAndOptionalDirectTransferRecordsOnlyChangedOwners(bool moveDirect)
     {
         var seed=await SeedAsync(); using var api=app.CreateApiClient(); var county=await AssignAsync("colm",TerritoryLevel.County,seed.County.Id);
         var direct=await AssignAsync("colm",TerritoryLevel.Location,seed.Locations[0]);
-        var command=Command("ciara",new TransferSelection(county.Id,county.Target),new TransferSelection(direct.Id,direct.Target));
+        var command=Command("ciara",moveDirect ? [new(county.Id,county.Target),new(direct.Id,direct.Target)] : [new(county.Id,county.Target)]);
         await SaveAndAssertAsync(api,command,await PreviewAsync(api,command));
         await using var scope=app.Api.Services.CreateAsyncScope(); var db=scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
         var entries=await db.AssignmentHistory.ToArrayAsync(); Assert.Single(entries.Select(row=>row.OperationId).Distinct());
-        Assert.Contains(entries,row=>row.Cause==OwnershipChangeCause.DirectLocationAssignment);
+        Assert.Equal(moveDirect,entries.Any(row=>row.Cause==OwnershipChangeCause.DirectLocationAssignment));
         Assert.Contains(entries,row=>row.Cause==OwnershipChangeCause.TerritoryAssignment);
+        Assert.Equal(moveDirect ? "ciara" : "colm",(await AssignmentsAsync()).Single(row=>row.Id==direct.Id).RepSubject);
     }
 
     [Fact]
@@ -105,14 +117,14 @@ public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app)
         var seed=await SeedAsync(); using var api=app.CreateApiClient(); var county=await AssignAsync("colm",TerritoryLevel.County,seed.County.Id);
         var command=Command("ciara",new TransferSelection(county.Id,new(TerritoryLevel.Town,seed.Towns[0].Id)),new TransferSelection(county.Id,new(TerritoryLevel.Town,seed.Towns[1].Id)));
         var preview=await PreviewAsync(api,command); app.Failures.FailAfterHistorySave=true;
-        using var response=await api.PostAsJsonAsync(Root,command with { PreviewProof=preview.Proof,Confirmed=true });
-        Assert.Equal(HttpStatusCode.InternalServerError,response.StatusCode); Assert.True(app.Failures.DidFailAfterSave);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => api.PostAsJsonAsync(Root,command with { PreviewProof=preview.Proof,Confirmed=true }));
+        Assert.True(app.Failures.DidFailAfterSave);
         Assert.Equal((1,0),await CountsAsync()); Assert.Equal("colm",Assert.Single(await AssignmentsAsync()).RepSubject);
     }
 
     [Theory]
     [InlineData("geography")] [InlineData("location")] [InlineData("assignment")] [InlineData("reporting")]
-    [InlineData("identity")] [InlineData("new-town")] [InlineData("moved-location")]
+    [InlineData("identity")] [InlineData("new-town")] [InlineData("moved-location")] [InlineData("expired")]
     public async Task I3_ChangedSnapshotRequiresExplicitNewConfirmation(string change)
     {
         var seed=await SeedAsync(); using var api=app.CreateApiClient(); var county=await AssignAsync("colm",TerritoryLevel.County,seed.County.Id);
@@ -128,6 +140,7 @@ public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app)
                 case "reporting": await db.RepReportingLines.Where(row=>row.RepSubject=="ciara").ExecuteUpdateAsync(set=>set.SetProperty(row=>row.ManagerSubject,"another-manager")); break;
                 case "identity": app.Staff.Entries["ciara"]=app.Staff.Entries["ciara"] with {DisplayName="Ciara New"}; break;
                 case "new-town": break;
+                case "expired": app.ClockOverride=DateTimeOffset.UtcNow.AddMinutes(31); break;
                 case "moved-location": await db.Locations.Where(row=>row.Id==seed.Locations[0]).ExecuteUpdateAsync(set=>set.SetProperty(row=>row.TownId,seed.OtherTown.Id)); break;
             }
         }
@@ -160,7 +173,7 @@ public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app)
     [Theory]
     [InlineData("inactive",HttpStatusCode.BadRequest)] [InlineData("non-rep",HttpStatusCode.BadRequest)]
     [InlineData("missing",HttpStatusCode.ServiceUnavailable)] [InlineData("identity-unavailable",HttpStatusCode.ServiceUnavailable)]
-    [InlineData("foreign-team",HttpStatusCode.Forbidden)] [InlineData("role-revoked",HttpStatusCode.Forbidden)]
+    [InlineData("foreign-team",HttpStatusCode.Forbidden)] [InlineData("role-revoked",HttpStatusCode.Forbidden)] [InlineData("missing-line",HttpStatusCode.BadRequest)]
     public async Task I4_InvalidRecipientOrAuthorityCannotTransfer(string kind,HttpStatusCode expected)
     {
         var seed=await SeedAsync(); using var api=app.CreateApiClient(); var county=await AssignAsync("colm",TerritoryLevel.County,seed.County.Id);
@@ -171,6 +184,10 @@ public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app)
             case "inactive": app.Staff.Entries["ciara"]=app.Staff.Entries["ciara"] with {Available=false}; break;
             case "non-rep": app.Staff.Entries["ciara"]=app.Staff.Entries["ciara"] with {Roles=[BusinessRoles.SalesManager]}; break;
             case "missing": app.Staff.Entries.Remove("ciara"); break;
+            case "missing-line":
+                await using(var scope=app.Api.Services.CreateAsyncScope())
+                    await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().RepReportingLines.Where(row=>row.RepSubject=="ciara").ExecuteDeleteAsync();
+                break;
             case "identity-unavailable": app.Staff.Unavailable=true; break;
             case "foreign-team": SetManager(); break;
             case "role-revoked": app.Roles.SetRoles("niamh",BusinessRoles.FieldSalesperson); break;
@@ -288,7 +305,7 @@ public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app)
         Assert.Equal(HttpStatusCode.Created,response.StatusCode); var customer=(await response.Content.ReadFromJsonAsync<CustomerDetails>())!;
         List<Guid> locations=[customer.Locations[0].Id]; var counts=large?new[]{31,18,22,9,37,23}:new[]{1,1,1,1,1,1};
         await using var scope=app.Api.Services.CreateAsyncScope(); var db=scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
-        db.RepReportingLines.Add(RepReportingLine.Create("ciara","niamh")); await db.SaveChangesAsync();
+        db.RepReportingLines.AddRange(RepReportingLine.Create("ciara","niamh"), RepReportingLine.Create("niamh","another-manager")); await db.SaveChangesAsync();
         for(int t=0;t<7;t++) for(int i=t==0?1:0;i<(t==6?1:counts[t]);i++)
         {
             Guid id=Guid.NewGuid(),town=t==6?otherTown.Id:towns[t].Id; string name="Shop "+locations.Count,normalized=name.ToUpperInvariant();
