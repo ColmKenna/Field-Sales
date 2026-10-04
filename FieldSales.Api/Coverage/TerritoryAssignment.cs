@@ -21,6 +21,14 @@ public sealed class TerritoryAssignment
         : LocationId is Guid location ? new(TerritoryLevel.Location, location)
         : throw new InvalidOperationException("The assignment has no target.");
 
+    public void TransferTo(string repSubject) => RepSubject = CoverageSubjects.Validate(repSubject, "ReceivingRepSubject");
+
+    public TerritoryAssignment CopyForTransfer(string repSubject, Guid? id = null) => new()
+    {
+        Id = id ?? Id, RepSubject = CoverageSubjects.Validate(repSubject, "ReceivingRepSubject"),
+        RegionId = RegionId, CountyId = CountyId, TownId = TownId, LocationId = LocationId, Version = Version.ToArray()
+    };
+
     public static TerritoryAssignment Create(string? repSubject, TerritoryTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);

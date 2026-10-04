@@ -40,7 +40,7 @@ public sealed record ImpactOwnerDetails(StaffChoice Rep, TerritoryTarget Source,
 public sealed record ImpactLocationDetails(Guid LocationId, string Name, ImpactOwnerDetails? PreviousOwner, ImpactOwnerDetails? NewOwner);
 public sealed record AssignmentImpactGroup(string? PreviousRepSubject, string? NewRepSubject, string Sentence, IReadOnlyList<ImpactLocationDetails> Locations);
 public sealed record AssignmentImpactDetails(string Proof, string Action, string TargetName, string RepName,
-    int ChangedLocations, IReadOnlyList<AssignmentImpactGroup> Groups, string? AssignmentVersion = null);
+    int ChangedLocations, IReadOnlyList<AssignmentImpactGroup> Groups, string? AssignmentVersion = null, IReadOnlyList<string>? TransferNotices = null, IReadOnlyList<string>? TransferredAssignments = null);
 public sealed record CoverageTargetChoice(TerritoryTarget Target, string Name, string Label);
 public sealed record AssignmentReviewOptions(IReadOnlyList<StaffChoice> Reps, IReadOnlyList<CoverageTargetChoice> Targets,
     IReadOnlyList<AssignedTerritoryDetails> Assignments);
@@ -52,3 +52,10 @@ public sealed record RepTerritoryAssignment(AssignedTerritoryDetails Assignment,
     int Locations, IReadOnlyList<TerritoryCarveOut> CarveOuts, IReadOnlyList<TerritoryTown> Towns);
 public sealed record RepTerritoryPage(StaffChoice Rep, StaffChoice? Manager, int PrimaryLocations,
     IReadOnlyList<RepTerritoryAssignment> Assignments);
+
+public sealed record TransferSelection(Guid AssignmentId, TerritoryTarget Target);
+public sealed record TransferAssignmentsRequest(string? SourceRepSubject, string? ReceivingRepSubject,
+    IReadOnlyList<TransferSelection>? Selections, string? Reason = null, string? PreviewProof = null, bool Confirmed = false);
+public sealed record TransferScope(TransferSelection Selection, string Name, bool Archived, int Locations,
+    StaffChoice? AssignedTo, IReadOnlyList<TransferScope> Children, string Context = "");
+public sealed record TransferReview(StaffChoice SourceRep, IReadOnlyList<StaffChoice> ReceivingReps, IReadOnlyList<TransferScope> Assignments);
