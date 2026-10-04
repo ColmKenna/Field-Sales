@@ -56,6 +56,41 @@ public sealed class AssignmentTransferClientTests
         var client=new CoverageApiClient(http,new HttpContextAccessor{HttpContext=new DefaultHttpContext{RequestServices=services}});
         var result=await client.SaveTransferAsync(new("colm","ciara",[]),default); Assert.Equal(expected,result.Status);
     }
+    [Theory]
+    [InlineData("valid")] [InlineData("wrong-receiver")] [InlineData("self")]
+    [InlineData("duplicate")] [InlineData("invalid-source")]
+    public async Task Should_RejectMalformedSourceChoices_When_LoadingTakeOver(string kind)
+    {
+        var choices = new TransferSourceOptions(new("receiver", "Niamh"), [new("colm", "Colm")]);
+        choices = kind switch
+        {
+            "wrong-receiver" => choices with { ReceivingRep = new("other", "Other") },
+            "self" => choices with { GivingReps = [choices.ReceivingRep] },
+            "duplicate" => choices with { GivingReps = [new("colm", "Colm"), new("colm", "Colm")] },
+            "invalid-source" => choices with { GivingReps = [new("", "Colm")] }, _ => choices
+        };
+        using var services = Services(); using var handler = new Reply(choices, "/coverage/transfers/sources");
+        using var http = new HttpClient(handler) { BaseAddress = new("https://api.test") };
+        var client = new CoverageApiClient(http, new HttpContextAccessor { HttpContext = new DefaultHttpContext { RequestServices = services } });
+        var result = await client.TransferSourcesAsync("receiver", default);
+        Assert.Equal(kind == "valid" ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable, result.Status);
+    }
+
+    [Theory]
+    [InlineData("valid")] [InlineData("empty-id")] [InlineData("invalid-rep")] [InlineData("duplicate-target")]
+    public async Task Should_RejectMalformedHolderChoices_When_LoadingAssignmentOptions(string kind)
+    {
+        var target = new CoverageTargetChoice(new(TerritoryLevel.Town, Guid.NewGuid()), "Rathdrum", "Rathdrum — Aoife's", new(Guid.NewGuid(), new("aoife", "Aoife")));
+        target = kind switch { "empty-id" => target with { Holder = target.Holder! with { AssignmentId = Guid.Empty } },
+            "invalid-rep" => target with { Holder = target.Holder! with { Rep = new("", "Aoife") } }, _ => target };
+        var choices = new AssignmentReviewOptions([new("receiver", "Niamh")], kind == "duplicate-target" ? [target, target] : [target], []);
+        using var services = Services(); using var handler = new Reply(choices, "/coverage/assignment-options");
+        using var http = new HttpClient(handler) { BaseAddress = new("https://api.test") };
+        var client = new CoverageApiClient(http, new HttpContextAccessor { HttpContext = new DefaultHttpContext { RequestServices = services } });
+        var result = await client.OptionsAsync("receiver", default);
+        Assert.Equal(kind == "valid" ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable, result.Status);
+    }
+
     private static ServiceProvider Services()=>new ServiceCollection().AddLogging().AddAuthentication("Test")
         .AddScheme<AuthenticationSchemeOptions,TokenHandler>("Test",_=>{}).Services.BuildServiceProvider();
     private sealed class Reply(object value,string path):HttpMessageHandler
