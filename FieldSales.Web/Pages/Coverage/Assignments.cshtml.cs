@@ -21,6 +21,9 @@ public sealed class AssignmentsModel(CoverageApiClient coverage) : PageModel
     public AssignmentImpactDetails? Preview { get; private set; }
     public string? Notice { get; private set; }
     public string? RepName => Options.Reps.SingleOrDefault(rep => rep.Subject == RepSubject)?.Name;
+    public static string Key(CoverageTargetChoice target) => target.Holder is { } holder
+        ? $"{target.Target.Level}:{target.Target.UnitId:D}:{holder.AssignmentId:D}:{Uri.EscapeDataString(holder.Rep.Subject)}"
+        : $"{target.Target.Level}:{target.Target.UnitId:D}";
 
     public async Task<IActionResult> OnGetAsync() => await LoadAsync() ?? Page();
 
@@ -30,6 +33,14 @@ public sealed class AssignmentsModel(CoverageApiClient coverage) : PageModel
         if (!ValidateCommand()) return await LoadAsync() ?? Page();
         if (Action == "Add")
         {
+            var choice = Options.Targets.SingleOrDefault(row => Key(row) == TargetKey);
+            if (choice is null) { ModelState.AddModelError("", "This area or its assignment changed. Reload the choices before reviewing it."); return Page(); }
+            if (choice.Holder is { } holder)
+            {
+                if (holder.Rep.Subject == RepSubject) { ModelState.AddModelError("", "This rep already holds this assignment."); return Page(); }
+                return RedirectToPage("./Transfer", new { repSubject = holder.Rep.Subject, receivingRepSubject = RepSubject,
+                    pull = true, pullAssignmentId = holder.AssignmentId, reason = Reason });
+            }
             var result = await coverage.PreviewAddAsync(AddRequest(), HttpContext.RequestAborted);
             if (result.Success) SetPreview(result.Value!);
             else if (result.Status is HttpStatusCode.BadRequest or HttpStatusCode.Conflict) ModelState.AddModelError("", result.Error ?? "This change cannot be previewed.");
@@ -88,7 +99,7 @@ public sealed class AssignmentsModel(CoverageApiClient coverage) : PageModel
     private TerritoryTarget? Target()
     {
         var parts = TargetKey?.Split(':');
-        return parts is { Length: 2 } && Enum.TryParse<TerritoryLevel>(parts[0], out var level) && Enum.IsDefined(level)
+        return parts is { Length: 2 or 4 } && Enum.TryParse<TerritoryLevel>(parts[0], out var level) && Enum.IsDefined(level)
             && Guid.TryParse(parts[1], out var id) && id != Guid.Empty ? new(level, id) : null;
     }
     private AddTerritoryAssignmentRequest AddRequest() => new(RepSubject, Target(), Reason, PreviewProof, Confirmed);

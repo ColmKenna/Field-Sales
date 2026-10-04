@@ -119,7 +119,9 @@ public sealed class TerritoryAssignmentStore(DirectoryDbContext db, CoverageRead
         if (existing is not null)
         {
             await access.RequireRepAccessAsync(actor, existing.RepSubject, ct);
-            throw new CoverageConflictException("This unit already has an assignment. Remove it before assigning another rep.");
+            throw new CoverageConflictException(existing.RepSubject == candidate.RepSubject
+                ? "This rep already holds this assignment."
+                : "This area is already assigned. Choose it in Add assignment to review a transfer.");
         }
     }
 

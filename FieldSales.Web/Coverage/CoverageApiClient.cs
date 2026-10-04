@@ -20,6 +20,11 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
         var result = await SendAsync<TransferReview>(HttpMethod.Get, "/coverage/transfers/review?sourceRepSubject=" + Uri.EscapeDataString(source), null, ct);
         return result.Success && result.Value!.SourceRep.Subject != source ? new(HttpStatusCode.ServiceUnavailable) : result;
     }
+    public async Task<DirectoryResult<TransferSourceOptions>> TransferSourcesAsync(string recipient, CancellationToken ct)
+    {
+        var result = await SendAsync<TransferSourceOptions>(HttpMethod.Get, "/coverage/transfers/sources?receivingRepSubject=" + Uri.EscapeDataString(recipient), null, ct);
+        return result.Success && result.Value!.ReceivingRep.Subject != recipient ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
     public async Task<DirectoryResult<AssignmentImpactDetails>> PreviewTransferAsync(TransferAssignmentsRequest value, CancellationToken ct)
     {
         var result = await SendAsync<AssignmentImpactDetails>(HttpMethod.Post, "/coverage/transfers/preview", value, ct);
@@ -101,6 +106,9 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
             {
                 RepTerritoryPage territory => ValidTerritory(territory),
                 TransferReview review => ValidTransferReview(review),
+                TransferSourceOptions sources => ValidChoice(sources.ReceivingRep) && sources.GivingReps is not null
+                    && sources.GivingReps.All(row => ValidChoice(row) && row.Subject != sources.ReceivingRep.Subject)
+                    && sources.GivingReps.Select(row => row.Subject).Distinct(StringComparer.Ordinal).Count() == sources.GivingReps.Count,
                 ReportingLinesPage page => page.Reps is not null && page.Managers is not null && page.Lines is not null
                     && page.Reps.All(ValidChoice) && page.Managers.All(ValidChoice)
                     && page.Lines.All(row => row is not null && ValidLine(row.Line) && !string.IsNullOrWhiteSpace(row.RepName)
@@ -110,7 +118,8 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
                 AssignmentReviewOptions options => options.Reps is not null && options.Targets is not null && options.Assignments is not null
                     && options.Reps.All(ValidChoice) && options.Targets.All(row => row is not null && row.Target is not null
                         && Enum.IsDefined(row.Target.Level) && row.Target.UnitId != Guid.Empty && !string.IsNullOrWhiteSpace(row.Name)
-                        && !string.IsNullOrWhiteSpace(row.Label))
+                        && !string.IsNullOrWhiteSpace(row.Label) && (row.Holder is null || row.Holder.AssignmentId != Guid.Empty && ValidChoice(row.Holder.Rep)))
+                    && options.Targets.Select(row => row.Target).Distinct().Count() == options.Targets.Count
                     && options.Assignments.All(row => row is not null && row.Assignment is not null
                         && row.Assignment.Id != Guid.Empty && !string.IsNullOrWhiteSpace(row.Name) && !string.IsNullOrWhiteSpace(row.Assignment.Version)),
                 _ => false

@@ -9,7 +9,7 @@
     <p><a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">@territoryRep · Territory</a></p>
 }
 <p>See which Locations change owner before saving.</p>
-<div asp-validation-summary="All" role="alert"></div>
+@if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
 @if (TempData["AssignmentNotice"] is string saved) { <p role="status">@saved</p> }
 @if (Model.Notice is { } notice) { <p role="alert">@notice Nothing was saved.</p> }
 @if (Model.Preview is { } preview)
@@ -58,7 +58,8 @@ else
                 <label asp-for="TargetKey">Territory or Location</label>
                 <select asp-for="TargetKey" required>
                     <option value="">Choose a territory or Location</option>
-                    @foreach (var target in Model.Options.Targets) { <option value="@(target.Target.Level + ":" + target.Target.UnitId)">@target.Label</option> }
+                    @foreach (var target in Model.Options.Targets)
+                    { <option value="@FieldSales.Web.Pages.Coverage.AssignmentsModel.Key(target)" disabled="@(target.Holder?.Rep.Subject == Model.RepSubject)">@target.Label@(target.Holder?.Rep.Subject == Model.RepSubject ? " · Already assigned" : "")</option> }
                 </select>
                 <label asp-for="Reason">Reason (optional)</label>
                 <input asp-for="Reason" maxlength="1000" />
