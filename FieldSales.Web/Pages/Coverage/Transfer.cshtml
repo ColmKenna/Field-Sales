@@ -4,8 +4,12 @@
 @{
     ViewData["Title"] = "Transfer assignments · " + Model.Review.SourceRep.Name;
 }
-<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">@Model.Review.SourceRep.Name · Territory</a></nav>
-<h1>Transfer from @Model.Review.SourceRep.Name</h1>
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory" asp-route-repSubject="@Model.ReturnRepSubject">@Model.ReturnRepName · Territory</a></nav>
+@if (Model.PullAssignmentId.HasValue)
+{ <h1>Transfer @Model.Visible[0].Name from @Model.Review.SourceRep.Name to @Model.Receiver!.Name?</h1> }
+else
+{ <h1>Transfer from @Model.Review.SourceRep.Name</h1> }
+@if (Model.Receiver is { } receiver) { <p>Receiving rep: <strong>@receiver.Name</strong></p> }
 @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
 @if (Model.Notice is not null) { <p role="status">@Model.Notice</p> }
 @if (Model.Preview is { } preview)
@@ -16,12 +20,13 @@
     <partial name="_AssignmentImpact" model="preview" />
     <form method="post" asp-page-handler="Save" class="reference-filter">
         <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
+        <input asp-for="Pull" type="hidden" /><input asp-for="PullAssignmentId" type="hidden" />
         <input asp-for="ReceivingRepSubject" type="hidden" /><input asp-for="Reason" type="hidden" />
         <input asp-for="PreviewProof" type="hidden" />
         @foreach (var key in Model.Selected) { <input name="Selected" value="@key" type="hidden" /> }
         @foreach (var key in Model.ReviewedSelections) { <input name="ReviewedSelections" value="@key" type="hidden" /> }
         <button class="button" type="submit" name="Confirmed" value="true">Confirm transfer</button>
-        <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+        <a asp-page="./Territory" asp-route-repSubject="@Model.ReturnRepSubject">Cancel</a>
     </form>
 }
 else if (Model.ChoosingRecipient)
@@ -30,6 +35,7 @@ else if (Model.ChoosingRecipient)
     <p>The impact preview will show the assignments moving and every Location changing owner.</p>
     <form method="post" asp-page-handler="Preview" class="product-form">
         <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
+        <input asp-for="Pull" type="hidden" /><input asp-for="PullAssignmentId" type="hidden" />
         @foreach (var key in Model.Selected) { <input name="Selected" value="@key" type="hidden" /> }
         <label asp-for="ReceivingRepSubject">Receiving rep</label>
         <select asp-for="ReceivingRepSubject" required>
@@ -38,17 +44,18 @@ else if (Model.ChoosingRecipient)
         </select>
         <label asp-for="Reason">Reason (optional)</label><input asp-for="Reason" maxlength="1000" />
         <button class="button" type="submit">Preview transfer</button>
-        <a asp-page="./Transfer" asp-route-repSubject="@Model.RepSubject" asp-route-filter="@Model.Filter">Change selection</a>
-        <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+        <a asp-page="./Transfer" asp-route-repSubject="@Model.RepSubject" asp-route-filter="@Model.Filter" asp-route-pull="@Model.Pull" asp-route-pullAssignmentId="@Model.PullAssignmentId" asp-route-receivingRepSubject="@Model.ReceivingRepSubject" asp-route-reason="@Model.Reason">Change selection</a>
+        <a asp-page="./Territory" asp-route-repSubject="@Model.ReturnRepSubject">Cancel</a>
     </form>
 }
 else
 {
-    <p>Every matching assignment is selected. Remove any areas to keep with @Model.Review.SourceRep.Name, then choose the receiving rep.</p>
+    <p>Every matching assignment is selected. Remove any areas to keep with @Model.Review.SourceRep.Name, then @(Model.Pull ? "preview the transfer." : "choose the receiving rep.")</p>
     @if (!string.IsNullOrWhiteSpace(Model.Filter)) { <p>Filter: <strong>@Model.Filter</strong></p> }
     @if (Model.Visible.Count == 0) { <p>No assignments match this filter.</p> }
-    <form method="post" asp-page-handler="Choose" class="transfer-selection">
+    <form method="post" asp-page-handler="@(Model.Pull ? "Preview" : "Choose")" class="transfer-selection">
         <input asp-for="RepSubject" type="hidden" /><input asp-for="Filter" type="hidden" />
+        <input asp-for="Pull" type="hidden" /><input asp-for="PullAssignmentId" type="hidden" />
         @foreach (var row in Model.Visible)
         {
             <fieldset class="transfer-scope">
@@ -74,8 +81,13 @@ else
                 }
             </fieldset>
         }
-        <button class="button" type="submit">Choose receiving rep</button>
-        <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+        @if (Model.Pull)
+        {
+            <input asp-for="ReceivingRepSubject" type="hidden" />
+            <label asp-for="Reason">Reason (optional)</label><input asp-for="Reason" maxlength="1000" />
+        }
+        <button class="button" type="submit" disabled="@(Model.Visible.Count == 0)">@(Model.Pull ? "Preview transfer" : "Choose receiving rep")</button>
+        <a asp-page="./Territory" asp-route-repSubject="@Model.ReturnRepSubject">Cancel</a>
     </form>
 }
 <script src="~/js/assignment-transfer.js" asp-append-version="true" defer></script>

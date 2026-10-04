@@ -12,8 +12,10 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
     [BindProperty(SupportsGet = true)] public string? Filter { get; set; }
     [BindProperty] public List<string> Selected { get; set; } = [];
     [BindProperty] public List<string> ReviewedSelections { get; set; } = [];
-    [BindProperty] public string? ReceivingRepSubject { get; set; }
-    [BindProperty] public string? Reason { get; set; }
+    [BindProperty(SupportsGet = true)] public string? ReceivingRepSubject { get; set; }
+    [BindProperty(SupportsGet = true)] public bool Pull { get; set; }
+    [BindProperty(SupportsGet = true)] public Guid? PullAssignmentId { get; set; }
+    [BindProperty(SupportsGet = true)] public string? Reason { get; set; }
     [BindProperty] public string? PreviewProof { get; set; }
     [BindProperty] public bool Confirmed { get; set; }
     public TransferReview Review { get; private set; } = new(new("", ""), [], []);
@@ -21,6 +23,9 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
     public AssignmentImpactDetails? Preview { get; private set; }
     public string? Notice { get; private set; }
     public bool ChoosingRecipient { get; private set; }
+    public StaffChoice? Receiver => Pull ? Review.ReceivingReps.SingleOrDefault(row => row.Subject == ReceivingRepSubject) : null;
+    public string? ReturnRepSubject => Pull ? ReceivingRepSubject : RepSubject;
+    public string ReturnRepName => Receiver?.Name ?? Review.SourceRep.Name;
     public static string Key(TransferScope row) => $"{row.Selection.AssignmentId:D}:{row.Selection.Target.Level}:{row.Selection.Target.UnitId:D}";
     public bool Matches(string value) => value.Contains(Filter?.Trim() ?? "", StringComparison.OrdinalIgnoreCase);
 
@@ -29,8 +34,8 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
         if (await LoadAsync() is { } denied) return denied;
         foreach (var row in Visible)
         {
-            if ((Matches(row.Name) || Matches(row.Context))) Selected.Add(Key(row));
-            Selected.AddRange(row.Children.Where(child => child.AssignedTo is null && ((Matches(row.Name) || Matches(row.Context)) || Matches(child.Name))).Select(Key));
+            if (PullAssignmentId.HasValue || Matches(row.Name) || Matches(row.Context)) Selected.Add(Key(row));
+            Selected.AddRange(row.Children.Where(child => child.AssignedTo is null && (PullAssignmentId.HasValue || Matches(row.Name) || Matches(row.Context) || Matches(child.Name))).Select(Key));
         }
         return Page();
     }
@@ -58,7 +63,7 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
         var selected = Reviewed(); if (selected is null) return Page();
         var result = await coverage.SaveTransferAsync(Command(selected), HttpContext.RequestAborted);
         if (result.Success && result.Value?.Saved == true)
-        { TempData["AssignmentNotice"] = "Assignments transferred."; return RedirectToPage("./Territory", new { repSubject = RepSubject }); }
+        { TempData["AssignmentNotice"] = "Assignments transferred."; return RedirectToPage("./Territory", new { repSubject = ReturnRepSubject }); }
         if (result.Value?.Preview is { } refreshed) { SetPreview(refreshed); Notice = "Nothing was saved. " + result.Error; }
         else if (result.Status is HttpStatusCode.BadRequest or HttpStatusCode.Conflict) ModelState.AddModelError("", result.Error ?? "Nothing was saved. Review the selection again.");
         else return StatusCode((int)result.Status);
@@ -67,11 +72,12 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
     private TransferAssignmentsRequest Command(IReadOnlyList<TransferSelection> selections) => new(RepSubject, ReceivingRepSubject, selections, Reason, PreviewProof, Confirmed);
     private IReadOnlyList<TransferSelection>? Selections()
     {
-        var allowed = Review.Assignments.SelectMany(row => row.Children.Where(child => child.AssignedTo is null).Prepend(row)).ToDictionary(Key);
+        var rows = PullAssignmentId.HasValue ? Visible : Review.Assignments;
+        var allowed = rows.SelectMany(row => row.Children.Where(child => child.AssignedTo is null).Prepend(row)).ToDictionary(Key);
         if (Selected.Count == 0 || Selected.Any(key => !allowed.ContainsKey(key)))
         { ModelState.AddModelError("", "Select at least one of this rep's assignments or areas. Reload if the selection changed."); return null; }
         List<TransferSelection> result = [];
-        foreach (var row in Review.Assignments)
+        foreach (var row in rows)
         {
             var children = row.Children.Where(child => child.AssignedTo is null).ToArray();
             // Children are authoritative for exclusions, even if a parent checkbox was submitted.
@@ -103,11 +109,15 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
     }
     private async Task<IActionResult?> LoadAsync()
     {
-        if (string.IsNullOrWhiteSpace(RepSubject)) return BadRequest();
+        if (!ModelState.IsValid || string.IsNullOrWhiteSpace(RepSubject)) return BadRequest("Review the transfer context again.");
         var result = await coverage.TransferReviewAsync(RepSubject, HttpContext.RequestAborted);
         if (!result.Success) return StatusCode((int)result.Status);
         Review = result.Value!;
+        if (Pull && Receiver is null) return BadRequest("Choose an active receiving rep whose assignments you can manage.");
+        if (PullAssignmentId.HasValue && (!Pull || !Review.Assignments.Any(row => row.Selection.AssignmentId == PullAssignmentId)))
+            return BadRequest("This assignment changed. Return to the receiving rep and review the choices again.");
         Visible = Review.Assignments.Where(row => (Matches(row.Name) || Matches(row.Context)) || row.Children.Any(child => Matches(child.Name))).ToArray();
+        if (PullAssignmentId.HasValue) Visible = Review.Assignments.Where(row => row.Selection.AssignmentId == PullAssignmentId).ToArray();
         return null;
     }
 }

@@ -41,9 +41,11 @@ public sealed record ImpactLocationDetails(Guid LocationId, string Name, ImpactO
 public sealed record AssignmentImpactGroup(string? PreviousRepSubject, string? NewRepSubject, string Sentence, IReadOnlyList<ImpactLocationDetails> Locations);
 public sealed record AssignmentImpactDetails(string Proof, string Action, string TargetName, string RepName,
     int ChangedLocations, IReadOnlyList<AssignmentImpactGroup> Groups, string? AssignmentVersion = null, IReadOnlyList<string>? TransferNotices = null, IReadOnlyList<string>? TransferredAssignments = null);
-public sealed record CoverageTargetChoice(TerritoryTarget Target, string Name, string Label);
+public sealed record CoverageAssignmentHolder(Guid AssignmentId, StaffChoice Rep);
+public sealed record CoverageTargetChoice(TerritoryTarget Target, string Name, string Label, CoverageAssignmentHolder? Holder = null);
 public sealed record AssignmentReviewOptions(IReadOnlyList<StaffChoice> Reps, IReadOnlyList<CoverageTargetChoice> Targets,
     IReadOnlyList<AssignedTerritoryDetails> Assignments);
+public sealed record TransferSourceOptions(StaffChoice ReceivingRep, IReadOnlyList<StaffChoice> GivingReps);
 
 public sealed record TerritoryCarveOut(StaffChoice Rep, int Locations);
 public sealed record TerritoryTown(Guid Id, string Name, bool Archived, int Locations,

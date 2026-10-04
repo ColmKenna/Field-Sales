@@ -1,0 +1,25 @@
+@page
+@model FieldSales.Web.Pages.Coverage.TakeOverModel
+@{ ViewData["Title"] = "Take over assignments · " + Model.Options.ReceivingRep.Name; }
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">@Model.Options.ReceivingRep.Name · Territory</a></nav>
+<h1>Take over assignments for @Model.Options.ReceivingRep.Name</h1>
+<p>Choose the giving rep, then review their assignments and remove any areas to keep with them. Nothing changes until you confirm the impact preview.</p>
+@if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
+@if (Model.Options.GivingReps.Count == 0)
+{
+    <p>No other reps have assignments available to transfer.</p>
+    <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Return to @Model.Options.ReceivingRep.Name</a>
+}
+else
+{
+    <form method="post" class="product-form">
+        <input asp-for="RepSubject" type="hidden" />
+        <label asp-for="GivingRepSubject">Giving rep</label>
+        <select asp-for="GivingRepSubject" required>
+            <option value="">Choose a rep</option>
+            @foreach (var rep in Model.Options.GivingReps) { <option value="@rep.Subject">@rep.Name</option> }
+        </select>
+        <button class="button" type="submit">Review assignments</button>
+        <a asp-page="./Territory" asp-route-repSubject="@Model.RepSubject">Cancel</a>
+    </form>
+}

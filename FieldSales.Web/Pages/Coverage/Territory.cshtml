@@ -28,6 +28,7 @@ else
     <section class="territory-summary" aria-label="Territory summary">
         <p><strong>@territory.PrimaryLocations @(territory.PrimaryLocations == 1 ? "Location" : "Locations") as Primary</strong></p>
         <a class="button" asp-page="./Assignments" asp-route-repSubject="@territory.Rep.Subject" asp-route-returnToTerritory="true">Add assignment</a>
+        <a class="button secondary" asp-page="./TakeOver" asp-route-repSubject="@territory.Rep.Subject">Take over from another rep…</a>
     </section>
     <section aria-labelledby="assignments-heading">
         <h2 id="assignments-heading">Assignments</h2>
