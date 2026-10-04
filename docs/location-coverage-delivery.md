@@ -11,7 +11,7 @@ Managers can open /Coverage/Location/{id} to see a shop's current Primary Rep an
 | 3. Walsh's Shop, with no assignment reaching it, shows “Primary: Unassigned” with an Assign action (the action itself is T-3.2.2). | PASS — Should_ShowUnassignedAndTownFirstAffordances_When_ShopHasNoCoverage covers zero/one/two other Town shops, excludes a different Town, verifies Town-first and single-shop disabled buttons and explanatory text. WI-027 owns enabling the actions; this item cannot save from the new pages. |
 | 4. History shows entries newest first in the form “17 Sep 2026 14:02 — Colm → Aoife — via Rathdrum assignment — by M. Byrne”. | PASS — Should_RetainNewestFirstCapturedHistory_When_CurrentNamesChangeOrIdentityDirectoryFails exercises two production writes at equal timestamps, Sequence ordering, renamed staff/geography and unavailable identity directory with no historical label lookup. Should_ShowExampleAndConvertOffsetToUtc_When_HistoryHasCapturedNames proves exact example wording/UTC conversion. Direct assignment, geography change, removal and reason presentation are covered separately. Times are explicitly UTC in the History view. |
 | 5. The page shows no list of open Visit Dues and no last-Call line. | PASS — authenticated page/SQL scenarios and real Razor render checks assert their absence; History is reached through a separate route, with no entries/latest change inline. |
-| 6. The Specialists line is present but empty until E20. | PASS — the rendered Specials line contains only its label and an empty value; authenticated fixture and SQL page tests assert it. |
+| 6. The Specialists line is present but empty until E20. | PASS — the rendered Specialists line contains only its label and an empty value; authenticated fixture and SQL page tests assert it. |
 
 ## Contract and authority
 
@@ -30,7 +30,7 @@ Managers can open /Coverage/Location/{id} to see a shop's current Primary Rep an
 - Existing JavaScript: **34/34 Passed**; isolated identity test files match repository source byte-for-byte.
 - Warnings-as-errors solution build: zero warnings/errors.
 - Browser checks use the actual authenticated Razor fixture renders with final CSS. Primary/source, direct and unassigned states, separate History/empty History, phone width (390px), maximum-length names/reasons and keyboard History navigation verified. These presentation checks complement real BFF/API/SQL tests.
-- Full solution regression: **pending**; completion will record exact Completed TRX totals before WI-026 is marked done.
+- Full solution regression: **2,028/2,028 Passed** (API **268**, Identity **1,049**, Web **711**), all three TRX files Completed, total=executed=passed, every individual result Passed, no failures/skips. New coverage: **71 cases** (20 real API/BFF/SQL, 40 typed-client/presentation, 11 authenticated Razor). Verified source commit **b311fec**; completion changes only documentation/notes and WI-026 status. No test assertion/execution-policy changes to existing suites.
 
 Artifacts: .artifacts/wi026/{characterization,focused-corrected,browser-pages,regression,rendered}; build logs and javascript.log alongside them. Local-only generated artifacts are ignored by Git.
 
