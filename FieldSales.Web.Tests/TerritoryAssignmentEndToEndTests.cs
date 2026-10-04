@@ -23,9 +23,14 @@ public sealed class CoverageReadApplication : GeographyApplication
 {
     protected override bool UseTestLocationUsage => false;
     public ReadProbe Reads { get; } = new();
+    public DateTimeOffset? ClockOverride { get; set; }
+    private sealed class CoverageClock(CoverageReadApplication app) : TimeProvider
+    { public override DateTimeOffset GetUtcNow() => app.ClockOverride ?? DateTimeOffset.UtcNow; }
 
     protected override void ConfigureAdditionalServices(IServiceCollection services, string connectionString)
     {
+        services.RemoveAll<TimeProvider>();
+        services.AddSingleton<TimeProvider>(new CoverageClock(this));
         services.RemoveAll<DirectoryDbContext>();
         services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>()
             .UseSqlServer(connectionString).AddInterceptors(Reads, Failures).Options));
@@ -36,7 +41,7 @@ public sealed class CoverageReadApplication : GeographyApplication
 
     public async Task ResetCoverageAsync()
     {
-        Roles.Unavailable = false;
+        Roles.Unavailable = false; ClockOverride = null;
         await using (var scope = Api.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();

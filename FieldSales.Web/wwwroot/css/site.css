@@ -104,3 +104,12 @@ p { line-height: 1.6; }
 .territory-context { color: #35485c; }
 .territory-remove { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
 .territory-remove input { max-width: 100%; }
+
+.transfer-scope { margin: 1rem 0; padding: 1rem; min-width: 0; border: 1px solid var(--border, #ccd3da); border-radius: .5rem; }
+.transfer-scope legend { max-width: 100%; font-weight: 600; }
+.transfer-scope label { display: inline; overflow-wrap: anywhere; }
+.transfer-scope input[type="checkbox"] { width: auto; margin-right: .5rem; }
+.transfer-child { margin: .75rem 0 .75rem 1rem; }
+.transfer-rollup { padding: .75rem; border-left: 4px solid #2563eb; background: #eff6ff; }
+
+.transfer-scope input:focus-visible { outline: 3px solid #e48f2b; outline-offset: 3px; }

@@ -21,7 +21,17 @@ public sealed class TerritoryAssignment
         : LocationId is Guid location ? new(TerritoryLevel.Location, location)
         : throw new InvalidOperationException("The assignment has no target.");
 
-    public static TerritoryAssignment Create(string? repSubject, TerritoryTarget target)
+    public void TransferTo(string repSubject) => RepSubject = CoverageSubjects.Validate(repSubject, "ReceivingRepSubject");
+
+    internal TerritoryAssignment CopyForTransfer(string repSubject) => new()
+    {
+        Id = Id, RepSubject = CoverageSubjects.Validate(repSubject, "ReceivingRepSubject"),
+        RegionId = RegionId, CountyId = CountyId, TownId = TownId, LocationId = LocationId, Version = Version.ToArray()
+    };
+
+    public static TerritoryAssignment Create(string? repSubject, TerritoryTarget target) => CreateForTransfer(Guid.NewGuid(), repSubject, target);
+
+    internal static TerritoryAssignment CreateForTransfer(Guid id, string? repSubject, TerritoryTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
         if (!Enum.IsDefined(target.Level))
@@ -30,7 +40,7 @@ public sealed class TerritoryAssignment
             throw new CoverageValidationException("Target.UnitId", "Choose a territory or location.");
         var assignment = new TerritoryAssignment
         {
-            Id = Guid.NewGuid(), RepSubject = CoverageSubjects.Validate(repSubject, "RepSubject")
+            Id = id, RepSubject = CoverageSubjects.Validate(repSubject, "RepSubject")
         };
         switch (target.Level)
         {

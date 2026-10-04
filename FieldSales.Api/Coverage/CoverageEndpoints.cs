@@ -10,6 +10,12 @@ public static class CoverageEndpoints
     public static void MapCoverageEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/coverage").RequireAuthorization("ManageCoverage");
+        group.MapGet("/transfers/review", (string sourceRepSubject, ClaimsPrincipal user, AssignmentTransferStore store, CancellationToken ct) =>
+            GuardAsync(async () => Results.Ok(await store.ReviewAsync(user, sourceRepSubject, ct))));
+        group.MapPost("/transfers/preview", (TransferAssignmentsRequest request, ClaimsPrincipal user, AssignmentTransferStore store, CancellationToken ct) =>
+            GuardAsync(async () => Results.Ok(await store.PreviewAsync(user, request, ct))));
+        group.MapPost("/transfers", (TransferAssignmentsRequest request, ClaimsPrincipal user, AssignmentTransferStore store, CancellationToken ct) =>
+            GuardAsync(async () => { var saved = await store.SaveAsync(user, request, ct); return Results.Ok(new CoverageMutationResult(true, saved.ChangedLocations)); }));
         group.MapGet("/reps/{repSubject}/territory", (string repSubject, ClaimsPrincipal user, RepTerritoryReader store, CancellationToken ct) =>
             GuardAsync(async () => Results.Ok(await store.ReadAsync(user, repSubject, ct))));
         group.MapGet("/reps", (ClaimsPrincipal user, ReportingLineStore store, CancellationToken ct) =>

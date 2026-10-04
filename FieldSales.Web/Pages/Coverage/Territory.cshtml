@@ -36,6 +36,7 @@ else
             <label asp-for="Filter">Town or area</label>
             <input asp-for="Filter" placeholder="Town or area…" />
             <button type="submit">Filter</button>
+            <a class="button secondary" asp-page="./Transfer" asp-route-repSubject="@territory.Rep.Subject" asp-route-filter="@Model.Filter">Transfer…</a>
             @if (!string.IsNullOrWhiteSpace(Model.Filter)) { <a asp-page="./Territory" asp-route-repSubject="@territory.Rep.Subject">Clear filter</a> }
         </form>
         @if (territory.Assignments.Count == 0) { <p>@territory.Rep.Name has no territory assignments.</p> }
@@ -70,6 +71,8 @@ else
                 else
                 {
                     <h3>@row.Assignment.Name (@row.Assignment.Assignment.Target.Level)</h3>
+                    @if (Model.MatchingCounties.TryGetValue(row.Assignment.Assignment.Id, out var matching) && matching.Length > 0)
+                    { <p>Matching Counties: @string.Join(", ", matching)</p> }
                     <p>@row.Locations @(row.Locations == 1 ? "Location" : "Locations")
                     @if (row.Assignment.Assignment.Target.Level == FieldSales.Directory.Contracts.TerritoryLevel.Location) { <span>· assigned directly</span> }
                     @foreach (var carveOut in row.CarveOuts) { <span class="territory-carve-out">· @carveOut.Locations carved out → @carveOut.Rep.Name</span> }
