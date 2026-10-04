@@ -18,6 +18,12 @@ public sealed record EffectiveOwnerDetails(string RepSubject, CoverageSourceDeta
 // Null Owner explicitly means Unassigned, rather than a missing Location.
 public sealed record LocationCoverageDetails(Guid LocationId, string Name, EffectiveOwnerDetails? Owner);
 
+// M-07 is a read-only shop view for managers, separate from team-scoped rep books.
+public sealed record LocationCoveragePage(Guid LocationId, string Name, Guid TownId, string TownName,
+    ImpactOwnerDetails? Owner, int OtherUnassignedLocations);
+public sealed record LocationCoverageHistoryPage(Guid LocationId, string Name, string TownName,
+    IReadOnlyList<AssignmentHistoryDetails> Entries);
+
 public enum OwnershipChangeCause { DirectLocationAssignment, TerritoryAssignment, GeographyChange }
 public sealed record HistoryIdentityDetails(string Subject, string DisplayName);
 public sealed record HistoryOwnerDetails(HistoryIdentityDetails Rep, CoverageSourceDetails Source);

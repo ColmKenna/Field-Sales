@@ -1,0 +1,29 @@
+@page "{id:guid}"
+@model FieldSales.Web.Pages.Coverage.LocationModel
+@using FieldSales.Directory.Contracts
+@{ ViewData["Title"] = Model.Location.Name + " · Coverage"; }
+<nav class="coverage-navigation location-coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a></nav>
+<h1 class="location-coverage-heading">@Model.Location.Name · @Model.Location.TownName</h1>
+<section class="location-coverage" aria-label="Location coverage">
+    <p class="location-primary"><strong>Primary:</strong>
+        @if (Model.Location.Owner is { } owner)
+        {
+            <span>@owner.Rep.Name (@(owner.Source.Level == TerritoryLevel.Location ? "assigned directly" : "via " + owner.SourceName))</span>
+        }
+        else { <span>Unassigned</span> }
+    </p>
+    @if (Model.Location.Owner is null)
+    {
+        <div class="location-assignment-options" aria-describedby="assignment-unavailable">
+            <button type="button" disabled>Assign @Model.Location.TownName (Town) to…</button>
+            @if (Model.Location.OtherUnassignedLocations > 0)
+            {
+                <p>@Model.Location.OtherUnassignedLocations other @(Model.Location.OtherUnassignedLocations == 1 ? "Location" : "Locations") in @Model.Location.TownName @(Model.Location.OtherUnassignedLocations == 1 ? "is" : "are") also unassigned</p>
+            }
+            <button type="button" disabled>Assign just this shop to…</button>
+        </div>
+        <p id="assignment-unavailable">Assignment actions are not available yet.</p>
+    }
+    <p class="location-specialists"><strong>Specialists:</strong><span></span></p>
+</section>
+<div class="location-coverage-footer"><a asp-page="./LocationHistory" asp-route-id="@Model.Location.LocationId">History →</a></div>

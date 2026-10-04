@@ -72,6 +72,10 @@ else
                 else
                 {
                     <h3>@row.Assignment.Name (@row.Assignment.Assignment.Target.Level)</h3>
+                    @if (row.Assignment.Assignment.Target.Level == FieldSales.Directory.Contracts.TerritoryLevel.Location)
+                    {
+                        <p><a asp-page="./Location" asp-route-id="@row.Assignment.Assignment.Target.UnitId">Who covers this shop?</a></p>
+                    }
                     @if (Model.MatchingCounties.TryGetValue(row.Assignment.Assignment.Id, out var matching) && matching.Length > 0)
                     { <p>Matching Counties: @string.Join(", ", matching)</p> }
                     <p>@row.Locations @(row.Locations == 1 ? "Location" : "Locations")

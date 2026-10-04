@@ -1,0 +1,19 @@
+@page "{id:guid}"
+@model FieldSales.Web.Pages.Coverage.LocationHistoryModel
+@using System.Globalization
+@using FieldSales.Web.Coverage
+@{ ViewData["Title"] = Model.History.Name + " · Assignment history"; }
+<nav class="coverage-navigation location-coverage-navigation" aria-label="Location"><a asp-page="./Location" asp-route-id="@Model.History.LocationId">Back to @Model.History.Name</a></nav>
+<h1 class="location-coverage-heading">@Model.History.Name · @Model.History.TownName</h1>
+<h2>Assignment history</h2>
+<p>Newest first. Times are UTC.</p>
+@if (Model.History.Entries.Count == 0) { <p>No assignment history yet.</p> }
+else
+{
+    <ol class="location-history">
+    @foreach (var row in Model.History.Entries)
+    {
+        <li><time datetime="@row.ChangedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)">@LocationHistoryPresentation.Timestamp(row.ChangedAt)</time> — @LocationHistoryPresentation.Change(row)</li>
+    }
+    </ol>
+}
