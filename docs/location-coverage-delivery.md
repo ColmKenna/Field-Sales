@@ -37,3 +37,7 @@ Artifacts: .artifacts/wi026/{characterization,focused-corrected,browser-pages,re
 ## Boundaries
 
 No migration, stored ownership, new resolver rule, reporting-line editor change or package/runtime update. WI-027 supplies coverage-changing controls; WI-028 supplies unassigned inventory. Visits/handover, specialist assignments and online-ordering setup remain their respective later items. Business-local timezone is not selected here; the existing explicit UTC convention remains.
+
+## Integration — 2026-10-04
+
+[PR #7](https://github.com/ColmKenna/Field-Sales/pull/7) merged into main at **2a506d83d88d45cda6484fd4acf647c312b29acc**, after the developer explicitly authorized PR and merge. Exact reviewed head: **8e95d67273649a0d1f1bbda6523abd583c0dd0ab**. [PR CI run 50](https://github.com/ColmKenna/Field-Sales/actions/runs/37220269274) succeeded: **2,028/2,028 .NET** (API **268**, Web **711**, Identity **1,049**), each project Test Run Successful; build zero warnings/errors. JavaScript **34/34** passed locally. Source/test code is unchanged from the fully verified source milestone.
