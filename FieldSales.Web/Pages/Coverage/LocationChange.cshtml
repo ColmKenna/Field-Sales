@@ -1,0 +1,39 @@
+@page "{id:guid}"
+@model FieldSales.Web.Pages.Coverage.LocationChangeModel
+@{ ViewData["Title"] = Model.Heading; }
+<nav class="coverage-navigation"><a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Back to @Model.Actions.Location.Name</a></nav>
+<h1 class="location-coverage-heading">@Model.Heading</h1>
+<p>@Model.Actions.Location.Name · @Model.Actions.Location.TownName</p>
+@if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
+@if (Model.Notice is not null) { <p role="status">@Model.Notice</p> }
+@if (Model.Preview is { } preview)
+{
+    <h2>Review assignment to @preview.RepName</h2>
+    <partial name="_AssignmentImpact" model="preview" />
+    <form method="post" asp-page-handler="Save" class="reference-filter">
+        <input asp-for="EntryProof" type="hidden" /><input asp-for="RepSubject" type="hidden" />
+        <input asp-for="Reason" type="hidden" /><input asp-for="PreviewProof" type="hidden" />
+        <button class="button" type="submit" name="Confirmed" value="true">Confirm assignment</button>
+        <a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Cancel</a>
+    </form>
+}
+else if (Model.Reps.Count == 0)
+{
+    <p>No eligible receiving reps are available for this change.</p>
+    <a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Back to Location</a>
+}
+else
+{
+    <p>Choose the receiving rep. Review the impact before confirming any change.</p>
+    <form method="post" asp-page-handler="Preview" class="product-form">
+        <input asp-for="EntryProof" type="hidden" />
+        <label asp-for="RepSubject">Receiving rep</label>
+        <select asp-for="RepSubject" required>
+            <option value="">Choose a rep</option>
+            @foreach (var rep in Model.Reps) { <option value="@rep.Subject">@rep.Name</option> }
+        </select>
+        <label asp-for="Reason">Reason (optional)</label><input asp-for="Reason" maxlength="1000" />
+        <button class="button" type="submit">@(Model.Entry.IsTransfer ? "Review transfer" : "Preview assignment")</button>
+        <a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Cancel</a>
+    </form>
+}
