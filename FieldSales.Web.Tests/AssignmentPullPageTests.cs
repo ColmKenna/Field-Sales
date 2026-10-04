@@ -50,6 +50,21 @@ public sealed class AssignmentPullPageTests
         Assert.Contains("Choose a rep whose assignments", await forged.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Should_KeepSelectionAndReceiver_When_PullExcludesEveryArea()
+    {
+        using var handler = new Reply(); await using var app = new StaffWebsiteFactory(handler); using var browser = app.CreateBrowser();
+        using var login = await browser.GetAsync("/__test/sign-in?subject=manager&roles=" + Uri.EscapeDataString(BusinessRoles.SalesManager));
+        using var page = await browser.GetAsync($"/Coverage/Transfer?repSubject=aoife&receivingRepSubject=receiver&pull=true&pullAssignmentId={handler.Assignment:D}");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode); var fields = AssignmentTransferEndToEndTests.Inputs(await page.Content.ReadAsStringAsync());
+        fields.RemoveAll(row => row.Key == "Selected");
+        using var invalid = await browser.PostAsync("/Coverage/Transfer?handler=Preview", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.OK, invalid.StatusCode);
+        string html = await invalid.Content.ReadAsStringAsync(); Assert.Contains("Select at least one", html); Assert.Contains("data-transfer-parent", html);
+        Assert.DoesNotContain("Choose the receiving rep", html);
+        Assert.Equal("receiver", AssignmentTransferEndToEndTests.Inputs(html).Single(row => row.Key == "ReceivingRepSubject").Value);
+        Assert.Equal(0, handler.Previews); Assert.Equal(0, handler.Saves); AssignmentTransferEndToEndTests.SaveRender("pull-empty-selection", html);
+    }
+
     private sealed class Reply : HttpMessageHandler
     {
         public Guid Assignment { get; } = Guid.NewGuid(); public Guid Unit { get; } = Guid.NewGuid();

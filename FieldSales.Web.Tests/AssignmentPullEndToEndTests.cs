@@ -182,8 +182,13 @@ public sealed class AssignmentPullEndToEndTests(CoverageReadApplication app) : I
         string html = await HtmlAsync(browser, "/Coverage/TakeOver?repSubject=receiver"); Assert.Contains("No other reps", html); Assert.DoesNotContain("Review assignments</button>", html);
         var fields = Inputs(html); Set(fields, "RepSubject", "receiver"); Set(fields, "GivingRepSubject", "receiver");
         using var forged = await browser.PostAsync("/Coverage/TakeOver", new FormUrlEncodedContent(fields));
-        // Empty state contains no form/token; a forged POST is still rejected by CSRF.
-        Assert.Equal(HttpStatusCode.BadRequest, forged.StatusCode); Assert.Equal((0, 0), await CountsAsync());
+        // The layout's sign-out form supplies a valid token; the business handler
+        // rejects the self source with the normal validation page and no redirect.
+        Assert.Equal(HttpStatusCode.OK, forged.StatusCode); Assert.Null(forged.Headers.Location);
+        Assert.Contains("Choose a rep whose assignments", await forged.Content.ReadAsStringAsync());
+        fields.RemoveAll(row => row.Key == "__RequestVerificationToken");
+        using var noCsrf = await browser.PostAsync("/Coverage/TakeOver", new FormUrlEncodedContent(fields));
+        Assert.Equal(HttpStatusCode.BadRequest, noCsrf.StatusCode); Assert.Equal((0, 0), await CountsAsync());
     }
 
     [Theory]

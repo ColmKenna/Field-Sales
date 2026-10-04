@@ -42,13 +42,13 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
     public async Task<IActionResult> OnPostChooseAsync()
     {
         if (await LoadAsync() is { } denied) return denied;
-        if (Selections() is not null) ChoosingRecipient = true;
+        if (Selections() is not null) ChoosingRecipient = !Pull;
         return Page();
     }
     public async Task<IActionResult> OnPostPreviewAsync()
     {
         if (await LoadAsync() is { } denied) return denied;
-        ChoosingRecipient = true;
+        ChoosingRecipient = !Pull;
         var selected = Selections(); if (selected is null) return Page();
         var result = await coverage.PreviewTransferAsync(Command(selected), HttpContext.RequestAborted);
         if (result.Success) { ReviewedSelections = selected.Select(row => $"{row.AssignmentId:D}:{row.Target.Level}:{row.Target.UnitId:D}").ToList(); SetPreview(result.Value!); }
@@ -59,7 +59,7 @@ public sealed class TransferModel(CoverageApiClient coverage) : PageModel
     public async Task<IActionResult> OnPostSaveAsync()
     {
         if (await LoadAsync() is { } denied) return denied;
-        ChoosingRecipient = true;
+        ChoosingRecipient = !Pull;
         var selected = Reviewed(); if (selected is null) return Page();
         var result = await coverage.SaveTransferAsync(Command(selected), HttpContext.RequestAborted);
         if (result.Success && result.Value?.Saved == true)
