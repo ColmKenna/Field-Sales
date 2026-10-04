@@ -5,6 +5,7 @@
 @{ ViewData["Title"] = Model.Location.Name; }
 <p><a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Location.CustomerId">Back to @Model.Location.CustomerName</a></p>
 <h1>@Model.Location.Name</h1>
+<p><a asp-page="/Coverage/Location" asp-route-id="@Model.Location.Id">Who covers this shop?</a></p>
 <dl>
     <dt>Customer</dt><dd><a asp-page="/HeadOffice/Customers/Detail" asp-route-id="@Model.Location.CustomerId">@Model.Location.CustomerName</a></dd>
     <dt>Town</dt><dd>@Model.Location.Town.Label</dd>

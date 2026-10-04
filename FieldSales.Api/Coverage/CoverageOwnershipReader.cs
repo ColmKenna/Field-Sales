@@ -9,9 +9,9 @@ public sealed record OwnershipSnapshot(IReadOnlyList<LocationOwnershipPath> Loca
 // Uses the caller's context/transaction; never starts a nested transaction.
 public sealed class CoverageOwnershipReader(DirectoryDbContext db)
 {
-    public IQueryable<LocationOwnershipPath> Paths(Guid? id = null) =>
+    public IQueryable<LocationOwnershipPath> Paths(Guid? id = null, Guid? townId = null) =>
         from location in db.Locations.AsNoTracking()
-        where id == null || location.Id == id
+        where (id == null || location.Id == id) && (townId == null || location.TownId == townId)
         join town in db.Towns on location.TownId equals town.Id
         join county in db.Counties on town.CountyId equals county.Id
         join region in db.Regions on county.RegionId equals region.Id

@@ -10,6 +10,16 @@ namespace FieldSales.Web.Coverage;
 
 public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
+    public async Task<DirectoryResult<LocationCoveragePage>> LocationAsync(Guid id, CancellationToken ct)
+    {
+        var result = await SendAsync<LocationCoveragePage>(HttpMethod.Get, $"/coverage/locations/{id}/page", null, ct);
+        return result.Success && result.Value!.LocationId != id ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
+    public async Task<DirectoryResult<LocationCoverageHistoryPage>> LocationHistoryAsync(Guid id, CancellationToken ct)
+    {
+        var result = await SendAsync<LocationCoverageHistoryPage>(HttpMethod.Get, $"/coverage/locations/{id}/page/history", null, ct);
+        return result.Success && result.Value!.LocationId != id ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
     public async Task<DirectoryResult<RepTerritoryPage>> TerritoryAsync(string rep, CancellationToken ct)
     {
         var result = await SendAsync<RepTerritoryPage>(HttpMethod.Get, "/coverage/reps/" + Uri.EscapeDataString(rep) + "/territory", null, ct);
@@ -104,6 +114,16 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
             var result = await response.Content.ReadFromJsonAsync<T>(ct);
             bool valid = result switch
             {
+                LocationCoveragePage location => location.LocationId != Guid.Empty && !string.IsNullOrWhiteSpace(location.Name)
+                    && location.TownId != Guid.Empty && !string.IsNullOrWhiteSpace(location.TownName)
+                    && location.OtherUnassignedLocations >= 0 && ValidOwner(location.Owner)
+                    && (location.Owner is null || location.Owner.Source.Level switch
+                    {
+                        TerritoryLevel.Location => location.Owner.Source.UnitId == location.LocationId,
+                        TerritoryLevel.Town => location.Owner.Source.UnitId == location.TownId,
+                        _ => true
+                    }),
+                LocationCoverageHistoryPage history => ValidLocationHistory(history),
                 RepTerritoryPage territory => ValidTerritory(territory),
                 TransferReview review => ValidTransferReview(review),
                 TransferSourceOptions sources => ValidChoice(sources.ReceivingRep) && sources.GivingReps is not null
@@ -180,6 +200,30 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
     private static bool ValidChoice(StaffChoice? value) => value is not null && !string.IsNullOrWhiteSpace(value.Subject) && !string.IsNullOrWhiteSpace(value.Name);
     private static bool ValidLine(RepReportingLineDetails? value) => value is not null && !string.IsNullOrWhiteSpace(value.RepSubject)
         && !string.IsNullOrWhiteSpace(value.ManagerSubject) && !string.IsNullOrWhiteSpace(value.Version);
+
+    private static bool ValidLocationHistory(LocationCoverageHistoryPage page)
+    {
+        if (page.LocationId == Guid.Empty || string.IsNullOrWhiteSpace(page.Name) || string.IsNullOrWhiteSpace(page.TownName)
+            || page.Entries is null) return false;
+        long previousSequence = long.MaxValue;
+        HashSet<Guid> ids = [];
+        foreach (var row in page.Entries)
+        {
+            if (row is null || row.Id == Guid.Empty || !ids.Add(row.Id) || row.Sequence <= 0 || row.Sequence >= previousSequence
+                || row.OperationId == Guid.Empty || row.LocationId != page.LocationId || string.IsNullOrWhiteSpace(row.LocationName)
+                || row.ChangedAt == default || !ValidIdentity(row.Actor) || !Enum.IsDefined(row.Cause)
+                || !ValidHistoryOwner(row.PreviousOwner, page.LocationId) || !ValidHistoryOwner(row.NewOwner, page.LocationId)
+                || row.PreviousOwner?.Rep.Subject == row.NewOwner?.Rep.Subject || string.IsNullOrWhiteSpace(row.Display)) return false;
+            previousSequence = row.Sequence;
+        }
+        return true;
+    }
+    private static bool ValidIdentity(HistoryIdentityDetails? value) => value is not null
+        && !string.IsNullOrWhiteSpace(value.Subject) && !string.IsNullOrWhiteSpace(value.DisplayName);
+    private static bool ValidHistoryOwner(HistoryOwnerDetails? value, Guid locationId) => value is null
+        || ValidIdentity(value.Rep) && value.Source is { Target: { } target } source && source.AssignmentId != Guid.Empty
+        && Enum.IsDefined(target.Level) && target.UnitId != Guid.Empty && !string.IsNullOrWhiteSpace(source.Name)
+        && (target.Level != TerritoryLevel.Location || target.UnitId == locationId);
 }
 
 public sealed record AssignmentSaveResult(bool Saved, AssignmentImpactDetails? Preview = null);
