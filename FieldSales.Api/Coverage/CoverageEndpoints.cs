@@ -10,6 +10,9 @@ public static class CoverageEndpoints
     public static void MapCoverageEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/coverage").RequireAuthorization("ManageCoverage");
+        group.MapGet("/locations/{id:guid}/page/actions", (Guid id, ClaimsPrincipal user,
+            LocationCoverageReader store, CancellationToken ct) => GuardAsync(async () =>
+                await store.ActionsAsync(user, id, ct) is { } actions ? Results.Ok(actions) : Results.NotFound()));
         group.MapGet("/locations/{id:guid}/page", (Guid id, ClaimsPrincipal user,
             LocationCoverageReader store, CancellationToken ct) => GuardAsync(async () =>
                 await store.ReadAsync(user, id, ct) is { } page ? Results.Ok(page) : Results.NotFound()));

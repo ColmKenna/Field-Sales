@@ -123,3 +123,5 @@ p { line-height: 1.6; }
 .location-history li { margin-bottom: 1rem; }
 .location-coverage-heading, .location-coverage-navigation, .location-coverage, .location-history, .location-assignment-options button { overflow-wrap: anywhere; }
 .location-assignment-options button { max-width: 100%; padding: .6rem .8rem; border: 1px solid #b9c8d6; border-radius: .4rem; font: inherit; }
+.location-assignment-options a { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
+.location-change { overflow-wrap: anywhere; }

@@ -10,6 +10,11 @@ namespace FieldSales.Web.Coverage;
 
 public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
+    public async Task<DirectoryResult<LocationCoverageActions>> LocationActionsAsync(Guid id, CancellationToken ct)
+    {
+        var result = await SendAsync<LocationCoverageActions>(HttpMethod.Get, $"/coverage/locations/{id}/page/actions", null, ct);
+        return result.Success && result.Value!.Location.LocationId != id ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
     public async Task<DirectoryResult<LocationCoveragePage>> LocationAsync(Guid id, CancellationToken ct)
     {
         var result = await SendAsync<LocationCoveragePage>(HttpMethod.Get, $"/coverage/locations/{id}/page", null, ct);
@@ -114,15 +119,8 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
             var result = await response.Content.ReadFromJsonAsync<T>(ct);
             bool valid = result switch
             {
-                LocationCoveragePage location => location.LocationId != Guid.Empty && !string.IsNullOrWhiteSpace(location.Name)
-                    && location.TownId != Guid.Empty && !string.IsNullOrWhiteSpace(location.TownName)
-                    && location.OtherUnassignedLocations >= 0 && ValidOwner(location.Owner)
-                    && (location.Owner is null || location.Owner.Source.Level switch
-                    {
-                        TerritoryLevel.Location => location.Owner.Source.UnitId == location.LocationId,
-                        TerritoryLevel.Town => location.Owner.Source.UnitId == location.TownId,
-                        _ => true
-                    }),
+                LocationCoverageActions actions => ValidLocationActions(actions),
+                LocationCoveragePage location => ValidLocation(location),
                 LocationCoverageHistoryPage history => ValidLocationHistory(history),
                 RepTerritoryPage territory => ValidTerritory(territory),
                 TransferReview review => ValidTransferReview(review),
@@ -161,6 +159,23 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
                 && !string.IsNullOrWhiteSpace(row.Name) && ValidOwner(row.PreviousOwner) && ValidOwner(row.NewOwner)))
         && value.Groups.Sum(group => group.Locations.Count) == value.ChangedLocations
         && value.Groups.SelectMany(group => group.Locations).Select(row => row.LocationId).Distinct().Count() == value.ChangedLocations;
+    private static bool ValidLocation(LocationCoveragePage? location) => location is not null
+        && location.LocationId != Guid.Empty && !string.IsNullOrWhiteSpace(location.Name)
+        && location.TownId != Guid.Empty && !string.IsNullOrWhiteSpace(location.TownName)
+        && location.OtherUnassignedLocations >= 0 && ValidOwner(location.Owner)
+        && (location.Owner is null || location.Owner.Source.Level switch
+        {
+            TerritoryLevel.Location => location.Owner.Source.UnitId == location.LocationId,
+            TerritoryLevel.Town => location.Owner.Source.UnitId == location.TownId,
+            _ => true
+        });
+    private static bool ValidLocationActions(LocationCoverageActions actions) => ValidLocation(actions.Location)
+        && (actions.Location.Owner is null
+            ? actions.SourceAssignmentId is null && actions.SourceLocations == 0 && !actions.CanTransferSource
+                && actions.CanAssignTown == actions.CanChangeShop
+            : actions.SourceAssignmentId is { } id && id != Guid.Empty && actions.SourceLocations > 0
+                && !actions.CanAssignTown && (actions.Location.Owner.Source.Level != TerritoryLevel.Location
+                    || actions.SourceLocations == 1 && !actions.CanTransferSource));
     private static bool ValidTransferReview(TransferReview value) => ValidChoice(value.SourceRep)
         && value.ReceivingReps is not null && value.ReceivingReps.All(rep => ValidChoice(rep) && rep.Subject != value.SourceRep.Subject)
         && value.ReceivingReps.Select(row => row.Subject).Distinct(StringComparer.Ordinal).Count() == value.ReceivingReps.Count

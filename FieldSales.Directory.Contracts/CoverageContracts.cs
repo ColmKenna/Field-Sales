@@ -21,6 +21,9 @@ public sealed record LocationCoverageDetails(Guid LocationId, string Name, Effec
 // M-07 is a read-only shop view for managers, separate from team-scoped rep books.
 public sealed record LocationCoveragePage(Guid LocationId, string Name, Guid TownId, string TownName,
     ImpactOwnerDetails? Owner, int OtherUnassignedLocations);
+// Navigation context only. Existing mutation endpoints recheck all authority and proofs.
+public sealed record LocationCoverageActions(LocationCoveragePage Location, Guid? SourceAssignmentId,
+    int SourceLocations, bool CanAssignTown, bool CanChangeShop, bool CanTransferSource);
 public sealed record LocationCoverageHistoryPage(Guid LocationId, string Name, string TownName,
     IReadOnlyList<AssignmentHistoryDetails> Entries);
 

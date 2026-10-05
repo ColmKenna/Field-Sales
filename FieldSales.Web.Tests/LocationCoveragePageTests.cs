@@ -93,7 +93,7 @@ public sealed class LocationCoveragePageTests
     private sealed class Reply(LocationCoveragePage page, LocationCoverageHistoryPage history) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        { Assert.Equal(HttpMethod.Get, request.Method); Assert.Equal("test-access-token", request.Headers.Authorization!.Parameter); return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create<object>(request.RequestUri!.AbsolutePath.EndsWith("/history", StringComparison.Ordinal) ? history : page) }); }
+        { Assert.Equal(HttpMethod.Get, request.Method); Assert.Equal("test-access-token", request.Headers.Authorization!.Parameter); return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create<object>(request.RequestUri!.AbsolutePath.EndsWith("/history", StringComparison.Ordinal) ? history : request.RequestUri.AbsolutePath.EndsWith("/actions", StringComparison.Ordinal) ? new LocationCoverageActions(page, page.Owner is null ? null : Guid.NewGuid(), page.Owner is null ? 0 : page.Owner.Source.Level == TerritoryLevel.Location ? 1 : 23, page.Owner is null, true, page.Owner is not null && page.Owner.Source.Level != TerritoryLevel.Location) : page) }); }
     }
     private sealed class NeverRead : HttpMessageHandler
     { public int Calls { get; private set; } protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) { Calls++; throw new InvalidOperationException("Protected API should not be reached"); } }

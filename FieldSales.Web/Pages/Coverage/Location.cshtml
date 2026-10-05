@@ -4,6 +4,7 @@
 @{ ViewData["Title"] = Model.Location.Name + " · Coverage"; }
 <nav class="coverage-navigation location-coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a></nav>
 <h1 class="location-coverage-heading">@Model.Location.Name · @Model.Location.TownName</h1>
+@if (TempData["AssignmentNotice"] is string notice) { <p role="status">@notice</p> }
 <section class="location-coverage" aria-label="Location coverage">
     <p class="location-primary"><strong>Primary:</strong>
         @if (Model.Location.Owner is { } owner)
@@ -14,16 +15,35 @@
     </p>
     @if (Model.Location.Owner is null)
     {
-        <div class="location-assignment-options" aria-describedby="assignment-unavailable">
-            <button type="button" disabled>Assign @Model.Location.TownName (Town) to…</button>
+        <div class="location-assignment-options">
+            @if (Model.Actions.CanAssignTown)
+            { <a class="button" asp-page="./LocationChange" asp-route-id="@Model.Location.LocationId" asp-route-entryProof="@Model.Entry("Town")">Assign @Model.Location.TownName (Town) to...</a> }
+            else { <button type="button" disabled>Assign @Model.Location.TownName (Town) to...</button> }
             @if (Model.Location.OtherUnassignedLocations > 0)
             {
-                <p>@Model.Location.OtherUnassignedLocations other @(Model.Location.OtherUnassignedLocations == 1 ? "Location" : "Locations") in @Model.Location.TownName @(Model.Location.OtherUnassignedLocations == 1 ? "is" : "are") also unassigned</p>
+                <p>@Model.Location.OtherUnassignedLocations other @(Model.Location.OtherUnassignedLocations == 1 ? "Location" : "Locations") in @Model.Location.TownName @(Model.Location.OtherUnassignedLocations == 1 ? "is" : "are") unassigned</p>
             }
-            <button type="button" disabled>Assign just this shop to…</button>
+            @if (Model.Actions.CanChangeShop)
+            { <a class="button" asp-page="./LocationChange" asp-route-id="@Model.Location.LocationId" asp-route-entryProof="@Model.Entry("Shop")">Assign just this shop to...</a> }
+            else { <button type="button" disabled>Assign just this shop to...</button> }
         </div>
-        <p id="assignment-unavailable">Assignment actions are not available yet.</p>
     }
+    else
+    {
+        <div class="location-assignment-options">
+            @if (Model.Actions.CanChangeShop)
+            { <a class="button" asp-page="./LocationChange" asp-route-id="@Model.Location.LocationId" asp-route-entryProof="@Model.Entry("Shop")">Change just this shop to...</a> }
+            else { <button type="button" disabled>Change just this shop to...</button> }
+            @if (Model.Location.Owner.Source.Level != TerritoryLevel.Location)
+            {
+                @if (Model.Actions.CanTransferSource)
+                { <a class="button" asp-page="./LocationChange" asp-route-id="@Model.Location.LocationId" asp-route-entryProof="@Model.Entry("Source")">Transfer @Model.Location.Owner.SourceName (@Model.Location.Owner.Source.Level, @Model.Actions.SourceLocations @(Model.Actions.SourceLocations == 1 ? "Location" : "Locations")) to...</a> }
+                else { <button type="button" disabled>Transfer @Model.Location.Owner.SourceName (@Model.Location.Owner.Source.Level, @Model.Actions.SourceLocations @(Model.Actions.SourceLocations == 1 ? "Location" : "Locations")) to...</button> }
+            }
+        </div>
+    }
+    @if (!Model.Actions.CanChangeShop || Model.Location.Owner is null && !Model.Actions.CanAssignTown || Model.Location.Owner is { Source.Level: not TerritoryLevel.Location } && !Model.Actions.CanTransferSource)
+    { <p>Some changes are unavailable. New assignments require active geography; existing assignment transfers require authority to manage the giving rep.</p> }
     <p class="location-specialists"><strong>Specialists:</strong><span></span></p>
 </section>
 <div class="location-coverage-footer"><a asp-page="./LocationHistory" asp-route-id="@Model.Location.LocationId">History →</a></div>

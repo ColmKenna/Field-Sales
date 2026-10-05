@@ -73,11 +73,12 @@ public sealed class LocationCoverageEndToEndTests(CoverageReadApplication app) :
         Assert.Equal(other, (await ReadAsync(api, seed.Shop.Id)).OtherUnassignedLocations);
         await using var website = app.CreateWebsite(); using var browser = website.CreateBrowser(); await SignInAsync(browser, BusinessRoles.SalesManager);
         string html = await HtmlAsync(browser, Page(seed.Shop.Id)); string decoded = WebUtility.HtmlDecode(html);
-        Assert.Contains("Unassigned", decoded); Assert.Contains("Assignment actions are not available yet.", decoded);
+        Assert.Contains("Unassigned", decoded); Assert.DoesNotContain("Assignment actions are not available yet.", decoded);
         Assert.True(decoded.IndexOf("Assign Rathdrum (Town)", StringComparison.Ordinal) < decoded.IndexOf("Assign just this shop", StringComparison.Ordinal));
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(html, "type=\"button\" disabled").Count);
-        if (other == 0) Assert.DoesNotContain("also unassigned", html);
-        else Assert.Contains($"{other} other {(other == 1 ? "Location" : "Locations")} in Rathdrum {(other == 1 ? "is" : "are")} also unassigned", html);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(html, "href=\"/Coverage/LocationChange/").Count);
+        Assert.DoesNotContain("type=\"button\" disabled", html);
+        if (other == 0) Assert.DoesNotContain("other Locations", html);
+        else Assert.Contains($"{other} other {(other == 1 ? "Location" : "Locations")} in Rathdrum {(other == 1 ? "is" : "are")} unassigned", html);
         Assert.Contains("No assignment history yet.", await HtmlAsync(browser, HistoryPage(seed.Shop.Id)));
         Assert.Equal((0, 0), await CountsAsync());
     }
