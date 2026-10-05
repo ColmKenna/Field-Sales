@@ -4,7 +4,7 @@
 
 The Location page now leads with Town assignment for an unassigned shop and just-shop change for a covered shop. All four entry actions use the existing reviewed Add or Transfer flow, require explicit confirmation, record actual ownership changes atomically, and return to the original Location.
 
-The user approved the plan and C1/S1–S19 scenarios with **Approved and Apply**, then accepted the rendered-flow checkpoint with **Continue T-3.2.2**. Delivery is the verified feature branch `feature/wi-027-change-shop-s-coverage-from`. Complete regression passes and WI-027 is marked done. Commit and push are the final delivery steps. WI-028 is not started.
+The user approved the plan and C1/S1–S19 scenarios with **Approved and Apply**, then accepted the rendered-flow checkpoint with **Continue T-3.2.2**. Delivery is the verified feature branch `feature/wi-027-change-shop-s-coverage-from`. Complete regression passes and WI-027 is marked done. Verified completion **6192b0c50653ad00733e9afbeeb38cf0c1937d46** is committed and pushed with its own upstream; subsequent handover changes documentation only. WI-028 is not started.
 
 ## Acceptance criteria — PASS
 
