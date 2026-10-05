@@ -22,7 +22,7 @@ public sealed class LocationCoverageActionPageTests
         html = await GetHtml(browser, entry); Capture(labels + "-choose", html);
         Assert.Contains("<label for=\"RepSubject\">Receiving rep</label>", html); Assert.Contains("<label for=\"Reason\">Reason (optional)</label>", html);
         Assert.Contains("href=\"" + page + "\">Cancel", html);
-        var fields = AssignmentTransferEndToEndTests.Inputs(html); fields.RemoveAll(row => row.Key is "RepSubject" or "Reason");
+        var fields = AssignmentTransferIntegrationTests.Inputs(html); fields.RemoveAll(row => row.Key is "RepSubject" or "Reason");
         fields.Add(new("RepSubject", "colm")); fields.Add(new("Reason", labels == "markup" ? "<img onerror=alert(1)>" : "Agreed coverage"));
         using var response = await browser.PostAsync($"/Coverage/LocationChange/{handler.Id}?handler=Preview", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode); html = await response.Content.ReadAsStringAsync(); Capture(labels + "-preview", html);

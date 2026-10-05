@@ -1,17 +1,21 @@
 <Solution>
-    <Folder Name="/src/"/>
-    <Project Path="FieldSales.Identity.Admin.Services/FieldSales.Identity.Admin.Services.csproj"/>
-    <Project Path="FieldSales.Identity.Admin.Tests/FieldSales.Identity.Admin.Tests.csproj"/>
-    <Project Path="FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj"/>
-    <Project Path="FieldSales.AppHost/FieldSales.AppHost.csproj"/>
-    <Project Path="FieldSales.ServiceDefaults/FieldSales.ServiceDefaults.csproj"/>
-    <Project Path="FieldSales.StaffAccess/FieldSales.StaffAccess.csproj"/>
-    <Project Path="FieldSales.Quantities/FieldSales.Quantities.csproj"/>
-    <Project Path="FieldSales.ReferenceData/FieldSales.ReferenceData.csproj"/>
-    <Project Path="FieldSales.Web/FieldSales.Web.csproj"/>
-    <Project Path="FieldSales.Web.Tests/FieldSales.Web.Tests.csproj"/>
-    <Project Path="FieldSales.Api/FieldSales.Api.csproj"/>
-    <Project Path="FieldSales.Api.Tests/FieldSales.Api.Tests.csproj"/>
-    <Project Path="FieldSales.Catalogue.Contracts/FieldSales.Catalogue.Contracts.csproj"/>
-    <Project Path="FieldSales.Directory.Contracts/FieldSales.Directory.Contracts.csproj"/>
+    <Folder Name="/src/">
+        <Project Path="FieldSales.AppHost/FieldSales.AppHost.csproj" />
+        <Project Path="FieldSales.ServiceDefaults/FieldSales.ServiceDefaults.csproj" />
+        <Project Path="FieldSales.Api/FieldSales.Api.csproj" />
+        <Project Path="FieldSales.Web/FieldSales.Web.csproj" />
+        <Project Path="FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj" />
+        <Project Path="FieldSales.Identity.Admin.Services/FieldSales.Identity.Admin.Services.csproj" />
+        <Project Path="FieldSales.Catalogue.Contracts/FieldSales.Catalogue.Contracts.csproj" />
+        <Project Path="FieldSales.Directory.Contracts/FieldSales.Directory.Contracts.csproj" />
+        <Project Path="FieldSales.Quantities/FieldSales.Quantities.csproj" />
+        <Project Path="FieldSales.ReferenceData/FieldSales.ReferenceData.csproj" />
+        <Project Path="FieldSales.StaffAccess/FieldSales.StaffAccess.csproj" />
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="FieldSales.UnitTests/FieldSales.UnitTests.csproj" />
+        <Project Path="FieldSales.Api.Tests/FieldSales.Api.Tests.csproj" />
+        <Project Path="FieldSales.Identity.Admin.Tests/FieldSales.Identity.Admin.Tests.csproj" />
+        <Project Path="FieldSales.Web.Tests/FieldSales.Web.Tests.csproj" />
+    </Folder>
 </Solution>
