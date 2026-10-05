@@ -31,4 +31,4 @@ The list reader uses the existing `EffectiveOwnerResolver` and four queries insi
 
 Only T-3.3.1 is delivered. The list intentionally contains **all** unassigned shops. The overview count and manager-area scoping follow in E14, gap lists in E17, and Location Profiles in E12. No schema, ownership-policy, mutation API or visit/handover changes.
 
-The provisional source commit intent is reconciled with the final diff: the change introduces list discovery and reuses reviewed assignment flows to fix coverage from each row. Integration remains separately authorized after green feature-branch delivery.
+The provisional source commit intent is reconciled with the final diff: the change introduces list discovery and reuses reviewed assignment flows to fix coverage from each row. The developer authorized integration on 2026-10-05. [PR #9](https://github.com/ColmKenna/Field-Sales/pull/9) merged into main at `57da316d0d968edf9ea7ea263f0750bb03e84245` after [GitHub CI](https://github.com/ColmKenna/Field-Sales/actions/runs/37288553295) passed all 2,171 tests at the verified branch head, with zero build warnings/errors.
