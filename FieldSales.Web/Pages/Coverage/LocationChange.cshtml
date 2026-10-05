@@ -1,6 +1,7 @@
 @page "{id:guid}"
 @model FieldSales.Web.Pages.Coverage.LocationChangeModel
 @{ ViewData["Title"] = Model.Heading; }
+<div class="location-change">
 <nav class="coverage-navigation"><a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Back to @Model.Actions.Location.Name</a></nav>
 <h1 class="location-coverage-heading">@Model.Heading</h1>
 <p>@Model.Actions.Location.Name · @Model.Actions.Location.TownName</p>
@@ -37,3 +38,4 @@ else
         <a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Cancel</a>
     </form>
 }
+</div>

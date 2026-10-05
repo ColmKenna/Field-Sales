@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "Transfer assignments · " + Model.Review.SourceRep.Name;
 }
+<div class="@(Model.ReturnLocationId.HasValue ? "location-change" : "")">
 <nav class="coverage-navigation" aria-label="Coverage"><a href="@Model.ReturnUrl">@(Model.ReturnLocationName is { } location ? "Back to " + location : Model.ReturnRepName + " · Territory")</a></nav>
 @if (Model.PullAssignmentId.HasValue)
 { <h1>Transfer @Model.Visible[0].Name from @Model.Review.SourceRep.Name to @Model.Receiver!.Name?</h1> }
@@ -90,4 +91,5 @@ else
         <a href="@Model.ReturnUrl">Cancel</a>
     </form>
 }
+</div>
 <script src="~/js/assignment-transfer.js" asp-append-version="true" defer></script>

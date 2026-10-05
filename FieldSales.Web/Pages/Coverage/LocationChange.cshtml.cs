@@ -1,6 +1,7 @@
 using System.Net;
 using FieldSales.Directory.Contracts;
 using FieldSales.Web.Coverage;
+using FieldSales.StaffAccess;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -88,6 +89,16 @@ public sealed class LocationChangeModel(CoverageApiClient coverage, IDataProtect
             if (!options.Success) return StatusCode((int)options.Status);
             if (!options.Value!.Targets.Any(row => row.Target == entry.Target)) return StatusCode(409, "This assignment target is no longer available.");
             Reps = options.Value.Reps.Where(rep => rep.Subject != Actions.Location.Owner?.Rep.Subject).ToArray();
+            // The stored assignment's RepSubject references RepReportingLines.
+            // General Add previews can include an unconfigured HO recipient;
+            // this focused chooser offers only changes the existing schema can save.
+            if (User.IsInRole(BusinessRoles.HeadOfficeUser))
+            {
+                var reporting = await coverage.ReportingLinesAsync(HttpContext.RequestAborted);
+                if (!reporting.Success) return StatusCode((int)reporting.Status);
+                var configured = reporting.Value!.Lines.Select(row => row.Line.RepSubject).ToHashSet(StringComparer.Ordinal);
+                Reps = Reps.Where(rep => configured.Contains(rep.Subject)).ToArray();
+            }
         }
         return null;
     }

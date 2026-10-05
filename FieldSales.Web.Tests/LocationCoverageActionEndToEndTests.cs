@@ -12,7 +12,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed class LocationCoverageActionEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed partial class LocationCoverageActionEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Theory]
     [InlineData(false, "Town", 5)] [InlineData(false, "Shop", 1)]
@@ -121,8 +121,12 @@ public sealed class LocationCoverageActionEndToEndTests(CoverageReadApplication 
     private static string Action(string html, string intent)
     {
         var links = Regex.Matches(html, "<a[^>]*href=\"([^\"]*LocationChange[^\"]*)\"[^>]*>([^<]*)</a>");
-        string phrase = intent == "Town" ? "Assign Laragh (Town)" : intent == "Source" ? "Transfer Rathdrum" : "just this shop";
-        return WebUtility.HtmlDecode(links.Single(link => WebUtility.HtmlDecode(link.Groups[2].Value).Contains(phrase, StringComparison.Ordinal)).Groups[1].Value);
+        return WebUtility.HtmlDecode(links.Single(link =>
+        {
+            string label = WebUtility.HtmlDecode(link.Groups[2].Value);
+            return intent == "Town" ? label.StartsWith("Assign ", StringComparison.Ordinal) && label.Contains("(Town)", StringComparison.Ordinal)
+                : intent == "Source" ? label.StartsWith("Transfer ", StringComparison.Ordinal) : label.Contains("just this shop", StringComparison.Ordinal);
+        }).Groups[1].Value);
     }
     private static void SaveRender(string name, string html)
     {
@@ -145,9 +149,9 @@ public sealed class LocationCoverageActionEndToEndTests(CoverageReadApplication 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode); var customer = (await created.Content.ReadFromJsonAsync<CustomerDetails>())!;
         for (int i = 1; i < locations; i++) { using var added = await api.PostAsJsonAsync($"/directory/customers/{customer.Id}/locations", new CreateLocationRequest("Neighbour " + i, town.Id)); Assert.Equal(HttpStatusCode.Created, added.StatusCode); }
         using var distant = await api.PostAsJsonAsync($"/directory/customers/{customer.Id}/locations", new CreateLocationRequest("Distant shop", other.Id)); Assert.Equal(HttpStatusCode.Created, distant.StatusCode);
-        return new(region, county, town, other, customer.Locations[0]);
+        return new(region, county, town, other, customer.Locations[0], customer.Id);
     }
     private static async Task<GeographyItem> Place(HttpClient api, string level, string name, Guid? parent = null)
     { using var r = await api.PostAsJsonAsync("/directory/geography/" + level, new CreateGeographyRequest(name, parent)); Assert.Equal(HttpStatusCode.Created, r.StatusCode); return (await r.Content.ReadFromJsonAsync<GeographyItem>())!; }
-    private sealed record Seed(GeographyItem Region, GeographyItem County, GeographyItem Town, GeographyItem OtherTown, LocationSummary Shop);
+    private sealed record Seed(GeographyItem Region, GeographyItem County, GeographyItem Town, GeographyItem OtherTown, LocationSummary Shop, Guid CustomerId);
 }
