@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
-const script = readFileSync(new URL('../FieldSales.Web/wwwroot/js/product-unit-form.js', import.meta.url), 'utf8');
+const script = readFileSync(new URL('../../src/FieldSales.Web/wwwroot/js/product-unit-form.js', import.meta.url), 'utf8');
 
 // Only the browser surface used by the script is supplied; all presentation logic is the real script.
 function page({ unit = 'Each', originalUnit = '', amount = '', enteredPrice } = {}) {

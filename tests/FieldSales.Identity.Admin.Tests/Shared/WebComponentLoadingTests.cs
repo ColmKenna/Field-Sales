@@ -21,12 +21,12 @@ public class WebComponentLoadingTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
 
         while (directory is not null &&
-               !Directory.Exists(Path.Combine(directory.FullName, "FieldSales.Identity", "src")))
+               !File.Exists(Path.Combine(directory.FullName, "FieldSales.slnx")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
         var pages = new DirectoryInfo(Path.Combine(
-            directory!.FullName, "FieldSales.Identity", "src", "FieldSales.Identity", "Pages"));
+            directory!.FullName, "src", "FieldSales.Identity", "src", "FieldSales.Identity", "Pages"));
         Assert.True(pages.Exists, $"Pages directory not found from {AppContext.BaseDirectory}");
         return pages;
     }
