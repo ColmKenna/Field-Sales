@@ -119,9 +119,7 @@ public sealed class DemoSeedTests(DemoSqlServer server) : IClassFixture<DemoSqlS
 
 public sealed class DemoSqlServer : IAsyncLifetime
 {
-    // Disposable test databases need no disk persistence; keep SQL files in memory.
-    private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
-        .WithTmpfsMount("/var/opt/mssql").Build();
+    private readonly MsSqlContainer container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     public Task InitializeAsync() => container.StartAsync();
     public Task DisposeAsync() => container.DisposeAsync().AsTask();
     public string Connection(string name) => new SqlConnectionStringBuilder(container.GetConnectionString())
