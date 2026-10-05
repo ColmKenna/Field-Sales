@@ -29,12 +29,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\FieldSales.Identity\src\FieldSales.Identity\FieldSales.Identity.csproj"/>
-        <ProjectReference Include="..\FieldSales.Identity.Admin.Services\FieldSales.Identity.Admin.Services.csproj"/>
+        <ProjectReference Include="..\..\src\FieldSales.Identity\src\FieldSales.Identity\FieldSales.Identity.csproj"/>
+        <ProjectReference Include="..\..\src\FieldSales.Identity.Admin.Services\FieldSales.Identity.Admin.Services.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="..\FieldSales.Identity\src\FieldSales.Identity\Data\AdoptionScripts\MigrationAdoption.sql"
+        <Content Include="..\..\src\FieldSales.Identity\src\FieldSales.Identity\Data\AdoptionScripts\MigrationAdoption.sql"
                  Link="Data\AdoptionScripts\MigrationAdoption.sql"
                  CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>

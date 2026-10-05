@@ -26,7 +26,7 @@ jobs:
         run: dotnet build FieldSales.slnx --no-restore
 
       - name: Run unit tests (Fast Fail)
-        run: dotnet test FieldSales.UnitTests/FieldSales.UnitTests.csproj --no-build --verbosity normal
+        run: dotnet test tests/FieldSales.UnitTests/FieldSales.UnitTests.csproj --no-build --verbosity normal
 
       # SQL Server-backed tests (migration adoption, concurrency, secret-reveal instance
       # handoff) run for real here, not skipped — GitHub-hosted ubuntu runners ship Docker
