@@ -24,6 +24,10 @@ public sealed record LocationCoveragePage(Guid LocationId, string Name, Guid Tow
 // Navigation context only. Existing mutation endpoints recheck all authority and proofs.
 public sealed record LocationCoverageActions(LocationCoveragePage Location, Guid? SourceAssignmentId,
     int SourceLocations, bool CanAssignTown, bool CanChangeShop, bool CanTransferSource);
+public sealed record UnassignedLocation(Guid CustomerId, string CustomerName, LocationCoverageActions Actions);
+public sealed record UnassignedTown(Guid Id, string Name, string CountyName, string RegionName,
+    IReadOnlyList<UnassignedLocation> Locations);
+public sealed record UnassignedCoveragePage(IReadOnlyList<UnassignedTown> Towns);
 public sealed record LocationCoverageHistoryPage(Guid LocationId, string Name, string TownName,
     IReadOnlyList<AssignmentHistoryDetails> Entries);
 

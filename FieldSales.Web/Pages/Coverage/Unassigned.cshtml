@@ -1,0 +1,42 @@
+@page
+@model FieldSales.Web.Pages.Coverage.UnassignedModel
+@{ ViewData["Title"] = "Unassigned Locations"; }
+<div class="unassigned-coverage">
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a></nav>
+<h1>Unassigned Locations</h1>
+@if (TempData["AssignmentNotice"] is string notice) { <p role="status">@notice</p> }
+@if (Model.Coverage.Towns.Count == 0)
+{
+    <p>All Locations have a responsible rep</p>
+}
+@foreach (var town in Model.Coverage.Towns)
+{
+    <section aria-labelledby="town-@town.Id" class="unassigned-town">
+        <h2 id="town-@town.Id">@town.Name</h2>
+        <p>@town.CountyName · @town.RegionName</p>
+        <ul class="unassigned-locations">
+        @foreach (var row in town.Locations)
+        {
+            var location = row.Actions.Location;
+            <li data-location-id="@location.LocationId">
+                <h3><a asp-page="./Location" asp-route-id="@location.LocationId">@location.Name</a></h3>
+                <p>Customer: @row.CustomerName</p>
+                <div class="location-assignment-options">
+                    @if (row.Actions.CanAssignTown)
+                    { <a class="button" asp-page="./LocationChange" asp-route-id="@location.LocationId" asp-route-entryProof="@Model.Entry(row, "Town")">Assign @town.Name (Town) to...</a> }
+                    else
+                    { <button type="button" disabled>Assign @town.Name (Town) to...</button> }
+                    <span>@town.Locations.Count @(town.Locations.Count == 1 ? "Location" : "Locations") in @town.Name @(town.Locations.Count == 1 ? "is" : "are") unassigned</span>
+                    @if (row.Actions.CanChangeShop)
+                    { <a class="button" asp-page="./LocationChange" asp-route-id="@location.LocationId" asp-route-entryProof="@Model.Entry(row, "Shop")">Assign just this shop to...</a> }
+                    else
+                    { <button type="button" disabled>Assign just this shop to...</button> }
+                </div>
+                @if (!row.Actions.CanAssignTown)
+                { <p>Assignments are unavailable while this Town, County or Region is archived.</p> }
+            </li>
+        }
+        </ul>
+    </section>
+}
+</div>

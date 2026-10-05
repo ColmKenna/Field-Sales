@@ -20,6 +20,8 @@ public sealed class LocationChangeModel(CoverageApiClient coverage, IDataProtect
     public IReadOnlyList<StaffChoice> Reps { get; private set; } = [];
     public AssignmentImpactDetails? Preview { get; private set; }
     public string? Notice { get; private set; }
+    public string ReturnPage => Entry.FromUnassigned ? "./Unassigned" : "./Location";
+    public Guid? ReturnLocationId => Entry.FromUnassigned ? null : Entry.LocationId;
     public string Heading => Entry.Intent == "Town" ? "Assign " + Actions.Location.TownName + " (Town)"
         : Entry.Intent == "Source" ? "Transfer " + Actions.Location.Owner!.SourceName + " (" + Entry.Source!.Level + ")"
         : (Actions.Location.Owner is null ? "Assign" : "Change") + " just this shop";
@@ -47,6 +49,14 @@ public sealed class LocationChangeModel(CoverageApiClient coverage, IDataProtect
         var result = await coverage.SaveAddAsync(Command(), HttpContext.RequestAborted);
         if (result.Success && result.Value?.Saved == true)
         {
+            if (Entry.FromUnassigned)
+            {
+                string rep = Reps.Single(row => row.Subject == RepSubject).Name;
+                TempData["AssignmentNotice"] = Entry.Intent == "Town"
+                    ? $"{Actions.Location.TownName}: {rep} (via {Actions.Location.TownName})."
+                    : $"{Actions.Location.Name}: {rep} (assigned directly).";
+                return RedirectToPage("./Unassigned");
+            }
             TempData["AssignmentNotice"] = "Assignment change saved.";
             return RedirectToPage("./Location", new { id });
         }

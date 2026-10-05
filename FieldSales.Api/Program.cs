@@ -16,6 +16,7 @@ builder.Services.AddScoped<CustomerStore>();
 builder.Services.AddScoped<CoverageReadStore>();
 builder.Services.AddScoped<RepTerritoryReader>();
 builder.Services.AddScoped<LocationCoverageReader>();
+builder.Services.AddScoped<UnassignedCoverageReader>();
 builder.Services.AddScoped<CoverageOwnershipReader>();
 builder.Services.AddScoped<AssignmentHistoryWriter>();
 builder.Services.AddScoped<AssignmentHistoryReadStore>();

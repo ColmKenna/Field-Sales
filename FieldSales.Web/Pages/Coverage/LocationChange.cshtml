@@ -2,7 +2,7 @@
 @model FieldSales.Web.Pages.Coverage.LocationChangeModel
 @{ ViewData["Title"] = Model.Heading; }
 <div class="location-change">
-<nav class="coverage-navigation"><a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Back to @Model.Actions.Location.Name</a></nav>
+<nav class="coverage-navigation"><a asp-page="@Model.ReturnPage" asp-route-id="@Model.ReturnLocationId">Back to @(Model.Entry.FromUnassigned ? "Unassigned" : Model.Actions.Location.Name)</a></nav>
 <h1 class="location-coverage-heading">@Model.Heading</h1>
 <p>@Model.Actions.Location.Name · @Model.Actions.Location.TownName</p>
 @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
@@ -15,13 +15,13 @@
         <input asp-for="EntryProof" type="hidden" /><input asp-for="RepSubject" type="hidden" />
         <input asp-for="Reason" type="hidden" /><input asp-for="PreviewProof" type="hidden" />
         <button class="button" type="submit" name="Confirmed" value="true">Confirm assignment</button>
-        <a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Cancel</a>
+        <a asp-page="@Model.ReturnPage" asp-route-id="@Model.ReturnLocationId">Cancel</a>
     </form>
 }
 else if (Model.Reps.Count == 0)
 {
     <p>No eligible receiving reps are available for this change.</p>
-    <a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Back to Location</a>
+    <a asp-page="@Model.ReturnPage" asp-route-id="@Model.ReturnLocationId">Back to @(Model.Entry.FromUnassigned ? "Unassigned" : "Location")</a>
 }
 else
 {
@@ -35,7 +35,7 @@ else
         </select>
         <label asp-for="Reason">Reason (optional)</label><input asp-for="Reason" maxlength="1000" />
         <button class="button" type="submit">@(Model.Entry.IsTransfer ? "Review transfer" : "Preview assignment")</button>
-        <a asp-page="./Location" asp-route-id="@Model.Entry.LocationId">Cancel</a>
+        <a asp-page="@Model.ReturnPage" asp-route-id="@Model.ReturnLocationId">Cancel</a>
     </form>
 }
 </div>
