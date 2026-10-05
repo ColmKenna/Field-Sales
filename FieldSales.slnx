@@ -13,15 +13,15 @@
         <Project Path="src/FieldSales.StaffAccess/FieldSales.StaffAccess.csproj" />
     </Folder>
     <Folder Name="/tests/Unit/">
-        <Project Path="tests/Unit/FieldSales.Api.UnitTests/FieldSales.Api.UnitTests.csproj" />
-        <Project Path="tests/Unit/FieldSales.Identity.Admin.UnitTests/FieldSales.Identity.Admin.UnitTests.csproj" />
-        <Project Path="tests/Unit/FieldSales.Web.UnitTests/FieldSales.Web.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Api/FieldSales.Api.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Identity.Admin/FieldSales.Identity.Admin.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Web/FieldSales.Web.UnitTests.csproj" />
     </Folder>
     <Folder Name="/tests/Integration/">
-        <Project Path="tests/Integration/FieldSales.Api.IntegrationTests/FieldSales.Api.IntegrationTests.csproj" />
-        <Project Path="tests/Integration/FieldSales.Identity.Admin.IntegrationTests/FieldSales.Identity.Admin.IntegrationTests.csproj" />
-        <Project Path="tests/Integration/FieldSales.Web.IntegrationTests/FieldSales.Web.IntegrationTests.csproj" />
-        <Project Path="tests/Integration/FieldSales.DemoData.IntegrationTests/FieldSales.DemoData.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Api/FieldSales.Api.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Identity.Admin/FieldSales.Identity.Admin.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Web/FieldSales.Web.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.DemoData/FieldSales.DemoData.IntegrationTests.csproj" />
     </Folder>
     <Folder Name="/tests/E2E/" />
     <Folder Name="/tools/">
