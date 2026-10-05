@@ -353,8 +353,8 @@ public sealed class GeographyIntegrationTests(GeographyApplication app) : IClass
         string? output = Environment.GetEnvironmentVariable("FIELD_SALES_GEOGRAPHY_ARTIFACT_DIR");
         if (string.IsNullOrWhiteSpace(output)) return;
         System.IO.Directory.CreateDirectory(output);
-        string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.."));
-        string stylesheet = new Uri(Path.Combine(repository, "FieldSales.Web/wwwroot/css/site.css")).AbsoluteUri;
+        string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        string stylesheet = new Uri(Path.Combine(repository, "src/FieldSales.Web/wwwroot/css/site.css")).AbsoluteUri;
         html = Regex.Replace(html, "href=\"/css/site.css[^\"]*\"", $"href=\"{stylesheet}\"");
         File.WriteAllText(Path.Combine(output, name + ".html"), html);
     }

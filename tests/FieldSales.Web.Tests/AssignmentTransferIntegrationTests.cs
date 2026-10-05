@@ -283,9 +283,9 @@ public sealed class AssignmentTransferIntegrationTests(CoverageReadApplication a
     internal static void SaveRender(string name,string html)
     {
         string? output=Environment.GetEnvironmentVariable("FIELD_SALES_TRANSFER_ARTIFACT_DIR"); if(string.IsNullOrWhiteSpace(output)) return;
-        System.IO.Directory.CreateDirectory(output); string root=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../../../.."));
-        string css=File.ReadAllText(Path.Combine(root,"FieldSales.Web/wwwroot/css/site.css"));
-        string js=File.ReadAllText(Path.Combine(root,"FieldSales.Web/wwwroot/js/assignment-transfer.js"));
+        System.IO.Directory.CreateDirectory(output); string root=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../../../../.."));
+        string css=File.ReadAllText(Path.Combine(root,"src/FieldSales.Web/wwwroot/css/site.css"));
+        string js=File.ReadAllText(Path.Combine(root,"src/FieldSales.Web/wwwroot/js/assignment-transfer.js"));
         html=Regex.Replace(html,"<link[^>]*href=\"/css/site.css[^\"]*\"[^>]*>","<style>"+css+"</style>");
         html=Regex.Replace(html,"<script[^>]*src=\"/js/assignment-transfer.js[^\"]*\"[^>]*></script>","<script>"+js+"</script>");
         File.WriteAllText(Path.Combine(output,name.Replace(' ','-')+".html"),html);

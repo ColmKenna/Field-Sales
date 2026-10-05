@@ -83,8 +83,8 @@ public sealed class LocationCoveragePageTests
     private static void SaveRender(string name, string html)
     {
         string? output = Environment.GetEnvironmentVariable("FIELD_SALES_LOCATION_ARTIFACT_DIR"); if (string.IsNullOrWhiteSpace(output)) return;
-        System.IO.Directory.CreateDirectory(output); string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.."));
-        string css = File.ReadAllText(Path.Combine(repository, "FieldSales.Web/wwwroot/css/site.css"));
+        System.IO.Directory.CreateDirectory(output); string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        string css = File.ReadAllText(Path.Combine(repository, "src/FieldSales.Web/wwwroot/css/site.css"));
         html = Regex.Replace(html, "<link[^>]*href=\"/css/site.css[^\"]*\"[^>]*>", "<style>" + css + "</style>");
         html = html.Replace("/Coverage/LocationHistory/11111111-1111-1111-1111-111111111111", name + "-history.html", StringComparison.Ordinal)
             .Replace("/Coverage/Location/11111111-1111-1111-1111-111111111111", name.Replace("-history", "", StringComparison.Ordinal) + ".html", StringComparison.Ordinal);

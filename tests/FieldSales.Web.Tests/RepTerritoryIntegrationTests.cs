@@ -285,8 +285,8 @@ public sealed class RepTerritoryIntegrationTests(CoverageReadApplication app) : 
         string? output = Environment.GetEnvironmentVariable("FIELD_SALES_TERRITORY_ARTIFACT_DIR");
         if (string.IsNullOrWhiteSpace(output)) return;
         System.IO.Directory.CreateDirectory(output);
-        string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.."));
-        string css = File.ReadAllText(Path.Combine(repository, "FieldSales.Web/wwwroot/css/site.css"));
+        string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        string css = File.ReadAllText(Path.Combine(repository, "src/FieldSales.Web/wwwroot/css/site.css"));
         html = Regex.Replace(html, "<link[^>]*href=\"/css/site.css[^\"]*\"[^>]*>", "<style>" + css + "</style>");
         File.WriteAllText(Path.Combine(output, name + ".html"), html);
     }

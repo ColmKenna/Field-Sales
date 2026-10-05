@@ -217,8 +217,8 @@ public sealed class UnassignedCoverageIntegrationTests(CoverageReadApplication a
     private static void Capture(string name, string html)
     {
         string? output = Environment.GetEnvironmentVariable("FIELD_SALES_UNASSIGNED_ARTIFACT_DIR"); if (string.IsNullOrEmpty(output)) return;
-        System.IO.Directory.CreateDirectory(output); string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.."));
-        string css = File.ReadAllText(Path.Combine(repository, "FieldSales.Web/wwwroot/css/site.css"));
+        System.IO.Directory.CreateDirectory(output); string repository = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+        string css = File.ReadAllText(Path.Combine(repository, "src/FieldSales.Web/wwwroot/css/site.css"));
         html = Regex.Replace(html, "<link[^>]*href=\"/css/site.css[^\"]*\"[^>]*>", "<style>" + css + "</style>"); File.WriteAllText(Path.Combine(output, name + ".html"), html);
     }
     private sealed record Seed(GeographyItem Region, GeographyItem County, GeographyItem Town, GeographyItem OtherTown,

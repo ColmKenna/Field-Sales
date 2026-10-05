@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -18,8 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FieldSales.Api\FieldSales.Api.csproj" />
-    <ProjectReference Include="..\FieldSales.Quantities\FieldSales.Quantities.csproj" />
+    <ProjectReference Include="..\..\src\FieldSales.Api\FieldSales.Api.csproj" />
+    <ProjectReference Include="..\..\src\FieldSales.Quantities\FieldSales.Quantities.csproj" />
   </ItemGroup>
 
   <ItemGroup>
