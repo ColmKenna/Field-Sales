@@ -4,13 +4,27 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class RestrictedProductVisibilityTests(RestrictedProductVisibilityTests.Sql sql)
-    : IClassFixture<RestrictedProductVisibilityTests.Sql>
+[Collection(SqlServerCollection.Name)]
+public sealed class RestrictedProductVisibilityTests(SqlServerFixture fixture) : IAsyncLifetime
 {
+    private string _connectionString = null!;
+
+    public CatalogueDbContext CreateContext() =>
+        new(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(_connectionString).Options);
+
+    public async Task InitializeAsync()
+    {
+        _connectionString = fixture.CreateConnectionString("Visibility");
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
     [Fact]
     public async Task Should_HideProductFromEveryRep_When_ItsGroupIsArchived()
     {
-        await using var db = sql.CreateContext();
+        await using var db = CreateContext();
         var group = await AddGroupAsync(db, "Pharmacy-only medicines");
         var other = await AddGroupAsync(db, "High-value equipment");
         Guid[] scope = [await AddProductAsync(db, group)];
@@ -24,7 +38,7 @@ public sealed class RestrictedProductVisibilityTests(RestrictedProductVisibility
     [Fact]
     public async Task Should_ShowProductOnlyToPermittedReps_When_ItsGroupIsActive()
     {
-        await using var db = sql.CreateContext();
+        await using var db = CreateContext();
         var group = await AddGroupAsync(db, "Pharmacy-only medicines");
         var other = await AddGroupAsync(db, "High-value equipment");
         Guid restricted = await AddProductAsync(db, group);
@@ -39,7 +53,7 @@ public sealed class RestrictedProductVisibilityTests(RestrictedProductVisibility
     [Fact]
     public async Task Should_ShowProductToEveryRep_When_ItHasNoGroup()
     {
-        await using var db = sql.CreateContext();
+        await using var db = CreateContext();
         var group = await AddGroupAsync(db, "Pharmacy-only medicines");
         Guid unrestricted = await AddProductAsync(db, null);
         Guid[] scope = [unrestricted, await AddProductAsync(db, group)];
@@ -53,7 +67,7 @@ public sealed class RestrictedProductVisibilityTests(RestrictedProductVisibility
     [Fact]
     public async Task Should_RestorePreviousVisibility_When_GroupIsUnarchived()
     {
-        await using var db = sql.CreateContext();
+        await using var db = CreateContext();
         var group = await AddGroupAsync(db, "Pharmacy-only medicines");
         var other = await AddGroupAsync(db, "High-value equipment");
         Guid restricted = await AddProductAsync(db, group);
@@ -92,26 +106,9 @@ public sealed class RestrictedProductVisibilityTests(RestrictedProductVisibility
     // Reads through a fresh context, as the snapshot builder would, and returns ids in scope order.
     private async Task<Guid[]> VisibleAsync(Guid[] scope, params Guid[] permitted)
     {
-        await using var db = sql.CreateContext();
+        await using var db = CreateContext();
         Guid[] visible = await db.Products.Where(product => scope.Contains(product.Id))
             .VisibleToRep(db.RestrictionGroups, permitted).Select(product => product.Id).ToArrayAsync();
         return scope.Where(visible.Contains).ToArray();
-    }
-
-    public sealed class Sql : IAsyncLifetime
-    {
-        private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-
-        public CatalogueDbContext CreateContext() =>
-            new(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(_sql.GetConnectionString()).Options);
-
-        public async Task InitializeAsync()
-        {
-            await _sql.StartAsync();
-            await using var db = CreateContext();
-            await db.Database.MigrateAsync();
-        }
-
-        public Task DisposeAsync() => _sql.DisposeAsync().AsTask();
     }
 }

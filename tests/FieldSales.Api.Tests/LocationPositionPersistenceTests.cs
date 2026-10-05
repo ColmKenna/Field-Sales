@@ -11,16 +11,31 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPositionDatabase>
+[Collection(SqlServerCollection.Name)]
+public sealed class LocationPositionPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
 {
-    private readonly LocationPositionDatabase database;
+    private readonly string catalogName = $"ApiTest_LocPos_{Guid.NewGuid():N}";
     private static readonly DateTimeOffset First = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
-    public LocationPositionPersistenceTests(LocationPositionDatabase database) => this.database = database;
+
+    public DbContextOptions<DirectoryDbContext> Options(string? database = null)
+    {
+        var connection = new SqlConnectionStringBuilder(fixture.ConnectionString) { InitialCatalog = database ?? catalogName };
+        return new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(connection.ConnectionString).Options;
+    }
+    public DirectoryDbContext Create() => new(Options());
+
+    public async Task InitializeAsync()
+    {
+        await using var db = Create();
+        await db.Database.MigrateAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Should_PreserveDirectoryData_When_CoordinateSchemaIsAddedOrAppRestarts()
     {
-        var options = database.Options("PositionUpgrade_" + Guid.NewGuid().ToString("N"));
+        var options = Options("PositionUpgrade_" + Guid.NewGuid().ToString("N"));
         Guid locationId, contactId = Guid.NewGuid(), typeId = Guid.NewGuid();
         await using (var db = new DirectoryDbContext(options))
         {
@@ -50,7 +65,7 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
     [Fact]
     public async Task Should_RetainPreviousSourcesAndExposeStoredPrecision_When_PositionsChangeOrClear()
     {
-        await using var db = database.Create();
+        await using var db = Create();
         Guid id = await SeedAsync(db);
         var location = await db.Locations.SingleAsync(item => item.Id == id);
         Assert.True(location.ApplyDefaultPosition(new(52.923456789m, -6.291234567m), LocationPositionPrecision.Town, First));
@@ -61,7 +76,7 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
         Assert.True(location.ApplyDefaultPosition(new(52.93m, -6.30m), LocationPositionPrecision.Eircode, First.AddHours(2)));
         await db.SaveChangesAsync();
 
-        await using var restarted = database.Create();
+        await using var restarted = Create();
         var saved = await restarted.Locations.Include(item => item.PositionHistory).SingleAsync(item => item.Id == id);
         var old = Assert.Single(saved.PositionHistory);
         Assert.Equal(52.9234568m, old.Latitude); Assert.Equal(-6.2912346m, old.Longitude);
@@ -75,7 +90,7 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
 
         Assert.True(saved.ApplyDefaultPosition(null, null, First.AddHours(3)));
         await restarted.SaveChangesAsync();
-        await using var cleared = database.Create();
+        await using var cleared = Create();
         var missing = await cleared.Locations.Include(item => item.PositionHistory).SingleAsync(item => item.Id == id);
         Assert.Null(missing.Latitude); Assert.Null(missing.Longitude); Assert.Null(missing.PositionPrecision);
         Assert.Null(missing.PositionSourceTownId); Assert.Null(missing.PositionSourceEircode); Assert.Null(missing.PositionedAt);
@@ -86,7 +101,7 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
     [Fact]
     public async Task Should_PreserveConfirmedPosition_When_AutomaticDefaultingIsAttempted()
     {
-        await using var db = database.Create();
+        await using var db = Create();
         Guid id = await SeedAsync(db);
         // Future GPS data is represented in storage; WI-019 exposes no confirmation command.
         await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Locations SET Latitude=52.9, Longitude=-6.3, PositionPrecision=2, PositionedAt={First} WHERE Id={id}");
@@ -104,16 +119,16 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
     public async Task Should_RollBackHistoryAndPosition_When_AnotherEditorHasChangedTheLocation()
     {
         Guid id;
-        await using (var seed = database.Create())
+        await using (var seed = Create())
         {
             id = await SeedAsync(seed);
             var location = await seed.Locations.SingleAsync(item => item.Id == id);
             location.ApplyDefaultPosition(new(52, -6), LocationPositionPrecision.Town, First);
             await seed.SaveChangesAsync();
         }
-        await using var stale = database.Create();
+        await using var stale = Create();
         var staleLocation = await stale.Locations.SingleAsync(item => item.Id == id);
-        await using (var winner = database.Create())
+        await using (var winner = Create())
         {
             var current = await winner.Locations.SingleAsync(item => item.Id == id);
             current.ApplyDefaultPosition(new(53, -7), LocationPositionPrecision.Eircode, First.AddHours(1));
@@ -121,7 +136,7 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
         }
         staleLocation.ApplyDefaultPosition(new(54, -8), LocationPositionPrecision.Town, First.AddHours(2));
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => stale.SaveChangesAsync());
-        await using var check = database.Create();
+        await using var check = Create();
         var saved = await check.Locations.Include(item => item.PositionHistory).SingleAsync(item => item.Id == id);
         Assert.Equal(53m, saved.Latitude); Assert.Equal(LocationPositionPrecision.Eircode, saved.PositionPrecision);
         Assert.Equal(First.AddHours(1), Assert.Single(saved.PositionHistory).ReplacedAt);
@@ -138,7 +153,7 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
     public async Task Should_RejectInvalidPositionStorage_When_DatabaseConstraintsAreUsed(
         int? latitude, int? longitude, int? precision, bool hasSourceTown)
     {
-        await using var db = database.Create();
+        await using var db = Create();
         Guid id = await SeedAsync(db);
         var error = await Assert.ThrowsAsync<SqlException>(() => db.Database.ExecuteSqlInterpolatedAsync($"""
             UPDATE Locations SET Latitude={latitude}, Longitude={longitude}, PositionPrecision={precision},
@@ -153,7 +168,7 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
     [Fact]
     public async Task Should_RejectInvalidDefaultSources_WithoutChangingAnExistingPosition()
     {
-        await using var db = database.Create();
+        await using var db = Create();
         Guid id = await SeedAsync(db);
         var location = await db.Locations.SingleAsync(item => item.Id == id);
         location.ApplyDefaultPosition(new(0, 0), LocationPositionPrecision.Town, First);
@@ -193,22 +208,4 @@ public sealed class LocationPositionPersistenceTests : IClassFixture<LocationPos
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO Locations (Id,CustomerId,Name,NormalizedName,TownId,Eircode) VALUES ({location},{customer},N'Existing shop',N'EXISTING SHOP',{town},N'A67 X123')");
         return location;
     }
-}
-
-public sealed class LocationPositionDatabase : IAsyncLifetime
-{
-    private readonly MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-    public DbContextOptions<DirectoryDbContext> Options(string? database = null)
-    {
-        var connection = new SqlConnectionStringBuilder(sql.GetConnectionString()) { InitialCatalog = database ?? "LocationPositions" };
-        return new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(connection.ConnectionString).Options;
-    }
-    public DirectoryDbContext Create() => new(Options());
-    public async Task InitializeAsync()
-    {
-        await sql.StartAsync();
-        await using var db = Create();
-        await db.Database.MigrateAsync();
-    }
-    public Task DisposeAsync() => sql.DisposeAsync().AsTask();
 }

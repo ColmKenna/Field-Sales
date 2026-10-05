@@ -11,8 +11,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class AssignmentHistoryPersistenceTests(CoverageDatabase database) : IClassFixture<CoverageDatabase>
+[Collection(SqlServerCollection.Name)]
+public sealed class AssignmentHistoryPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
 {
+    private readonly CoverageDatabase database = new(fixture);
+
+    public Task InitializeAsync() => database.InitializeAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
     private static readonly DateTimeOffset At = new(2026, 9, 17, 14, 2, 59, TimeSpan.Zero);
     private static readonly HistoryStaffSnapshot Staff = new("actor", [
         new("actor", "M. Byrne", [BusinessRoles.HeadOfficeUser], true),

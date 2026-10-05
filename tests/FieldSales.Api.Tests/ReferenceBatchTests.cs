@@ -7,7 +7,8 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class ReferenceBatchTests
+[Collection(SqlServerCollection.Name)]
+public sealed class ReferenceBatchTests(SqlServerFixture fixture)
 {
     [Fact]
     public void Registry_RejectsMissingAndDuplicateSourcesAndResolvesUnknownKeys()
@@ -39,11 +40,9 @@ public sealed class ReferenceBatchTests
     [Fact]
     public async Task BatchUsage_CountsDistinctProductsWithOneSqlReadPerSourceRegardlessOfListSize()
     {
-        await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
         CommandCounter counter = new();
         await using var db = new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
-            .UseSqlServer(sql.GetConnectionString()).AddInterceptors(counter).Options);
+            .UseSqlServer(fixture.CreateConnectionString("RefBatch")).AddInterceptors(counter).Options);
         await db.Database.MigrateAsync();
         Category category = new CategoryTree([]).Add("category");
         Brand primary = Brand.Create("primary"), alternative = Brand.Create("alternative");

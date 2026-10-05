@@ -32,9 +32,7 @@ public sealed class CategoryIntegrationTests
     [Fact]
     public async Task Should_PersistSixLevelTreeCreatedThroughWebsite_When_ApplicationRestarts()
     {
-        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        string connectionString = sql.GetConnectionString();
+        string connectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Category");
         string token = CreateToken();
         string sixthUrl;
 

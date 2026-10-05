@@ -22,10 +22,13 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class ProductPriceApiTests : IClassFixture<ProductPriceApplication>
+[Collection(SqlServerCollection.Name)]
+public sealed class ProductPriceApiTests(SqlServerFixture fixture) : IAsyncLifetime
 {
-    private readonly ProductPriceApplication _app;
-    public ProductPriceApiTests(ProductPriceApplication app) => _app = app;
+    private readonly ProductPriceApplication _app = new(fixture.CreateConnectionString("PriceApi"));
+
+    public Task InitializeAsync() => _app.InitializeAsync();
+    public Task DisposeAsync() => _app.DisposeAsync();
 
     [Fact]
     public async Task Should_PreserveHistory_When_ApplicationRestarts()
@@ -194,18 +197,16 @@ public sealed class ProductPriceApiTests : IClassFixture<ProductPriceApplication
     }
 }
 
-public sealed class ProductPriceApplication : IAsyncLifetime
+public sealed class ProductPriceApplication(string connectionString) : IAsyncLifetime
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
-    private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     public PriceRoleLookup Roles { get; } = new();
     public PriceSaveBarrier ConcurrentSaves { get; } = new();
     public WebApplicationFactory<Program> Api { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        await _sql.StartAsync();
         Api = NewApi();
         _ = Api.Server;
         await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
@@ -215,7 +216,6 @@ public sealed class ProductPriceApplication : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await Api.DisposeAsync();
-        await _sql.DisposeAsync();
     }
 
     public async Task RestartAsync()
@@ -250,13 +250,13 @@ public sealed class ProductPriceApplication : IAsyncLifetime
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Authentication:Authority"] = Issuer,
-            ["ConnectionStrings:CatalogueDb"] = _sql.GetConnectionString()
+            ["ConnectionStrings:CatalogueDb"] = connectionString
         }));
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<CatalogueDbContext>();
             services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
-                .UseSqlServer(_sql.GetConnectionString()).AddInterceptors(ConcurrentSaves).Options));
+                .UseSqlServer(connectionString).AddInterceptors(ConcurrentSaves).Options));
             services.RemoveAll<IStaffRoleLookup>();
             services.AddSingleton<IStaffRoleLookup>(Roles);
             services.RemoveAll<TimeProvider>();

@@ -8,14 +8,13 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class BrandPersistenceTests
+[Collection(SqlServerCollection.Name)]
+public sealed class BrandPersistenceTests(SqlServerFixture fixture)
 {
     [Fact]
     public async Task Should_SaveBrand_When_NameIsValid()
     {
-        await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(fixture.CreateConnectionString("Brand")).Options;
         Guid id;
         await using (var predecessor = new CatalogueDbContext(options))
         {
@@ -59,9 +58,7 @@ public sealed class BrandPersistenceTests
     [InlineData(true)]
     public async Task Should_RefuseDelete_When_ReferenceAppearsAfterPageLoad(bool alternative)
     {
-        await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(fixture.CreateConnectionString("Brand")).Options;
         await using var db = new CatalogueDbContext(options);
         await db.Database.MigrateAsync();
         var category = new CategoryTree([]).Add("Lotion");

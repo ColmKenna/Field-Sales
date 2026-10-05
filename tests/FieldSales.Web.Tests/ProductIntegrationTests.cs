@@ -319,13 +319,13 @@ public sealed class ProductApplication : IAsyncLifetime
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
-    private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     public TestStaffRoleLookup Roles { get; } = new();
     public WebApplicationFactory<CatalogueDbContext> Api { get; private set; } = null!;
+    public string ConnectionString { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        await _sql.StartAsync();
+        ConnectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Product");
         Api = NewApi();
         _ = Api.Server;
         await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
@@ -335,7 +335,6 @@ public sealed class ProductApplication : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await Api.DisposeAsync();
-        await _sql.DisposeAsync();
     }
 
     public WebApplicationFactory<CatalogueDbContext> NewApi() =>
@@ -346,13 +345,13 @@ public sealed class ProductApplication : IAsyncLifetime
             builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Authentication:Authority"] = Issuer,
-                ["ConnectionStrings:CatalogueDb"] = _sql.GetConnectionString()
+                ["ConnectionStrings:CatalogueDb"] = ConnectionString
             }));
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<CatalogueDbContext>();
                 services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
-                    .UseSqlServer(_sql.GetConnectionString()).Options));
+                    .UseSqlServer(ConnectionString).Options));
                 services.RemoveAll<IStaffRoleLookup>();
                 services.AddSingleton<IStaffRoleLookup>(Roles);
                 services.RemoveAll<TimeProvider>();

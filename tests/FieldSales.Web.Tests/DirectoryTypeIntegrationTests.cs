@@ -23,6 +23,7 @@ public sealed class DirectoryTypeApplication : GeographyApplication
     protected override bool UseTestLocationUsage => false;
     public DirectoryTypeTestContacts Contacts { get; } = new();
     public string Registration { get; set; } = "valid";
+    private string? _catalogueConnectionString;
     protected override void ConfigureAdditionalServices(IServiceCollection services, string connectionString)
     {
         foreach (var descriptor in services.Where(service => service.IsKeyedService
@@ -30,9 +31,9 @@ public sealed class DirectoryTypeApplication : GeographyApplication
             services.Remove(descriptor);
         if (Registration != "missing") services.AddKeyedSingleton<IReferenceUsageSource>("directory-types", Contacts);
         if (Registration == "duplicate") services.AddKeyedSingleton<IReferenceUsageSource>("directory-types", new DirectoryTypeTestContacts());
-        string catalogue = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "DirectoryTypeCatalogueTests" }.ConnectionString;
+        _catalogueConnectionString ??= new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "DirectoryTypeCatalogueTests_" + Guid.NewGuid().ToString("N") }.ConnectionString;
         services.RemoveAll<CatalogueDbContext>();
-        services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(catalogue).Options));
+        services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(_catalogueConnectionString).Options));
     }
     protected override async Task InitializeAdditionalAsync()
     {

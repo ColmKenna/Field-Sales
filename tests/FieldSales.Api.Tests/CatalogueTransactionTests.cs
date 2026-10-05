@@ -5,15 +5,14 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public class CatalogueTransactionTests
+[Collection(SqlServerCollection.Name)]
+public class CatalogueTransactionTests(SqlServerFixture fixture)
 {
     [Fact]
     public async Task SqlRetryClearsFailedStateAndUncommittedWorkRollsBack()
     {
-        await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
         await using var db = new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
-            .UseSqlServer(sql.GetConnectionString(), options => options.EnableRetryOnFailure(2, TimeSpan.Zero, null)).Options);
+            .UseSqlServer(fixture.CreateConnectionString("Tx"), options => options.EnableRetryOnFailure(2, TimeSpan.Zero, null)).Options);
         await db.Database.MigrateAsync();
         int attempts = 0;
         Guid id = await CatalogueTransactions.RunAsync(db, IsolationLevel.Serializable, async transaction =>

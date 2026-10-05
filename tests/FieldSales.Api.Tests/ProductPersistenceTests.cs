@@ -8,14 +8,14 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class ProductPersistenceTests
+[Collection(SqlServerCollection.Name)]
+public sealed class ProductPersistenceTests(SqlServerFixture fixture)
 {
     [Fact]
     public async Task Should_PreserveEachAndPriceHistory_When_QuantityMigrationUpgradesExistingProduct()
     {
-        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        string connectionString = fixture.CreateConnectionString("ProductQuantityMigration");
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(connectionString).Options;
         Guid id = Guid.NewGuid();
         Guid categoryId;
         await using (CatalogueDbContext predecessor = new(options))
@@ -47,9 +47,8 @@ public sealed class ProductPersistenceTests
     [Fact]
     public async Task Should_PersistExactRulesAndRejectInvalidMinimum_When_ProductIsReloaded()
     {
-        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        string connectionString = fixture.CreateConnectionString("ProductRules");
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(connectionString).Options;
         Guid id;
         await using (CatalogueDbContext setup = new(options))
         {
@@ -76,10 +75,9 @@ public sealed class ProductPersistenceTests
     [Fact]
     public async Task Should_SaveOnlyOneProduct_When_DuplicateCodesAreSubmittedConcurrently()
     {
-        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
+        string connectionString = fixture.CreateConnectionString("ProductConcurrent");
         DbContextOptions<CatalogueDbContext> options = new DbContextOptionsBuilder<CatalogueDbContext>()
-            .UseSqlServer(sql.GetConnectionString()).Options;
+            .UseSqlServer(connectionString).Options;
         Guid categoryId;
         await using (CatalogueDbContext setup = new(options))
         {
@@ -114,10 +112,9 @@ public sealed class ProductPersistenceTests
     [Fact]
     public async Task Should_ReturnApplicablePrice_When_EffectiveDateIsReached()
     {
-        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
+        string connectionString = fixture.CreateConnectionString("ProductEffectiveDate");
         DbContextOptions<CatalogueDbContext> options = new DbContextOptionsBuilder<CatalogueDbContext>()
-            .UseSqlServer(sql.GetConnectionString()).Options;
+            .UseSqlServer(connectionString).Options;
         Guid productId;
         DateOnly initial = new(2026, 9, 30);
         DateOnly next = new(2026, 11, 1);

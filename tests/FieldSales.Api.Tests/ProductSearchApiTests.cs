@@ -12,8 +12,13 @@ using Microsoft.AspNetCore.TestHost;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class ProductSearchApiTests(ProductPriceApplication app) : IClassFixture<ProductPriceApplication>
+[Collection(SqlServerCollection.Name)]
+public sealed class ProductSearchApiTests(SqlServerFixture fixture) : IAsyncLifetime
 {
+    private readonly ProductPriceApplication app = new(fixture.CreateConnectionString("SearchApi"));
+
+    public Task InitializeAsync() => app.InitializeAsync();
+    public Task DisposeAsync() => app.DisposeAsync();
     [Theory]
     [InlineData("SPF30", 3)]
     [InlineData("  spf30  ", 3)]

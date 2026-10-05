@@ -364,16 +364,15 @@ public class GeographyApplication : IAsyncLifetime
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey Key = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
-    private readonly MsSqlContainer _sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     public TestStaffRoleLookup Roles { get; } = new();
     public TestLocationUsageSource Locations { get; } = new();
     protected virtual bool UseTestLocationUsage => true;
     public WebApplicationFactory<DirectoryDbContext> Api { get; private set; } = null!;
-    private string ConnectionString => new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(_sql.GetConnectionString()) { InitialCatalog = "DirectoryTests" }.ConnectionString;
+    public string ConnectionString { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        await _sql.StartAsync();
+        ConnectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Geography");
         Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
         Api = NewApi();
         await using var scope = Api.Services.CreateAsyncScope();
@@ -382,7 +381,7 @@ public class GeographyApplication : IAsyncLifetime
     }
     protected virtual Task InitializeAdditionalAsync() => Task.CompletedTask;
     protected virtual void ConfigureAdditionalServices(IServiceCollection services, string connectionString) { }
-    public async Task DisposeAsync() { await Api.DisposeAsync(); await _sql.DisposeAsync(); }
+    public async Task DisposeAsync() { await Api.DisposeAsync(); }
     private WebApplicationFactory<DirectoryDbContext> NewApi() => new WebApplicationFactory<DirectoryDbContext>().WithWebHostBuilder(builder =>
     {
         builder.UseEnvironment("Testing");
@@ -391,7 +390,7 @@ public class GeographyApplication : IAsyncLifetime
         {
             ["Authentication:Authority"] = Issuer,
             ["ConnectionStrings:DirectoryDb"] = ConnectionString,
-            ["ConnectionStrings:CatalogueDb"] = _sql.GetConnectionString()
+            ["ConnectionStrings:CatalogueDb"] = ConnectionString
         }));
         builder.ConfigureTestServices(services =>
         {
