@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Read the same local secrets as AppHost; no separate password setup. -->
+    <UserSecretsId>eae9793f-793c-4b49-96c7-f561f50d00d4</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/FieldSales.Api/FieldSales.Api.csproj" />
+    <ProjectReference Include="../../src/FieldSales.Identity/src/FieldSales.Identity/FieldSales.Identity.csproj" />
+    <ProjectReference Include="../../src/FieldSales.Web/FieldSales.Web.csproj" />
+    <Compile Include="../../src/FieldSales.AppHost/DemoProfile.cs" Link="DemoProfile.cs" />
+  </ItemGroup>
+</Project>

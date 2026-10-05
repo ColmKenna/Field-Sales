@@ -227,6 +227,20 @@ serving, so a fresh clone needs no migration-bundle step and no manual port disc
 
 ### 4. Development Seed Data
 
+For connected sample business data in separate, disposable databases, use the
+[isolated demo profile and seed commands](docs/demo-data.md):
+
+```sh
+./scripts/demo-data.sh start
+# In another terminal, after all applications are healthy:
+./scripts/demo-data.sh seed
+```
+
+Stop the demo AppHost, then run `./scripts/demo-data.sh reset` to remove the demo
+environment's data. Normal development databases are kept separately.
+Use the [manual testing checklist](docs/demo-data-manual-testing.md) to verify the
+demo setup and removal through the browser and terminal.
+
 In **Development only**, the host seeds its initial identity configuration and test accounts so
 the console is usable immediately. No seeding of any kind occurs in other environments.
 
