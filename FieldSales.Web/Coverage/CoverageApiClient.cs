@@ -10,6 +10,8 @@ namespace FieldSales.Web.Coverage;
 
 public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor contexts)
 {
+    public Task<DirectoryResult<UnassignedCoveragePage>> UnassignedAsync(CancellationToken ct) =>
+        SendAsync<UnassignedCoveragePage>(HttpMethod.Get, "/coverage/unassigned", null, ct);
     public async Task<DirectoryResult<LocationCoverageActions>> LocationActionsAsync(Guid id, CancellationToken ct)
     {
         var result = await SendAsync<LocationCoverageActions>(HttpMethod.Get, $"/coverage/locations/{id}/page/actions", null, ct);
@@ -119,6 +121,7 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
             var result = await response.Content.ReadFromJsonAsync<T>(ct);
             bool valid = result switch
             {
+                UnassignedCoveragePage unassigned => ValidUnassigned(unassigned),
                 LocationCoverageActions actions => ValidLocationActions(actions),
                 LocationCoveragePage location => ValidLocation(location),
                 LocationCoverageHistoryPage history => ValidLocationHistory(history),
@@ -176,6 +179,26 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
             : actions.SourceAssignmentId is { } id && id != Guid.Empty && actions.SourceLocations > 0
                 && !actions.CanAssignTown && (actions.Location.Owner.Source.Level != TerritoryLevel.Location
                     || actions.SourceLocations == 1 && !actions.CanTransferSource));
+    private static bool ValidUnassigned(UnassignedCoveragePage page)
+    {
+        if (page.Towns is null) return false;
+        HashSet<Guid> towns = [], locations = [];
+        foreach (var town in page.Towns)
+        {
+            if (town is null || town.Id == Guid.Empty || !towns.Add(town.Id) || string.IsNullOrWhiteSpace(town.Name)
+                || string.IsNullOrWhiteSpace(town.CountyName) || string.IsNullOrWhiteSpace(town.RegionName)
+                || town.Locations is not { Count: > 0 }) return false;
+            foreach (var row in town.Locations)
+            {
+                if (row is null || row.CustomerId == Guid.Empty || string.IsNullOrWhiteSpace(row.CustomerName)
+                    || row.Actions is null || !ValidLocationActions(row.Actions) || row.Actions.Location.Owner is not null
+                    || row.Actions.Location.TownId != town.Id || row.Actions.Location.TownName != town.Name
+                    || row.Actions.Location.OtherUnassignedLocations != town.Locations.Count - 1
+                    || !locations.Add(row.Actions.Location.LocationId)) return false;
+            }
+        }
+        return true;
+    }
     private static bool ValidTransferReview(TransferReview value) => ValidChoice(value.SourceRep)
         && value.ReceivingReps is not null && value.ReceivingReps.All(rep => ValidChoice(rep) && rep.Subject != value.SourceRep.Subject)
         && value.ReceivingReps.Select(row => row.Subject).Distinct(StringComparer.Ordinal).Count() == value.ReceivingReps.Count

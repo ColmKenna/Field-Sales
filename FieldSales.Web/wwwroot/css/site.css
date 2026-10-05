@@ -125,3 +125,6 @@ p { line-height: 1.6; }
 .location-assignment-options button { max-width: 100%; padding: .6rem .8rem; border: 1px solid #b9c8d6; border-radius: .4rem; font: inherit; }
 .location-assignment-options a { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
 .location-change { overflow-wrap: anywhere; }
+.unassigned-coverage { overflow-wrap: anywhere; }
+.unassigned-locations { list-style: none; padding: 0; }
+.unassigned-locations > li { padding-block: 1rem; border-bottom: 1px solid #cbd5e1; }

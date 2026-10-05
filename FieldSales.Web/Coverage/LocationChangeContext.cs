@@ -9,15 +9,15 @@ namespace FieldSales.Web.Coverage;
 
 // Protect only navigation intent. Authority and impact proof still belong to the API.
 public sealed record LocationChangeContext(Guid LocationId, Guid TownId, Guid? SourceAssignmentId,
-    TerritoryTarget? Source, string? OwnerSubject, string Intent, string ActorSubject)
+    TerritoryTarget? Source, string? OwnerSubject, string Intent, string ActorSubject, bool FromUnassigned = false)
 {
     private const string Purpose = "FieldSales.Coverage.LocationEntry.v1";
-    public static string Issue(IDataProtectionProvider protection, ClaimsPrincipal actor, LocationCoverageActions actions, string intent)
+    public static string Issue(IDataProtectionProvider protection, ClaimsPrincipal actor, LocationCoverageActions actions, string intent, bool fromUnassigned = false)
     {
         var page = actions.Location;
         return protection.CreateProtector(Purpose).Protect(JsonSerializer.Serialize(new LocationChangeContext(
             page.LocationId, page.TownId, actions.SourceAssignmentId, page.Owner?.Source, page.Owner?.Rep.Subject,
-            intent, actor.GetStaffSubject() ?? "")));
+            intent, actor.GetStaffSubject() ?? "", fromUnassigned)));
     }
     public static LocationChangeContext? Read(IDataProtectionProvider protection, ClaimsPrincipal actor, string? proof)
     {
@@ -27,6 +27,8 @@ public sealed record LocationChangeContext(Guid LocationId, Guid TownId, Guid? S
             var entry = JsonSerializer.Deserialize<LocationChangeContext>(protection.CreateProtector(Purpose).Unprotect(proof));
             return entry is not null && entry.LocationId != Guid.Empty && entry.TownId != Guid.Empty
                 && entry.Intent is "Town" or "Shop" or "Source" && !string.IsNullOrWhiteSpace(entry.ActorSubject)
+                && (!entry.FromUnassigned || entry.Intent is "Town" or "Shop" && entry.Source is null
+                    && entry.SourceAssignmentId is null && entry.OwnerSubject is null)
                 && entry.ActorSubject == actor.GetStaffSubject() ? entry : null;
         }
         catch (Exception exception) when (exception is CryptographicException or JsonException or ArgumentException) { return null; }

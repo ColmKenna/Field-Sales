@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = Model.Territory is { } title ? title.Rep.Name + " · Territory" : "Coverage";
 }
-<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a></nav>
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Unassigned">Unassigned Locations</a></nav>
 @if (Model.Territory is not { } territory)
 {
     <h1>Coverage</h1>
