@@ -21,7 +21,8 @@ The list reader uses the existing `EffectiveOwnerResolver` and four queries insi
 ## Verification
 
 - Pre-change coverage characterization: **261/261 passed**, no failures/skips; every TRX result Passed and run Completed.
-- Final affected and complete regression results are recorded in the WI-028 agent notes after execution.
+- Final affected suite: **214/214 passed**, including all **46 new cases** (21 authenticated BFF/API/SQL and 25 typed-contract/render cases).
+- Complete .NET regression: **2,171/2,171 passed** (API 268, Identity 1,049, Web 854). Every project Completed; every individual TRX result Passed; no failures/skips. Results under `.artifacts/wi028/full-regression`.
 - Warnings-as-errors solution build: zero warnings/errors.
 - Existing JavaScript suites: **34/34 passed** (18 identity/admin, 5 product-unit, 11 delivery status).
 - Actual captured Razor output checked in the in-app Browser: standard list at desktop 1280px and phone 390px; maximum-length labels at 390px; exact empty state. No horizontal overflow. Tab from the Town action focuses the shop-only action. Evidence under `.artifacts/wi028/rendered`; the local test server and temporary browser tab are closed and the viewport override reset.
