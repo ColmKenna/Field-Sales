@@ -25,9 +25,13 @@ jobs:
       - name: Build solution
         run: dotnet build FieldSales.slnx --no-restore
 
+      - name: Run unit tests (Fast Fail)
+        run: dotnet test FieldSales.UnitTests/FieldSales.UnitTests.csproj --no-build --verbosity normal
+
       # SQL Server-backed tests (migration adoption, concurrency, secret-reveal instance
       # handoff) run for real here, not skipped — GitHub-hosted ubuntu runners ship Docker
       # already running, which Testcontainers needs. A silent skip would mean CI stops
       # proving the thing most likely to break: real schema migrations against real SQL Server.
-      - name: Run test suite
-        run: dotnet test FieldSales.slnx --no-build --verbosity normal
+      - name: Run integration test suite
+        run: dotnet test FieldSales.slnx --no-build -m:1 --settings sqlserver.runsettings --verbosity normal
+
