@@ -11,8 +11,13 @@ namespace FieldSales.Api.Tests;
 
 // Increment 1 exercises only the approved duplicate/invalid storage,
 // reporting-line uniqueness and schema upgrade/restart scenario families.
-public sealed class TerritoryAssignmentPersistenceTests(CoverageDatabase database) : IClassFixture<CoverageDatabase>
+[Collection(SqlServerCollection.Name)]
+public sealed class TerritoryAssignmentPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
 {
+    private readonly CoverageDatabase database = new(fixture);
+
+    public Task InitializeAsync() => database.InitializeAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
     [Fact]
     public async Task Should_PreserveDirectoryAndCoverageData_When_SchemaIsUpgradedOrRestarted()
     {
@@ -230,20 +235,23 @@ public sealed class TerritoryAssignmentPersistenceTests(CoverageDatabase databas
     }
 }
 
-public sealed class CoverageDatabase : IAsyncLifetime
+public sealed class CoverageDatabase(SqlServerFixture fixture) : IAsyncLifetime
 {
-    private readonly MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+    private readonly string _catalogName = $"ApiTest_Coverage_{Guid.NewGuid():N}";
+
     public DbContextOptions<DirectoryDbContext> Options(string? name = null)
     {
-        var connection = new SqlConnectionStringBuilder(sql.GetConnectionString()) { InitialCatalog = name ?? "Coverage" };
+        var connection = new SqlConnectionStringBuilder(fixture.ConnectionString) { InitialCatalog = name ?? _catalogName };
         return new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(connection.ConnectionString).Options;
     }
+
     public DirectoryDbContext Create() => new(Options());
+
     public async Task InitializeAsync()
     {
-        await sql.StartAsync();
         await using var db = Create();
         await db.Database.MigrateAsync();
     }
-    public Task DisposeAsync() => sql.DisposeAsync().AsTask();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 }

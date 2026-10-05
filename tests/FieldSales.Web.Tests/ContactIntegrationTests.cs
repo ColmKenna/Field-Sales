@@ -19,12 +19,13 @@ namespace FieldSales.Web.Tests;
 
 public sealed class ContactApplication : GeographyApplication
 {
+    private string? _catalogueConnectionString;
     protected override bool UseTestLocationUsage => false;
     protected override void ConfigureAdditionalServices(IServiceCollection services, string connectionString)
     {
-        string catalogue = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "ContactCatalogueTests" }.ConnectionString;
+        _catalogueConnectionString ??= new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "ContactCatalogueTests_" + Guid.NewGuid().ToString("N") }.ConnectionString;
         services.RemoveAll<CatalogueDbContext>();
-        services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(catalogue).Options));
+        services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(_catalogueConnectionString).Options));
     }
     protected override async Task InitializeAdditionalAsync()
     {

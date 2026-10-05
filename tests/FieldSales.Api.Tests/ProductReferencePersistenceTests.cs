@@ -9,16 +9,15 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class ProductReferencePersistenceTests
+[Collection(SqlServerCollection.Name)]
+public sealed class ProductReferencePersistenceTests(SqlServerFixture fixture)
 {
     private const string Predecessor = "20261001085456_AddBrandsAndProductReferences";
 
     [Fact]
     public async Task Should_PreserveLegacyAttributesAndProductData_When_ReferenceMigrationUpgradesAndRollsBack()
     {
-        await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(fixture.CreateConnectionString("ProductRef")).Options;
         Guid id = Guid.NewGuid();
         Guid categoryId = Guid.NewGuid();
         string longValue = "Quoted \"value\" ·\n" + new string('界', 6000);
@@ -61,9 +60,7 @@ public sealed class ProductReferencePersistenceTests
     [Fact]
     public async Task Should_KeepLegacyData_When_MigrationFindsInvalidAttributeInput()
     {
-        await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(fixture.CreateConnectionString("ProductRef")).Options;
         await using var db = new CatalogueDbContext(options);
         await db.GetService<IMigrator>().MigrateAsync(Predecessor);
         Guid category = Guid.NewGuid();
@@ -89,9 +86,7 @@ public sealed class ProductReferencePersistenceTests
     [InlineData("restriction-groups")]
     public async Task Should_RefuseDeletion_When_ProductReferencesExist(string key)
     {
-        await using var sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(sql.GetConnectionString()).Options;
+        var options = new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(fixture.CreateConnectionString("ProductRef")).Options;
         await using var db = new CatalogueDbContext(options);
         await db.Database.MigrateAsync();
         var category = new CategoryTree([]).Add("Category");

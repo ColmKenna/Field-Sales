@@ -21,7 +21,8 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Api.Tests;
 
-public sealed class CataloguePersistenceTests
+[Collection(SqlServerCollection.Name)]
+public sealed class CataloguePersistenceTests(SqlServerFixture fixture)
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(
@@ -30,11 +31,10 @@ public sealed class CataloguePersistenceTests
     [Fact]
     public async Task Should_PersistRootAndNestedCategories_When_ApiRestarts()
     {
-        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
+        string connectionString = fixture.CreateConnectionString("CataloguePersistence");
         Guid rootId;
         Guid childId;
-        await using (WebApplicationFactory<Program> first = CreateFactory(sql.GetConnectionString()))
+        await using (WebApplicationFactory<Program> first = CreateFactory(connectionString))
         {
             await MigrateAsync(first);
             using HttpClient browser = first.CreateClient(new WebApplicationFactoryClientOptions
@@ -55,7 +55,7 @@ public sealed class CataloguePersistenceTests
                 (await PostAsync(browser, "Denied", null, BusinessRoles.SalesManager)).StatusCode);
         }
 
-        await using WebApplicationFactory<Program> restarted = CreateFactory(sql.GetConnectionString());
+        await using WebApplicationFactory<Program> restarted = CreateFactory(connectionString);
         using HttpClient client = restarted.CreateClient(new WebApplicationFactoryClientOptions
             { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token());
@@ -74,9 +74,8 @@ public sealed class CataloguePersistenceTests
     [Fact]
     public async Task Should_RefreshDescendantBreadcrumbs_When_AncestorIsRenamed()
     {
-        await using MsSqlContainer sql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-        await sql.StartAsync();
-        await using WebApplicationFactory<Program> factory = CreateFactory(sql.GetConnectionString());
+        string connectionString = fixture.CreateConnectionString("CatalogueRename");
+        await using WebApplicationFactory<Program> factory = CreateFactory(connectionString);
         await MigrateAsync(factory);
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
             { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
