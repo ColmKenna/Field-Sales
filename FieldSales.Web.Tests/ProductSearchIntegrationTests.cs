@@ -16,7 +16,7 @@ using Supplier = CatalogueApi::FieldSales.Api.Catalogue.Supplier;
 
 namespace FieldSales.Web.Tests;
 
-public sealed class ProductSearchEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
+public sealed class ProductSearchIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]
     public async Task Should_ShowDistinctPathsTodayPriceAndRecordLinks_When_SPF30IsSearched()

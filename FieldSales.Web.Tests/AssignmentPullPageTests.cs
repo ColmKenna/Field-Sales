@@ -15,19 +15,19 @@ public sealed class AssignmentPullPageTests
         using var login = await browser.GetAsync("/__test/sign-in?subject=manager&roles=" + Uri.EscapeDataString(role)); Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
         using var menu = await browser.GetAsync("/Coverage/Assignments?repSubject=receiver&returnToTerritory=true"); Assert.Equal(HttpStatusCode.OK, menu.StatusCode);
         string html = await menu.Content.ReadAsStringAsync(); Assert.Contains("Rathdrum — Aoife's", WebUtility.HtmlDecode(html));
-        AssignmentTransferEndToEndTests.SaveRender("pull-add", html);
-        var fields = AssignmentTransferEndToEndTests.Inputs(html); fields.Add(new("TargetKey", $"Town:{handler.Unit:D}:{handler.Assignment:D}:aoife"));
+        AssignmentTransferIntegrationTests.SaveRender("pull-add", html);
+        var fields = AssignmentTransferIntegrationTests.Inputs(html); fields.Add(new("TargetKey", $"Town:{handler.Unit:D}:{handler.Assignment:D}:aoife"));
         using var start = await browser.PostAsync("/Coverage/Assignments?handler=Preview", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.Redirect, start.StatusCode);
         using var question = await browser.GetAsync(start.Headers.Location); Assert.Equal(HttpStatusCode.OK, question.StatusCode);
         html = await question.Content.ReadAsStringAsync(); Assert.Contains("Transfer Rathdrum from Aoife to Niamh?", html);
-        fields = AssignmentTransferEndToEndTests.Inputs(html); Assert.Equal("receiver", fields.Single(row => row.Key == "ReceivingRepSubject").Value);
+        fields = AssignmentTransferIntegrationTests.Inputs(html); Assert.Equal("receiver", fields.Single(row => row.Key == "ReceivingRepSubject").Value);
         Assert.Single(fields, row => row.Key == "Selected"); Assert.DoesNotContain("Choose receiving rep", html);
-        AssignmentTransferEndToEndTests.SaveRender("pull-question", html);
+        AssignmentTransferIntegrationTests.SaveRender("pull-question", html);
         using var preview = await browser.PostAsync("/Coverage/Transfer?handler=Preview", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         html = await preview.Content.ReadAsStringAsync(); Assert.Contains("Confirm transfer", html); Assert.Contains("repSubject=receiver\">Cancel", html);
         Assert.DoesNotContain("test-access-token", html); Assert.Equal(1, handler.Previews); Assert.Equal(0, handler.Saves);
-        AssignmentTransferEndToEndTests.SaveRender("pull-impact", html);
-        fields = AssignmentTransferEndToEndTests.Inputs(html); fields.Add(new("Confirmed", "true"));
+        AssignmentTransferIntegrationTests.SaveRender("pull-impact", html);
+        fields = AssignmentTransferIntegrationTests.Inputs(html); fields.Add(new("Confirmed", "true"));
         using var saved = await browser.PostAsync("/Coverage/Transfer?handler=Save", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode); Assert.Equal("/Coverage/Territory?repSubject=receiver", saved.Headers.Location!.OriginalString); Assert.Equal(1, handler.Saves);
     }
@@ -38,13 +38,13 @@ public sealed class AssignmentPullPageTests
         using var handler = new Reply(); await using var app = new StaffWebsiteFactory(handler); using var browser = app.CreateBrowser();
         using var login = await browser.GetAsync("/__test/sign-in?subject=manager&roles=" + Uri.EscapeDataString(BusinessRoles.SalesManager));
         using var page = await browser.GetAsync("/Coverage/TakeOver?repSubject=receiver"); Assert.Equal(HttpStatusCode.OK, page.StatusCode);
-        string html = await page.Content.ReadAsStringAsync(); AssignmentTransferEndToEndTests.SaveRender("takeover", html);
-        var fields = AssignmentTransferEndToEndTests.Inputs(html); fields.Add(new("GivingRepSubject", "aoife"));
+        string html = await page.Content.ReadAsStringAsync(); AssignmentTransferIntegrationTests.SaveRender("takeover", html);
+        var fields = AssignmentTransferIntegrationTests.Inputs(html); fields.Add(new("GivingRepSubject", "aoife"));
         using var start = await browser.PostAsync("/Coverage/TakeOver", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.Redirect, start.StatusCode);
         using var review = await browser.GetAsync(start.Headers.Location); Assert.Equal(HttpStatusCode.OK, review.StatusCode);
         html = await review.Content.ReadAsStringAsync(); Assert.Contains("Receiving rep: <strong>Niamh</strong>", html);
-        Assert.Equal(2, AssignmentTransferEndToEndTests.Inputs(html).Count(row => row.Key == "Selected")); Assert.Equal(0, handler.Previews); Assert.Equal(0, handler.Saves);
-        AssignmentTransferEndToEndTests.SaveRender("takeover-review", html);
+        Assert.Equal(2, AssignmentTransferIntegrationTests.Inputs(html).Count(row => row.Key == "Selected")); Assert.Equal(0, handler.Previews); Assert.Equal(0, handler.Saves);
+        AssignmentTransferIntegrationTests.SaveRender("takeover-review", html);
         fields.RemoveAll(row => row.Key == "GivingRepSubject"); fields.Add(new("GivingRepSubject", "receiver"));
         using var forged = await browser.PostAsync("/Coverage/TakeOver", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.OK, forged.StatusCode);
         Assert.Contains("Choose a rep whose assignments", await forged.Content.ReadAsStringAsync());
@@ -56,13 +56,13 @@ public sealed class AssignmentPullPageTests
         using var handler = new Reply(); await using var app = new StaffWebsiteFactory(handler); using var browser = app.CreateBrowser();
         using var login = await browser.GetAsync("/__test/sign-in?subject=manager&roles=" + Uri.EscapeDataString(BusinessRoles.SalesManager));
         using var page = await browser.GetAsync($"/Coverage/Transfer?repSubject=aoife&receivingRepSubject=receiver&pull=true&pullAssignmentId={handler.Assignment:D}");
-        Assert.Equal(HttpStatusCode.OK, page.StatusCode); var fields = AssignmentTransferEndToEndTests.Inputs(await page.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode); var fields = AssignmentTransferIntegrationTests.Inputs(await page.Content.ReadAsStringAsync());
         fields.RemoveAll(row => row.Key == "Selected");
         using var invalid = await browser.PostAsync("/Coverage/Transfer?handler=Preview", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.OK, invalid.StatusCode);
         string html = await invalid.Content.ReadAsStringAsync(); Assert.Contains("Select at least one", html); Assert.Contains("data-transfer-parent", html);
         Assert.DoesNotContain("Choose the receiving rep", html);
-        Assert.Equal("receiver", AssignmentTransferEndToEndTests.Inputs(html).Single(row => row.Key == "ReceivingRepSubject").Value);
-        Assert.Equal(0, handler.Previews); Assert.Equal(0, handler.Saves); AssignmentTransferEndToEndTests.SaveRender("pull-empty-selection", html);
+        Assert.Equal("receiver", AssignmentTransferIntegrationTests.Inputs(html).Single(row => row.Key == "ReceivingRepSubject").Value);
+        Assert.Equal(0, handler.Previews); Assert.Equal(0, handler.Saves); AssignmentTransferIntegrationTests.SaveRender("pull-empty-selection", html);
     }
 
     private sealed class Reply : HttpMessageHandler

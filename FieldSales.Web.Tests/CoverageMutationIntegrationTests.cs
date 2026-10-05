@@ -16,7 +16,7 @@ using ReferenceUsageUnavailableException = CatalogueApi::FieldSales.Api.Catalogu
 
 namespace FieldSales.Web.Tests;
 
-public sealed class CoverageMutationEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class CoverageMutationIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Root = "/coverage";
     private const string Page = "/HeadOffice/Coverage/ReportingLines";

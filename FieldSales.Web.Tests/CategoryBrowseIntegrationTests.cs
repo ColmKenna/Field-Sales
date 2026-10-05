@@ -15,7 +15,7 @@ using ProductBasePrice = CatalogueApi::FieldSales.Api.Catalogue.ProductBasePrice
 
 namespace FieldSales.Web.Tests;
 
-public sealed class CategoryBrowseEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
+public sealed class CategoryBrowseIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]
     public async Task Should_Show180Beneath12HereAndChildrenBeforeProducts_When_SuncareIsOpened()

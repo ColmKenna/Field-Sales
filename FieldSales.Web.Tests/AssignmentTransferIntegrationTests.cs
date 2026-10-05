@@ -13,7 +13,7 @@ using RepReportingLine = CatalogueApi::FieldSales.Api.Coverage.RepReportingLine;
 
 namespace FieldSales.Web.Tests;
 
-public sealed class AssignmentTransferEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class AssignmentTransferIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Root = "/coverage/transfers";
     private const string Page = "/Coverage/Transfer";

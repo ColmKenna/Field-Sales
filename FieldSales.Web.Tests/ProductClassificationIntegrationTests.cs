@@ -18,7 +18,7 @@ using NamedReferenceItem = CatalogueApi::FieldSales.Api.Catalogue.NamedReference
 
 namespace FieldSales.Web.Tests;
 
-public sealed class ProductClassificationEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
+public sealed class ProductClassificationIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]
     public async Task Should_SaveAndShowClassification_When_SourceExampleIsSubmitted()

@@ -10,7 +10,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed class AssignmentHistoryEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class AssignmentHistoryIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Fact]
     public async Task Should_InheritCountyOwnerAndRecordCreation_When_FirstAndAdditionalLocationsAreSaved()

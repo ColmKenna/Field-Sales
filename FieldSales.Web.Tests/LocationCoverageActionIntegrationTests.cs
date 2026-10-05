@@ -12,7 +12,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed partial class LocationCoverageActionEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed partial class LocationCoverageActionIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Theory]
     [InlineData(false, "Town", 5)] [InlineData(false, "Shop", 1)]
@@ -116,7 +116,7 @@ public sealed partial class LocationCoverageActionEndToEndTests(CoverageReadAppl
     private static string Actions(Guid id) => $"/coverage/locations/{id}/page/actions";
     private static async Task<string> HtmlAsync(HttpClient browser, string path)
     { using var r = await browser.GetAsync(path); Assert.Equal(HttpStatusCode.OK, r.StatusCode); return await r.Content.ReadAsStringAsync(); }
-    private static List<KeyValuePair<string, string>> Inputs(string html) => AssignmentTransferEndToEndTests.Inputs(html);
+    private static List<KeyValuePair<string, string>> Inputs(string html) => AssignmentTransferIntegrationTests.Inputs(html);
     private static void Set(List<KeyValuePair<string, string>> fields, string name, string value) { fields.RemoveAll(row => row.Key == name); fields.Add(new(name, value)); }
     private static string Action(string html, string intent)
     {

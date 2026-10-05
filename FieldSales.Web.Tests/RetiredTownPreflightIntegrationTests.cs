@@ -14,7 +14,7 @@ namespace FieldSales.Web.Tests;
 
 // Exercise the exact preflight gap found by CI, without timing sleeps or
 // weakening the existing concurrent-retirement assertions.
-public sealed class RetiredTownPreflightEndToEndTests(RetiredTownPreflightApplication app)
+public sealed class RetiredTownPreflightIntegrationTests(RetiredTownPreflightApplication app)
     : IClassFixture<RetiredTownPreflightApplication>
 {
     [Theory]

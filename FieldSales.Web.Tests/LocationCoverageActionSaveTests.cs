@@ -11,7 +11,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed partial class LocationCoverageActionEndToEndTests
+public sealed partial class LocationCoverageActionIntegrationTests
 {
     [Theory]
     [InlineData(false, "Town", 4)] [InlineData(false, "Shop", 1)] [InlineData(true, "Shop", 1)]

@@ -18,7 +18,7 @@ using GeographyValidationException = CatalogueApi::FieldSales.Api.Directory.Geog
 
 namespace FieldSales.Web.Tests;
 
-public sealed class GeographyRetirementEndToEndTests(GeographyApplication app) : IClassFixture<GeographyApplication>
+public sealed class GeographyRetirementIntegrationTests(GeographyApplication app) : IClassFixture<GeographyApplication>
 {
     private const string Root = "/directory/geography";
     private const string Page = "/HeadOffice/Geography";

@@ -12,7 +12,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed class LocationCoverageEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class LocationCoverageIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Theory]
     [InlineData(TerritoryLevel.Region, "Leinster")]

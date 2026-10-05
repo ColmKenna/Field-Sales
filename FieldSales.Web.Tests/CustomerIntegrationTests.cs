@@ -21,7 +21,7 @@ public sealed class CustomerApplication : GeographyApplication
     protected override bool UseTestLocationUsage => false;
 }
 
-public sealed class CustomerEndToEndTests(CustomerApplication app) : IClassFixture<CustomerApplication>
+public sealed class CustomerIntegrationTests(CustomerApplication app) : IClassFixture<CustomerApplication>
 {
     private const string Customers = "/directory/customers";
     private const string Locations = "/directory/locations";

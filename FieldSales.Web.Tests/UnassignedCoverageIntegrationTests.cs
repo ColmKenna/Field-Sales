@@ -12,7 +12,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed class UnassignedCoverageEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class UnassignedCoverageIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string ListUrl = "/Coverage/Unassigned";
 
@@ -55,7 +55,7 @@ public sealed class UnassignedCoverageEndToEndTests(CoverageReadApplication app)
         string html = await HtmlAsync(browser, ListUrl);
         html = await HtmlAsync(browser, Action(Row(html, seed.Shop.Id), intent));
         Assert.Contains("href=\"/Coverage/Unassigned\">Cancel", html);
-        var fields = AssignmentTransferEndToEndTests.Inputs(html); Set(fields, "RepSubject", "colm"); Set(fields, "Reason", "Cover the shops");
+        var fields = AssignmentTransferIntegrationTests.Inputs(html); Set(fields, "RepSubject", "colm"); Set(fields, "Reason", "Cover the shops");
         string changeUrl = $"/Coverage/LocationChange/{seed.Shop.Id}";
         using var preview = await browser.PostAsync(changeUrl + "?handler=Preview", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode); html = await preview.Content.ReadAsStringAsync();
@@ -63,7 +63,7 @@ public sealed class UnassignedCoverageEndToEndTests(CoverageReadApplication app)
         Assert.Contains("Confirm assignment", html); Assert.Contains("href=\"/Coverage/Unassigned\">Cancel", html);
         Assert.Equal((0, 0), await CountsAsync());
         Assert.Contains(changed + (changed == 1 ? " Location becomes" : " Locations become"), html);
-        fields = AssignmentTransferEndToEndTests.Inputs(html); Set(fields, "Confirmed", "true"); Set(fields, "ReturnUrl", "https://untrusted.invalid");
+        fields = AssignmentTransferIntegrationTests.Inputs(html); Set(fields, "Confirmed", "true"); Set(fields, "ReturnUrl", "https://untrusted.invalid");
         using var saved = await browser.PostAsync(changeUrl + "?handler=Save", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode); Assert.Equal(ListUrl, saved.Headers.Location!.OriginalString);
         Assert.Equal((1, changed), await CountsAsync());
@@ -93,11 +93,11 @@ public sealed class UnassignedCoverageEndToEndTests(CoverageReadApplication app)
         await using var web = app.CreateWebsite(); using var browser = await BrowserAsync(web);
         string html = await HtmlAsync(browser, ListUrl); Assert.DoesNotContain($"data-location-id=\"{carved}\"", html);
         html = await HtmlAsync(browser, Action(Row(html, seed.Shop.Id), "Town"));
-        var fields = AssignmentTransferEndToEndTests.Inputs(html); Set(fields, "RepSubject", "colm");
+        var fields = AssignmentTransferIntegrationTests.Inputs(html); Set(fields, "RepSubject", "colm");
         string url = $"/Coverage/LocationChange/{seed.Shop.Id}";
         using var preview = await browser.PostAsync(url + "?handler=Preview", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode); html = await preview.Content.ReadAsStringAsync(); Assert.Contains("4 Locations", html);
-        fields = AssignmentTransferEndToEndTests.Inputs(html); Set(fields, "Confirmed", "true");
+        fields = AssignmentTransferIntegrationTests.Inputs(html); Set(fields, "Confirmed", "true");
         using var saved = await browser.PostAsync(url + "?handler=Save", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode);
         using var api = app.CreateApiClient(); var owner = (await api.GetFromJsonAsync<LocationCoveragePage>($"/coverage/locations/{carved}/page"))!.Owner!;
         Assert.Equal("brian", owner.Rep.Subject); Assert.Equal(TerritoryLevel.Location, owner.Source.Level); Assert.Equal((2, 4), await CountsAsync());
@@ -159,7 +159,7 @@ public sealed class UnassignedCoverageEndToEndTests(CoverageReadApplication app)
     {
         var seed = await SeedAsync(2); await using var web = app.CreateWebsite(); using var browser = await BrowserAsync(web);
         string html = await HtmlAsync(browser, ListUrl); string url = Action(Row(html, seed.Shop.Id), "Town");
-        html = await HtmlAsync(browser, url); var fields = AssignmentTransferEndToEndTests.Inputs(html); Set(fields, "RepSubject", kind == "recipient" ? "brian" : "colm");
+        html = await HtmlAsync(browser, url); var fields = AssignmentTransferIntegrationTests.Inputs(html); Set(fields, "RepSubject", kind == "recipient" ? "brian" : "colm");
         if (kind == "proof") Set(fields, "EntryProof", "forged");
         if (kind == "held-town") await AssignAsync("aoife", new(TerritoryLevel.Town, seed.Town.Id));
         if (kind == "csrf") fields.RemoveAll(row => row.Key == "__RequestVerificationToken");

@@ -29,7 +29,7 @@ using LocationTownUsageSource = CatalogueApi::FieldSales.Api.Directory.LocationT
 
 namespace FieldSales.Web.Tests;
 
-public sealed class GeographyEndToEndTests(GeographyApplication app) : IClassFixture<GeographyApplication>
+public sealed class GeographyIntegrationTests(GeographyApplication app) : IClassFixture<GeographyApplication>
 {
     private const string PageUrl = "/HeadOffice/Geography";
     private const string Root = "/directory/geography";

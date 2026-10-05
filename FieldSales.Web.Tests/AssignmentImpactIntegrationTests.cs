@@ -14,7 +14,7 @@ using DryRun = CatalogueApi::FieldSales.Api.Coverage.AssignmentImpactPreview;
 
 namespace FieldSales.Web.Tests;
 
-public sealed class AssignmentImpactEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class AssignmentImpactIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Root = "/coverage/assignments";
     private const string Page = "/Coverage/Assignments";

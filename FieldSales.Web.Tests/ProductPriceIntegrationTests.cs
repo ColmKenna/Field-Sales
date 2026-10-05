@@ -10,7 +10,7 @@ using Product = CatalogueApi::FieldSales.Api.Catalogue.Product;
 
 namespace FieldSales.Web.Tests;
 
-public sealed class ProductPriceEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
+public sealed class ProductPriceIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]
     public async Task Should_PreserveHistory_When_PriceFormsAreSavedAndApplicationRestarts()

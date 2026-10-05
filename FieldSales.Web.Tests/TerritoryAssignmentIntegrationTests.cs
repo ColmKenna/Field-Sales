@@ -124,7 +124,7 @@ public sealed class CoverageReadApplication : GeographyApplication
 
 // Real SQL, real API JWT/current-role boundary; assignment writes are setup only.
 // Production add/remove/history operations belong to later approved increments.
-public sealed class TerritoryAssignmentEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class TerritoryAssignmentIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Fact]
     public async Task Should_ResolveColmViaWicklow_When_CountyWith140LocationsIsAssigned()

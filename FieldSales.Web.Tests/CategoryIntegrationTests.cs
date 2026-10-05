@@ -23,7 +23,7 @@ using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbCon
 
 namespace FieldSales.Web.Tests;
 
-public sealed class CategoryEndToEndTests
+public sealed class CategoryIntegrationTests
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(

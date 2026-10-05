@@ -13,7 +13,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed class AssignmentPullEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class AssignmentPullIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Theory]
     [InlineData(TerritoryLevel.Region)] [InlineData(TerritoryLevel.County)]
@@ -38,7 +38,7 @@ public sealed class AssignmentPullEndToEndTests(CoverageReadApplication app) : I
         using var preview = await browser.PostAsync("/Coverage/Transfer?handler=Preview", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode); html = await preview.Content.ReadAsStringAsync();
         Assert.Contains("Confirm transfer", html); Assert.DoesNotContain("test-access-token", html); Assert.Equal((3, 0), await CountsAsync());
-        AssignmentTransferEndToEndTests.SaveRender("pull-preview-" + level, html);
+        AssignmentTransferIntegrationTests.SaveRender("pull-preview-" + level, html);
         fields = Inputs(html); fields.Add(new("Confirmed", "true"));
         using var saved = await browser.PostAsync("/Coverage/Transfer?handler=Save", new FormUrlEncodedContent(fields));
         Assert.Equal(HttpStatusCode.Redirect, saved.StatusCode); Assert.Equal("/Coverage/Territory?repSubject=receiver", saved.Headers.Location!.OriginalString);
@@ -70,7 +70,7 @@ public sealed class AssignmentPullEndToEndTests(CoverageReadApplication app) : I
         string html = await HtmlAsync(browser, "/Coverage/Territory?repSubject=receiver"); Assert.Contains("Take over from another rep", html);
         html = await HtmlAsync(browser, "/Coverage/TakeOver?repSubject=receiver"); Assert.Contains("Colm", html);
         Assert.Equal(role == BusinessRoles.HeadOfficeUser, Regex.IsMatch(html, "<option value=\"brian\""));
-        AssignmentTransferEndToEndTests.SaveRender("takeover-" + role, html);
+        AssignmentTransferIntegrationTests.SaveRender("takeover-" + role, html);
         var fields = Inputs(html); Set(fields, "GivingRepSubject", "colm");
         using var start = await browser.PostAsync("/Coverage/TakeOver", new FormUrlEncodedContent(fields)); Assert.Equal(HttpStatusCode.Redirect, start.StatusCode);
         html = await HtmlAsync(browser, start.Headers.Location!.OriginalString); Assert.Contains("Receiving rep: <strong>Niamh</strong>", html);
@@ -241,7 +241,7 @@ public sealed class AssignmentPullEndToEndTests(CoverageReadApplication app) : I
     { await using var scope = app.Api.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>(); var row = TerritoryAssignment.Create(rep, target); db.TerritoryAssignments.Add(row); await db.SaveChangesAsync(); return row; }
     private async Task<(int, int)> CountsAsync()
     { await using var scope = app.Api.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>(); return (await db.TerritoryAssignments.CountAsync(), await db.AssignmentHistory.CountAsync()); }
-    private static List<KeyValuePair<string, string>> Inputs(string html) => AssignmentTransferEndToEndTests.Inputs(html);
+    private static List<KeyValuePair<string, string>> Inputs(string html) => AssignmentTransferIntegrationTests.Inputs(html);
     private static void Set(List<KeyValuePair<string, string>> fields, string name, string value) { fields.RemoveAll(row => row.Key == name); fields.Add(new(name, value)); }
     private static string Option(string html, Guid id)
     { var option = Regex.Matches(html, "<option[^>]*>").Cast<Match>().Single(row => row.Value.Contains(id.ToString("D"), StringComparison.Ordinal)); return WebUtility.HtmlDecode(Regex.Match(option.Value, "value=\"([^\"]*)\"").Groups[1].Value); }

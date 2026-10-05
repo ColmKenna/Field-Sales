@@ -30,7 +30,7 @@ using Category = CatalogueApi::FieldSales.Api.Catalogue.Category;
 
 namespace FieldSales.Web.Tests;
 
-public sealed class ProductEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
+public sealed class ProductIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string CreateUrl = "/HeadOffice/Products/Create";
     private const string ProductName = "SPF30 Sun Lotion v2 200ml";

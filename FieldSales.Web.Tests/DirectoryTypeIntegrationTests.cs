@@ -41,7 +41,7 @@ public sealed class DirectoryTypeApplication : GeographyApplication
     }
 }
 
-public sealed class DirectoryTypeEndToEndTests(DirectoryTypeApplication app) : IClassFixture<DirectoryTypeApplication>
+public sealed class DirectoryTypeIntegrationTests(DirectoryTypeApplication app) : IClassFixture<DirectoryTypeApplication>
 {
     private const string LocationTypes = "location-types";
     private const string ContactTypes = "contact-types";

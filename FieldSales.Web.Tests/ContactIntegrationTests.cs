@@ -53,7 +53,7 @@ public sealed class ContactApplication : GeographyApplication
     }
 }
 
-public sealed class ContactEndToEndTests(ContactApplication app) : IClassFixture<ContactApplication>
+public sealed class ContactIntegrationTests(ContactApplication app) : IClassFixture<ContactApplication>
 {
     private const string Contacts = "/directory/contacts";
     private const string Types = "/directory/reference-data/contact-types";

@@ -61,7 +61,7 @@ public sealed class LocationCoordinateApplication : GeographyApplication
     }
 }
 
-public sealed class LocationCoordinateEndToEndTests(LocationCoordinateApplication app) : IClassFixture<LocationCoordinateApplication>
+public sealed class LocationCoordinateIntegrationTests(LocationCoordinateApplication app) : IClassFixture<LocationCoordinateApplication>
 {
     [Theory]
     [InlineData(null)]

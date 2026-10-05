@@ -19,7 +19,7 @@ using ProductReferenceAssignments = CatalogueApi::FieldSales.Api.Catalogue.Produ
 
 namespace FieldSales.Web.Tests;
 
-public sealed class ReferenceListEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
+public sealed class ReferenceListIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string Page = "/HeadOffice/ReferenceData";
     private const string RestrictionGroups = ReferenceListKeys.RestrictionGroups;

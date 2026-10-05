@@ -14,7 +14,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-public sealed class RepTerritoryEndToEndTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
+public sealed class RepTerritoryIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Page = "/Coverage/Territory";
     private const string Review = "/Coverage/Assignments";

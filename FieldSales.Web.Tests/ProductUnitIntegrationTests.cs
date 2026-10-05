@@ -13,7 +13,7 @@ using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbCon
 
 namespace FieldSales.Web.Tests;
 
-public sealed class ProductUnitEndToEndTests(ProductApplication app) : IClassFixture<ProductApplication>
+public sealed class ProductUnitIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string CreateUrl = "/HeadOffice/Products/Create";
 
