@@ -70,6 +70,7 @@ tests/
 | **TEST-TD-003** | Process-Wide Environment Variable Mutation in `AdminWebFactory` | [#16](https://github.com/ColmKenna/Field-Sales/pull/16) | `cb09ae2` | Removed static constructor setting process-wide environment variables in `AdminWebFactory`. Replaced with in-memory host settings using `builder.UseSetting(...)` and `builder.ConfigureAppConfiguration(...)`. Added `AdminWebFactoryTests` confirming zero process pollution. |
 | **TEST-TD-004** | Redundant Solution-Wide Test Execution and Double-Execution in CI | [#15](https://github.com/ColmKenna/Field-Sales/pull/15) | `d092c80` | Eliminated duplicate execution in CI by partitioning steps into fast-fail unit tests (`--filter "Category=Unit"`) and SQL Server integration tests (`--filter "Category!=Unit"`). |
 | **TEST-TD-006** | Complete Absence of Test Traits Preventing Selective Filtering | [#15](https://github.com/ColmKenna/Field-Sales/pull/15) | `d092c80` | Tagged all test classes and methods across all projects with xUnit `[Trait("Category", "Unit")]` and `[Trait("Category", "Integration")]`. |
+| **TEST-TD-010** | Unused Dependencies and Vulnerability Warnings in Test Projects | - | `a4c15cd` | Audited packages across test suites and pruned 17 unused package references (including `FluentAssertions`, `NetArchTest.Rules`, `Microsoft.EntityFrameworkCore.InMemory`, `xunit.v3`, and redundant `Moq`/`TimeProvider.Testing`/`Sqlite` references) across `Directory.Packages.props` and test project files. |
 
 ---
 
@@ -79,35 +80,19 @@ The remaining technical debt findings are ranked below by impact, risk, and reco
 
 ```mermaid
 graph TD
-    A["TEST-TD-010: Unused Dependencies"] --> B["TEST-TD-007: Flat Web Integration Structure"]
-    B --> C["TEST-TD-008: Leaked Task02 Naming"]
-    C --> D["TEST-TD-013: Move demo-data-script.test.py"]
-    D --> E["TEST-TD-011: Misplaced Unit Boundaries"]
-    E --> F["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
-    F --> G["TEST-TD-012: In-Memory Fake API Drift"]
-    G --> H["TEST-TD-009: Inconsistent Method Naming"]
+    A["TEST-TD-007: Flat Web Integration Structure"] --> B["TEST-TD-008: Leaked Task02 Naming"]
+    B --> C["TEST-TD-013: Move demo-data-script.test.py"]
+    C --> D["TEST-TD-011: Misplaced Unit Boundaries"]
+    D --> E["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
+    E --> F["TEST-TD-012: In-Memory Fake API Drift"]
+    F --> G["TEST-TD-009: Inconsistent Method Naming"]
 ```
 
 ---
 
 ### Finding Details
 
-#### 1. TEST-TD-010: Unused Dependencies and Vulnerability Warnings in Test Projects
-- **Classification**: Upgrade / Dependency debt
-- **Severity**: Medium | **Effort**: Small
-- **Location**:
-  - `tests/Unit/**/*.csproj`
-  - `tests/Integration/**/*.csproj`
-- **Problem**:
-  Test projects carry redundant transitive package references or outdated minor versions.
-- **Why It Matters**:
-  Inflates restore times, introduces vulnerability audit noise, and causes dependency resolution conflicts across target frameworks.
-- **Recommended Remediation**:
-  Audit each test `.csproj` with `dotnet list package --vulnerable` and `dotnet list package --outdated`. Prune unnecessary direct references and ensure unified package versions via `Directory.Packages.props` or consistent package versions.
-
----
-
-#### 2. TEST-TD-007: Flat Directory Structure and Mingled Helpers in `FieldSales.Web` Integration Tests
+#### 1. TEST-TD-007: Flat Directory Structure and Mingled Helpers in `FieldSales.Web` Integration Tests
 - **Classification**: Organisation debt
 - **Severity**: Medium | **Effort**: Small
 - **Location**:
@@ -127,7 +112,7 @@ graph TD
 
 ---
 
-#### 3. TEST-TD-008: Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`)
+#### 2. TEST-TD-008: Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`)
 - **Classification**: Organisation debt
 - **Severity**: Low | **Effort**: Small
 - **Location**:
@@ -141,7 +126,7 @@ graph TD
 
 ---
 
-#### 4. TEST-TD-013: Loose Unmanaged Python Script in Test Directory Root
+#### 3. TEST-TD-013: Loose Unmanaged Python Script in Test Directory Root
 - **Classification**: Organisation debt
 - **Severity**: Low | **Effort**: Small
 - **Location**:
@@ -155,7 +140,7 @@ graph TD
 
 ---
 
-#### 5. TEST-TD-011: Misplaced Integration Test Boundaries in Unit Test Projects
+#### 4. TEST-TD-011: Misplaced Integration Test Boundaries in Unit Test Projects
 - **Classification**: Test architecture debt
 - **Severity**: Medium | **Effort**: Small
 - **Location**:
@@ -169,7 +154,7 @@ graph TD
 
 ---
 
-#### 6. TEST-TD-005: Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests
+#### 5. TEST-TD-005: Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests
 - **Classification**: Performance debt
 - **Severity**: Medium | **Effort**: Medium
 - **Location**:
@@ -183,7 +168,7 @@ graph TD
 
 ---
 
-#### 7. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
+#### 6. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
 - **Classification**: Maintainability debt
 - **Severity**: Medium | **Effort**: Medium
 - **Location**:
@@ -197,7 +182,7 @@ graph TD
 
 ---
 
-#### 8. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
+#### 7. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
 - **Classification**: Maintainability debt
 - **Severity**: Low | **Effort**: Medium
 - **Location**:
