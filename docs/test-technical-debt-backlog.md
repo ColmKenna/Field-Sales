@@ -40,9 +40,13 @@ tests/
 │   │   ├── FieldSales.Api.IntegrationTests.csproj   # 12 test files, 100 tests (uses SqlServerFixture)
 │   │   └── SqlServerFixture.cs                      # Shared SQL Server container + isolated catalogs
 │   ├── FieldSales.Web/
-│   │   ├── FieldSales.Web.IntegrationTests.csproj   # 46 test files, 721 tests (uses WebSqlServerFixture)
-│   │   ├── WebSqlServerFixture.cs                   # Shared SQL Server container + isolated catalogs
-│   │   └── StaffWebsiteFactory.cs                   # WebApplicationFactory integration harness
+│   │   ├── FieldSales.Web.IntegrationTests.csproj   # 46 test files in domain subfolders, 721 tests
+│   │   ├── Assignments/                             # 17 territory and coverage test files
+│   │   ├── Catalogue/                               # 11 product, category, and brand test files
+│   │   ├── Contacts/                                # 3 contact integration and characterisation test files
+│   │   ├── Customers/                               # 3 customer and directory type test files
+│   │   ├── Geography/                               # 4 geography and coordinates test files
+│   │   └── Infrastructure/                          # WebSqlServerFixture, StaffWebsiteFactory, auth & fixtures
 │   ├── FieldSales.Identity.Admin/
 │   │   ├── FieldSales.Identity.Admin.IntegrationTests.csproj # 794 tests (uses collection fixture)
 │   │   └── (17 subfolders of live EF/SQL Server admin tests)
@@ -71,6 +75,7 @@ tests/
 | **TEST-TD-004** | Redundant Solution-Wide Test Execution and Double-Execution in CI | [#15](https://github.com/ColmKenna/Field-Sales/pull/15) | `d092c80` | Eliminated duplicate execution in CI by partitioning steps into fast-fail unit tests (`--filter "Category=Unit"`) and SQL Server integration tests (`--filter "Category!=Unit"`). |
 | **TEST-TD-006** | Complete Absence of Test Traits Preventing Selective Filtering | [#15](https://github.com/ColmKenna/Field-Sales/pull/15) | `d092c80` | Tagged all test classes and methods across all projects with xUnit `[Trait("Category", "Unit")]` and `[Trait("Category", "Integration")]`. |
 | **TEST-TD-010** | Unused Dependencies and Vulnerability Warnings in Test Projects | - | `a4c15cd` | Audited packages across test suites and pruned 17 unused package references (including `FluentAssertions`, `NetArchTest.Rules`, `Microsoft.EntityFrameworkCore.InMemory`, `xunit.v3`, and redundant `Moq`/`TimeProvider.Testing`/`Sqlite` references) across `Directory.Packages.props` and test project files. |
+| **TEST-TD-007** | Flat Directory Structure and Mingled Helpers in `FieldSales.Web` Integration Tests | - | `ff3ca49` | Reorganized 46 flat integration test files and harnesses in `FieldSales.Web` into 6 domain subfolders (`Assignments/`, `Catalogue/`, `Contacts/`, `Customers/`, `Geography/`, and `Infrastructure/`) preserving git history. |
 
 ---
 
@@ -80,39 +85,18 @@ The remaining technical debt findings are ranked below by impact, risk, and reco
 
 ```mermaid
 graph TD
-    A["TEST-TD-007: Flat Web Integration Structure"] --> B["TEST-TD-008: Leaked Task02 Naming"]
-    B --> C["TEST-TD-013: Move demo-data-script.test.py"]
-    C --> D["TEST-TD-011: Misplaced Unit Boundaries"]
-    D --> E["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
-    E --> F["TEST-TD-012: In-Memory Fake API Drift"]
-    F --> G["TEST-TD-009: Inconsistent Method Naming"]
+    A["TEST-TD-008: Leaked Task02 Naming"] --> B["TEST-TD-013: Move demo-data-script.test.py"]
+    B --> C["TEST-TD-011: Misplaced Unit Boundaries"]
+    C --> D["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
+    D --> E["TEST-TD-012: In-Memory Fake API Drift"]
+    E --> F["TEST-TD-009: Inconsistent Method Naming"]
 ```
 
 ---
 
 ### Finding Details
 
-#### 1. TEST-TD-007: Flat Directory Structure and Mingled Helpers in `FieldSales.Web` Integration Tests
-- **Classification**: Organisation debt
-- **Severity**: Medium | **Effort**: Small
-- **Location**:
-  - `tests/Integration/FieldSales.Web/`
-- **Problem**:
-  46 integration test files sit directly in the root of `tests/Integration/FieldSales.Web/` alongside test fixtures (`WebSqlServerFixture.cs`) and server factories (`StaffWebsiteFactory.cs`).
-- **Why It Matters**:
-  Navigation is noisy and domain areas (Customer, Contact, Geography, Territory, Catalogue, Assignment, Auth) are mixed together without visual structure.
-- **Recommended Remediation**:
-  Organize tests into domain subfolders matching feature areas:
-  - `tests/Integration/FieldSales.Web/Assignments/`
-  - `tests/Integration/FieldSales.Web/Catalogue/`
-  - `tests/Integration/FieldSales.Web/Contacts/`
-  - `tests/Integration/FieldSales.Web/Customers/`
-  - `tests/Integration/FieldSales.Web/Geography/`
-  - `tests/Integration/FieldSales.Web/Infrastructure/` (move `WebSqlServerFixture.cs`, `StaffWebsiteFactory.cs`, helpers)
-
----
-
-#### 2. TEST-TD-008: Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`)
+#### 1. TEST-TD-008: Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`)
 - **Classification**: Organisation debt
 - **Severity**: Low | **Effort**: Small
 - **Location**:
@@ -126,7 +110,7 @@ graph TD
 
 ---
 
-#### 3. TEST-TD-013: Loose Unmanaged Python Script in Test Directory Root
+#### 2. TEST-TD-013: Loose Unmanaged Python Script in Test Directory Root
 - **Classification**: Organisation debt
 - **Severity**: Low | **Effort**: Small
 - **Location**:
