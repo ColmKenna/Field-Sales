@@ -18,7 +18,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     entirely (<c>EnsureCreated</c>), so this is the one place that gap is actually closed —
 ///     against real SQL Server, using the same migrations production ships.
 /// </summary>
-[Collection(Task02SqlServerCollection.Name)]
+[Collection(IdentityAdminSqlServerCollection.Name)]
 public sealed class DevelopmentMigrationSqlServerTests
 {
     [Fact]
@@ -93,7 +93,7 @@ public sealed class DevelopmentMigrationSqlServerTests
     }
 
     /// <summary>
-    ///     Three never-before-used database names on the shared <see cref="Task02SqlServerFactory" />
+    ///     Three never-before-used database names on the shared <see cref="IdentityAdminSqlServerFactory" />
     ///     container. <c>Database.MigrateAsync()</c> creates the database itself when it does not
     ///     exist, so nothing here pre-creates schema — these stay genuinely empty until the code
     ///     under test touches them.
@@ -110,11 +110,11 @@ public sealed class DevelopmentMigrationSqlServerTests
             return new FreshDatabases
             {
                 IdentityConnectionString =
-                    Task02SqlServerFactory.BuildConnectionString($"DevMigration_Identity_{suffix}"),
+                    IdentityAdminSqlServerFactory.BuildConnectionString($"DevMigration_Identity_{suffix}"),
                 ConfigurationConnectionString =
-                    Task02SqlServerFactory.BuildConnectionString($"DevMigration_Configuration_{suffix}"),
+                    IdentityAdminSqlServerFactory.BuildConnectionString($"DevMigration_Configuration_{suffix}"),
                 OperationalConnectionString =
-                    Task02SqlServerFactory.BuildConnectionString($"DevMigration_Operational_{suffix}")
+                    IdentityAdminSqlServerFactory.BuildConnectionString($"DevMigration_Operational_{suffix}")
             };
         }
 

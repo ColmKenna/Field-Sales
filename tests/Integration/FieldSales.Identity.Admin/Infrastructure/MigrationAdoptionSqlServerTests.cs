@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
-[Collection(Task02SqlServerCollection.Name)]
+[Collection(IdentityAdminSqlServerCollection.Name)]
 public sealed class MigrationAdoptionSqlServerTests
 {
     private const string ProductVersion = "10.0.10";
@@ -29,7 +29,7 @@ public sealed class MigrationAdoptionSqlServerTests
         int itemCount)
     {
         string databaseName = $"Task06_Adoption_{Guid.NewGuid():N}";
-        string connectionString = Task02SqlServerFactory.BuildConnectionString(databaseName);
+        string connectionString = IdentityAdminSqlServerFactory.BuildConnectionString(databaseName);
         (DbContext context, ServiceProvider? provider) = CreateContext(contextName, connectionString);
         await using (context)
         using (provider)
@@ -62,7 +62,7 @@ public sealed class MigrationAdoptionSqlServerTests
         const string baselineMigration = "20260810232228_AddAuditLogEnhancements";
         const string fingerprint = "B47BFC21BEAE809E7CB40E84AABA3252061DF51755E72F43AB983C18FBAC745F";
         string databaseName = $"Task06_Partial_{Guid.NewGuid():N}";
-        string connectionString = Task02SqlServerFactory.BuildConnectionString(databaseName);
+        string connectionString = IdentityAdminSqlServerFactory.BuildConnectionString(databaseName);
         (DbContext context, ServiceProvider? provider) = CreateContext(contextName, connectionString);
         await using (context)
         using (provider)

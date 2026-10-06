@@ -17,8 +17,8 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
-[Collection(Task02SqlServerCollection.Name)]
-public sealed class StaffDirectoryEndpointTests(Task02SqlServerFactory databases) : IAsyncLifetime
+[Collection(IdentityAdminSqlServerCollection.Name)]
+public sealed class StaffDirectoryEndpointTests(IdentityAdminSqlServerFactory databases) : IAsyncLifetime
 {
     private const string Issuer = "https://staff-directory.test";
     private static readonly SymmetricSecurityKey Key = new(Encoding.UTF8.GetBytes("test-only-staff-directory-signing-32bytes"));

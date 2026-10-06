@@ -17,8 +17,8 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
-[Collection(Task02SqlServerCollection.Name)]
-public sealed class StaffRoleLookupEndpointTests(Task02SqlServerFactory databases)
+[Collection(IdentityAdminSqlServerCollection.Name)]
+public sealed class StaffRoleLookupEndpointTests(IdentityAdminSqlServerFactory databases)
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(

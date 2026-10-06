@@ -10,12 +10,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
-[Collection(Task02SqlServerCollection.Name)]
+[Collection(IdentityAdminSqlServerCollection.Name)]
 public sealed class ConfigurationConcurrencyTests
 {
-    private readonly Task02SqlServerFactory _factory;
+    private readonly IdentityAdminSqlServerFactory _factory;
 
-    public ConfigurationConcurrencyTests(Task02SqlServerFactory factory)
+    public ConfigurationConcurrencyTests(IdentityAdminSqlServerFactory factory)
     {
         _factory = factory;
     }

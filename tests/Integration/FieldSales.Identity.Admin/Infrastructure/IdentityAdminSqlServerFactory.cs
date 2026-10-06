@@ -21,24 +21,24 @@ using Testcontainers.MsSql;
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
 [CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class Task02SqlServerCollection : ICollectionFixture<Task02SqlServerFactory>
+public sealed class IdentityAdminSqlServerCollection : ICollectionFixture<IdentityAdminSqlServerFactory>
 {
-    public const string Name = "TASK-02 SQL Server";
+    public const string Name = "Identity Admin SQL Server";
 }
 
 /// <summary>
 ///     Disposable, migration-backed SQL Server databases for isolation and retry tests. By default,
 ///     the fixture starts a dedicated Docker container; CI can provide a server through
-///     TASK_SQLSERVER_CONNECTION_STRING_TEMPLATE instead. These tests never use SQLite or EF InMemory
+///     IDENTITY_ADMIN_SQLSERVER_CONNECTION_STRING_TEMPLATE instead. These tests never use SQLite or EF InMemory
 ///     for transaction assertions.
 /// </summary>
-public sealed class Task02SqlServerFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class IdentityAdminSqlServerFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-latest";
     private static string? _containerConnectionStringTemplate;
-    private readonly string _configurationDatabase = $"Task02_Configuration_{Guid.NewGuid():N}";
-    private readonly string _identityDatabase = $"Task02_Identity_{Guid.NewGuid():N}";
-    private readonly string _operationalDatabase = $"Task02_Operational_{Guid.NewGuid():N}";
+    private readonly string _configurationDatabase = $"IdentityAdmin_Configuration_{Guid.NewGuid():N}";
+    private readonly string _identityDatabase = $"IdentityAdmin_Identity_{Guid.NewGuid():N}";
+    private readonly string _operationalDatabase = $"IdentityAdmin_Operational_{Guid.NewGuid():N}";
     private bool _databasesDeleted;
     private MsSqlContainer? _sqlContainer;
 
@@ -134,7 +134,8 @@ public sealed class Task02SqlServerFactory : WebApplicationFactory<Program>, IAs
 
     private async Task StartContainerWhenNoServerIsConfiguredAsync()
     {
-        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TASK_SQLSERVER_CONNECTION_STRING_TEMPLATE")))
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("IDENTITY_ADMIN_SQLSERVER_CONNECTION_STRING_TEMPLATE"))
+            || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TASK_SQLSERVER_CONNECTION_STRING_TEMPLATE")))
             return;
 
         _sqlContainer = new MsSqlBuilder(SqlServerImage).Build();
@@ -232,20 +233,21 @@ public sealed class Task02SqlServerFactory : WebApplicationFactory<Program>, IAs
 
     public static string BuildConnectionString(string database)
     {
-        string? configuredTemplate = Environment.GetEnvironmentVariable("TASK_SQLSERVER_CONNECTION_STRING_TEMPLATE")
+        string? configuredTemplate = Environment.GetEnvironmentVariable("IDENTITY_ADMIN_SQLSERVER_CONNECTION_STRING_TEMPLATE")
+                                     ?? Environment.GetEnvironmentVariable("TASK_SQLSERVER_CONNECTION_STRING_TEMPLATE")
                                      ?? _containerConnectionStringTemplate;
         if (!string.IsNullOrWhiteSpace(configuredTemplate))
         {
             if (!configuredTemplate.Contains("{database}", StringComparison.Ordinal))
                 throw new InvalidOperationException(
-                    "TASK_SQLSERVER_CONNECTION_STRING_TEMPLATE must contain the {database} placeholder.");
+                    "IDENTITY_ADMIN_SQLSERVER_CONNECTION_STRING_TEMPLATE must contain the {database} placeholder.");
 
             return configuredTemplate.Replace("{database}", database, StringComparison.Ordinal);
         }
 
         throw new InvalidOperationException(
             "The SQL Server test fixture has not started. Run the test through xUnit or configure " +
-            "TASK_SQLSERVER_CONNECTION_STRING_TEMPLATE.");
+            "IDENTITY_ADMIN_SQLSERVER_CONNECTION_STRING_TEMPLATE.");
     }
 }
 

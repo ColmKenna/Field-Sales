@@ -12,12 +12,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.SecretReveals;
 
-[Collection(Task02SqlServerCollection.Name)]
+[Collection(IdentityAdminSqlServerCollection.Name)]
 public sealed class SecretRevealSqlServerIntegrationTests
 {
-    private readonly Task02SqlServerFactory _factory;
+    private readonly IdentityAdminSqlServerFactory _factory;
 
-    public SecretRevealSqlServerIntegrationTests(Task02SqlServerFactory factory)
+    public SecretRevealSqlServerIntegrationTests(IdentityAdminSqlServerFactory factory)
     {
         _factory = factory;
     }

@@ -17,14 +17,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Client = Duende.IdentityServer.Models.Client;
 using Secret = Duende.IdentityServer.Models.Secret;
 
-namespace FieldSales.Identity.Admin.Tests.Task02;
+namespace FieldSales.Identity.Admin.Tests.SqlServer;
 
-[Collection(Task02SqlServerCollection.Name)]
-public sealed class Task02SqlServerIntegrationTests
+[Collection(IdentityAdminSqlServerCollection.Name)]
+public sealed class IdentityAdminSqlServerIntegrationTests
 {
-    private readonly Task02SqlServerFactory _factory;
+    private readonly IdentityAdminSqlServerFactory _factory;
 
-    public Task02SqlServerIntegrationTests(Task02SqlServerFactory factory)
+    public IdentityAdminSqlServerIntegrationTests(IdentityAdminSqlServerFactory factory)
     {
         _factory = factory;
         _factory.BackChannelLogout.Reset();
@@ -41,11 +41,11 @@ public sealed class Task02SqlServerIntegrationTests
         Assert.Equal(HttpStatusCode.OK, before.StatusCode);
         Assert.InRange(_factory.IdentityCommands.ReadCount, 1, 10);
         Console.WriteLine(
-            $"TASK-02 per-request security-stamp validation executed {_factory.IdentityCommands.ReadCount} IdentityDb read command(s).");
+            $"Identity Admin per-request security-stamp validation executed {_factory.IdentityCommands.ReadCount} IdentityDb read command(s).");
 
         string userId = string.Empty;
         string? originalStamp = null;
-        string grantKey = $"task02-cookie-{Guid.NewGuid():N}";
+        string grantKey = $"identityadmin-cookie-{Guid.NewGuid():N}";
         await _factory.RunInScopeAsync(async services =>
         {
             UserManager<ApplicationUser> users = services.GetRequiredService<UserManager<ApplicationUser>>();
@@ -90,7 +90,7 @@ public sealed class Task02SqlServerIntegrationTests
     public async Task RevokeUserAccess_NotifiesOnlyAfterCommit_AndNotificationFailureReturnsWarning()
     {
         string tag = Guid.NewGuid().ToString("N");
-        string grantKey = $"task02-notification-{tag}";
+        string grantKey = $"identityadmin-notification-{tag}";
         string userId = string.Empty;
         string? originalStamp = null;
 
@@ -177,7 +177,7 @@ public sealed class Task02SqlServerIntegrationTests
             actor.HttpContext = new DefaultHttpContext
             {
                 User = new ClaimsPrincipal(new ClaimsIdentity(
-                    new[] { new Claim(ClaimTypes.NameIdentifier, admin!.Id) }, "Task02"))
+                    new[] { new Claim(ClaimTypes.NameIdentifier, admin!.Id) }, "IdentityAdminTesting"))
             };
 
             RoleChangeResult result = await services.GetRequiredService<IUserDetailsService>()
@@ -267,11 +267,11 @@ public sealed class Task02SqlServerIntegrationTests
     [Fact]
     public async Task ConcurrentEnableAndDelete_ProducesOnlyASerializedOutcome()
     {
-        string clientId = $"task02-client-race-{Guid.NewGuid():N}";
+        string clientId = $"identityadmin-client-race-{Guid.NewGuid():N}";
         await SeedClientAsync(new Client
         {
             ClientId = clientId,
-            ClientName = "TASK-02 Client Race",
+            ClientName = "Identity Admin Client Race",
             Enabled = false,
             RequireClientSecret = false
         });
@@ -330,11 +330,11 @@ public sealed class Task02SqlServerIntegrationTests
     [Fact]
     public async Task SecretRevocation_ExpiredReplacementDoesNotCount_AndExpiredTargetCanBeRemoved()
     {
-        string clientId = $"task02-secret-expiry-{Guid.NewGuid():N}";
+        string clientId = $"identityadmin-secret-expiry-{Guid.NewGuid():N}";
         await SeedClientAsync(new Client
         {
             ClientId = clientId,
-            ClientName = "TASK-02 Secret Expiry",
+            ClientName = "Identity Admin Secret Expiry",
             RequireClientSecret = true,
             ClientSecrets =
             {
@@ -366,11 +366,11 @@ public sealed class Task02SqlServerIntegrationTests
     [Fact]
     public async Task ConcurrentRevocationOfFinalTwoUsableSecrets_AllowsExactlyOneAndAuditsOncePerAttempt()
     {
-        string clientId = $"task02-secret-race-{Guid.NewGuid():N}";
+        string clientId = $"identityadmin-secret-race-{Guid.NewGuid():N}";
         await SeedClientAsync(new Client
         {
             ClientId = clientId,
-            ClientName = "TASK-02 Secret Race",
+            ClientName = "Identity Admin Secret Race",
             RequireClientSecret = true,
             ClientSecrets =
             {
@@ -441,7 +441,7 @@ public sealed class Task02SqlServerIntegrationTests
     {
         Key = key,
         Type = "refresh_token",
-        ClientId = "task02-client",
+        ClientId = "identityadmin-client",
         SubjectId = subjectId,
         CreationTime = DateTime.UtcNow,
         Expiration = DateTime.UtcNow.AddDays(1),

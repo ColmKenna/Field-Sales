@@ -13,10 +13,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FieldSales.Identity.Admin.Tests.Task02;
+namespace FieldSales.Identity.Admin.Tests.SqlServer;
 
-[Collection(Task02SqlServerCollection.Name)]
-public class TransactionHelperSqlServerTests(Task02SqlServerFactory factory)
+[Collection(IdentityAdminSqlServerCollection.Name)]
+public class TransactionHelperSqlServerTests(IdentityAdminSqlServerFactory factory)
 {
     [Fact]
     public async Task ScopeCreationRetryDoesNotDuplicateScopesLinksOrAuditEvents()

@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
-[Collection(Task02SqlServerCollection.Name)]
+[Collection(IdentityAdminSqlServerCollection.Name)]
 public sealed class TemplateAdoptionBaselineTests
 {
     [Fact]
@@ -193,13 +193,13 @@ public sealed class TemplateAdoptionBaselineTests
         private readonly string _suffix = Guid.NewGuid().ToString("N");
 
         public string IdentityConnectionString =>
-            Task02SqlServerFactory.BuildConnectionString($"Adoption_Identity_{_suffix}");
+            IdentityAdminSqlServerFactory.BuildConnectionString($"Adoption_Identity_{_suffix}");
 
         public string ConfigurationConnectionString =>
-            Task02SqlServerFactory.BuildConnectionString($"Adoption_Configuration_{_suffix}");
+            IdentityAdminSqlServerFactory.BuildConnectionString($"Adoption_Configuration_{_suffix}");
 
         public string OperationalConnectionString =>
-            Task02SqlServerFactory.BuildConnectionString($"Adoption_Operational_{_suffix}");
+            IdentityAdminSqlServerFactory.BuildConnectionString($"Adoption_Operational_{_suffix}");
 
         public async ValueTask DisposeAsync()
         {

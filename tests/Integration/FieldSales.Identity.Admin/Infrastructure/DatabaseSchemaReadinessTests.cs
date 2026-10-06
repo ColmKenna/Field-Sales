@@ -7,12 +7,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
-[Collection(Task02SqlServerCollection.Name)]
+[Collection(IdentityAdminSqlServerCollection.Name)]
 public sealed class DatabaseSchemaReadinessTests
 {
-    private readonly Task02SqlServerFactory _factory;
+    private readonly IdentityAdminSqlServerFactory _factory;
 
-    public DatabaseSchemaReadinessTests(Task02SqlServerFactory factory)
+    public DatabaseSchemaReadinessTests(IdentityAdminSqlServerFactory factory)
     {
         _factory = factory;
     }
