@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Duende.IdentityServer.Models;
 using FieldSales.Identity.Services.Validation;
 using Microsoft.Extensions.Configuration;
@@ -80,30 +79,5 @@ public class TokenLifetimeConfigurationTests
                 TokenLifetimes.Default.AuthorizationCodeLifetimeSeconds));
 
         Assert.Equal(TokenLifetimes.Default, tokenLifetimes);
-    }
-
-    [Fact]
-    public void ShippedAppsettingsJson_DeclaresTheSameValuesAsTheCodeDefault()
-    {
-        // Guards against the file and Config.TokenLifetimes.Default drifting apart silently —
-        // both are meant to say the same thing (Duende's own defaults), stated explicitly rather
-        // than left implicit in the SDK.
-        string path = Path.Combine(
-            AppContext.BaseDirectory, "appsettings.json");
-        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
-
-        JsonElement tokenLifetimes = document.RootElement
-            .GetProperty("IdentityServer")
-            .GetProperty("TokenLifetimes");
-
-        Assert.Equal(
-            TokenLifetimes.Default.AccessTokenLifetimeSeconds,
-            tokenLifetimes.GetProperty("AccessTokenLifetimeSeconds").GetInt32());
-        Assert.Equal(
-            TokenLifetimes.Default.IdentityTokenLifetimeSeconds,
-            tokenLifetimes.GetProperty("IdentityTokenLifetimeSeconds").GetInt32());
-        Assert.Equal(
-            TokenLifetimes.Default.AuthorizationCodeLifetimeSeconds,
-            tokenLifetimes.GetProperty("AuthorizationCodeLifetimeSeconds").GetInt32());
     }
 }

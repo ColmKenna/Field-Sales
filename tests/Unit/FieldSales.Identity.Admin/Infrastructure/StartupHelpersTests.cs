@@ -65,8 +65,8 @@ public class StartupHelpersTests
     [Fact]
     public void CertificatePathsKeepAbsolutePathsAndResolveRelativePathsAgainstContentRoot()
     {
-        string root = Path.GetFullPath(".");
-        string absolute = Path.Combine(root, "certificate.pfx");
+        string root = OperatingSystem.IsWindows() ? @"C:\app\content" : "/app/content";
+        string absolute = OperatingSystem.IsWindows() ? @"C:\app\certs\certificate.pfx" : "/app/certs/certificate.pfx";
         Assert.Equal(absolute, StartupConfiguration.ResolveCertificatePath(root, absolute));
         Assert.Equal(Path.Combine(root, "keys", "certificate.pfx"),
             StartupConfiguration.ResolveCertificatePath(root, Path.Combine("keys", "certificate.pfx")));

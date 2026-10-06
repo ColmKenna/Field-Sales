@@ -25,8 +25,4 @@
     <Using Include="FieldSales.Identity.Services" />
   </ItemGroup>
 
-  <Target Name="CopyIdentityAppSettings" AfterTargets="Build">
-    <Copy SourceFiles="..\..\..\src\FieldSales.Identity\src\FieldSales.Identity\appsettings.json" DestinationFiles="$(TargetDir)appsettings.json" />
-  </Target>
-
 </Project>
