@@ -120,8 +120,8 @@ access, repeat seeding, preservation of edits, restart, reset, and normal-data i
 ### Automated verification
 
 ```sh
-dotnet test tests/FieldSales.DemoData.Tests
-python3 tests/demo-data-script.test.py
+dotnet test tests/Integration/FieldSales.DemoData
+python3 scripts/tests/demo-data-script.test.py
 ```
 
 The integration tests use disposable SQL Server databases to verify a complete

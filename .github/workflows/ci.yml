@@ -28,6 +28,9 @@ jobs:
       - name: Run unit tests (Fast Fail)
         run: dotnet test FieldSales.slnx --filter "Category=Unit" --no-build --verbosity normal
 
+      - name: Run demo-data script tests
+        run: python3 scripts/tests/demo-data-script.test.py
+
       # SQL Server-backed tests (migration adoption, concurrency, secret-reveal instance
       # handoff) run for real here, not skipped — GitHub-hosted ubuntu runners ship Docker
       # already running, which Testcontainers needs. A silent skip would mean CI stops

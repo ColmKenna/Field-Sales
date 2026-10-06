@@ -1,12 +1,24 @@
 """Verify reset scope and refusal paths without deleting actual Docker storage."""
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "demo-data.sh"
+def find_bash():
+    git_bash = Path("C:/Program Files/Git/bin/bash.exe")
+    if git_bash.exists():
+        return str(git_bash)
+    which_bash = shutil.which("bash")
+    if which_bash and "system32" not in which_bash.lower():
+        return which_bash
+    return "bash"
+
+
+BASH = find_bash()
+SCRIPT = Path(__file__).resolve().parent.parent / "demo-data.sh"
 VOLUME = "fieldsales-demo-sqlserver-data"
 
 
@@ -29,9 +41,9 @@ esac
 """)
             docker.chmod(0o755)
             env = dict(os.environ, PATH=directory + os.pathsep + os.environ["PATH"],
-                       MOCK_LOG=str(log), MOCK_RUNNING=running, MOCK_STOPPED=stopped,
+                       MOCK_LOG=log.as_posix(), MOCK_RUNNING=running, MOCK_STOPPED=stopped,
                        MOCK_VOLUMES=volumes, MOCK_FAILURE=failure)
-            result = subprocess.run(["bash", str(SCRIPT), "reset"], env=env, text=True, capture_output=True)
+            result = subprocess.run([BASH, SCRIPT.as_posix(), "reset"], env=env, text=True, capture_output=True)
             return result, log.read_text().splitlines()
 
     def test_refuses_reset_while_demo_is_running(self):
