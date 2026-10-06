@@ -54,7 +54,6 @@ tests/
 │       ├── FieldSales.DemoData.IntegrationTests.csproj       # 3 tests (uses DemoSqlServer)
 ├── E2E/
 │   └── .gitkeep                                     # Reserved for multi-service end-to-end user journeys
-└── demo-data-script.test.py                         # Standalone Python script (see TEST-TD-013)
 ```
 
 ### Current Verification Baseline
@@ -77,6 +76,7 @@ tests/
 | **TEST-TD-010** | Unused Dependencies and Vulnerability Warnings in Test Projects | - | `a4c15cd` | Audited packages across test suites and pruned 17 unused package references (including `FluentAssertions`, `NetArchTest.Rules`, `Microsoft.EntityFrameworkCore.InMemory`, `xunit.v3`, and redundant `Moq`/`TimeProvider.Testing`/`Sqlite` references) across `Directory.Packages.props` and test project files. |
 | **TEST-TD-007** | Flat Directory Structure and Mingled Helpers in `FieldSales.Web` Integration Tests | - | `ff3ca49` | Reorganized 46 flat integration test files and harnesses in `FieldSales.Web` into 6 domain subfolders (`Assignments/`, `Catalogue/`, `Contacts/`, `Customers/`, `Geography/`, and `Infrastructure/`) preserving git history. |
 | **TEST-TD-008** | Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`) | - | `e79827b` | Renamed `Task02SqlServerFactory` $\rightarrow$ `IdentityAdminSqlServerFactory`, `Task02SqlServerCollection` $\rightarrow$ `IdentityAdminSqlServerCollection`, directory `Task02/` $\rightarrow$ `SqlServer/` (`IdentityAdminSqlServerIntegrationTests`), updated connection string template handling, and updated all 10 consuming test suites. |
+| **TEST-TD-013** | Loose Unmanaged Python Script in Test Directory Root | - | `9f4a37b` | Relocated `demo-data-script.test.py` from `tests/` root into `scripts/tests/`, hardened for cross-platform execution (Linux/macOS/Windows Git Bash), wired into GitHub Actions CI, and updated references in documentation. |
 
 ---
 
@@ -86,31 +86,16 @@ The remaining technical debt findings are ranked below by impact, risk, and reco
 
 ```mermaid
 graph TD
-    A["TEST-TD-013: Move demo-data-script.test.py"] --> B["TEST-TD-011: Misplaced Unit Boundaries"]
-    B --> C["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
-    C --> D["TEST-TD-012: In-Memory Fake API Drift"]
-    D --> E["TEST-TD-009: Inconsistent Method Naming"]
+    A["TEST-TD-011: Misplaced Unit Boundaries"] --> B["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
+    B --> C["TEST-TD-012: In-Memory Fake API Drift"]
+    C --> D["TEST-TD-009: Inconsistent Method Naming"]
 ```
 
 ---
 
 ### Finding Details
 
-#### 1. TEST-TD-013: Loose Unmanaged Python Script in Test Directory Root
-- **Classification**: Organisation debt
-- **Severity**: Low | **Effort**: Small
-- **Location**:
-  - [tests/demo-data-script.test.py](file:///Users/colmkenna/Source/Field-Sales/tests/demo-data-script.test.py)
-- **Problem**:
-  A standalone Python `unittest` script sits directly in the root of `tests/`. It is not run by `dotnet test` and is omitted from CI workflows.
-- **Why It Matters**:
-  Clutters the top-level test folder and risks silent bit-rot when `tools/FieldSales.DemoData/` or CLI scripts are modified.
-- **Recommended Remediation**:
-  Move to `tools/FieldSales.DemoData/scripts/` or `scripts/tests/` and add a step to [.github/workflows/ci.yml](file:///Users/colmkenna/Source/Field-Sales/.github/workflows/ci.yml) (`python3 scripts/tests/demo-data-script.test.py`).
-
----
-
-#### 2. TEST-TD-011: Misplaced Integration Test Boundaries in Unit Test Projects
+#### 1. TEST-TD-011: Misplaced Integration Test Boundaries in Unit Test Projects
 - **Classification**: Test architecture debt
 - **Severity**: Medium | **Effort**: Small
 - **Location**:
@@ -124,7 +109,7 @@ graph TD
 
 ---
 
-#### 3. TEST-TD-005: Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests
+#### 2. TEST-TD-005: Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests
 - **Classification**: Performance debt
 - **Severity**: Medium | **Effort**: Medium
 - **Location**:
@@ -138,7 +123,7 @@ graph TD
 
 ---
 
-#### 4. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
+#### 3. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
 - **Classification**: Maintainability debt
 - **Severity**: Medium | **Effort**: Medium
 - **Location**:
@@ -152,7 +137,7 @@ graph TD
 
 ---
 
-#### 5. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
+#### 4. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
 - **Classification**: Maintainability debt
 - **Severity**: Low | **Effort**: Medium
 - **Location**:
