@@ -76,6 +76,7 @@ tests/
 | **TEST-TD-006** | Complete Absence of Test Traits Preventing Selective Filtering | [#15](https://github.com/ColmKenna/Field-Sales/pull/15) | `d092c80` | Tagged all test classes and methods across all projects with xUnit `[Trait("Category", "Unit")]` and `[Trait("Category", "Integration")]`. |
 | **TEST-TD-010** | Unused Dependencies and Vulnerability Warnings in Test Projects | - | `a4c15cd` | Audited packages across test suites and pruned 17 unused package references (including `FluentAssertions`, `NetArchTest.Rules`, `Microsoft.EntityFrameworkCore.InMemory`, `xunit.v3`, and redundant `Moq`/`TimeProvider.Testing`/`Sqlite` references) across `Directory.Packages.props` and test project files. |
 | **TEST-TD-007** | Flat Directory Structure and Mingled Helpers in `FieldSales.Web` Integration Tests | - | `ff3ca49` | Reorganized 46 flat integration test files and harnesses in `FieldSales.Web` into 6 domain subfolders (`Assignments/`, `Catalogue/`, `Contacts/`, `Customers/`, `Geography/`, and `Infrastructure/`) preserving git history. |
+| **TEST-TD-008** | Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`) | - | `e79827b` | Renamed `Task02SqlServerFactory` $\rightarrow$ `IdentityAdminSqlServerFactory`, `Task02SqlServerCollection` $\rightarrow$ `IdentityAdminSqlServerCollection`, directory `Task02/` $\rightarrow$ `SqlServer/` (`IdentityAdminSqlServerIntegrationTests`), updated connection string template handling, and updated all 10 consuming test suites. |
 
 ---
 
@@ -85,32 +86,17 @@ The remaining technical debt findings are ranked below by impact, risk, and reco
 
 ```mermaid
 graph TD
-    A["TEST-TD-008: Leaked Task02 Naming"] --> B["TEST-TD-013: Move demo-data-script.test.py"]
-    B --> C["TEST-TD-011: Misplaced Unit Boundaries"]
-    C --> D["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
-    D --> E["TEST-TD-012: In-Memory Fake API Drift"]
-    E --> F["TEST-TD-009: Inconsistent Method Naming"]
+    A["TEST-TD-013: Move demo-data-script.test.py"] --> B["TEST-TD-011: Misplaced Unit Boundaries"]
+    B --> C["TEST-TD-005: Host Re-Instantiation in AngleSharp"]
+    C --> D["TEST-TD-012: In-Memory Fake API Drift"]
+    D --> E["TEST-TD-009: Inconsistent Method Naming"]
 ```
 
 ---
 
 ### Finding Details
 
-#### 1. TEST-TD-008: Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`)
-- **Classification**: Organisation debt
-- **Severity**: Low | **Effort**: Small
-- **Location**:
-  - `tests/Integration/FieldSales.Identity.Admin/`
-- **Problem**:
-  Several test classes, fixtures, and collection definitions are named `Task02*` (e.g. `Task02SqlServerCollection`, `Task02DatabaseFixture`), which is an artifact of temporary sprint/task backlog tickets.
-- **Why It Matters**:
-  Obscures the purpose of the fixtures for future engineers and creates confusion when searching for the canonical Identity database fixture.
-- **Recommended Remediation**:
-  Rename `Task02SqlServerCollection` $\rightarrow$ `IdentityAdminSqlServerCollection` (and corresponding fixture classes) and update references across the 17 integration test files.
-
----
-
-#### 2. TEST-TD-013: Loose Unmanaged Python Script in Test Directory Root
+#### 1. TEST-TD-013: Loose Unmanaged Python Script in Test Directory Root
 - **Classification**: Organisation debt
 - **Severity**: Low | **Effort**: Small
 - **Location**:
@@ -124,7 +110,7 @@ graph TD
 
 ---
 
-#### 4. TEST-TD-011: Misplaced Integration Test Boundaries in Unit Test Projects
+#### 2. TEST-TD-011: Misplaced Integration Test Boundaries in Unit Test Projects
 - **Classification**: Test architecture debt
 - **Severity**: Medium | **Effort**: Small
 - **Location**:
@@ -138,7 +124,7 @@ graph TD
 
 ---
 
-#### 5. TEST-TD-005: Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests
+#### 3. TEST-TD-005: Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests
 - **Classification**: Performance debt
 - **Severity**: Medium | **Effort**: Medium
 - **Location**:
@@ -152,7 +138,7 @@ graph TD
 
 ---
 
-#### 6. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
+#### 4. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
 - **Classification**: Maintainability debt
 - **Severity**: Medium | **Effort**: Medium
 - **Location**:
@@ -166,7 +152,7 @@ graph TD
 
 ---
 
-#### 7. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
+#### 5. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
 - **Classification**: Maintainability debt
 - **Severity**: Low | **Effort**: Medium
 - **Location**:
