@@ -1,7 +1,10 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
-using FieldSales.Web.Security;
+using FieldSales.Catalogue.Contracts;
+using FieldSales.StaffAccess;
 using FieldSales.Web.Data;
+using FieldSales.Web.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,7 +15,8 @@ public sealed class CategoryPageTests
     [Fact]
     public async Task HeadOfficeStaffCanCreateRootsAndChildrenThroughTheWebsite()
     {
-        await using StaffWebsiteFactory website = new();
+        using CategoryReplyHandler api = new();
+        await using StaffWebsiteFactory website = new(api);
         using HttpClient browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
 
@@ -31,13 +35,13 @@ public sealed class CategoryPageTests
         string leaf = await GetHtmlAsync(browser, child.Headers.Location!.OriginalString);
         Assert.Contains("Suncare", leaf);
         Assert.Contains("Lotions", leaf);
-        Assert.Equal(2, website.Catalogue.Count);
+        Assert.Equal(2, api.Count);
 
         using HttpResponseMessage duplicate = await PostFormAsync(browser, detailUrl, detail, "LOTIONS");
         Assert.Equal(HttpStatusCode.OK, duplicate.StatusCode);
         Assert.Contains("A category with this name already exists here.",
             await duplicate.Content.ReadAsStringAsync());
-        Assert.Equal(2, website.Catalogue.Count);
+        Assert.Equal(2, api.Count);
     }
 
     [Theory]
@@ -45,7 +49,8 @@ public sealed class CategoryPageTests
     [InlineData(StaffRoles.SalesManager)]
     public async Task OtherStaffCannotReadOrPostCategories(string role)
     {
-        await using StaffWebsiteFactory website = new();
+        using CategoryReplyHandler api = new();
+        await using StaffWebsiteFactory website = new(api);
         using HttpClient browser = website.CreateBrowser();
         await SignInAsync(browser, "other", role);
 
@@ -54,13 +59,14 @@ public sealed class CategoryPageTests
         using HttpResponseMessage write = await browser.PostAsync("/HeadOffice/Categories",
             new FormUrlEncodedContent(new Dictionary<string, string> { ["Name"] = "Denied" }));
         Assert.Equal("/AccessDenied", write.Headers.Location?.AbsolutePath);
-        Assert.Equal(0, website.Catalogue.Count);
+        Assert.Equal(0, api.Count);
     }
 
     [Fact]
     public async Task RenamingAncestorRefreshesDescendantPathWithoutChangingItsUrl()
     {
-        await using StaffWebsiteFactory website = new();
+        using CategoryReplyHandler api = new();
+        await using StaffWebsiteFactory website = new(api);
         using HttpClient browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
         string roots = await GetHtmlAsync(browser, "/HeadOffice/Categories");
@@ -83,7 +89,7 @@ public sealed class CategoryPageTests
         Assert.Contains("Sun Care", descendant);
         Assert.DoesNotContain("Suncare", descendant);
         Assert.Contains("Lotions", descendant);
-        Assert.Equal(4, website.Catalogue.Count);
+        Assert.Equal(4, api.Count);
 
         string renamedPage = await GetHtmlAsync(browser, childUrl);
         using HttpResponseMessage duplicate = await PostFormAsync(browser,
@@ -92,13 +98,14 @@ public sealed class CategoryPageTests
         Assert.Contains("A category with this name already exists here.",
             await duplicate.Content.ReadAsStringAsync());
         Assert.Contains("Sun Care", await GetHtmlAsync(browser, childUrl));
-        Assert.Equal(4, website.Catalogue.Count);
+        Assert.Equal(4, api.Count);
     }
 
     [Fact]
     public async Task RemovedRoleRejectsOpenRenameFormWithoutSavingOrReplayingIt()
     {
-        await using StaffWebsiteFactory website = new();
+        using CategoryReplyHandler api = new();
+        await using StaffWebsiteFactory website = new(api);
         using HttpClient browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
         string roots = await GetHtmlAsync(browser, "/HeadOffice/Categories");
@@ -116,13 +123,14 @@ public sealed class CategoryPageTests
         website.Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
         Assert.Contains("Suncare", await GetHtmlAsync(browser, categoryUrl));
         Assert.DoesNotContain("Changed", await GetHtmlAsync(browser, categoryUrl));
-        Assert.Equal(1, website.Catalogue.Count);
+        Assert.Equal(1, api.Count);
     }
 
     [Fact]
     public async Task ExpiredSessionRejectsOpenRenameFormWithoutReplayingIt()
     {
-        await using StaffWebsiteFactory website = new();
+        using CategoryReplyHandler api = new();
+        await using StaffWebsiteFactory website = new(api);
         using HttpClient browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
         string roots = await GetHtmlAsync(browser, "/HeadOffice/Categories");
@@ -143,7 +151,7 @@ public sealed class CategoryPageTests
         await SignInAsync(browser, "niamh", StaffRoles.HeadOfficeUser);
         Assert.Contains("Suncare", await GetHtmlAsync(browser, categoryUrl));
         Assert.DoesNotContain("Changed", await GetHtmlAsync(browser, categoryUrl));
-        Assert.Equal(1, website.Catalogue.Count);
+        Assert.Equal(1, api.Count);
     }
 
     private static async Task SignInAsync(HttpClient browser, string subject, string role)
@@ -170,5 +178,108 @@ public sealed class CategoryPageTests
             [field] = name,
             ["__RequestVerificationToken"] = WebUtility.HtmlDecode(token.Groups[1].Value)
         }));
+    }
+
+    // Scripted API responses exercise the real Razor page, BFF, cookie and antiforgery boundary.
+    // Business validation and actual SQL persistence are covered by CategoryIntegrationTests.
+    private sealed class CategoryReplyHandler : HttpMessageHandler
+    {
+        private readonly Dictionary<Guid, CategoryItem> _categories = [];
+
+        public int Count
+        {
+            get
+            {
+                lock (_categories) return _categories.Count;
+            }
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
+            Assert.Equal("test-access-token", request.Headers.Authorization?.Parameter);
+            string path = request.RequestUri!.AbsolutePath.TrimEnd('/');
+
+            if (path == "/staff/session" && request.Method == HttpMethod.Get)
+            {
+                return Json(HttpStatusCode.OK,
+                    new StaffSessionResponse("staff-1", [StaffRoles.SalesManager, StaffRoles.HeadOfficeUser]));
+            }
+
+            if (path == "/catalogue/categories" && request.Method == HttpMethod.Get)
+            {
+                lock (_categories)
+                {
+                    return Json(HttpStatusCode.OK, _categories.Values.Where(c => c.ParentId is null)
+                        .OrderBy(c => c.Name).ToArray());
+                }
+            }
+
+            if (path == "/catalogue/categories" && request.Method == HttpMethod.Post)
+            {
+                var body = await request.Content!.ReadFromJsonAsync<CreateCategoryRequest>(cancellationToken);
+                lock (_categories)
+                {
+                    if (body!.ParentId is not null && !_categories.ContainsKey(body.ParentId.Value))
+                        return new HttpResponseMessage(HttpStatusCode.NotFound);
+                    if (_categories.Values.Any(c => c.ParentId == body.ParentId &&
+                        string.Equals(c.Name, body.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        return new HttpResponseMessage(HttpStatusCode.Conflict);
+                    CategoryItem added = new(Guid.NewGuid(), body.ParentId, body.Name.Trim());
+                    _categories.Add(added.Id, added);
+                    return Json(HttpStatusCode.Created, added);
+                }
+            }
+
+            if (path.StartsWith("/catalogue/categories/", StringComparison.Ordinal)
+                && path.EndsWith("/name", StringComparison.Ordinal)
+                && Guid.TryParse(path["/catalogue/categories/".Length..^"/name".Length], out Guid renameId)
+                && request.Method == HttpMethod.Put)
+            {
+                var body = await request.Content!.ReadFromJsonAsync<RenameCategoryRequest>(cancellationToken);
+                lock (_categories)
+                {
+                    if (!_categories.TryGetValue(renameId, out var selected))
+                        return new HttpResponseMessage(HttpStatusCode.NotFound);
+                    if (_categories.Values.Any(c => c.Id != renameId && c.ParentId == selected.ParentId
+                        && string.Equals(c.Name, body!.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        return new HttpResponseMessage(HttpStatusCode.Conflict);
+                    var renamed = selected with { Name = body!.Name.Trim() };
+                    _categories[renameId] = renamed;
+                    return Json(HttpStatusCode.OK, renamed);
+                }
+            }
+
+            if (path.StartsWith("/catalogue/categories/", StringComparison.Ordinal)
+                && Guid.TryParse(path["/catalogue/categories/".Length..], out Guid id)
+                && request.Method == HttpMethod.Get)
+            {
+                lock (_categories)
+                {
+                    if (!_categories.TryGetValue(id, out var selected))
+                        return new HttpResponseMessage(HttpStatusCode.NotFound);
+                    List<CategoryBreadcrumbSegment> pathSegments = [];
+                    var current = selected;
+                    while (true)
+                    {
+                        pathSegments.Add(new(current.Id, current.Name));
+                        if (current.ParentId is null) break;
+                        current = _categories[current.ParentId.Value];
+                    }
+                    pathSegments.Reverse();
+                    return Json(HttpStatusCode.OK, new CategoryDetails(selected,
+                        pathSegments, _categories.Values.Where(c => c.ParentId == id).ToArray(), []));
+                }
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }
+
+        private static HttpResponseMessage Json<T>(HttpStatusCode status, T value) =>
+            new(status) { Content = JsonContent.Create(value) };
+
+        private sealed record CreateCategoryRequest(string Name, Guid? ParentId);
+        private sealed record RenameCategoryRequest(string Name);
     }
 }
