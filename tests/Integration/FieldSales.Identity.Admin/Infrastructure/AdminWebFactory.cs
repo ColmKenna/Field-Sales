@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
@@ -28,22 +29,33 @@ public class AdminWebFactory : WebApplicationFactory<Program>
     public ConfigurationDbCommandCounter ConfigurationCommands { get; } = new();
     public ConfigurationDbCommandCounter PersistedGrantCommands { get; } = new();
 
-    static AdminWebFactory()
-    {
-        Environment.SetEnvironmentVariable("Clients__StaffWebUri", "https://localhost:7203");
-        Environment.SetEnvironmentVariable("Clients__StaffWebSecret", "secret");
-        Environment.SetEnvironmentVariable("Seed__SysAdminPassword", "Password123!");
-        Environment.SetEnvironmentVariable("Seed__SysAdminEmail", "admin@sales.local");
-        Environment.SetEnvironmentVariable("Seed__TestUserPassword", "Password123!");
-        Environment.SetEnvironmentVariable("ConnectionStrings__IdentityDb", "Server=localhost;Database=dummy;");
-        Environment.SetEnvironmentVariable("ConnectionStrings__IdentityConfigDb", "Server=localhost;Database=dummy;");
-        Environment.SetEnvironmentVariable("ConnectionStrings__IdentityOperationalDb",
-            "Server=localhost;Database=dummy;");
-    }
-
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        builder.UseSetting("Clients:StaffWebUri", "https://localhost:7203");
+        builder.UseSetting("Clients:StaffWebSecret", "secret");
+        builder.UseSetting("Seed:SysAdminPassword", "Password123!");
+        builder.UseSetting("Seed:SysAdminEmail", "admin@sales.local");
+        builder.UseSetting("Seed:TestUserPassword", "Password123!");
+        builder.UseSetting("ConnectionStrings:IdentityDb", "Server=localhost;Database=dummy;");
+        builder.UseSetting("ConnectionStrings:IdentityConfigDb", "Server=localhost;Database=dummy;");
+        builder.UseSetting("ConnectionStrings:IdentityOperationalDb", "Server=localhost;Database=dummy;");
+
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Clients:StaffWebUri"] = "https://localhost:7203",
+                ["Clients:StaffWebSecret"] = "secret",
+                ["Seed:SysAdminPassword"] = "Password123!",
+                ["Seed:SysAdminEmail"] = "admin@sales.local",
+                ["Seed:TestUserPassword"] = "Password123!",
+                ["ConnectionStrings:IdentityDb"] = "Server=localhost;Database=dummy;",
+                ["ConnectionStrings:IdentityConfigDb"] = "Server=localhost;Database=dummy;",
+                ["ConnectionStrings:IdentityOperationalDb"] = "Server=localhost;Database=dummy;"
+            });
+        });
 
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();
