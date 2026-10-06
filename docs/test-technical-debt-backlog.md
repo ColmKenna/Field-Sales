@@ -78,6 +78,7 @@ tests/
 | **TEST-TD-008** | Leaked Sprint/Work-Item Naming in `FieldSales.Identity.Admin` (`Task02*`) | - | `e79827b` | Renamed `Task02SqlServerFactory` $\rightarrow$ `IdentityAdminSqlServerFactory`, `Task02SqlServerCollection` $\rightarrow$ `IdentityAdminSqlServerCollection`, directory `Task02/` $\rightarrow$ `SqlServer/` (`IdentityAdminSqlServerIntegrationTests`), updated connection string template handling, and updated all 10 consuming test suites. |
 | **TEST-TD-013** | Loose Unmanaged Python Script in Test Directory Root | - | `9f4a37b` | Relocated `demo-data-script.test.py` from `tests/` root into `scripts/tests/`, hardened for cross-platform execution (Linux/macOS/Windows Git Bash), wired into GitHub Actions CI, and updated references in documentation. |
 | **TEST-TD-011** | Misplaced Integration Test Boundaries in Unit Test Projects | - | `f376444` | Relocated disk file and crypto certificate loading tests to `tests/Integration/FieldSales.Identity.Admin/Infrastructure/` with `[Trait("Category", "Integration")]`, refactored unit test counterparts to be hermetic and 100% in-memory, decoupled `StartupHelpersTests` from disk cwd, and eliminated MSBuild `CopyIdentityAppSettings` target. |
+| **TEST-TD-005** | Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests | - | `3f6222e` | Refactored 30 AngleSharp UI and characterisation test classes across `tests/Integration/FieldSales.Identity.Admin/` (`Shared/`, `*IndexIntegrationTests`, and detail/tab/create/edit suites) to share `AdminWebFactory` using xUnit `IClassFixture<AdminWebFactory>` and child host overrides (`WithWebHostBuilder`), eliminating over 190 redundant host instantiations and reducing test execution time by 50-90% per suite while preserving zero test pollution. |
 
 ---
 
@@ -87,29 +88,14 @@ The remaining technical debt findings are ranked below by impact, risk, and reco
 
 ```mermaid
 graph TD
-    A["TEST-TD-005: Host Re-Instantiation in AngleSharp"] --> B["TEST-TD-012: In-Memory Fake API Drift"]
-    B --> C["TEST-TD-009: Inconsistent Method Naming"]
+    A["TEST-TD-012: In-Memory Fake API Drift"] --> B["TEST-TD-009: Inconsistent Method Naming"]
 ```
 
 ---
 
 ### Finding Details
 
-#### 1. TEST-TD-005: Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests
-- **Classification**: Performance debt
-- **Severity**: Medium | **Effort**: Medium
-- **Location**:
-  - `tests/Unit/FieldSales.Identity.Admin/` & `tests/Integration/FieldSales.Identity.Admin/`
-- **Problem**:
-  AngleSharp-based Razor Page UI tests instantiate `new AdminWebFactory()` per test method merely to render static HTML tags or assert element presence.
-- **Why It Matters**:
-  Booting the ASP.NET Core DI container and compilation pipeline repeatedly adds multiple seconds of overhead for tests that only inspect HTML markup.
-- **Recommended Remediation**:
-  Share the factory across test classes using xUnit `IClassFixture<AdminWebFactory>` or render Razor Page views in-memory without spinning up the full HTTP server pipeline.
-
----
-
-#### 2. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
+#### 1. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
 - **Classification**: Maintainability debt
 - **Severity**: Medium | **Effort**: Medium
 - **Location**:
@@ -123,7 +109,7 @@ graph TD
 
 ---
 
-#### 3. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
+#### 2. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
 - **Classification**: Maintainability debt
 - **Severity**: Low | **Effort**: Medium
 - **Location**:
