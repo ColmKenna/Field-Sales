@@ -79,6 +79,7 @@ tests/
 | **TEST-TD-013** | Loose Unmanaged Python Script in Test Directory Root | - | `9f4a37b` | Relocated `demo-data-script.test.py` from `tests/` root into `scripts/tests/`, hardened for cross-platform execution (Linux/macOS/Windows Git Bash), wired into GitHub Actions CI, and updated references in documentation. |
 | **TEST-TD-011** | Misplaced Integration Test Boundaries in Unit Test Projects | - | `f376444` | Relocated disk file and crypto certificate loading tests to `tests/Integration/FieldSales.Identity.Admin/Infrastructure/` with `[Trait("Category", "Integration")]`, refactored unit test counterparts to be hermetic and 100% in-memory, decoupled `StartupHelpersTests` from disk cwd, and eliminated MSBuild `CopyIdentityAppSettings` target. |
 | **TEST-TD-005** | Costly Host Re-Instantiation per Test Method in AngleSharp UI Tests | - | `3f6222e` | Refactored 30 AngleSharp UI and characterisation test classes across `tests/Integration/FieldSales.Identity.Admin/` (`Shared/`, `*IndexIntegrationTests`, and detail/tab/create/edit suites) to share `AdminWebFactory` using xUnit `IClassFixture<AdminWebFactory>` and child host overrides (`WithWebHostBuilder`), eliminating over 190 redundant host instantiations and reducing test execution time by 50-90% per suite while preserving zero test pollution. |
+| **TEST-TD-012** | In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler` | - | `91f3aac` | Removed public mutable fake API `TestCatalogueHandler` and `StaffWebsiteFactory.Catalogue` property. Configured `StaffWebsiteFactory` with a minimal `DefaultStaffApiHandler` providing authenticated `/staff/session` contract, and encapsulated a dedicated, scenario-specific scripted `CategoryReplyHandler` in `CategoryPageTests.cs` matching the pattern in `ProductPricePageTests.cs`. |
 
 ---
 
@@ -88,28 +89,14 @@ The remaining technical debt findings are ranked below by impact, risk, and reco
 
 ```mermaid
 graph TD
-    A["TEST-TD-012: In-Memory Fake API Drift"] --> B["TEST-TD-009: Inconsistent Method Naming"]
+    A["TEST-TD-009: Inconsistent Method Naming"]
 ```
 
 ---
 
 ### Finding Details
 
-#### 1. TEST-TD-012: In-Memory Fake API Re-Implementation in `StaffWebsiteFactory.TestCatalogueHandler`
-- **Classification**: Maintainability debt
-- **Severity**: Medium | **Effort**: Medium
-- **Location**:
-  - `tests/Integration/FieldSales.Web/StaffWebsiteFactory.cs`
-- **Problem**:
-  A custom fake HTTP handler simulates `FieldSales.Api` responses with internal mutable state dictionaries rather than testing against the actual API contract or canned mocks.
-- **Why It Matters**:
-  Risk of drift: changes to `FieldSales.Api` will not be reflected in `TestCatalogueHandler`, leading to false confidence where tests pass against the fake but fail in production.
-- **Recommended Remediation**:
-  Replace the mutable fake with `Api.Server.CreateHandler()` to execute the real API pipeline in-memory, or use explicit, scenario-specific canned responses.
-
----
-
-#### 2. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
+#### 1. TEST-TD-009: Inconsistent Test Method Naming Conventions Across Test Suites
 - **Classification**: Maintainability debt
 - **Severity**: Low | **Effort**: Medium
 - **Location**:
