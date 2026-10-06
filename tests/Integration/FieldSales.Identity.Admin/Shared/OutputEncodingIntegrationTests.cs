@@ -34,7 +34,7 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///         these tests cover what the view does when it meets one.
 ///     </para>
 /// </remarks>
-public class OutputEncodingIntegrationTests : IDisposable
+public class OutputEncodingIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
     // No "/" in the payload: ASP.NET Core deliberately does not decode %2F inside a path
     // segment, so a closing tag would arrive at the page as literal "%2F" and the test would
@@ -42,7 +42,13 @@ public class OutputEncodingIntegrationTests : IDisposable
     // and round-trips through both a query string and a route segment unchanged.
     private const string Injected = "<img src=x onerror=alert(1)>";
 
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public OutputEncodingIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -76,12 +82,10 @@ public class OutputEncodingIntegrationTests : IDisposable
     [Fact]
     public async Task ConfirmationModal_ResourceNameContainingMarkup_IsEncodedButKeepsLiteralMarkup()
     {
-        var factory = new AdminWebFactory();
-        _disposables.Add(factory);
-        HttpClient client = factory.CreateClient();
+        HttpClient client = _baseFactory.CreateClient();
 
         string name = $"{Guid.NewGuid():N}-{Injected}-api";
-        await factory.RunInScopeAsync(async sp =>
+        await _baseFactory.RunInScopeAsync(async sp =>
         {
             ConfigurationDbContext configDb = sp.GetRequiredService<ConfigurationDbContext>();
             configDb.ApiResources.Add(new ApiResource { Name = name, Enabled = true });
@@ -128,9 +132,7 @@ public class OutputEncodingIntegrationTests : IDisposable
                 It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ClientSecretGenerateResult.Succeeded("brand-new-plaintext-secret"));
 
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => services.AddSingleton(mock.Object));
         });

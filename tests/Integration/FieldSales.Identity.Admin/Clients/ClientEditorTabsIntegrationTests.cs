@@ -15,11 +15,17 @@ namespace FieldSales.Identity.Admin.Tests.Clients;
 ///     once shared (WI-07): no editor page renders the strip, and each one carries a standalone
 ///     back link to the client's Details page instead.
 /// </summary>
-public class ClientEditorTabsIntegrationTests : IDisposable
+public class ClientEditorTabsIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
     private const string ClientId = "coop.market.razor";
 
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public ClientEditorTabsIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -37,10 +43,7 @@ public class ClientEditorTabsIntegrationTests : IDisposable
 
     private HttpClient CreateClient()
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services =>
             {

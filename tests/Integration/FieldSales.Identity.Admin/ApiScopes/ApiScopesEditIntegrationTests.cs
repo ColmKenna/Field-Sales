@@ -17,9 +17,15 @@ namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 ///     Uses a real (SQLite in-memory) database via <see cref="AdminWebFactory" /> so the
 ///     redirect/model-binding/antiforgery pipeline is exercised end to end.
 /// </summary>
-public class ApiScopesEditIntegrationTests : IDisposable
+public class ApiScopesEditIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _factory;
     private readonly List<IDisposable> _disposables = new();
+
+    public ApiScopesEditIntegrationTests(AdminWebFactory factory)
+    {
+        _factory = factory;
+    }
 
     public void Dispose()
     {
@@ -28,15 +34,13 @@ public class ApiScopesEditIntegrationTests : IDisposable
 
     private (AdminWebFactory Factory, HttpClient Client) CreateClient(bool allowAutoRedirect = true)
     {
-        var factory = new AdminWebFactory();
-        _disposables.Add(factory);
-
-        HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        HttpClient client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = allowAutoRedirect
         });
+        _disposables.Add(client);
 
-        return (factory, client);
+        return (_factory, client);
     }
 
     private static async Task<IDocument> GetDocumentAsync(HttpResponseMessage response)

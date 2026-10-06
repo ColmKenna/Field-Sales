@@ -12,9 +12,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Grants;
 
-public class GrantsIndexIntegrationTests : IDisposable
+public class GrantsIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public GrantsIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -23,10 +29,7 @@ public class GrantsIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IGrantListService grantListService)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(grantListService); });
         });

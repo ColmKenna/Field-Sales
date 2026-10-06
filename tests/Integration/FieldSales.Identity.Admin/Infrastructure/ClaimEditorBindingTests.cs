@@ -9,8 +9,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
-public class ClaimEditorBindingTests
+public class ClaimEditorBindingTests : IClassFixture<AdminWebFactory>
 {
+    private readonly AdminWebFactory _factory;
+
+    public ClaimEditorBindingTests(AdminWebFactory factory)
+    {
+        _factory = factory;
+    }
+
     [Theory]
     [InlineData("ApiScopes", "AddClaim", false)]
     [InlineData("ApiScopes", "RemoveClaim", false)]
@@ -22,12 +29,11 @@ public class ClaimEditorBindingTests
     [InlineData("IdentityResources", "RemoveClaim", true)]
     public async Task ClaimMutation_UsesOnlyUrlTarget(string area, string handler, bool missingUrlTarget)
     {
-        using var factory = new AdminWebFactory();
-        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using HttpClient client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         string target = "target-" + Guid.NewGuid().ToString("N");
         string other = "other-" + Guid.NewGuid().ToString("N");
         bool removing = handler == "RemoveClaim";
-        await factory.RunInScopeAsync(async services =>
+        await _factory.RunInScopeAsync(async services =>
         {
             var db = services.GetRequiredService<ConfigurationDbContext>();
             foreach (string name in new[] { target, other })
@@ -53,7 +59,7 @@ public class ClaimEditorBindingTests
         using HttpResponseMessage response = await client.SendAsync(request);
         Assert.Equal(missingUrlTarget ? HttpStatusCode.NotFound : HttpStatusCode.Redirect, response.StatusCode);
         if (!missingUrlTarget) Assert.Contains("name=" + target, response.Headers.Location!.OriginalString);
-        await factory.RunInScopeAsync(async services =>
+        await _factory.RunInScopeAsync(async services =>
         {
             var db = services.GetRequiredService<ConfigurationDbContext>();
             async Task<bool> HasClaim(string name) => area == "ApiScopes"

@@ -14,14 +14,14 @@ using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
-public class ClientsCreateIntegrationTests : IDisposable
+public class ClientsCreateIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
     private readonly HttpClient _client;
     private readonly AdminWebFactory _factory;
 
-    public ClientsCreateIntegrationTests()
+    public ClientsCreateIntegrationTests(AdminWebFactory factory)
     {
-        _factory = new AdminWebFactory();
+        _factory = factory;
         _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
@@ -31,7 +31,6 @@ public class ClientsCreateIntegrationTests : IDisposable
     public void Dispose()
     {
         _client.Dispose();
-        _factory.Dispose();
     }
 
     private static async Task<IDocument> GetDocumentAsync(HttpResponseMessage response)

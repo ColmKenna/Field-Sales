@@ -15,9 +15,15 @@ namespace FieldSales.Identity.Admin.Tests.Clients;
 ///     Each test builds its own factory/client with <see cref="IClientListService" /> replaced by a
 ///     mock so the rendered markup is fully controlled and independent of database state.
 /// </summary>
-public class ClientsIndexIntegrationTests : IDisposable
+public class ClientsIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public ClientsIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -26,10 +32,7 @@ public class ClientsIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IClientListService clientListService)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(clientListService); });
         });

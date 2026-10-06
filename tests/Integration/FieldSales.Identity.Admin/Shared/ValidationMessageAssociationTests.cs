@@ -15,20 +15,15 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///     aria-describedby, so an assistive technology can report the error against the field it
 ///     belongs to. These check the rendered markup, because the association only exists there.
 /// </summary>
-public class ValidationMessageAssociationTests : IDisposable
+public class ValidationMessageAssociationTests : IClassFixture<AdminWebFactory>
 {
-    private readonly List<IDisposable> _disposables = new();
+    private readonly AdminWebFactory _factory;
+    private readonly HttpClient _client;
 
-    public void Dispose()
+    public ValidationMessageAssociationTests(AdminWebFactory factory)
     {
-        foreach (IDisposable disposable in _disposables) disposable.Dispose();
-    }
-
-    private AdminWebFactory CreateFactory()
-    {
-        var factory = new AdminWebFactory();
-        _disposables.Add(factory);
-        return factory;
+        _factory = factory;
+        _client = factory.CreateClient();
     }
 
     private static async Task<IDocument> GetDocumentAsync(HttpResponseMessage response)
@@ -92,7 +87,7 @@ public class ValidationMessageAssociationTests : IDisposable
     [MemberData(nameof(FormPages))]
     public async Task FormPage_PointsEveryControlAtItsValidationMessage(string url, int expectedAssociations)
     {
-        HttpResponseMessage response = await CreateFactory().CreateClient().GetAsync(url);
+        HttpResponseMessage response = await _client.GetAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         AssertAssociationsResolve(await GetDocumentAsync(response), url, expectedAssociations);
@@ -101,10 +96,9 @@ public class ValidationMessageAssociationTests : IDisposable
     [Fact]
     public async Task EditorPages_PointEveryControlAtItsValidationMessage()
     {
-        AdminWebFactory factory = CreateFactory();
-        HttpClient client = factory.CreateClient();
+        HttpClient client = _client;
 
-        await factory.RunInScopeAsync(async serviceProvider =>
+        await _factory.RunInScopeAsync(async serviceProvider =>
         {
             ConfigurationDbContext configurationDb =
                 serviceProvider.GetRequiredService<ConfigurationDbContext>();
@@ -125,7 +119,7 @@ public class ValidationMessageAssociationTests : IDisposable
         });
 
         string userId = string.Empty;
-        await factory.RunInScopeAsync(async serviceProvider =>
+        await _factory.RunInScopeAsync(async serviceProvider =>
         {
             var users = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var user = new ApplicationUser { UserName = "assoc.user", Email = "assoc@example.test" };
@@ -159,7 +153,7 @@ public class ValidationMessageAssociationTests : IDisposable
     [Fact]
     public async Task InvalidPost_RedisplaysTheErrorInsideTheReferencedElement()
     {
-        HttpClient client = CreateFactory().CreateClient();
+        HttpClient client = _client;
 
         HttpResponseMessage getResponse = await client.GetAsync("/Admin/Roles/Create");
         IDocument getDocument = await GetDocumentAsync(getResponse);

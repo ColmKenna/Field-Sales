@@ -11,9 +11,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Diagnostics;
 
-public class DiagnosticsIndexIntegrationTests : IDisposable
+public class DiagnosticsIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public DiagnosticsIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -22,10 +28,7 @@ public class DiagnosticsIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IDiagnosticsService diagnosticsService)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(diagnosticsService); });
         });

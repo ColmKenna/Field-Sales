@@ -16,9 +16,15 @@ namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 ///     Each test builds its own factory/client with <see cref="IApiScopeListService" /> replaced by a
 ///     mock so the rendered markup is fully controlled and independent of database state.
 /// </summary>
-public class ApiScopesIndexIntegrationTests : IDisposable
+public class ApiScopesIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public ApiScopesIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -27,10 +33,7 @@ public class ApiScopesIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IApiScopeListService apiScopeListService, bool allowAutoRedirect = true)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(apiScopeListService); });
         });

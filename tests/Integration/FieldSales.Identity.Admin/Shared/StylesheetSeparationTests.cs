@@ -10,12 +10,18 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///     Each surface loads the shared stylesheet plus its own, and neither loads the other's.
 ///     shared.css must come first: the public and admin sheets build on its tokens and reset.
 /// </summary>
-public class StylesheetSeparationTests
+public class StylesheetSeparationTests : IClassFixture<AdminWebFactory>
 {
-    private static async Task<string[]> StylesheetsAsync(string url, string? identity = null)
+    private readonly AdminWebFactory _factory;
+
+    public StylesheetSeparationTests(AdminWebFactory factory)
     {
-        using var factory = new AdminWebFactory();
-        HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        _factory = factory;
+    }
+
+    private async Task<string[]> StylesheetsAsync(string url, string? identity = null)
+    {
+        using HttpClient client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false
         });
@@ -25,9 +31,9 @@ public class StylesheetSeparationTests
         HttpResponseMessage response = await client.GetAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
+        string content = await response.Content.ReadAsStringAsync();
         IBrowsingContext context = BrowsingContext.New(AngleSharp.Configuration.Default);
-        IDocument document = await context.OpenAsync(
-            request => request.Content(response.Content.ReadAsStringAsync().Result));
+        IDocument document = await context.OpenAsync(request => request.Content(content));
 
         return document.QuerySelectorAll("link[rel=stylesheet]")
             .Select(link => link.GetAttribute("href")!.Split('?')[0])

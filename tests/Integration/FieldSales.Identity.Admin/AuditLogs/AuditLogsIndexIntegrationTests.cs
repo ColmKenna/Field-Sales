@@ -12,9 +12,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.AuditLogs;
 
-public class AuditLogsIndexIntegrationTests : IDisposable
+public class AuditLogsIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public AuditLogsIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -23,10 +29,7 @@ public class AuditLogsIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClientWithMockedService(IAuditLogListService auditLogListService)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(auditLogListService); });
         });
@@ -156,8 +159,7 @@ public class AuditLogsIndexIntegrationTests : IDisposable
         // Uses the real DI-registered IAuditLogListService against the SQLite in-memory
         // ApplicationDbContext (no mocking) to exercise the actual GET search + EF Core
         // Skip/Take pagination end to end, per the WI-33 scenario-review test ownership.
-        var factory = new AdminWebFactory();
-        _disposables.Add(factory);
+        var factory = _baseFactory;
 
         string tag = $"audit-e2e-{Guid.NewGuid():N}";
 

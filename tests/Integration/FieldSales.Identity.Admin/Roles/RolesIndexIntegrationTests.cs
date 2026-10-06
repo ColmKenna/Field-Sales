@@ -12,9 +12,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Roles;
 
-public class RolesIndexIntegrationTests : IDisposable
+public class RolesIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public RolesIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -23,10 +29,7 @@ public class RolesIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IRoleService roleService, bool allowAutoRedirect = true)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(roleService); });
         });

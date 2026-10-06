@@ -20,9 +20,15 @@ namespace FieldSales.Identity.Admin.Tests.Apis;
 ///     delete modal. Uses a real (SQLite in-memory) database via <see cref="AdminWebFactory" />
 ///     so the redirect/TempData/antiforgery pipeline is exercised end to end.
 /// </summary>
-public class ApisEditorIntegrationTests : IDisposable
+public class ApisEditorIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _factory;
     private readonly List<IDisposable> _disposables = new();
+
+    public ApisEditorIntegrationTests(AdminWebFactory factory)
+    {
+        _factory = factory;
+    }
 
     public void Dispose()
     {
@@ -31,15 +37,13 @@ public class ApisEditorIntegrationTests : IDisposable
 
     private (AdminWebFactory Factory, HttpClient Client) CreateClient(bool allowAutoRedirect = true)
     {
-        var factory = new AdminWebFactory();
-        _disposables.Add(factory);
-
-        HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        HttpClient client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = allowAutoRedirect
         });
+        _disposables.Add(client);
 
-        return (factory, client);
+        return (_factory, client);
     }
 
     private static async Task<IDocument> GetDocumentAsync(HttpResponseMessage response)

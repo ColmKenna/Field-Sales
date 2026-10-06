@@ -12,9 +12,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
-public class ClientsSecretsIntegrationTests : IDisposable
+public class ClientsSecretsIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public ClientsSecretsIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -23,10 +29,7 @@ public class ClientsSecretsIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IClientSecretsService clientDetailsService, bool allowAutoRedirect = true)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(clientDetailsService); });
         });
@@ -172,9 +175,7 @@ public class ClientsSecretsIntegrationTests : IDisposable
             .ReturnsAsync(ClientSecretGenerateResult.Succeeded("brand-new-plaintext-secret"));
 
         var handler = new HttpClientHandler { UseCookies = true, CookieContainer = new CookieContainer() };
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => services.AddSingleton(mock.Object));
         });

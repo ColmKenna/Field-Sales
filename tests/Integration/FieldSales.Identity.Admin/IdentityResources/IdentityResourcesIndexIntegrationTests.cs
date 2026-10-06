@@ -10,9 +10,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 
-public class IdentityResourcesIndexIntegrationTests : IDisposable
+public class IdentityResourcesIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public IdentityResourcesIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -21,10 +27,7 @@ public class IdentityResourcesIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IIdentityResourceListService identityResourceListService)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(identityResourceListService); });
         });

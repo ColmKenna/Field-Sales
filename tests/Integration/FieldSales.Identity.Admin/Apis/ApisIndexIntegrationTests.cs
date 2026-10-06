@@ -15,9 +15,15 @@ namespace FieldSales.Identity.Admin.Tests.Apis;
 ///     Each test builds its own factory/client with <see cref="IApiResourceListService" /> replaced by a
 ///     mock so the rendered markup is fully controlled and independent of database state.
 /// </summary>
-public class ApisIndexIntegrationTests : IDisposable
+public class ApisIndexIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public ApisIndexIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -26,10 +32,7 @@ public class ApisIndexIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IApiResourceListService apiResourceListService)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(apiResourceListService); });
         });

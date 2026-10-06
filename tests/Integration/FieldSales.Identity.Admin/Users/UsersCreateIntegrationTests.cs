@@ -11,9 +11,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Users;
 
-public class UsersCreateIntegrationTests : IDisposable
+public class UsersCreateIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public UsersCreateIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -22,10 +28,7 @@ public class UsersCreateIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IUserCreateService userCreateService, bool allowAutoRedirect = true)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(userCreateService); });
         });

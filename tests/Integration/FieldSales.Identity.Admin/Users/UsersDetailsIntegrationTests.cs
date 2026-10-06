@@ -11,9 +11,15 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Users;
 
-public class UsersDetailsIntegrationTests : IDisposable
+public class UsersDetailsIntegrationTests : IClassFixture<AdminWebFactory>, IDisposable
 {
+    private readonly AdminWebFactory _baseFactory;
     private readonly List<IDisposable> _disposables = new();
+
+    public UsersDetailsIntegrationTests(AdminWebFactory baseFactory)
+    {
+        _baseFactory = baseFactory;
+    }
 
     public void Dispose()
     {
@@ -22,10 +28,7 @@ public class UsersDetailsIntegrationTests : IDisposable
 
     private HttpClient CreateClient(IUserDetailsService userDetailsService, bool allowAutoRedirect = true)
     {
-        var baseFactory = new AdminWebFactory();
-        _disposables.Add(baseFactory);
-
-        WebApplicationFactory<Program> factory = baseFactory.WithWebHostBuilder(builder =>
+        WebApplicationFactory<Program> factory = _baseFactory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services => { services.AddSingleton(userDetailsService); });
         });
@@ -290,7 +293,7 @@ public class UsersDetailsIntegrationTests : IDisposable
         Assert.True(removeButton!.IsDisabled);
 
         // The reason is visible text, not a title. A disabled control is not focusable, so a
-        // title on it is unreachable by keyboard and never announced — it explained the refusal
+        // title on it is unreachable by keyboard and never announced ï¿½ it explained the refusal
         // only to a sighted mouse user hovering the button they had been told not to press.
         IElement? reason = document.QuerySelector("#tab-panel-roles .danger-row-desc");
         Assert.NotNull(reason);
