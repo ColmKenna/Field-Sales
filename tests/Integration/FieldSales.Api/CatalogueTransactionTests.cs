@@ -9,7 +9,7 @@ namespace FieldSales.Api.Tests;
 public class CatalogueTransactionTests(SqlServerFixture fixture)
 {
     [Fact]
-    public async Task SqlRetryClearsFailedStateAndUncommittedWorkRollsBack()
+    public async Task Should_ClearFailedStateAndRollBackUncommittedWork_When_SqlRetryOccurs()
     {
         await using var db = new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
             .UseSqlServer(fixture.CreateConnectionString("Tx"), options => options.EnableRetryOnFailure(2, TimeSpan.Zero, null)).Options);

@@ -19,7 +19,7 @@ public class ClientSecretClockTests
     }
 
     [Fact]
-    public void FactoryHashesPlaintextAndPreservesExpiry()
+    public void Should_HashPlaintextAndPreserveExpiry_When_CreatedByFactory()
     {
         var clock = new Clock();
         var expiry = clock.GetUtcNow().UtcDateTime.AddDays(1);
@@ -32,7 +32,7 @@ public class ClientSecretClockTests
     }
 
     [Fact]
-    public async Task CreationCloningAndRotationUseInjectedClock()
+    public async Task Should_UseInjectedClock_When_CreatingCloningAndRotatingSecrets()
     {
         await using var root = new AdminWebFactory();
         var clock = new Clock();

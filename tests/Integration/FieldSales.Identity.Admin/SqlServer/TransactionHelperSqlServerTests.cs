@@ -19,7 +19,7 @@ namespace FieldSales.Identity.Admin.Tests.SqlServer;
 public class TransactionHelperSqlServerTests(IdentityAdminSqlServerFactory factory)
 {
     [Fact]
-    public async Task ScopeCreationRetryDoesNotDuplicateScopesLinksOrAuditEvents()
+    public async Task Should_NotDuplicateScopesLinksOrAuditEvents_When_ScopeCreationRetries()
     {
         string name = $"resource-{Guid.NewGuid():N}";
         string scopeName = $"scope-{Guid.NewGuid():N}";
@@ -64,7 +64,7 @@ public class TransactionHelperSqlServerTests(IdentityAdminSqlServerFactory facto
     }
 
     [Fact]
-    public async Task TransientFailureRollsBackAndRetriesWithFreshState()
+    public async Task Should_RollBackAndRetryWithFreshState_When_TransientFailureOccurs()
     {
         string name = $"retry-{Guid.NewGuid():N}";
         await factory.RunInScopeAsync(async services =>
@@ -87,7 +87,7 @@ public class TransactionHelperSqlServerTests(IdentityAdminSqlServerFactory facto
     }
 
     [Fact]
-    public async Task UnhandledFailureRollsBackAndPreservesException()
+    public async Task Should_RollBackAndPreserveException_When_UnhandledFailureOccurs()
     {
         string name = $"rollback-{Guid.NewGuid():N}";
         var failure = new InvalidOperationException("injected failure after save");

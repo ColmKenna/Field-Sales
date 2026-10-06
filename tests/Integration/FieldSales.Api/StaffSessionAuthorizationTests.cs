@@ -24,7 +24,7 @@ public sealed class StaffSessionAuthorizationTests
         Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
 
     [Fact]
-    public async Task StaffEndpointRequiresValidAudienceScopeAndBusinessRole()
+    public async Task Should_RequireValidAudienceScopeAndBusinessRole_When_AccessingStaffEndpoint()
     {
         TestRoleLookup roleLookup = new();
         await using WebApplicationFactory<Program> factory = CreateFactory(roleLookup);
@@ -72,7 +72,7 @@ public sealed class StaffSessionAuthorizationTests
     }
 
     [Fact]
-    public async Task StaffEndpointIsUnavailableWhileCurrentRolesCannotBeChecked()
+    public async Task Should_ReturnUnavailable_When_CurrentRolesCannotBeChecked()
     {
         TestRoleLookup roleLookup = new() { Unavailable = true };
         await using WebApplicationFactory<Program> factory = CreateFactory(roleLookup);

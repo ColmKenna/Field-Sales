@@ -18,7 +18,7 @@ namespace FieldSales.Web.Tests;
 public sealed class StaffCookieEventsTests
 {
     [Fact]
-    public async Task ExpiringApiTokenIsRefreshedInsideServerSession()
+    public async Task Should_RefreshExpiringApiTokenInsideServerSession_When_ValidatePrincipalCalled()
     {
         string? posted = null;
         using HttpClient client = new(new ReplyHandler(async request =>

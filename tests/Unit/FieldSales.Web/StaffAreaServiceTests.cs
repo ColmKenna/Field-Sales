@@ -16,7 +16,7 @@ public sealed class StaffAreaServiceTests
     [InlineData(1, false, StaffLandingStatus.Direct, "/Rep")]
     [InlineData(2, false, StaffLandingStatus.Choose, null)]
     [InlineData(2, true, StaffLandingStatus.Direct, "/Manager")]
-    public async Task Landing_UsesRememberedAreaBeforeSingleOrMultipleChoices(int count, bool remember, StaffLandingStatus expected, string? route)
+    public async Task Should_UseRememberedAreaBeforeSingleOrMultipleChoices_When_LandingResolved(int count, bool remember, StaffLandingStatus expected, string? route)
     {
         await using SqliteConnection connection = await OpenDatabaseAsync();
         await using ServiceProvider services = CreateServices(connection);
@@ -36,7 +36,7 @@ public sealed class StaffAreaServiceTests
     }
 
     [Fact]
-    public async Task RememberedAreaIsReturnedOnlyWhileStaffStillHasItsRole()
+    public async Task Should_ReturnRememberedAreaOnlyWhileRoleRetained_When_StaffAreaQueried()
     {
         await using SqliteConnection connection = await OpenDatabaseAsync();
         await using ServiceProvider services = CreateServices(connection);
@@ -51,7 +51,7 @@ public sealed class StaffAreaServiceTests
     }
 
     [Fact]
-    public async Task CannotRememberAnUnknownOrUnpermittedArea()
+    public async Task Should_NotRememberArea_When_AreaIsUnknownOrUnpermitted()
     {
         await using SqliteConnection connection = await OpenDatabaseAsync();
         await using ServiceProvider services = CreateServices(connection);
@@ -71,7 +71,7 @@ public sealed class StaffAreaServiceTests
     [InlineData("//attacker.test/Rep", null)]
     [InlineData("https://attacker.test/Manager", null)]
     [InlineData("/Representative", null)]
-    public void LocalPathMapsOnlyToItsStaffArea(string url, string? expected) =>
+    public void Should_MapLocalPathOnlyToItsStaffArea_When_PathResolved(string url, string? expected) =>
         Assert.Equal(expected, StaffAreas.ForLocalUrl(url)?.Key);
 
     private static async Task<SqliteConnection> OpenDatabaseAsync()

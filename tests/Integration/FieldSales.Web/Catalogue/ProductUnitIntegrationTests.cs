@@ -20,7 +20,7 @@ public sealed class ProductUnitIntegrationTests(ProductApplication app) : IClass
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CreationEach_IgnoresStaleNonnumericMeasuredFields(bool legacy)
+    public async Task Should_IgnoreStaleNonnumericMeasuredFields_When_CreationEachCalled(bool legacy)
     {
         Guid category = await app.ResetAsync();
         await using StaffWebsiteFactory website = app.CreateWebsite();

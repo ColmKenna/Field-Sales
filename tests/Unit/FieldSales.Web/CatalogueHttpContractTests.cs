@@ -18,7 +18,7 @@ namespace FieldSales.Web.Tests;
 public sealed class CatalogueHttpContractTests
 {
     [Fact]
-    public async Task StaffSession_UsesTheTypedBearerClientAndDecodesRoles()
+    public async Task Should_UseTypedBearerClientAndDecodeRoles_When_StaffSessionQueried()
     {
         using var services = TokenServices();
         using var http = new HttpClient(new ReplyHandler((request, _) =>
@@ -40,7 +40,7 @@ public sealed class CatalogueHttpContractTests
     [InlineData(HttpStatusCode.InternalServerError, CatalogueReadStatus.Unavailable)]
     [InlineData(HttpStatusCode.Unauthorized, CatalogueReadStatus.Unauthorized)]
     [InlineData(HttpStatusCode.Forbidden, CatalogueReadStatus.Forbidden)]
-    public async Task ReadFailures_HaveDistinctPageOutcomes(HttpStatusCode code, CatalogueReadStatus expected)
+    public async Task Should_HaveDistinctPageOutcomes_When_ReadFails(HttpStatusCode code, CatalogueReadStatus expected)
     {
         using var services = TokenServices();
         using var http = new HttpClient(new ReplyHandler((_, _) => Task.FromResult(new HttpResponseMessage(code))))
@@ -65,7 +65,7 @@ public sealed class CatalogueHttpContractTests
     [InlineData("not JSON")]
     [InlineData("null")]
     [InlineData("{}")]
-    public async Task MalformedSuccess_IsUnavailable(string body)
+    public async Task Should_ReturnUnavailable_When_SuccessPayloadIsMalformed(string body)
     {
         using var services = TokenServices();
         using var http = new HttpClient(new ReplyHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -78,7 +78,7 @@ public sealed class CatalogueHttpContractTests
     }
 
     [Fact]
-    public async Task ProductSearch_EncodesLiteralQueryAndFiltersAndUsesServerHeldBearerToken()
+    public async Task Should_EncodeLiteralQueryAndFiltersAndUseServerHeldToken_When_SearchingProducts()
     {
         Guid category = Guid.NewGuid(), brand = Guid.NewGuid();
         const string query = "A&B / 50% + SPF30";
@@ -106,7 +106,7 @@ public sealed class CatalogueHttpContractTests
     [InlineData("""{"items":[],"categories":[null],"brands":[]}""")]
     [InlineData("""{"items":[],"categories":[],"brands":[null]}""")]
     [InlineData("""{"items":[{}],"categories":[],"brands":[]}""")]
-    public async Task ProductSearch_RejectsIncompleteSuccessfulPayloads(string body)
+    public async Task Should_RejectIncompletePayloads_When_SearchingProducts(string body)
     {
         using var services = TokenServices();
         using var http = new HttpClient(new ReplyHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -119,7 +119,7 @@ public sealed class CatalogueHttpContractTests
     [Theory]
     [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Conflict)]
-    public async Task MalformedWriteError_IsUnavailable(HttpStatusCode code)
+    public async Task Should_ReturnUnavailable_When_WriteErrorIsMalformed(HttpStatusCode code)
     {
         using var services = TokenServices();
         using var http = new HttpClient(new ReplyHandler((_, _) => Task.FromResult(new HttpResponseMessage(code)
@@ -135,7 +135,7 @@ public sealed class CatalogueHttpContractTests
     }
 
     [Fact]
-    public async Task NetworkFailure_IsUnavailableAndCallerCancellationPropagates()
+    public async Task Should_ReturnUnavailableAndPropagateCallerCancellation_When_NetworkFails()
     {
         using var services = TokenServices();
         using var http = new HttpClient(new ReplyHandler((_, _) => throw new HttpRequestException("offline")))
@@ -149,7 +149,7 @@ public sealed class CatalogueHttpContractTests
     }
 
     [Fact]
-    public async Task CancellationDuringSend_Propagates()
+    public async Task Should_PropagateCancellation_When_CancelledDuringSend()
     {
         using var services = TokenServices();
         using CancellationTokenSource canceled = new();
@@ -167,7 +167,7 @@ public sealed class CatalogueHttpContractTests
     [InlineData("PUT")]
     [InlineData("DELETE")]
     [InlineData("PATCH")]
-    public async Task StaffWrite_IsSentExactlyOnceDespiteInheritedRetryPolicy(string method)
+    public async Task Should_SendStaffWriteExactlyOnce_When_RetryPolicyInherited(string method)
     {
         int sent = 0;
         ServiceCollection services = new();
@@ -187,7 +187,7 @@ public sealed class CatalogueHttpContractTests
     }
 
     [Fact]
-    public async Task SafeRead_RetainsRetrySupport()
+    public async Task Should_RetainRetrySupport_When_SafeReadInvoked()
     {
         int sent = 0;
         ServiceCollection services = new();
@@ -204,7 +204,7 @@ public sealed class CatalogueHttpContractTests
     }
 
     [Fact]
-    public void Contracts_RoundTripOptionalAndHistoricalFields()
+    public void Should_RoundTripOptionalAndHistoricalFields_When_ContractsSerialized()
     {
         JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
         ProductDetails product = new(new(Guid.NewGuid(), "TEA", "Tea", Guid.NewGuid(), "kg", 0.5m, 1m),

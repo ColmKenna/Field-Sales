@@ -19,7 +19,7 @@ public class TokenCleanupTests : IClassFixture<AdminWebFactory>
     }
 
     [Fact]
-    public void TheResolvedOperationalStoreOptionsEnableCleanup()
+    public void Should_EnableTokenCleanup_When_OperationalStoreOptionsResolved()
     {
         OperationalStoreOptions options = _factory.Services.GetRequiredService<OperationalStoreOptions>();
 
@@ -28,7 +28,7 @@ public class TokenCleanupTests : IClassFixture<AdminWebFactory>
     }
 
     [Fact]
-    public void EveryRegisteredOperationalStoreOptionsAgrees()
+    public void Should_AgreeOnTokenCleanupSettings_When_MultipleOperationalStoreOptionsRegistered()
     {
         // Duplicate registrations are the hazard here: one configured instance and one bare
         // one resolve differently depending on which the consumer asks for, and the bare one

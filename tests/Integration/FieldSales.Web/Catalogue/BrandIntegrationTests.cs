@@ -27,7 +27,7 @@ public sealed class BrandIntegrationTests(ProductApplication app) : IClassFixtur
     private const string ApiPath = "/catalogue/reference-data/brands";
 
     [Fact]
-    public async Task UnknownReferenceKey_Returns404OnEveryRoute()
+    public async Task Should_Return404OnEveryRoute_When_ReferenceKeyIsUnknown()
     {
         using var api = app.CreateApiClient();
         string root = "/catalogue/reference-data/unknown";

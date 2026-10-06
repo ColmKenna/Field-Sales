@@ -9,7 +9,7 @@ public class AuditOperationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task FailureWritesOnceAndPreservesOriginalException(bool loaded)
+    public async Task Should_WriteOnceAndPreserveOriginalException_When_OperationFails(bool loaded)
     {
         var writer = new RecordingWriter();
         var failure = new InvalidOperationException("private exception text");
@@ -27,7 +27,7 @@ public class AuditOperationTests
     }
 
     [Fact]
-    public async Task ReusedExceptionStillProducesOneEventForEachInvocation()
+    public async Task Should_ProduceOneEventForEachInvocation_When_ExceptionIsReused()
     {
         var writer = new RecordingWriter();
         var failure = new InvalidOperationException();
@@ -39,7 +39,7 @@ public class AuditOperationTests
     }
 
     [Fact]
-    public async Task WriterFailureCannotReplaceCancellation()
+    public async Task Should_PreserveCancellation_When_WriterFails()
     {
         var writer = new RecordingWriter { Throw = true };
         using var source = new CancellationTokenSource();

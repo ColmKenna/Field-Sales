@@ -17,7 +17,7 @@ namespace FieldSales.Web.Tests;
 public sealed class ProtectedAreasTests
 {
     [Fact]
-    public void BrowserCookieUsesServerSideTicketStore()
+    public void Should_UseServerSideTicketStore_When_BrowserCookieConfigured()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
         _ = factory.CreateClient();
@@ -30,7 +30,7 @@ public sealed class ProtectedAreasTests
     [InlineData("/Rep", "Field Salesperson")]
     [InlineData("/Manager", "Sales Manager")]
     [InlineData("/HeadOffice", "Head Office User")]
-    public async Task ProtectedAreaRequiresItsBusinessRole(string path, string role)
+    public async Task Should_RequireBusinessRole_When_AccessingProtectedArea(string path, string role)
     {
         await using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -58,7 +58,7 @@ public sealed class ProtectedAreasTests
     }
 
     [Fact]
-    public async Task MultipleRoleUserSeesOnlyPermittedAreaChoices()
+    public async Task Should_DisplayOnlyPermittedAreaChoices_When_UserHasMultipleRoles()
     {
         await using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions

@@ -14,7 +14,7 @@ public class StartupHelpersTests
     [InlineData("Production", false, true)]
     [InlineData("Staging", false, true)]
     [InlineData("Testing", false, false)]
-    public async Task SchemaWorkflowPreservesEnvironmentAndScopeLifetime(string name, bool migrate, bool check)
+    public async Task Should_PreserveEnvironmentAndScopeLifetime_When_ExecutingSchemaWorkflow(string name, bool migrate, bool check)
     {
         var environment = new Mock<IHostEnvironment>();
         environment.SetupGet(e => e.EnvironmentName).Returns(name);
@@ -29,7 +29,7 @@ public class StartupHelpersTests
     }
 
     [Fact]
-    public async Task PendingProductionMigrationsFailWithExistingMessage()
+    public async Task Should_FailWithExistingMessage_When_ProductionMigrationsArePending()
     {
         var environment = new Mock<IHostEnvironment>();
         environment.SetupGet(e => e.EnvironmentName).Returns(Environments.Production);
@@ -41,7 +41,7 @@ public class StartupHelpersTests
     }
 
     [Fact]
-    public async Task DatabaseFailurePreservesOriginalException()
+    public async Task Should_PreserveOriginalException_When_DatabaseFails()
     {
         var environment = new Mock<IHostEnvironment>();
         environment.SetupGet(e => e.EnvironmentName).Returns(Environments.Development);
@@ -53,7 +53,7 @@ public class StartupHelpersTests
     }
 
     [Fact]
-    public async Task TestingDoesNotResolveTheDatabase()
+    public async Task Should_NotResolveDatabase_When_EnvironmentIsTesting()
     {
         var environment = new Mock<IHostEnvironment>();
         environment.SetupGet(e => e.EnvironmentName).Returns("Testing");
@@ -63,7 +63,7 @@ public class StartupHelpersTests
     }
 
     [Fact]
-    public void CertificatePathsKeepAbsolutePathsAndResolveRelativePathsAgainstContentRoot()
+    public void Should_KeepAbsolutePathsAndResolveRelativeAgainstContentRoot_When_ConfiguringCertificates()
     {
         string root = OperatingSystem.IsWindows() ? @"C:\app\content" : "/app/content";
         string absolute = OperatingSystem.IsWindows() ? @"C:\app\certs\certificate.pfx" : "/app/certs/certificate.pfx";
@@ -75,7 +75,7 @@ public class StartupHelpersTests
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
-    public void LegacyNullOnlyConfigurationChecksRetainTheirBlankValuePolicy(string value)
+    public void Should_RetainBlankValuePolicy_When_LegacyNullOnlyConfigurationChecked(string value)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(
             new Dictionary<string, string?> { ["key"] = value }).Build();

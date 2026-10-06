@@ -57,7 +57,7 @@ public sealed class StaffLoginFailureTests
     }
 
     [Fact]
-    public async Task RejectedStaffCredentialsReturnToStaffEntryForRetry()
+    public async Task Should_ReturnToStaffEntryForRetry_When_StaffCredentialsAreRejected()
     {
         var users = new Mock<UserManager<ApplicationUser>>(
             new Mock<IUserStore<ApplicationUser>>().Object, null!, null!, null!, null!, null!, null!, null!, null!);
@@ -86,7 +86,7 @@ public sealed class StaffLoginFailureTests
     }
 
     [Fact]
-    public async Task RejectedNonStaffCredentialsRemainOnIdentityLogin()
+    public async Task Should_RemainOnIdentityLogin_When_NonStaffCredentialsAreRejected()
     {
         var users = new Mock<UserManager<ApplicationUser>>(
             new Mock<IUserStore<ApplicationUser>>().Object, null!, null!, null!, null!, null!, null!, null!, null!);

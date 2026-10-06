@@ -27,7 +27,7 @@ public class PaginationRouteTests
         new QueryCollection(entries.ToDictionary(e => e.Key, e => new Microsoft.Extensions.Primitives.StringValues(e.Value)));
 
     [Fact]
-    public void FilterAndExplicitRouteOverloadsPreservePaginationAndRoutes()
+    public void Should_PreservePaginationAndRoutes_When_UsingFilterAndExplicitRouteOverloads()
     {
         var result = FieldSales.Identity.Services.ListResult<string>.Page(["one", "two"], 6,
             FieldSales.Identity.Services.Pagination.From(2, 2));
@@ -43,7 +43,7 @@ public class PaginationRouteTests
     }
 
     [Fact]
-    public void ExplicitRouteValues_AreCarriedOntoBothLinks()
+    public void Should_CarryExplicitRouteValuesOntoBothLinks_When_ExplicitRouteValuesProvided()
     {
         PaginationModel model = Model(routeValues: new Dictionary<string, string?> { ["Filter"] = "acme" });
 
@@ -54,7 +54,7 @@ public class PaginationRouteTests
     }
 
     [Fact]
-    public void WithoutExplicitRouteValues_TheCurrentQueryIsCarriedInstead()
+    public void Should_CarryCurrentQueryInstead_When_NoExplicitRouteValuesProvided()
     {
         PaginationModel model = Model();
         IQueryCollection query = Query(("Filter", "acme"), ("Sort", "name"), ("PageNumber", "2"));
@@ -68,7 +68,7 @@ public class PaginationRouteTests
     }
 
     [Fact]
-    public void ExplicitRouteValues_SuppressTheQueryStringFallback()
+    public void Should_SuppressQueryStringFallback_When_ExplicitRouteValuesProvided()
     {
         PaginationModel model = Model(routeValues: new Dictionary<string, string?> { ["Filter"] = "explicit" });
 
@@ -79,7 +79,7 @@ public class PaginationRouteTests
     }
 
     [Fact]
-    public void EmptyValues_AreDroppedFromExplicitValuesAndFromTheQuery()
+    public void Should_DropEmptyValues_When_ExplicitValuesOrQueryContainEmptyValues()
     {
         PaginationModel withBlankExplicit =
             Model(routeValues: new Dictionary<string, string?> { ["Filter"] = "", ["Sort"] = "name" });
@@ -90,7 +90,7 @@ public class PaginationRouteTests
     }
 
     [Fact]
-    public void PageNumberIsNeverHarvestedFromTheQueryUnderAnotherCasing()
+    public void Should_NotHarvestPageNumber_When_QueryUsesDifferentCasing()
     {
         PaginationModel model = Model();
 
@@ -101,7 +101,7 @@ public class PaginationRouteTests
     }
 
     [Fact]
-    public void FirstAndLastPages_HaveNoRouteForTheDisabledDirection()
+    public void Should_HaveNoRouteForDisabledDirection_When_FirstOrLastPage()
     {
         PaginationModel first = Model(pageNumber: 1, totalPages: 3);
         Assert.Null(first.PreviousPageRoute(null));
@@ -117,7 +117,7 @@ public class PaginationRouteTests
     }
 
     [Fact]
-    public void NoRouteValuesAndNoQuery_StillNumbersThePage()
+    public void Should_StillNumberThePage_When_NoRouteValuesAndNoQuery()
     {
         IDictionary<string, string?> next = Model().NextPageRoute(null)!;
 

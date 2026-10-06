@@ -13,7 +13,7 @@ public class SecretRevealPresentationTests
     [InlineData("", "target")]
     [InlineData("handle", "")]
     [InlineData("handle", " ")]
-    public async Task MissingHandleOrTargetDoesNotConsume(string? handle, string targetId)
+    public async Task Should_NotConsumeSecret_When_HandleOrTargetIsMissing(string? handle, string targetId)
     {
         var service = new Mock<ISecretRevealService>(MockBehavior.Strict);
         Assert.Null(await service.Object.TryRevealAsync(new(SecretRevealPurpose.ClientCreated, targetId), handle, default));
@@ -24,7 +24,7 @@ public class SecretRevealPresentationTests
     [InlineData(SecretRevealPurpose.ClientCreated)]
     [InlineData(SecretRevealPurpose.ClientSecretGenerated)]
     [InlineData(SecretRevealPurpose.ApiResourceSecretGenerated)]
-    public async Task PurposeTargetHandleAndCancellationReachTheService(SecretRevealPurpose purpose)
+    public async Task Should_ForwardPurposeTargetHandleAndCancellation_When_ConsumingSecret(SecretRevealPurpose purpose)
     {
         var service = new Mock<ISecretRevealService>(MockBehavior.Strict);
         var target = new SecretRevealTarget(purpose, "target");

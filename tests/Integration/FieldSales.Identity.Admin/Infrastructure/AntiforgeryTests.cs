@@ -55,7 +55,7 @@ public class AntiforgeryTests : IClassFixture<AdminWebFactory>
     }
 
     [Fact]
-    public async Task TheCreatePageStillRendersATokenToPostWith()
+    public async Task Should_RenderAntiforgeryToken_When_CreatePageRequested()
     {
         // Guards the two above from passing for the wrong reason: if the page stopped
         // rendering a form, every POST would fail and the refusals would prove nothing.

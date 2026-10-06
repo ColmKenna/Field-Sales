@@ -20,7 +20,7 @@ public class AdminCreationPolicyTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task BootstrapUsesEmailAndSeedingUsesUsernameWithoutChangingExistingUsers(bool foundByEmail)
+    public async Task Should_UseEmailForBootstrapAndUsernameForSeeding_When_UsersAlreadyExist(bool foundByEmail)
     {
         var users = Users();
         var roles = Roles();
@@ -49,7 +49,7 @@ public class AdminCreationPolicyTests
     }
 
     [Fact]
-    public async Task RoleCreationFailureLogsDuringBootstrapAndThrowsDuringSeeding()
+    public async Task Should_LogDuringBootstrapAndThrowDuringSeeding_When_RoleCreationFails()
     {
         var users = Users();
         var roles = Roles();
@@ -70,7 +70,7 @@ public class AdminCreationPolicyTests
     }
 
     [Fact]
-    public async Task SharedCreationPreservesUserFieldsAndFailureResult()
+    public async Task Should_PreserveUserFieldsAndFailureResult_When_SharedCreationFails()
     {
         var users = Users();
         var failed = IdentityResult.Failed(new IdentityError { Description = "Creation failed" });

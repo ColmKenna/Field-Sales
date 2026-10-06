@@ -17,7 +17,7 @@ namespace FieldSales.Web.Tests;
 public sealed class SqlTicketStoreTests
 {
     [Fact]
-    public async Task FallbackExpiry_ReadsNamedCookieOptionsDuringStoreAndRenewWithoutDependencyCycle()
+    public async Task Should_ReadNamedCookieOptionsDuringStoreAndRenew_When_FallbackExpiryEvaluated()
     {
         await using SqliteConnection connection = new("Data Source=:memory:");
         await connection.OpenAsync();
@@ -51,7 +51,7 @@ public sealed class SqlTicketStoreTests
     }
 
     [Fact]
-    public async Task TokensStayProtectedInSqlAndRemovedSessionCannotBeRetrieved()
+    public async Task Should_ProtectTokensInSqlAndPreventRetrieval_When_SessionIsRemoved()
     {
         await using SqliteConnection connection = new("Data Source=:memory:");
         await connection.OpenAsync();
@@ -75,7 +75,7 @@ public sealed class SqlTicketStoreTests
     }
 
     [Fact]
-    public async Task ExpiredSessionIsRejectedAndDeleted()
+    public async Task Should_RejectAndPurgeSession_When_SessionIsExpired()
     {
         await using SqliteConnection connection = new("Data Source=:memory:");
         await connection.OpenAsync();

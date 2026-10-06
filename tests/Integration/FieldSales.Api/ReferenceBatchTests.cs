@@ -11,7 +11,7 @@ namespace FieldSales.Api.Tests;
 public sealed class ReferenceBatchTests(SqlServerFixture fixture)
 {
     [Fact]
-    public void Registry_RejectsMissingAndDuplicateSourcesAndResolvesUnknownKeys()
+    public void Should_RejectMissingAndDuplicateSourcesAndResolveUnknownKeys_When_RegistryLoaded()
     {
         using var db = new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
             .UseSqlServer("Server=localhost;Database=unused;Integrated Security=True;TrustServerCertificate=True").Options);
@@ -26,7 +26,7 @@ public sealed class ReferenceBatchTests(SqlServerFixture fixture)
     }
 
     [Fact]
-    public async Task SourceFailure_RemainsUnavailableWithItsOriginalCause()
+    public async Task Should_RemainUnavailableWithOriginalCause_When_SourceFails()
     {
         using var db = new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
             .UseSqlServer("Server=localhost;Database=unused;Integrated Security=True;TrustServerCertificate=True").Options);
@@ -38,7 +38,7 @@ public sealed class ReferenceBatchTests(SqlServerFixture fixture)
     }
 
     [Fact]
-    public async Task BatchUsage_CountsDistinctProductsWithOneSqlReadPerSourceRegardlessOfListSize()
+    public async Task Should_CountDistinctProductsWithOneSqlReadPerSource_When_BatchUsageQueried()
     {
         CommandCounter counter = new();
         await using var db = new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()

@@ -13,14 +13,14 @@ public sealed class StaffContractTests
     [InlineData("fieldsales.api.extra", false)]
     [InlineData("prefix-fieldsales.api", false)]
     [InlineData("FIELDSALES.API", false)]
-    public void ScopeMatching_UsesExactSpaceSeparatedValues(string scope, bool expected)
+    public void Should_UseExactSpaceSeparatedValues_When_MatchingScopes(string scope, bool expected)
     {
         ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim("scope", "openid"), new Claim("scope", scope)]));
         Assert.Equal(expected, principal.HasScope(StaffApiContract.Scope));
     }
 
     [Fact]
-    public void SubjectLookup_PreservesFirstSubClaimPrecedence()
+    public void Should_PreserveFirstSubClaimPrecedence_When_LookingUpSubject()
     {
         ClaimsPrincipal principal = new(new ClaimsIdentity([
             new Claim(ClaimTypes.NameIdentifier, "legacy"), new Claim("sub", "first"), new Claim("sub", "second")]));
@@ -28,7 +28,7 @@ public sealed class StaffContractTests
     }
 
     [Fact]
-    public void RoleReplacement_ReturnsRemovedRolesAndPreservesUnrelatedClaims()
+    public void Should_ReturnRemovedRolesAndPreserveUnrelatedClaims_When_ReplacingRoles()
     {
         ClaimsPrincipal principal = new(new ClaimsIdentity([
             new Claim("role", BusinessRoles.HeadOfficeUser), new Claim("role", "SysAdmin"), new Claim("sub", "staff")]));

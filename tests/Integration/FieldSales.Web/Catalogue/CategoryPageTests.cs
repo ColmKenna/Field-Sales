@@ -13,7 +13,7 @@ namespace FieldSales.Web.Tests;
 public sealed class CategoryPageTests
 {
     [Fact]
-    public async Task HeadOfficeStaffCanCreateRootsAndChildrenThroughTheWebsite()
+    public async Task Should_AllowHeadOfficeStaffToCreateRootsAndChildren_When_SubmittedThroughWebsite()
     {
         using CategoryReplyHandler api = new();
         await using StaffWebsiteFactory website = new(api);
@@ -47,7 +47,7 @@ public sealed class CategoryPageTests
     [Theory]
     [InlineData(StaffRoles.FieldSalesperson)]
     [InlineData(StaffRoles.SalesManager)]
-    public async Task OtherStaffCannotReadOrPostCategories(string role)
+    public async Task Should_DenyReadAndPostAccess_When_StaffIsNotHeadOffice(string role)
     {
         using CategoryReplyHandler api = new();
         await using StaffWebsiteFactory website = new(api);
@@ -63,7 +63,7 @@ public sealed class CategoryPageTests
     }
 
     [Fact]
-    public async Task RenamingAncestorRefreshesDescendantPathWithoutChangingItsUrl()
+    public async Task Should_RefreshDescendantPathWithoutChangingUrl_When_AncestorIsRenamed()
     {
         using CategoryReplyHandler api = new();
         await using StaffWebsiteFactory website = new(api);
@@ -102,7 +102,7 @@ public sealed class CategoryPageTests
     }
 
     [Fact]
-    public async Task RemovedRoleRejectsOpenRenameFormWithoutSavingOrReplayingIt()
+    public async Task Should_RejectOpenRenameFormWithoutSavingOrReplaying_When_RoleIsRemoved()
     {
         using CategoryReplyHandler api = new();
         await using StaffWebsiteFactory website = new(api);
@@ -127,7 +127,7 @@ public sealed class CategoryPageTests
     }
 
     [Fact]
-    public async Task ExpiredSessionRejectsOpenRenameFormWithoutReplayingIt()
+    public async Task Should_RejectOpenRenameFormWithoutReplaying_When_SessionIsExpired()
     {
         using CategoryReplyHandler api = new();
         await using StaffWebsiteFactory website = new(api);

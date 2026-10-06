@@ -100,7 +100,7 @@ public sealed class StaffWebsiteScenarioTests
     }
 
     [Fact]
-    public async Task RejectedSignInShowsRetryAndKeepsStaffAreasProtected()
+    public async Task Should_ShowRetryAndKeepStaffAreasProtected_When_SignInIsRejected()
     {
         await using StaffWebsiteFactory website = new();
         using HttpClient browser = website.CreateBrowser();
@@ -259,7 +259,7 @@ public sealed class StaffWebsiteScenarioTests
     }
 
     [Fact]
-    public async Task SeveralRemainingAreasOfferOnlyCurrentChoicesAfterRoleRemoval()
+    public async Task Should_OfferOnlyCurrentChoices_When_RoleIsRemovedWithSeveralRemainingAreas()
     {
         await using StaffWebsiteFactory website = new();
         using HttpClient browser = website.CreateBrowser();
@@ -279,7 +279,7 @@ public sealed class StaffWebsiteScenarioTests
     }
 
     [Fact]
-    public async Task ProtectedContentIsUnavailableWhileCurrentRolesCannotBeChecked()
+    public async Task Should_MakeProtectedContentUnavailable_When_CurrentRolesCannotBeChecked()
     {
         await using StaffWebsiteFactory website = new();
         using HttpClient browser = website.CreateBrowser();

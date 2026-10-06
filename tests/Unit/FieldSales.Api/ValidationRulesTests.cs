@@ -14,7 +14,7 @@ public sealed class ValidationRulesTests
 
     [Theory]
     [MemberData(nameof(Prices))]
-    public void DomainAndRequestValidation_AgreeOnPriceBoundaries(decimal amount, bool valid)
+    public void Should_AgreeOnPriceBoundaries_When_DomainAndRequestValidationChecked(decimal amount, bool valid)
     {
         Assert.Equal(valid, ProductBasePrice.IsValidAmount(amount));
         if (valid) Assert.Equal(amount, ProductBasePrice.Create(Guid.NewGuid(), amount, new(2026, 1, 1)).Amount);
@@ -22,7 +22,7 @@ public sealed class ValidationRulesTests
     }
 
     [Fact]
-    public void NameBoundary_UsesTrimmedLengthAndBreadcrumbKeepsAncestry()
+    public void Should_UseTrimmedLengthAndKeepAncestry_When_ValidatingNameBoundaries()
     {
         Assert.True(NameRules.IsValid(" " + new string('n', 200) + " ", 200));
         Assert.False(NameRules.IsValid(new string('n', 201), 200));

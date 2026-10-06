@@ -71,7 +71,7 @@ public class ClientsCreateIntegrationTests : IClassFixture<AdminWebFactory>, IDi
     }
 
     [Fact]
-    public async Task CloneRedirectSerializesHandleAndRevealsSecretOnlyOnce()
+    public async Task Should_SerializeHandleAndRevealSecretOnlyOnce_When_CloneRedirects()
     {
         string sourceId = $"clone-source-{Guid.NewGuid():N}";
         string targetId = $"clone-target-{Guid.NewGuid():N}";

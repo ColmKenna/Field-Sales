@@ -25,14 +25,14 @@ public class CookieHardeningTests : IClassFixture<AdminWebFactory>
     }
 
     [Fact]
-    public void TheCookieIsHttpOnlyAndSecureOnly()
+    public void Should_ConfigureHttpOnlyAndSecurePolicy_When_CookieOptionsConfigured()
     {
         Assert.True(_options.Cookie.HttpOnly);
         Assert.Equal(CookieSecurePolicy.Always, _options.Cookie.SecurePolicy);
     }
 
     [Fact]
-    public void SameSiteIsNoneBecauseIdentityServerNeedsTheCookieCrossSite()
+    public void Should_ConfigureSameSiteNone_When_IdentityServerRequiresCrossSiteCookie()
     {
         // Not this project's choice: IdentityServer post-configures it for front-channel
         // logout and check-session. Pinned so that if the integration ever stops doing it,
@@ -41,14 +41,14 @@ public class CookieHardeningTests : IClassFixture<AdminWebFactory>
     }
 
     [Fact]
-    public void TheLifetimeIsStatedRatherThanInherited()
+    public void Should_StateExplicitLifetime_When_ConfiguringCookie()
     {
         Assert.Equal(TimeSpan.FromDays(14), _options.ExpireTimeSpan);
         Assert.True(_options.SlidingExpiration);
     }
 
     [Fact]
-    public void TheSignInPathsAreUnchanged()
+    public void Should_PreserveSignInPaths_When_CookieConfigured()
     {
         Assert.Equal("/Account/Login", _options.LoginPath);
         Assert.Equal("/Account/Logout", _options.LogoutPath);

@@ -10,7 +10,7 @@ public sealed class FormPresentationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void EachNormalization_DiscardsStaleBinderErrorsButPreservesOtherInputs(bool legacy)
+    public void Should_DiscardStaleBinderErrorsButPreserveOtherInputs_When_EachNormalized(bool legacy)
     {
         ModelStateDictionary state = new();
         state.AddModelError("QuantityStep", "not numeric");
@@ -28,7 +28,7 @@ public sealed class FormPresentationTests
     }
 
     [Fact]
-    public void EditingWithoutUnit_DoesNotApplyLegacyCreationFallback()
+    public void Should_NotApplyLegacyCreationFallback_When_EditingWithoutUnit()
     {
         ModelStateDictionary state = new();
         ProductUnitForm value = ProductUnitForm.Normalize(state, "", 1, 2);
@@ -38,7 +38,7 @@ public sealed class FormPresentationTests
     }
 
     [Fact]
-    public void ErrorMapping_PreservesSummaryErrors()
+    public void Should_PreserveSummaryErrors_When_MappingErrors()
     {
         ModelStateDictionary state = new();
         state.AddErrors(new Dictionary<string, string[]> { [""] = ["summary"], ["Name"] = ["field"] });

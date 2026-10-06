@@ -19,7 +19,7 @@ public sealed class AssignmentTransferClientTests
     [Theory]
     [InlineData("valid")] [InlineData("wrong-rep")] [InlineData("negative")]
     [InlineData("duplicate")] [InlineData("foreign-parent")] [InlineData("invalid-level")] [InlineData("null-child")]
-    public async Task U3_TypedReviewRejectsMalformedResponses(string kind)
+    public async Task Should_RejectMalformedResponses_When_TypedReviewExecutes(string kind)
     {
         var id=Guid.NewGuid(); var child=new TransferScope(new(id,new(TerritoryLevel.Town,Guid.NewGuid())),"Bray",false,1,null,[]);
         var parent=new TransferScope(new(id,new(TerritoryLevel.County,Guid.NewGuid())),"Wicklow",false,1,null,[child]);
@@ -41,7 +41,7 @@ public sealed class AssignmentTransferClientTests
 
     [Theory]
     [InlineData("valid")] [InlineData("missing-notices")] [InlineData("missing-assignments")] [InlineData("incorrect-total")] [InlineData("wrong-action")]
-    public async Task U3_TypedTransferPreviewRequiresCompleteImpact(string kind)
+    public async Task Should_RequireCompleteImpact_When_TypedTransferPreviewExecutes(string kind)
     {
         var preview=new AssignmentImpactDetails("proof","Transfer","Selected","Ciara",0,[],TransferNotices:[],TransferredAssignments:["Wicklow (County)"]);
         preview=kind switch {"missing-notices"=>preview with {TransferNotices=null},"missing-assignments"=>preview with {TransferredAssignments=null},"wrong-action"=>preview with {Action="Add"},"incorrect-total"=>preview with {ChangedLocations=1},_=>preview};
@@ -52,7 +52,7 @@ public sealed class AssignmentTransferClientTests
     }
     [Theory]
     [InlineData(true,1,HttpStatusCode.OK)] [InlineData(false,1,HttpStatusCode.ServiceUnavailable)] [InlineData(true,-1,HttpStatusCode.ServiceUnavailable)]
-    public async Task U3_TypedSaveValidatesReceipt(bool saved,int count,HttpStatusCode expected)
+    public async Task Should_ValidateReceipt_When_TypedSaveExecutes(bool saved,int count,HttpStatusCode expected)
     {
         using var services=Services(); using var handler=new Reply(new CoverageMutationResult(saved,count),"/coverage/transfers"); using var http=new HttpClient(handler){BaseAddress=new("https://api.test")};
         var client=new CoverageApiClient(http,new HttpContextAccessor{HttpContext=new DefaultHttpContext{RequestServices=services}});
