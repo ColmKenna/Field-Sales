@@ -25,6 +25,8 @@ builder.Services.AddScoped<TerritoryAssignmentStore>();
 builder.Services.AddScoped<AssignmentTransferStore>();
 builder.Services.AddScoped<AssignmentReviewStore>();
 builder.Services.AddSingleton<AssignmentPreviewProofs>();
+builder.Services.AddScoped<RestrictionPermissionWriter>();
+builder.Services.AddScoped<RestrictionPermissionStore>();
 builder.Services.AddScoped<ReportingLineStore>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddLocationCoordinates(builder.Configuration);

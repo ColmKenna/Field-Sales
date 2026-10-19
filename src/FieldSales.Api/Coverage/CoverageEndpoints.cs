@@ -71,6 +71,15 @@ public static class CoverageEndpoints
         group.MapGet("/reps/{repSubject}/history", (string repSubject, ClaimsPrincipal user,
             AssignmentHistoryReadStore store, CancellationToken ct) => GuardAsync(async () =>
                 Results.Ok(await store.ForRepAsync(user, repSubject, ct))));
+        group.MapGet("/permissions/reps", (ClaimsPrincipal user, RestrictionPermissionStore store, CancellationToken ct) =>
+            GuardAsync(async () => Results.Ok(await store.RepsAsync(user, ct))));
+        group.MapGet("/reps/{repSubject}/permissions", (string repSubject, ClaimsPrincipal user,
+            RestrictionPermissionStore store, CancellationToken ct) => GuardAsync(async () =>
+                await store.ReadAsync(user, repSubject, ct) is { } page ? Results.Ok(page) : Results.NotFound()));
+        group.MapPost("/reps/{repSubject}/permissions/{groupId:guid}", (string repSubject, Guid groupId,
+            ChangeRestrictionPermissionRequest request, ClaimsPrincipal user, RestrictionPermissionStore store, CancellationToken ct) =>
+            GuardAsync(async () => await store.ChangeAsync(user, repSubject, groupId, request, ct) is { } saved
+                ? Results.Ok(saved) : Results.NotFound()));
     }
 
     private static async Task<IResult> GuardAsync(Func<Task<IResult>> operation)
