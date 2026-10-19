@@ -73,6 +73,14 @@ public static class CoverageEndpoints
                 Results.Ok(await store.ForRepAsync(user, repSubject, ct))));
         group.MapGet("/permissions/reps", (ClaimsPrincipal user, RestrictionPermissionStore store, CancellationToken ct) =>
             GuardAsync(async () => Results.Ok(await store.RepsAsync(user, ct))));
+        group.MapGet("/permissions/groups", (RestrictionPermissionCohortStore store, CancellationToken ct) =>
+            GuardAsync(async () => Results.Ok(await store.GroupsAsync(ct))));
+        group.MapGet("/permissions/groups/{groupId:guid}", (Guid groupId, ClaimsPrincipal user,
+            RestrictionPermissionCohortStore store, CancellationToken ct) => GuardAsync(async () =>
+                await store.ReadAsync(user, groupId, ct) is { } page ? Results.Ok(page) : Results.NotFound()));
+        group.MapPost("/permissions/groups/{groupId:guid}/grants", (Guid groupId, GrantCohortPermissionRequest request,
+            ClaimsPrincipal user, RestrictionPermissionCohortStore store, CancellationToken ct) => GuardAsync(async () =>
+                await store.GrantAsync(user, groupId, request, ct) is { } saved ? Results.Ok(saved) : Results.NotFound()));
         group.MapGet("/reps/{repSubject}/permissions", (string repSubject, ClaimsPrincipal user,
             RestrictionPermissionStore store, CancellationToken ct) => GuardAsync(async () =>
                 await store.ReadAsync(user, repSubject, ct) is { } page ? Results.Ok(page) : Results.NotFound()));

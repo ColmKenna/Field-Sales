@@ -1,0 +1,76 @@
+@page
+@model FieldSales.Web.Pages.Coverage.GroupPermissionsModel
+@{
+    ViewData["Title"] = Model.Permissions is { } title ? title.Group.Name + " · Permissions" : "Group permissions";
+}
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Permissions">Rep permissions</a> · <a asp-page="./GroupPermissions">Group permissions</a></nav>
+@if (Model.Permissions is not { } permissions)
+{
+    <h1>Group permissions</h1>
+    <p>Choose a Restriction Group to grant permission to a trained cohort.</p>
+    @if (Model.Groups.Count == 0) { <p>No active Restriction Groups exist yet.</p> }
+    else
+    {
+        <ul class="geography-list permission-reps">
+        @foreach (var group in Model.Groups)
+        {
+            <li><a asp-page="./GroupPermissions" asp-route-groupId="@group.RestrictionGroupId">@group.Name</a></li>
+        }
+        </ul>
+    }
+}
+else
+{
+    <div class="permission-heading"><h1>@permissions.Group.Name</h1><p>Group permissions</p></div>
+    @if (TempData["CohortPermissionNotice"] is string notice) { <p role="status">@notice</p> }
+    @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
+    @if (permissions.Group.Archived)
+    {
+        <p class="permission-view-only">Archived — existing permissions have no effect while archived. No new permissions can be granted.</p>
+    }
+    <p>Grant permission to the reps who completed training. Changes take effect at each rep's next Sync.</p>
+    @if (permissions.Reps.Count == 0) { <p>No field salespeople are available.</p> }
+    else
+    {
+        <form method="post" asp-page-handler="Grant" class="permission-cohort">
+            <input type="hidden" name="GroupId" value="@permissions.Group.RestrictionGroupId" />
+            <div class="permission-table" role="region" aria-label="Rep permissions" tabindex="0">
+                <table>
+                    <caption>Rep permissions for @permissions.Group.Name</caption>
+                    <thead><tr><th scope="col">Rep</th><th scope="col">Status</th><th scope="col">Last change</th><th scope="col">Grant</th></tr></thead>
+                    <tbody>
+                    @for (int index = 0; index < permissions.Reps.Count; index++)
+                    {
+                        var row = permissions.Reps[index];
+                        <tr data-rep-subject="@row.Rep.Subject">
+                            <th scope="row"><a asp-page="./Permissions" asp-route-repSubject="@row.Rep.Subject">@row.Rep.Name</a></th>
+                            <td>@(row.Granted ? "Granted" : "Not granted") @if (!row.Active) { <span class="permission-archived">Not active</span> }</td>
+                            <td>@(row.LastChange?.Display ?? "No changes recorded")</td>
+                            <td>
+                                <input type="hidden" name="Reps[@index].RepSubject" value="@row.Rep.Subject" />
+                                <input type="hidden" name="Reps[@index].ExpectedLastChangeId" value="@row.LastChange?.Id" />
+                                @if (row.CanGrant)
+                                {
+                                    <label><input type="checkbox" name="Reps[@index].Selected" value="true" /> Grant to @row.Rep.Name</label>
+                                }
+                                else
+                                {
+                                    <span class="permission-locked">@(row.Granted ? "Already granted" : !row.Active ? "Not active" : "View only")</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            @if (permissions.Reps.Any(row => row.CanGrant))
+            {
+                <div class="permission-cohort-action">
+                    <label asp-for="Reason">Reason for all selected reps (optional)</label>
+                    <textarea asp-for="Reason" maxlength="1000" rows="2"></textarea>
+                    <button type="submit" class="button">Grant to selected reps</button>
+                </div>
+            }
+        </form>
+    }
+}

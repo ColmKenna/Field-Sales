@@ -17,3 +17,13 @@ public sealed record PermissionRepChoice(StaffChoice Rep, bool Active, bool CanC
 // ExpectedLastChangeId is the last change the page showed for this rep and group, or null when it showed none.
 public sealed record ChangeRestrictionPermissionRequest(RestrictionPermissionChangeKind Change, string? Reason,
     Guid? ExpectedLastChangeId);
+
+// M-14 per group, using the same record and rule as the per-rep view. CanGrant is display context;
+// every selected rep is checked again before the whole cohort is written in one transaction.
+public sealed record PermissionGroupChoice(Guid RestrictionGroupId, string Name, bool Archived);
+public sealed record GroupPermissionRep(StaffChoice Rep, bool Active, bool Granted,
+    RestrictionPermissionChangeDetails? LastChange, bool CanGrant);
+public sealed record GroupPermissionsPage(PermissionGroupChoice Group, IReadOnlyList<GroupPermissionRep> Reps);
+public sealed record CohortPermissionSelection(string RepSubject, Guid? ExpectedLastChangeId);
+public sealed record GrantCohortPermissionRequest(IReadOnlyList<CohortPermissionSelection> Reps, string? Reason);
+public sealed record CohortPermissionGrantResult(Guid RestrictionGroupId, IReadOnlyList<RestrictionPermissionChangeDetails> Changes);

@@ -214,6 +214,27 @@ The reserved ports are proposals until the item that adds the project confirms t
 - An In Progress order line for such a product (valid when captured) is a WI-043 obligation: no
   orders or tablet exist yet.
 
+## WI-030 cohort grants (2026-10-19, developer, plan approval)
+
+The developer replied **approved** to the WI-030 implementation plan and its 15 Scenario Review
+cases. Implement through the T-3.4.2 checkpoint; continuation requires **Continue T-3.4.2**.
+
+- Reuse WI-029's rule, writer and record. All grants in one action succeed or fail together.
+- Forbidden, invalid, already-granted or stale selections reject the entire action; no partial
+  grants or duplicate history entries. Empty, duplicate and malformed selections are validation errors.
+- Already-granted, outside-team and self rows cannot be selected. Head Office may grant across
+  teams but cannot grant to themselves. Inactive current holders remain visible without grant controls.
+- Active group chooser; direct archived group pages are read-only. Shared reason follows WI-029.
+- The five named reps in CV009-B are granted by another authorized actor, preserving the no-self-change rule.
+- WI-031 owns removal and consequence messaging; WI-043 owns tablet behavior. No schema change here.
+
+### WI-030 review checkpoint accepted (2026-10-19, developer)
+
+The developer replied **Continue T-3.4.2** after the group page, five-rep grant and outside-team
+denial evidence were presented and the authorization rule was explained. This accepts the checkpoint
+and authorizes the remaining approved scenarios, full verification and completion on the feature
+branch. PR creation and integration remain separate actions.
+
 ## WI-029 Restriction Permissions (2026-10-19, developer, plan approval)
 
 The developer replied **Approved** to the WI-029 plan, accepting decisions D0–D9 and the Human-Led
