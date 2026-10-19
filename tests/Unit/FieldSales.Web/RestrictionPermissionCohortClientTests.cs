@@ -24,6 +24,7 @@ public sealed class RestrictionPermissionCohortClientTests
     [InlineData("blank-rep")] [InlineData("granted-without-record")] [InlineData("foreign-record")]
     [InlineData("opposite-record")] [InlineData("grant-held")] [InlineData("grant-archived")]
     [InlineData("grant-inactive")] [InlineData("malformed-json")] [InlineData("null-json")]
+    [InlineData("remove-held")] [InlineData("remove-not-held")] [InlineData("grant-and-remove")]
     public async Task Should_FailClosed_When_TheApiReturnsAnInconsistentGroupPage(string kind)
     {
         Guid group = Guid.NewGuid();
@@ -50,6 +51,9 @@ public sealed class RestrictionPermissionCohortClientTests
             "grant-held" => page with { Reps = [row with { Granted = true, LastChange = entry }] },
             "grant-archived" => page with { Group = page.Group with { Archived = true } },
             "grant-inactive" => page with { Reps = [row with { Active = false, Granted = true, LastChange = entry }] },
+            "remove-held" => page with { Reps = [row with { Granted = true, LastChange = entry, CanGrant = false, CanRemove = true }] },
+            "remove-not-held" => page with { Reps = [row with { CanGrant = false, CanRemove = true }] },
+            "grant-and-remove" => page with { Reps = [row with { CanRemove = true }] },
             _ => page
         };
         using var services = Services();
@@ -57,7 +61,7 @@ public sealed class RestrictionPermissionCohortClientTests
         using var http = new HttpClient(handler) { BaseAddress = new("https://staff-api.test") };
         var client = Client(http, services);
         var result = await client.GroupPermissionsAsync(group, default);
-        bool valid = kind is "valid" or "empty" or "granted" or "removed" or "archived" or "inactive-held";
+        bool valid = kind is "valid" or "empty" or "granted" or "removed" or "archived" or "inactive-held" or "remove-held";
         Assert.Equal(valid ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable, result.Status);
         if (!valid) Assert.Null(result.Value);
         Assert.Equal("/coverage/permissions/groups/" + group, handler.Path);
@@ -72,11 +76,24 @@ public sealed class RestrictionPermissionCohortClientTests
     [InlineData("null-changes")] [InlineData("null-row")] [InlineData("empty-id")]
     [InlineData("invalid-sequence")] [InlineData("missing-actor")] [InlineData("self-change")]
     [InlineData("malformed-json")] [InlineData("null-json")] [InlineData("outage")]
-    public async Task Should_FailClosed_When_TheApiReturnsAnInconsistentCohortResponse(string kind)
+    public Task Should_FailClosed_When_TheApiReturnsAnInconsistentCohortResponse(string kind) => CheckCohortReplyAsync(kind, false);
+
+    [Theory]
+    [InlineData("valid")] [InlineData("missing-change")] [InlineData("duplicate-id")]
+    [InlineData("duplicate-sequence")] [InlineData("duplicate-rep")] [InlineData("foreign-rep")]
+    [InlineData("wrong-group")] [InlineData("foreign-group-change")] [InlineData("removed")]
+    [InlineData("wrong-reason")] [InlineData("different-actor")] [InlineData("different-time")]
+    [InlineData("null-changes")] [InlineData("null-row")] [InlineData("empty-id")]
+    [InlineData("invalid-sequence")] [InlineData("missing-actor")] [InlineData("self-change")]
+    [InlineData("malformed-json")] [InlineData("null-json")] [InlineData("outage")]
+    public Task Should_FailClosed_When_TheRemovalApiReplyIsInconsistent(string kind) => CheckCohortReplyAsync(kind, true);
+
+    private static async Task CheckCohortReplyAsync(string kind, bool removal)
     {
         Guid group = Guid.NewGuid();
-        var colm = Change(group, "colm", 1);
-        var aoife = Change(group, "aoife", 2);
+        var change = removal ? RestrictionPermissionChangeKind.Removed : RestrictionPermissionChangeKind.Granted;
+        var colm = Change(group, "colm", 1) with { Change = change };
+        var aoife = Change(group, "aoife", 2) with { Change = change };
         var response = new CohortPermissionGrantResult(group, [colm, aoife]);
         response = kind switch
         {
@@ -87,7 +104,7 @@ public sealed class RestrictionPermissionCohortClientTests
             "foreign-rep" => response with { Changes = [colm, aoife with { Rep = new("brian", "Brian") }] },
             "wrong-group" => response with { RestrictionGroupId = Guid.NewGuid() },
             "foreign-group-change" => response with { Changes = [colm, aoife with { RestrictionGroupId = Guid.NewGuid() }] },
-            "removed" => response with { Changes = [colm, aoife with { Change = RestrictionPermissionChangeKind.Removed }] },
+            "removed" => response with { Changes = [colm, aoife with { Change = removal ? RestrictionPermissionChangeKind.Granted : RestrictionPermissionChangeKind.Removed }] },
             "wrong-reason" => response with { Changes = [colm, aoife with { Reason = "Another reason" }] },
             "different-actor" => response with { Changes = [colm, aoife with { Actor = new("orla", "Orla") }] },
             "different-time" => response with { Changes = [colm, aoife with { ChangedAt = aoife.ChangedAt.AddMinutes(1) }] },
@@ -100,14 +117,25 @@ public sealed class RestrictionPermissionCohortClientTests
             _ => response
         };
         using var services = Services();
-        using var handler = new Reply(response, kind, HttpMethod.Post);
+        object payload = removal ? new CohortPermissionRemovalResult(response.RestrictionGroupId, response.Changes) : response;
+        using var handler = new Reply(payload, kind, HttpMethod.Post);
         using var http = new HttpClient(handler) { BaseAddress = new("https://staff-api.test") };
         var client = Client(http, services);
-        var result = await client.GrantCohortPermissionAsync(group, new([new("colm", null), new("aoife", null)], "  Training complete  "), default);
-        Assert.Equal(kind == "valid" ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable, result.Status);
-        if (kind != "valid") Assert.Null(result.Value);
-        Assert.Equal("/coverage/permissions/groups/" + group + "/grants", handler.Path);
-        Assert.Equal(1, handler.Calls); // No retry of a grant, even when its reply cannot be trusted.
+        var expectedStatus = kind == "valid" ? HttpStatusCode.OK : HttpStatusCode.ServiceUnavailable;
+        if (removal)
+        {
+            var result = await client.RemoveCohortPermissionAsync(group, new([new("colm", Guid.NewGuid()), new("aoife", Guid.NewGuid())], "  Training complete  "), default);
+            Assert.Equal(expectedStatus, result.Status);
+            if (kind != "valid") Assert.Null(result.Value);
+        }
+        else
+        {
+            var result = await client.GrantCohortPermissionAsync(group, new([new("colm", null), new("aoife", null)], "  Training complete  "), default);
+            Assert.Equal(expectedStatus, result.Status);
+            if (kind != "valid") Assert.Null(result.Value);
+        }
+        Assert.Equal("/coverage/permissions/groups/" + group + (removal ? "/removals" : "/grants"), handler.Path);
+        Assert.Equal(1, handler.Calls); // No retry of a mutation, even when its reply cannot be trusted.
     }
 
     [Theory]

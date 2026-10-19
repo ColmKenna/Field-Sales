@@ -221,6 +221,10 @@ lines will still send**, plus **a review step with Confirm removal and Cancel**.
 **Approved** to the implementation plan and 17 Human-Led scenarios. This authorizes the single-rep
 increment only; stop for review before cohort removal, and stop again after that increment.
 
+On 2026-10-20 the developer replied **Continue WI-031**, accepting the pushed single-rep checkpoint
+`0ded5cc` and authorizing the planned cohort increment. Stop for review after its tests/previews;
+the final verification/completion increment follows acceptance of that checkpoint.
+
 - MI-44 is settled for WI-031's wording only. The order-line-count portions of CV009-E/F are
   superseded by this decision. No guessed/last-known count and no new tablet/order telemetry.
 - Single: "Colm will lose Pharmacy-only medicines at his next Sync. Any lines already on unsent

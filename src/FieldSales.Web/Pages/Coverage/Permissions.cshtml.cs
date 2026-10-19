@@ -50,7 +50,7 @@ public sealed class PermissionsModel(CoverageApiClient coverage, PermissionRemov
     {
         string? actor = User.GetStaffSubject();
         var state = actor is null ? null : reviews.Read(reviewProof, actor);
-        if (!ModelState.IsValid || !confirmed || state is null || state.Reps.Count != 1 || state.Reps[0].Subject != RepSubject)
+        if (!ModelState.IsValid || !confirmed || state is null || state.IsCohort || state.Reps.Count != 1 || state.Reps[0].Subject != RepSubject)
         {
             ModelState.AddModelError(string.Empty, "This removal review is invalid or expired. Review the permission again before confirming.");
             Response.StatusCode = StatusCodes.Status400BadRequest;

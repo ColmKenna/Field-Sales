@@ -2,9 +2,17 @@
 <section class="permission-removal-review" aria-labelledby="permission-removal-title">
     <h2 id="permission-removal-title">Review removal</h2>
     <p class="permission-removal-consequence">@Model.Review.Consequence</p>
+    @if (Model.Review.State.IsCohort)
+    {
+        <p>Selected reps:</p>
+        <ul>@foreach (var rep in Model.Review.State.Reps) { <li>@rep.Name</li> }</ul>
+    }
     <p>Reason: @(Model.Review.State.Reason ?? "Not provided")</p>
     <form method="post" asp-page-handler="ConfirmRemoval">
-        <input type="hidden" name="RepSubject" value="@Model.Review.State.Reps[0].Subject" />
+        @if (Model.Review.State.IsCohort)
+        { <input type="hidden" name="GroupId" value="@Model.Review.State.GroupId" /> }
+        else
+        { <input type="hidden" name="RepSubject" value="@Model.Review.State.Reps[0].Subject" /> }
         <input type="hidden" name="ReviewProof" value="@Model.Review.Proof" />
         <div class="permission-removal-actions">
             <button type="submit" name="Confirmed" value="true" class="button">Confirm removal</button>
