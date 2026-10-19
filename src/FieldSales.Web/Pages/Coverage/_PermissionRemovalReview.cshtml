@@ -1,0 +1,14 @@
+@model FieldSales.Web.Coverage.PermissionRemovalReviewModel
+<section class="permission-removal-review" aria-labelledby="permission-removal-title">
+    <h2 id="permission-removal-title">Review removal</h2>
+    <p class="permission-removal-consequence">@Model.Review.Consequence</p>
+    <p>Reason: @(Model.Review.State.Reason ?? "Not provided")</p>
+    <form method="post" asp-page-handler="ConfirmRemoval">
+        <input type="hidden" name="RepSubject" value="@Model.Review.State.Reps[0].Subject" />
+        <input type="hidden" name="ReviewProof" value="@Model.Review.Proof" />
+        <div class="permission-removal-actions">
+            <button type="submit" name="Confirmed" value="true" class="button">Confirm removal</button>
+            <a href="@Model.CancelUrl" class="button secondary">Cancel</a>
+        </div>
+    </form>
+</section>

@@ -123,7 +123,15 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
 
         var removal = RowForm(html, Pharmacy);
         Assert.Equal("Removed", removal.Fields["Change"]);
-        html = await FollowAsync(browser, await browser.PostAsync(removal.Action, new FormUrlEncodedContent(removal.Fields)));
+        using (var review = await browser.PostAsync(removal.Action, new FormUrlEncodedContent(removal.Fields)))
+        {
+            Assert.Equal(HttpStatusCode.OK, review.StatusCode);
+            html = await review.Content.ReadAsStringAsync();
+            Assert.Contains("Review removal", html);
+            Assert.Equal((1, 1), await _host.CountsAsync());
+        }
+        var confirmation = PermissionRemovalReviewPageTests.ConfirmationForm(html);
+        html = await FollowAsync(browser, await browser.PostAsync(confirmation.Action, new FormUrlEncodedContent(confirmation.Fields)));
         Assert.Contains("Pharmacy-only medicines removed from Colm. This takes effect at Colm's next Sync.", WebUtility.HtmlDecode(html));
         Assert.Equal([Pharmacy, "Not granted", "Removed 15 Sep 2026 14:02 UTC by Niamh Byrne"], Assert.Single(Rows(html))[..3]);
 

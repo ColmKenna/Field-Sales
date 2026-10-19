@@ -34,6 +34,13 @@ else
     </div>
     @if (TempData["PermissionNotice"] is string notice) { <p role="status">@notice</p> }
     @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
+    @if (Model.RemovalReview is { } review)
+    {
+        <partial name="_PermissionRemovalReview" model="@(new FieldSales.Web.Coverage.PermissionRemovalReviewModel(review,
+            Url.Page("./Permissions", new { repSubject = permissions.Rep.Subject })!))" />
+    }
+    else
+    {
     @if (!permissions.CanChange)
     {
         <p class="permission-view-only">You can view @permissions.Rep.Name's permissions but not change them.</p>
@@ -91,5 +98,6 @@ else
                 </tbody>
             </table>
         </div>
+    }
     }
 }
