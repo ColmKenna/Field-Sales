@@ -66,3 +66,18 @@ that starts cold finds it there.
 - `plan-data.js` is about 10 MB. Don't Read it whole. Query it with Node
   (`global.window={}; require('./plan-data.js'); window.DELIVERY_PLAN`), and edit it with exact,
   count-checked string replacement.
+- **NuGet audit breaks `-warnaserror` (seen 2026-10-19, WI-029).** Main itself fails a warnings-as-errors
+  build with NU1902/NU1903 advisories on transitive packages (Pkcs, Xml, MessagePack). Until the
+  developer upgrades them, verify with
+  `dotnet build FieldSales.slnx --no-incremental -m:1 -warnaserror '-warnnotaserror:NU1902;NU1903'`
+  and check that no other warning code appears.
+- **The API test host ignores `ConnectionStrings:CatalogueDb` from test configuration**, because the
+  API's Aspire `AddSqlServerDbContext` reads it before WebApplicationFactory applies its settings.
+  Replace `CatalogueDbContext` in `ConfigureTestServices` (see `ProductApplication` or
+  `RestrictionPermissionHost`) when a coverage fixture needs the catalogue.
+- **Phone-width screenshots:** headless Edge won't lay out a window narrower than about 500 px, so a
+  `--window-size=390,…` capture is cropped, not a real 390 px layout. Load the page in a 390 px
+  `<iframe>` (with `--allow-file-access-from-files`) instead. `--dump-dom` output only arrived through
+  `Start-Process … -RedirectStandardOutput <file> -Wait`, not `& msedge …`. Example: WI-029 notes.
+- **JS admin UI tests without repo noise:** copy the identity host's `package*.json`, `tests/` and
+  `wwwroot/js/` to the scratchpad, `npm ci --ignore-scripts` there and run `node --test tests/*.test.mjs`.
