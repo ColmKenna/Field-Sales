@@ -214,6 +214,37 @@ The reserved ports are proposals until the item that adds the project confirms t
 - An In Progress order line for such a product (valid when captured) is a WI-043 obligation: no
   orders or tablet exist yet.
 
+## WI-029 Restriction Permissions (2026-10-19, developer, plan approval)
+
+The developer replied **Approved** to the WI-029 plan, accepting decisions D0–D9 and the Human-Led
+scenario matrix as written in `WI-029.md`.
+
+- **Who may change:** the rep's own Sales Manager (current reporting line) or any Head Office User,
+  for any rep holding Field Salesperson, including a Sales Manager who also sells. **Any** Sales
+  Manager or Head Office User may view any rep's permissions. **Nobody changes their own
+  permissions**, Head Office included. WI-030's cohort grants must reuse this rule, not a second check.
+- The reason is optional on grant and removal, with the Assignment History rules (trimmed, at most
+  1000 characters, no control characters).
+- **Archived groups:** no new grant; removal stays allowed and is recorded; the per-rep view lists
+  archived groups the rep holds, with Remove only.
+- **Storage:** CatalogueDb, code under `FieldSales.Api/Coverage`. `RestrictionPermissionChanges` is
+  the append-only record (captured rep, actor and group names; no FK). `RestrictionPermissions`
+  holds current grants, with a restrictive FK to `RestrictionGroups`, written in the same
+  serializable catalogue transaction. The reporting line is read in a serializable DirectoryDb
+  transaction kept open until the catalogue write commits. This satisfies the WI-009/WI-011
+  obligation that another area's references join the retirement transaction.
+- A stale or repeated change is refused with "This permission changed. Reload before saving." and
+  nothing is recorded.
+- A group whose permissions were all removed may be deleted when no product uses it; the record
+  keeps its captured name. A group with a current grant offers Archive only.
+- Grants need an active Field Salesperson; removals also work for a rep who has since become
+  inactive. A failed identity lookup saves nothing.
+- **Hand-offs:** the `restriction-permissions` usage source counts current grants.
+  `RestrictionPermissionReader.CurrentGroupIdsAsync(repSubject)` gives **WI-043** the rep's current
+  permissions for `VisibleToRep`. WI-043 owns S1's "appears on his tablet after Sync" and S2.
+- **WI-031** owns the removal consequence statement (M14.2, CV009-E/F). Until it lands, Remove
+  saves directly.
+
 ## WI-015 geography retirement (2026-10-02, developer, plan approval)
 
 - Archive applies to the selected geography row. An archived County or Region

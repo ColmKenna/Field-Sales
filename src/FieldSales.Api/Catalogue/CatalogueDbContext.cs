@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using FieldSales.Api.Coverage;
 using FieldSales.Quantities;
 
 namespace FieldSales.Api.Catalogue;
@@ -15,6 +16,9 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<RestrictionGroup> RestrictionGroups => Set<RestrictionGroup>();
     public DbSet<ProductAttributeValue> ProductAttributeValues => Set<ProductAttributeValue>();
+    // Coverage's Restriction Permissions are stored beside their groups (WI-029).
+    public DbSet<RestrictionPermission> RestrictionPermissions => Set<RestrictionPermission>();
+    public DbSet<RestrictionPermissionChange> RestrictionPermissionChanges => Set<RestrictionPermissionChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,6 +28,7 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
         ConfigureReference<AttributeName>(modelBuilder, "AttributeNames");
         ConfigureReference<Supplier>(modelBuilder, "Suppliers");
         ConfigureReference<RestrictionGroup>(modelBuilder, "RestrictionGroups");
+        RestrictionPermissionModelConfiguration.Configure(modelBuilder);
         modelBuilder.Entity<ProductAttributeValue>(entity =>
         {
             entity.ToTable("ProductAttributeValues");
@@ -107,6 +112,24 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
             entity.Property(price => price.Amount).HasPrecision(18, 2);
             entity.Property(price => price.EffectiveFrom).HasColumnType("date");
         });
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        GuardPermissionRecord();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        GuardPermissionRecord();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void GuardPermissionRecord()
+    {
+        if (ChangeTracker.Entries<RestrictionPermissionChange>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Restriction permission changes are append-only.");
     }
 
     private static void ConfigureReference<T>(ModelBuilder modelBuilder, string table) where T : NamedReferenceItem

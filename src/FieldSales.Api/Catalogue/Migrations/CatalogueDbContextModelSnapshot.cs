@@ -338,6 +338,96 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.ToTable("Suppliers", (string)null);
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Coverage.RestrictionPermission", b =>
+                {
+                    b.Property<string>("RepSubject")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<Guid>("RestrictionGroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("RepSubject", "RestrictionGroupId");
+
+                    b.HasIndex("RestrictionGroupId");
+
+                    b.ToTable("RestrictionPermissions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RestrictionPermissions_Grant", "LEN([RepSubject]) > 0 AND [RestrictionGroupId] <> '00000000-0000-0000-0000-000000000000'");
+                        });
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Coverage.RestrictionPermissionChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<int>("Change")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("RepName")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("RepSubject")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<Guid>("RestrictionGroupId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RestrictionGroupName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("Sequence")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Sequence"));
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sequence")
+                        .IsUnique();
+
+                    b.HasIndex("RestrictionGroupId", "Sequence");
+
+                    b.HasIndex("RepSubject", "RestrictionGroupId", "Sequence");
+
+                    b.ToTable("RestrictionPermissionChanges", null, t =>
+                        {
+                            t.HasTrigger("TR_RestrictionPermissionChanges_AppendOnly");
+
+                            t.HasCheckConstraint("CK_RestrictionPermissionChanges_Change", "[Id] <> '00000000-0000-0000-0000-000000000000'\nAND [RestrictionGroupId] <> '00000000-0000-0000-0000-000000000000'\nAND LEN([RepSubject]) > 0 AND LEN([RepName]) > 0 AND LEN([RestrictionGroupName]) > 0\nAND LEN([ActorSubject]) > 0 AND LEN([ActorName]) > 0 AND [ActorSubject] <> [RepSubject]\nAND [Change] IN (0, 1) AND DATEPART(TZOFFSET, [ChangedAt]) = 0\nAND ([Reason] IS NULL OR LEN([Reason]) > 0)");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("FieldSales.Api.Catalogue.Category", b =>
                 {
                     b.HasOne("FieldSales.Api.Catalogue.Category", null)
@@ -417,6 +507,15 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.HasOne("FieldSales.Api.Catalogue.Product", null)
                         .WithMany("BasePrices")
                         .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Coverage.RestrictionPermission", b =>
+                {
+                    b.HasOne("FieldSales.Api.Catalogue.RestrictionGroup", null)
+                        .WithMany()
+                        .HasForeignKey("RestrictionGroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
