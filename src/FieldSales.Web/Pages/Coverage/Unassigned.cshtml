@@ -2,7 +2,7 @@
 @model FieldSales.Web.Pages.Coverage.UnassignedModel
 @{ ViewData["Title"] = "Unassigned Locations"; }
 <div class="unassigned-coverage">
-<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a></nav>
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Permissions">Rep permissions</a></nav>
 <h1>Unassigned Locations</h1>
 @if (TempData["AssignmentNotice"] is string notice) { <p role="status">@notice</p> }
 @if (Model.Coverage.Towns.Count == 0)

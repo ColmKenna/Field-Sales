@@ -2,7 +2,9 @@ namespace FieldSales.Directory.Contracts;
 
 public enum RestrictionPermissionChangeKind { Granted, Removed }
 
-public sealed record RestrictionPermissionChangeDetails(Guid Id, long Sequence, RestrictionPermissionChangeKind Change,
+// Rep, group and actor names are the ones captured when the change was recorded.
+public sealed record RestrictionPermissionChangeDetails(Guid Id, long Sequence, HistoryIdentityDetails Rep,
+    Guid RestrictionGroupId, string RestrictionGroupName, RestrictionPermissionChangeKind Change,
     DateTimeOffset ChangedAt, HistoryIdentityDetails Actor, string? Reason, string Display);
 
 // M-14 per rep. The Can* flags are navigation context only; every change rechecks the rule.

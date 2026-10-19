@@ -128,3 +128,18 @@ p { line-height: 1.6; }
 .unassigned-coverage { overflow-wrap: anywhere; }
 .unassigned-locations { list-style: none; padding: 0; }
 .unassigned-locations > li { padding-block: 1rem; border-bottom: 1px solid #cbd5e1; }
+
+.permission-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0 1rem; overflow-wrap: anywhere; }
+.permission-reps > li { align-items: center; }
+.permission-markers span { margin-left: .75rem; color: #35485c; }
+.permission-view-only { padding: .6rem 1rem; border-left: 4px solid #b9c8d6; background: #fff; }
+.permission-table { overflow-x: auto; }
+.permission-table table { width: 100%; border-collapse: collapse; background: #fff; }
+.permission-table caption { text-align: left; font-weight: 600; padding-block: .75rem; }
+.permission-table th, .permission-table td { text-align: left; vertical-align: top; padding: .8rem; border-bottom: 1px solid #d7dee6; overflow-wrap: break-word; }
+.permission-archived { display: block; color: #7a4a00; }
+.permission-change { display: grid; gap: .5rem; min-width: 12rem; }
+.permission-change label { font-weight: 600; }
+.permission-change input { width: 100%; min-height: 2.5rem; padding: .5rem; border: 1px solid #b9c8d6; border-radius: .3rem; font: inherit; }
+.permission-change input:focus-visible { outline: 3px solid #e48f2b; outline-offset: 2px; }
+.permission-change .button { justify-self: start; max-width: 100%; overflow-wrap: anywhere; }

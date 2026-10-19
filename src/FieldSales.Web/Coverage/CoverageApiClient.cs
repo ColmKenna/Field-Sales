@@ -50,6 +50,23 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
     public Task<DirectoryResult<AssignmentSaveResult>> SaveTransferAsync(TransferAssignmentsRequest value, CancellationToken ct) =>
         SaveAsync("/coverage/transfers", value, ct, true);
 
+    public Task<DirectoryResult<PermissionRepChoice[]>> PermissionRepsAsync(CancellationToken ct) =>
+        SendAsync<PermissionRepChoice[]>(HttpMethod.Get, "/coverage/permissions/reps", null, ct);
+    public async Task<DirectoryResult<RepPermissionsPage>> RepPermissionsAsync(string rep, CancellationToken ct)
+    {
+        var result = await SendAsync<RepPermissionsPage>(HttpMethod.Get, "/coverage/reps/" + Uri.EscapeDataString(rep) + "/permissions", null, ct);
+        return result.Success && result.Value!.Rep.Subject != rep ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
+    // A POST is never retried automatically (AddSafeReadResilience); the page reloads before another attempt.
+    public async Task<DirectoryResult<RestrictionPermissionChangeDetails>> ChangePermissionAsync(string rep, Guid group,
+        ChangeRestrictionPermissionRequest value, CancellationToken ct)
+    {
+        var result = await SendAsync<RestrictionPermissionChangeDetails>(HttpMethod.Post,
+            "/coverage/reps/" + Uri.EscapeDataString(rep) + "/permissions/" + group, value, ct);
+        return result.Success && (result.Value!.Rep.Subject != rep || result.Value.RestrictionGroupId != group
+            || result.Value.Change != value.Change) ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
+
     public Task<DirectoryResult<ReportingLinesPage>> ReportingLinesAsync(CancellationToken ct) =>
         SendAsync<ReportingLinesPage>(HttpMethod.Get, "/coverage/reporting-lines", null, ct);
     public Task<DirectoryResult<RepReportingLineDetails>> SetReportingLineAsync(string rep, SetRepReportingLineRequest value, CancellationToken ct) =>
@@ -135,6 +152,10 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
                     && page.Lines.All(row => row is not null && ValidLine(row.Line) && !string.IsNullOrWhiteSpace(row.RepName)
                         && !string.IsNullOrWhiteSpace(row.ManagerName)),
                 RepReportingLineDetails line => ValidLine(line),
+                PermissionRepChoice[] reps => reps.All(row => row is not null && ValidChoice(row.Rep))
+                    && reps.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == reps.Length,
+                RepPermissionsPage permissions => ValidPermissions(permissions),
+                RestrictionPermissionChangeDetails change => ValidPermissionChange(change),
                 AssignmentImpactDetails preview => ValidPreview(preview),
                 AssignmentReviewOptions options => options.Reps is not null && options.Targets is not null && options.Assignments is not null
                     && options.Reps.All(ValidChoice) && options.Targets.All(row => row is not null && row.Target is not null
@@ -258,6 +279,20 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
     }
     private static bool ValidIdentity(HistoryIdentityDetails? value) => value is not null
         && !string.IsNullOrWhiteSpace(value.Subject) && !string.IsNullOrWhiteSpace(value.DisplayName);
+    // The latest change decides the state, so a page whose rows disagree with their own record is refused.
+    private static bool ValidPermissions(RepPermissionsPage page) => ValidChoice(page.Rep) && page.Groups is not null
+        && page.Groups.All(row => row is not null && row.RestrictionGroupId != Guid.Empty && !string.IsNullOrWhiteSpace(row.Name)
+            && (row.LastChange is null ? !row.Granted : ValidPermissionChange(row.LastChange)
+                && row.LastChange.Rep.Subject == page.Rep.Subject && row.LastChange.RestrictionGroupId == row.RestrictionGroupId
+                && row.Granted == (row.LastChange.Change == RestrictionPermissionChangeKind.Granted))
+            && (!row.Archived || row.Granted) && !(row.CanGrant && row.CanRemove)
+            && (!row.CanGrant || page.CanChange && page.Active && !row.Granted && !row.Archived)
+            && (!row.CanRemove || page.CanChange && row.Granted))
+        && page.Groups.Select(row => row.RestrictionGroupId).Distinct().Count() == page.Groups.Count;
+    private static bool ValidPermissionChange(RestrictionPermissionChangeDetails? value) => value is not null
+        && value.Id != Guid.Empty && value.Sequence > 0 && ValidIdentity(value.Rep) && value.RestrictionGroupId != Guid.Empty
+        && !string.IsNullOrWhiteSpace(value.RestrictionGroupName) && Enum.IsDefined(value.Change) && value.ChangedAt != default
+        && ValidIdentity(value.Actor) && value.Actor.Subject != value.Rep.Subject && !string.IsNullOrWhiteSpace(value.Display);
     private static bool ValidHistoryOwner(HistoryOwnerDetails? value, Guid locationId) => value is null
         || ValidIdentity(value.Rep) && value.Source is { Target: { } target } source && source.AssignmentId != Guid.Empty
         && Enum.IsDefined(target.Level) && target.UnitId != Guid.Empty && !string.IsNullOrWhiteSpace(source.Name)

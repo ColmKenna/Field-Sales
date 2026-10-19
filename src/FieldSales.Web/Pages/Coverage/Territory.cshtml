@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = Model.Territory is { } title ? title.Rep.Name + " · Territory" : "Coverage";
 }
-<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Unassigned">Unassigned Locations</a></nav>
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Unassigned">Unassigned Locations</a> · <a asp-page="./Permissions">Rep permissions</a></nav>
 @if (Model.Territory is not { } territory)
 {
     <h1>Coverage</h1>
@@ -23,6 +23,7 @@ else
     <div class="territory-heading">
         <h1>@territory.Rep.Name</h1>
         <p>Reports to: @(territory.Manager?.Name ?? "Not set")</p>
+        <p><a asp-page="./Permissions" asp-route-repSubject="@territory.Rep.Subject">Restriction permissions</a></p>
     </div>
     @if (TempData["AssignmentNotice"] is string notice) { <p role="status">@notice</p> }
     <section class="territory-summary" aria-label="Territory summary">
