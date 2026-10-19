@@ -143,3 +143,13 @@ p { line-height: 1.6; }
 .permission-change input { width: 100%; min-height: 2.5rem; padding: .5rem; border: 1px solid #b9c8d6; border-radius: .3rem; font: inherit; }
 .permission-change input:focus-visible { outline: 3px solid #e48f2b; outline-offset: 2px; }
 .permission-change .button { justify-self: start; max-width: 100%; overflow-wrap: anywhere; }
+.permission-cohort { min-width: 0; }
+.permission-cohort .permission-table { margin-bottom: 1.25rem; }
+.permission-cohort td:last-child { min-width: 10rem; }
+.permission-cohort td:nth-child(3) { min-width: 16rem; }
+.permission-cohort label { overflow-wrap: anywhere; }
+.permission-cohort input[type="checkbox"] { width: auto; margin-right: .4rem; }
+.permission-locked { color: #35485c; }
+.permission-cohort-action { display: grid; gap: .6rem; max-width: 36rem; }
+.permission-cohort-action textarea { width: 100%; box-sizing: border-box; padding: .6rem; font: inherit; }
+.permission-cohort-action button { justify-self: start; max-width: 100%; overflow-wrap: anywhere; }

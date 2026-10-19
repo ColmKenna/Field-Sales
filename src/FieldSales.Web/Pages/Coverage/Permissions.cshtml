@@ -4,7 +4,7 @@
 @{
     ViewData["Title"] = Model.Permissions is { } title ? title.Rep.Name + " · Permissions" : "Rep permissions";
 }
-<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Unassigned">Unassigned Locations</a> · <a asp-page="./Permissions">Rep permissions</a></nav>
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Unassigned">Unassigned Locations</a> · <a asp-page="./Permissions">Rep permissions</a> · <a asp-page="./GroupPermissions">Group permissions</a></nav>
 @if (Model.Permissions is not { } permissions)
 {
     <h1>Rep permissions</h1>

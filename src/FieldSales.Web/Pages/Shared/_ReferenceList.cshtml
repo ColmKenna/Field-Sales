@@ -20,6 +20,10 @@
 {
     <section class="reference-item" data-reference-id="@item.Id">
         <h3>@item.Name@(item.IsArchived ? " (archived)" : "")</h3>
+        @if (Model.SelectedList.Key == ReferenceListKeys.RestrictionGroups)
+        {
+            <p><a asp-page="/Coverage/GroupPermissions" asp-route-groupId="@item.Id">Rep permissions for @item.Name</a></p>
+        }
         @if (item.Description is not null) { <p class="reference-description">@item.Description</p> }
         <partial name="_ReferenceRetirement" model="@(new FieldSales.Web.ReferenceData.ReferenceRetirementModel(item,
             Url.Page("/HeadOffice/ReferenceData/Index", "Confirm", new { id = item.Id, listKey = Model.SelectedList.Key, showArchived = Model.ShowArchived })!))" />
