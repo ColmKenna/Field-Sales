@@ -16,6 +16,7 @@ using RestrictionGroupListStore = CatalogueApi::FieldSales.Api.Catalogue.Restric
 using Product = CatalogueApi::FieldSales.Api.Catalogue.Product;
 using NamedReferenceItem = CatalogueApi::FieldSales.Api.Catalogue.NamedReferenceItem;
 using ProductReferenceAssignments = CatalogueApi::FieldSales.Api.Catalogue.ProductReferenceAssignments;
+using RestrictionPermissionUsageSource = CatalogueApi::FieldSales.Api.Coverage.RestrictionPermissionUsageSource;
 
 namespace FieldSales.Web.Tests;
 
@@ -349,9 +350,14 @@ public sealed class ReferenceListIntegrationTests(ProductApplication app) : ICla
 
     private WebApplicationFactory<CatalogueDbContext> WithPermissions(Guid group, long count) =>
         app.NewApi().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            services.AddSingleton<IReferenceUsageSource>(new PermissionUsageSource(group, count))));
+        {
+            foreach (var real in services.Where(service => service.ServiceType == typeof(IReferenceUsageSource)
+                && service.ImplementationType == typeof(RestrictionPermissionUsageSource)).ToArray())
+                services.Remove(real);
+            services.AddSingleton<IReferenceUsageSource>(new PermissionUsageSource(group, count));
+        }));
 
-    // Stands in for the Coverage area's permission source until WI-029 registers the real one.
+    // Replaces the Coverage area's permission source with a fixed count for one group.
     private sealed class PermissionUsageSource(Guid group, long count) : IReferenceUsageSource
     {
         public string SourceKey => RestrictionGroupListStore.PermissionSource;

@@ -187,8 +187,9 @@ public sealed class ProductClassificationApiTests(SqlServerFixture fixture) : IA
         await using (var scope = app.Api.Services.CreateAsyncScope())
         {
             var reader = scope.ServiceProvider.GetRequiredService<FieldSales.ReferenceData.IReferenceUsageReader>();
-            Assert.Equal(0, (await reader.ReadAsync(new("restriction-groups", seed.Group.Id), default)).Counts.Single().Count);
-            Assert.Equal(1, (await reader.ReadAsync(new("restriction-groups", replacement.Id), default)).Counts.Single().Count);
+            // Restriction Groups also count permissions (WI-029); this test is about product usage.
+            Assert.Equal(0, (await reader.ReadAsync(new("restriction-groups", seed.Group.Id), default)).Counts.Single(ProductCount).Count);
+            Assert.Equal(1, (await reader.ReadAsync(new("restriction-groups", replacement.Id), default)).Counts.Single(ProductCount).Count);
             foreach (var item in new[] { ("profiles", seed.Profile.Id), ("suppliers", seed.Supplier.Id), ("brands", seed.Primary.Id), ("brands", seed.Alternative.Id) })
                 Assert.Equal(1, (await reader.ReadAsync(new(item.Item1, item.Item2), default)).Counts.Single().Count);
         }
@@ -197,8 +198,10 @@ public sealed class ProductClassificationApiTests(SqlServerFixture fixture) : IA
         await using var clearedScope = app.Api.Services.CreateAsyncScope();
         var clearedReader = clearedScope.ServiceProvider.GetRequiredService<FieldSales.ReferenceData.IReferenceUsageReader>();
         foreach (var item in new[] { ("profiles", seed.Profile.Id), ("suppliers", seed.Supplier.Id), ("brands", seed.Primary.Id), ("brands", seed.Alternative.Id), ("restriction-groups", replacement.Id) })
-            Assert.Equal(0, (await clearedReader.ReadAsync(new(item.Item1, item.Item2), default)).Counts.Single().Count);
+            Assert.Equal(0, (await clearedReader.ReadAsync(new(item.Item1, item.Item2), default)).Counts.Single(ProductCount).Count);
     }
+
+    private static bool ProductCount(FieldSales.ReferenceData.ReferenceCount count) => count.SourceKey == "products";
 
     [Fact]
     public async Task Should_DenyWrite_When_RoleIsRemovedOrTokenExpires()

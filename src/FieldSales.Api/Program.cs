@@ -52,6 +52,8 @@ builder.Services.AddScoped<IReferenceListStore, SupplierListStore>();
 builder.Services.AddScoped<IReferenceListStore, RestrictionGroupListStore>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductBrandUsageSource>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, ProductReferenceUsageSource>();
+builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageSource, RestrictionPermissionUsageSource>();
+builder.Services.AddScoped<RestrictionPermissionReader>();
 builder.Services.AddScoped<ReferenceCatalogueRegistry>();
 builder.Services.AddScoped<FieldSales.ReferenceData.IReferenceUsageReader, ReferenceUsageReader>();
 builder.Services.AddScoped<ProductBrandAssignments>();

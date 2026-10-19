@@ -56,6 +56,9 @@ public sealed class RestrictionPermissionHost : IAsyncDisposable
         // Privileged test-database reset; the record's DML append-only guards stay enabled.
         await catalogue.Database.ExecuteSqlRawAsync("TRUNCATE TABLE [RestrictionPermissionChanges]");
         await catalogue.RestrictionPermissions.ExecuteDeleteAsync();
+        await catalogue.ProductBasePrices.ExecuteDeleteAsync();
+        await catalogue.Products.ExecuteDeleteAsync();
+        await catalogue.Categories.ExecuteDeleteAsync(); // the tests only add top-level categories
         await catalogue.RestrictionGroups.ExecuteDeleteAsync();
         var groups = groupNames.Select(RestrictionGroup.Create).ToArray();
         catalogue.RestrictionGroups.AddRange(groups);
@@ -88,11 +91,11 @@ public sealed class RestrictionPermissionHost : IAsyncDisposable
         return (await db.RestrictionPermissionChanges.CountAsync(), await db.RestrictionPermissions.CountAsync());
     }
 
-    public async Task ArchiveAsync(Guid group)
+    public async Task ArchiveAsync(Guid group, bool archived = true)
     {
         await using var scope = Api.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().RestrictionGroups.Where(row => row.Id == group)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.IsArchived, true));
+            .ExecuteUpdateAsync(setters => setters.SetProperty(row => row.IsArchived, archived));
     }
 
     public async Task<string> ReportingVersionAsync(string rep)
