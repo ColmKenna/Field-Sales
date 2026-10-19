@@ -228,6 +228,13 @@ cases. Implement through the T-3.4.2 checkpoint; continuation requires **Continu
 - The five named reps in CV009-B are granted by another authorized actor, preserving the no-self-change rule.
 - WI-031 owns removal and consequence messaging; WI-043 owns tablet behavior. No schema change here.
 
+### WI-030 review checkpoint accepted (2026-10-19, developer)
+
+The developer replied **Continue T-3.4.2** after the group page, five-rep grant and outside-team
+denial evidence were presented and the authorization rule was explained. This accepts the checkpoint
+and authorizes the remaining approved scenarios, full verification and completion on the feature
+branch. PR creation and integration remain separate actions.
+
 ## WI-029 Restriction Permissions (2026-10-19, developer, plan approval)
 
 The developer replied **Approved** to the WI-029 plan, accepting decisions D0–D9 and the Human-Led

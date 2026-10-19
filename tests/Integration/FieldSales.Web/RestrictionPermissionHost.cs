@@ -26,14 +26,14 @@ public sealed class RestrictionPermissionHost : IAsyncDisposable
 {
     private readonly CoverageReadApplication _app;
 
-    public RestrictionPermissionHost(CoverageReadApplication app)
+    public RestrictionPermissionHost(CoverageReadApplication app, params IInterceptor[] interceptors)
     {
         _app = app;
         Api = app.Api.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<CatalogueDbContext>();
             services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
-                .UseSqlServer(app.ConnectionString).AddInterceptors(Gate).Options));
+                .UseSqlServer(app.ConnectionString).AddInterceptors(Gate).AddInterceptors(interceptors).Options));
         }));
     }
 
