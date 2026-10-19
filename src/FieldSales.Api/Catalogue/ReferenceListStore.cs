@@ -70,12 +70,13 @@ public sealed class SupplierListStore(CatalogueDbContext db)
 public sealed class RestrictionGroupListStore(CatalogueDbContext db)
     : ReferenceListStore<RestrictionGroup>(db, ListDefinition, RestrictionGroup.Create)
 {
-    /// <summary>The Coverage area's permission usage source key. It joins the required sources once registered (WI-029).</summary>
+    /// <summary>The Coverage area's permission usage source key, counted by RestrictionPermissionUsageSource.</summary>
     public const string PermissionSource = "restriction-permissions";
 
     // While archived, a group's permissions grant nothing and its products are hidden from every rep (MI-45).
+    // A group someone holds is in use, so it can be archived but not deleted.
     private static readonly ReferenceListDefinition ListDefinition = new(ReferenceListKeys.RestrictionGroups,
-        "Restriction Group", "Restriction Groups", ["products"],
+        "Restriction Group", "Restriction Groups", ["products", PermissionSource],
     [
         new(ReferenceAction.Archive, PermissionSource,
             "permission will be kept but has no effect while archived", "permissions will be kept but have no effect while archived"),

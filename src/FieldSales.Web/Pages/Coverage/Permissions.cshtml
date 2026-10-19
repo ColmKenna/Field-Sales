@@ -1,0 +1,95 @@
+@page
+@model FieldSales.Web.Pages.Coverage.PermissionsModel
+@using FieldSales.Directory.Contracts
+@{
+    ViewData["Title"] = Model.Permissions is { } title ? title.Rep.Name + " · Permissions" : "Rep permissions";
+}
+<nav class="coverage-navigation" aria-label="Coverage"><a asp-page="./Territory">Coverage</a> · <a asp-page="./Unassigned">Unassigned Locations</a> · <a asp-page="./Permissions">Rep permissions</a></nav>
+@if (Model.Permissions is not { } permissions)
+{
+    <h1>Rep permissions</h1>
+    <p>Choose a rep to see which Restriction Groups they hold.</p>
+    @if (Model.Reps.Count == 0) { <p>No field salespeople are available.</p> }
+    else
+    {
+        <ul class="geography-list permission-reps">
+        @foreach (var choice in Model.Reps)
+        {
+            <li>
+                <a asp-page="./Permissions" asp-route-repSubject="@choice.Rep.Subject">@choice.Rep.Name</a>
+                <span class="permission-markers">
+                    @if (!choice.Active) { <span>Not active</span> }
+                    @if (!choice.CanChange) { <span>View only</span> }
+                </span>
+            </li>
+        }
+        </ul>
+    }
+}
+else
+{
+    <div class="permission-heading">
+        <h1>@permissions.Rep.Name</h1>
+        <p>Restriction permissions</p>
+    </div>
+    @if (TempData["PermissionNotice"] is string notice) { <p role="status">@notice</p> }
+    @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
+    @if (!permissions.CanChange)
+    {
+        <p class="permission-view-only">You can view @permissions.Rep.Name's permissions but not change them.</p>
+    }
+    else if (!permissions.Active)
+    {
+        <p class="permission-view-only">@permissions.Rep.Name is not an active field salesperson, so permissions can be removed but not granted.</p>
+    }
+    <p>Changes take effect at @permissions.Rep.Name's next Sync.</p>
+    @if (permissions.Groups.Count == 0)
+    {
+        <p>No Restriction Groups exist yet.</p>
+    }
+    else
+    {
+        <div class="permission-table">
+            <table>
+                <caption>Restriction Groups for @permissions.Rep.Name</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Restriction Group</th><th scope="col">Status</th><th scope="col">Last change</th>
+                        @if (permissions.CanChange) { <th scope="col">Change</th> }
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var group in permissions.Groups)
+                {
+                    <tr>
+                        <th scope="row">@group.Name</th>
+                        <td>
+                            @(group.Granted ? "Granted" : "Not granted")
+                            @if (group.Archived) { <span class="permission-archived">Archived — no effect while archived</span> }
+                        </td>
+                        <td>@(group.LastChange?.Display ?? "No changes recorded")</td>
+                        @if (permissions.CanChange)
+                        {
+                            <td>
+                                @if (group.CanGrant || group.CanRemove)
+                                {
+                                    var change = group.CanGrant ? RestrictionPermissionChangeKind.Granted : RestrictionPermissionChangeKind.Removed;
+                                    <form method="post" asp-page-handler="Change" class="permission-change">
+                                        <input type="hidden" name="RepSubject" value="@permissions.Rep.Subject" />
+                                        <input type="hidden" name="GroupId" value="@group.RestrictionGroupId" />
+                                        <input type="hidden" name="Change" value="@change" />
+                                        <input type="hidden" name="ExpectedLastChangeId" value="@group.LastChange?.Id" />
+                                        <label for="reason-@group.RestrictionGroupId">Reason (optional)</label>
+                                        <input id="reason-@group.RestrictionGroupId" name="Reason" maxlength="1000" />
+                                        <button type="submit" class="button@(group.CanRemove ? " secondary" : "")">@(group.CanGrant ? "Grant" : "Remove") @group.Name</button>
+                                    </form>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+}
