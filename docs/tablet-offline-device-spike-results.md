@@ -188,3 +188,23 @@ twenty search terms, recording failures, all runs, median and worst. Establish t
 10 Mbit/s/100 ms RTT conditions separately before judging that network target. The 2 Mbit/s
 mode is a degraded diagnostic. Stop for Android review after 1B-B. The older iPad mini and
 Mac/Xcode/signing compatibility remain the final 1B-C check before 1C.
+
+## Checkpoint 1B-B connection attempt — 20 October 2026
+
+The developer authorized continuation with **proceed**, then reported **Connected and debugging
+allowed**. ADB showed only an offline discovered wireless transport, then no devices. Windows
+also showed no Samsung/Android USB hardware ID or WPD tablet. No target was selected, installed
+or launched. The developer subsequently answered **Cannot connect right now**. Samsung runtime,
+correctness and timing evidence therefore remain **not run**; 1B-B is incomplete and WI-032
+stays active. No iPad or production work started.
+
+Preparation completed while checking the connection: verified the final APK hash and all three
+seed-42 fixture hashes; generated a seed-77 baseline fixture with the unchanged 1A generator for
+owner isolation; verified all four owner/profile manifest endpoints on the loopback fixture
+host. The temporary host was stopped using its verified PID/start time/command line. Thirty
+planned refresh/offline-reopen trials remain marked `not-run` in
+`.artifacts/wi032/samsung-session/run-checklist.json`. No application code changed or tests
+needed rerunning for this preparation/documentation.
+
+When the Samsung is available, reconnect it to this PC, enable/authorize USB debugging, then
+resume explicit-device preflight and the commands above. Do not repeat the build checkpoint.
