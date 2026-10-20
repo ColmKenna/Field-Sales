@@ -23,10 +23,14 @@
         <Project Path="tests/Integration/FieldSales.Web/FieldSales.Web.IntegrationTests.csproj" />
         <Project Path="tests/Integration/FieldSales.DemoData/FieldSales.DemoData.IntegrationTests.csproj" />
         <Project Path="tests/Integration/FieldSales.SnapshotSpike/FieldSales.SnapshotSpike.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.TabletSpike/FieldSales.TabletSpike.IntegrationTests.csproj" />
     </Folder>
     <Folder Name="/tests/E2E/" />
     <Folder Name="/tools/">
         <Project Path="tools/FieldSales.DemoData/FieldSales.DemoData.csproj" />
         <Project Path="tools/FieldSales.SnapshotSpike/FieldSales.SnapshotSpike.csproj" />
+        <Project Path="tools/FieldSales.TabletSpike.Core/FieldSales.TabletSpike.Core.csproj" />
+        <Project Path="tools/FieldSales.TabletSpike.Cli/FieldSales.TabletSpike.Cli.csproj" />
+        <Project Path="tools/FieldSales.TabletSpike.Host/FieldSales.TabletSpike.Host.csproj" />
     </Folder>
 </Solution>

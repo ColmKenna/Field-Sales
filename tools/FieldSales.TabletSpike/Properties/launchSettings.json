@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Android storage spike": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

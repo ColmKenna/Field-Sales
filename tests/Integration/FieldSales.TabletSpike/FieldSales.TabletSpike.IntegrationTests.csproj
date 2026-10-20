@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="../../../tools/FieldSales.SnapshotSpike/FieldSales.SnapshotSpike.csproj" />
+    <ProjectReference Include="../../../tools/FieldSales.TabletSpike.Core/FieldSales.TabletSpike.Core.csproj" />
+    <ProjectReference Include="../../../tools/FieldSales.TabletSpike.Cli/FieldSales.TabletSpike.Cli.csproj" />
+    <ProjectReference Include="../../../tools/FieldSales.TabletSpike.Host/FieldSales.TabletSpike.Host.csproj" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

@@ -122,6 +122,9 @@ becomes active when 1A starts and stays active until all of its acceptance crite
    force-close, offline reopen and timing cases; agent supplies commands, collects exported
    metrics and analyses them. Use a synthetic-only transfer harness, separate from production
    API/identity. No personal or live business data. **STOP after results are recorded.**
+   **20 October steering:** Samsung/Android first; the developer has Mac access and will check
+   the older iPad mini at the end. Concrete checkpoints/scenarios are in
+   [the Android-first 1B plan](tablet-offline-device-spike-plan.md), approved for 1B-A.
 3. **1C — Decide runtime/storage and production design.** Human accepts or changes the candidate,
    capacity budgets, supported device/OS floor, full-download affordability and deployment path.
    Resolve MI-62, I-03 layout, address source, contract ownership and compatibility. Agent records
