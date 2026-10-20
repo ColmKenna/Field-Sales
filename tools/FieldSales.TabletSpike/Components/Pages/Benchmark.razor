@@ -71,7 +71,7 @@ else
     private string transport = "LAN";
     private string status = "Opening local data…", term = "", note = "", exportStatus = "", webView = "unavailable until WebView initializes";
     private string? preflightError;
-    private bool busy, paused, searching, firstRender = true;
+    private bool busy, paused, searching, localReady, firstRender = true;
     private double openMs;
     private SpikeWorkspace? workspace;
     private SnapshotSqliteStore? store;
@@ -93,6 +93,7 @@ else
         profile = Preferences.Get("spike-profile", profile);
         owner = Preferences.Get("spike-owner", owner);
         await OpenLocal();
+        localReady = true;
     }
     protected override async Task OnAfterRenderAsync(bool first)
     {
@@ -102,7 +103,9 @@ else
             try { paint.Completion.TrySetResult(await JS.InvokeAsync<double>("spike.afterPaintElapsed", paint.Start)); }
             catch (Exception e) { paint.Completion.TrySetException(e); }
         }
-        if (firstRender)
+        // Blazor can render while OnInitializedAsync is still awaiting the local read.
+        // Capture the reopen report only after that read has populated all measured state.
+        if (firstRender && localReady)
         {
             firstRender = false;
             webView = await JS.InvokeAsync<string>("spike.userAgent");

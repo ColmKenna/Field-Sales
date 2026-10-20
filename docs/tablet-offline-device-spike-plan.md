@@ -21,6 +21,24 @@ developer need not identify them manually before the Android runner is built.
 This is an isolated synthetic-data evaluation tool. It evaluates MAUI Blazor Hybrid + SQLite;
 it does not implement production tablet sign-in, business capture or the final Sync contract.
 
+### Emulator amendment — 20 October 2026
+
+After USB/Wi-Fi connection attempts, the developer instructed **use an emulator for now as I
+can't get them connected to the same network**. This authorizes an interim diagnostic increment
+on an explicitly selected emulator: install/launch the Release spike, drive its
+synthetic fixture/search/Unsent controls, exercise cancellation and package-only force-close,
+and retrieve local reports. Use the loopback fixture host with adb reverse and select
+**Emulator bridge (diagnostic)** for transfers. Do not operate either discovered wireless device.
+
+Record emulator identity, storage constraints, all attempted runs and recovery outcomes; stop
+for review after this increment. This replaces the immediate need to connect the Samsung,
+without completing Samsung checkpoint 1B-B, iPad checkpoint 1B-C or MI-02. The five-repeat physical
+device matrix and final storage/runtime decision remain pending. Do not clear other emulator
+apps/data or resize/wipe the existing AVD to accommodate a fixture. The initial `emulator-5554`
+ran baseline and pre-activation recovery, then lacked space for an APK update. A separate
+`WI032_Tablet_API36` AVD (`emulator-5556`) uses the already installed Android 36 image and a fresh
+8 GB data partition under `.artifacts/wi032/emulator-avds/`; no existing AVD data is copied.
+
 ## Proposed behavior and storage design
 
 1. A minimal runner selects a fixture server/profile and shows the selected synthetic owner,

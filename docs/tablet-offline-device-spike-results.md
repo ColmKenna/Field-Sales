@@ -1,9 +1,10 @@
-# WI-032 checkpoint 1B-A — Android build and correctness evidence
+# WI-032 — Android storage spike evidence
 
 20 October 2026. The developer approved the [1B plan](tablet-offline-device-spike-plan.md),
 including twelve named scenarios, for checkpoint **1B-A only**. This document is the build
-handoff. Samsung measurements (1B-B), iPad mini verification (1B-C) and the runtime/storage
-decision (1C) are still pending. WI-032 remains active; MI-02 is open.
+handoff, extended with the developer-authorized emulator diagnostics below. Samsung measurements
+(1B-B), iPad mini verification (1B-C) and the runtime/storage decision (1C) remain pending.
+WI-032 remains active; MI-02 is open.
 
 ## What the runner evaluates
 
@@ -73,13 +74,13 @@ necessary for the agreed search/reopen targets.
   plus 26 new spike cases). Every project ran with the bounded SQL Server settings. Final
   report-I/O and retention-timing corrections were followed by another **26/26** affected
   scenario run and a rebuilt Release APK; no existing application or scenario was changed.
-- Android Release publish: **succeeded with no build warnings**. The final 44,617,983-byte APK is
-  `.artifacts/wi032/1b-android/com.fieldsales.tabletspike-Signed.apk`, SHA-256
+- Initial Android Release publish: **succeeded with no build warnings**. The 44,617,983-byte
+  checkpoint APK is retained as `.artifacts/wi032/emulator-session/original-release.apk`, SHA-256
   `e3e95808229c151cadc77f01a1d936b92f6bb5581fffc3593dc29d65b5bca659`.
   Package/launcher inspection confirms API 24 minimum, API 36 target and ARM64, ARMv7,
   x86_64 ABIs. APK v2/v3 signature and 16 KiB native zip alignment checks pass. The three
   embedded `libe_sqlite3.so` files each exactly match their pinned 3.53.3 NuGet asset.
-  This verifies packaging, not Android runtime loading; that preflight runs on Samsung in 1B-B.
+  Runtime loading was subsequently verified in the emulators below; Samsung remains pending.
 - Successful build toolchain: SDK **10.0.401**, Android workload **36.1.69**, Android SDK/build
   tools **36.0.0**, MAUI packages/SDK **10.0.20**, Mono runtime/AOT **10.0.12**. Release uses
   trimming/AOT with explicit JSON metadata and development signing. No physical install/smoke
@@ -208,3 +209,138 @@ needed rerunning for this preparation/documentation.
 
 When the Samsung is available, reconnect it to this PC, enable/authorize USB debugging, then
 resume explicit-device preflight and the commands above. Do not repeat the build checkpoint.
+
+## Emulator diagnostics — 20 October 2026
+
+The developer instructed **use an emulator for now as I can't get them connected to the same
+network**. The [plan amendment](tablet-offline-device-spike-plan.md#emulator-amendment--20-october-2026)
+authorizes this interim increment. No discovered wireless device was paired or operated.
+
+### Environments and APK
+
+- Initial AVD `Medium_Phone_API_36.0`, `emulator-5554`: Android 16/API 36, Google
+  `sdk_gphone64_x86_64`, X64, WebView 155.0.8059.43, 1080×2400/density 420. Runtime preflight
+  loaded SQLite 3.53.3/WAL/FULL. It imported baseline and recovered the previous generation after
+  a pre-activation force-close. Its baseline refresh was 6.451 s; twenty searches matched the
+  fixture, worst recorded automated render time 122 ms.
+- This existing AVD had only 503,016 KiB free before installation and 226,556 KiB after staging
+  target. Android refused the corrected APK update with **Requested internal only, but not
+  enough space**. This is an installation failure, not an importer SQLITE_FULL result. No other
+  app/data was cleared. After reports were retrieved, only this session's newly installed
+  `com.fieldsales.tabletspike` and its port mapping were removed from that AVD.
+- A separate workspace-owned AVD `WI032_Tablet_API36`, `emulator-5556`, was created from the
+  already installed Android 36 Google Play x86_64 image with the `medium_tablet` profile and a
+  fresh 8 GB data partition. No existing AVD data was copied/resized/wiped. Android 16/API 36,
+  same reported Google model/X64, WebView **133.0.6943.137**, 2560×1600/density 320, about
+  1.9 GB configured RAM; 7,005,068 KiB available after install. It ran headless with software
+  graphics (`swiftshader_indirect`); it does not represent Samsung ARM performance.
+- Corrected Release APK: `.artifacts/wi032/1b-android/com.fieldsales.tabletspike-Signed.apk`,
+  **44,956,825 bytes**, SHA-256
+  `bfbb91c32f9b106aec73417322659b828e024e277ab0cb30bc813e4fad874c9f`.
+  Publish succeeded; v2/v3 signature and 16 KiB zip alignment checks passed. Runtime native
+  preflight again loaded 3.53.3/WAL/FULL. Development signing and OS floors are unchanged.
+
+### Reporting correction and functional checks
+
+The original pre-activation restart recovered the old baseline generation and the edited Order
+note correctly, but exported an incorrect incomplete startup report (`ce477ae0…`, null manifest/
+generation, zero reopen time). Blazor rendered before `OnInitializedAsync`'s local read completed;
+`OnAfterRenderAsync` captured partially initialized fields and never refreshed that report.
+The component now waits for local initialization before its first report capture. This follows
+the documented [asynchronous component lifecycle](https://learn.microsoft.com/en-us/aspnet/core/blazor/components/lifecycle?view=aspnetcore-10.0).
+The bad report remains in the evidence and is excluded from successful reopen measurements.
+No importer, storage policy, production behavior or tests were changed to accommodate it.
+
+Emulator checks completed:
+
+- Every full baseline/target/stress import verified the original compressed/plain hashes and
+  all fourteen counts across the nine payload families. The parser's maximum buffer was
+  **65,536 bytes** for each successful tablet run.
+- An edited note, **Emulator saved note WI-032**, retained canonical fingerprint
+  `193a2c1f273b464aecff293c18ca9e2b813936b20a86a5ab2d6b2637e3767075` across cancellation,
+  target/stress refresh, owner switching and cold reopening. The original Unsent fixture SHA
+  remained unchanged. Both Calls and the schedule change also remained visible.
+- Cancellation at a real partial-download pause kept the old baseline generation and edited
+  fingerprint; the report remains **cancelled**, including its deliberate pause time.
+- Force-close before activation recovered the previous baseline. Force-close after target
+  activation recovered the whole new target generation; its interrupted refresh report
+  (`1f083e14…`) remains **incomplete**, separate from the successful reopen report.
+- Switching to unused owner 77 showed no downloaded data or owner-42 note; returning to owner
+  42 restored its stress generation and edited fingerprint. A second populated owner was not
+  downloaded in this emulator increment; that variant already has portable integration coverage.
+- Target and stress cold launches worked with test-AVD airplane mode enabled, Wi-Fi confirmed
+  disabled and adb reverse removed. Both corrected exports are **offline-open-complete**, with
+  the actual manifest/generation, nonzero read time and matching edited fingerprints.
+- Twenty fixed search terms per profile (**60 on the isolated tablet, another 20 on the initial
+  phone AVD**) returned expected counts, including accent/apostrophe/case variants, partial
+  Name/Town matches and zero results. Local report analysis checked those counts against the
+  unchanged fixture naming/town distribution and checked manifest hashes/counts/native settings.
+
+### Single-run measurements
+
+These are **emulator diagnostics**, one uninterrupted import per profile. Baseline was fresh;
+target and stress replaced existing generations. OS caches and host load were uncontrolled;
+repository tests ran concurrently. Transport was **Emulator bridge (diagnostic)** through a
+loopback-only fixture host and adb reverse, with no throttling or measured physical link/RTT.
+No medians, worst-of-five physical runs or physical acceptance are claimed.
+
+| Profile (run ID prefix) | Total refresh | Largest sampled disk | Last sampled disk | Worst of 20 automated search/render times |
+|---|---:|---:|---:|---:|
+| Baseline (`22b6d5eb`) | 4.195 s | 35.66 MiB | 29.01 MiB | 257.6 ms |
+| Target (`696165d4`) | 13.042 s | 288.60 MiB | 276.56 MiB | 92.0 ms |
+| Stress (`f202ca8b`) | 67.177 s | 932.64 MiB | 884.54 MiB | 113.0 ms |
+
+Disk totals include allocated database/index space, retained/staged generations, sidecars,
+transfer and Unsent files; they are not payload sizes or continuously measured peaks. These
+sequential runs include reuse/retention of earlier generations and database free pages.
+End-of-run WorkingSet64 samples were 318.77, 332.12 and 292.28 MiB respectively, **not peak RSS**.
+
+| Offline cold reopen | Database + work read | Android `am start -W` activity time |
+|---|---:|---:|
+| Target (`24c1bb5f`) | 695.3 ms | 1,663 ms |
+| Stress (`96cddd81`) | 3,045.7 ms | 9,693 ms |
+
+The stress read itself exceeded the provisional three-second review target. Android activity
+time measures a different scope and also exceeded it; neither clock establishes full
+tap-to-usable UI time. Preserve these slower results for physical-device review. Reopen exports
+retain the UI's default `LAN` label, but no transfer occurred in these airplane-mode tests.
+This increment does not settle MI-02, the supported physical devices or the production budget.
+
+### Verification and handoff
+
+Solution build passed with **0 errors** and only standing NU1902/NU1903 warnings (90). The first
+attempt found the owned fixture host locking its output; stopping that verified process and
+rerunning resolved the lock. The corrected Android publish used the existing copied-manifest
+workaround above, without installing/updating workloads.
+
+All **2,343 distinct .NET cases** pass in the final per-project evidence, with no skips, and
+**34 JavaScript checks** pass. The initial full run had 2,342 passes and one Web authentication
+redirect after Windows slept from 21:02 until 22:59 local time. System sleep/resume events are
+retained. The entire unchanged **766-case Web integration suite** then passed on rerun. A
+temporary process-only system-awake request covered completion; no persistent power setting
+changed. The two corrected native offline reopens are the runtime regression checks for the
+startup-report race; portable tests alone do not exercise that Blazor lifecycle.
+
+Evidence: `.artifacts/wi032/emulator-session/` contains `report-summary.json`, original and
+tablet `reports/`, UI XML/screenshots, native/OS preflights, APK metadata/signature log, solution/
+Android build logs, `full-tests/*.trx`, `web-rerun/*.trx`, JS logs and sleep events. Interrupted,
+cancelled and bad original startup reports remain separate. Transient UI-automation/share-sheet
+inspection failures were retried; the final report was retrieved from its local external file
+after confirming the share chooser. Nothing was shared to another app or person.
+
+The synthetic host and task-created AVD are stopped after retrieval; the AVD's installed fixed
+app, stress snapshot and edited note remain under `.artifacts/wi032/emulator-avds/` for reuse.
+Airplane mode was restored and task port mappings removed. The original emulator remains
+running with its other apps/data intact. To reuse the isolated AVD with the installed emulator:
+
+```powershell
+$env:ANDROID_AVD_HOME = 'D:/repos/Field-Sales/.artifacts/wi032/emulator-avds'
+Start-Process 'C:/Users/colmk/AppData/Local/Android/Sdk/emulator/emulator.exe' -WindowStyle Hidden -ArgumentList '-avd WI032_Tablet_API36 -port 5556 -no-audio -no-snapshot -gpu swiftshader_indirect'
+# After boot, start the synthetic host in another terminal and use the explicit serial:
+pwsh -File scripts/tablet-spike.ps1 -Action Host
+pwsh -File scripts/tablet-spike.ps1 -Action Reverse -DeviceSerial emulator-5556
+pwsh -File scripts/tablet-spike.ps1 -Action Launch -DeviceSerial emulator-5556 -Cold
+```
+
+Stop for review of this emulator increment. Samsung/iPad measurements and the physical five-run
+matrix remain pending; WI-032 stays active. No iPad, 1C, production sign-in or WI-033 work started.
