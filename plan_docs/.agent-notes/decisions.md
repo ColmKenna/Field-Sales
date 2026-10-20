@@ -225,6 +225,11 @@ On 2026-10-20 the developer replied **Continue WI-031**, accepting the pushed si
 `0ded5cc` and authorizing the planned cohort increment. Stop for review after its tests/previews;
 the final verification/completion increment follows acceptance of that checkpoint.
 
+The developer's subsequent **Continue WI-031** on 2026-10-20 accepts the pushed cohort checkpoint
+`948e68f` and authorizes final full-suite verification, acceptance evidence, status done and final
+commit/push. No PR creation or integration was requested. The reviewed single-rep copy uses neutral
+“their next Sync” because the directory has no pronoun data.
+
 - MI-44 is settled for WI-031's wording only. The order-line-count portions of CV009-E/F are
   superseded by this decision. No guessed/last-known count and no new tablet/order telemetry.
 - Single: "Colm will lose Pharmacy-only medicines at his next Sync. Any lines already on unsent
