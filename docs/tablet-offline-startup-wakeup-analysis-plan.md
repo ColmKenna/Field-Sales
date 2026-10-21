@@ -134,3 +134,17 @@ Missing information required from the developer for this analysis: **none**.
 - Perfetto's [CPU scheduling guide](https://perfetto.dev/docs/data-sources/cpu-scheduling)
   states that `sched_waking` is always emitted on the source CPU and is usually sufficient for
   latency analysis, and defines the S, D, R and R+ states.
+
+## Execution checkpoint — 22 October 2026
+
+Approved by the developer's **Approved** after `98d3c97`. All eight steps ran on cases 2/3
+only; all 132 evidence files hash identically before and after, clocks and retained totals
+reproduce, and main's running totals reconcile exactly. All seven scenario intents were checked.
+Main sleeps through each gap inside one frame's `postAndWait`, queued behind a 2.75–2.88 s
+WebView GL draw of the previous frame while WebView's GPU thread is CPU-busy. The end-of-gap
+wakers (`VizWebView`, `Chrome_IOThread`) are frame-pipeline handoffs; case 2's chain stopped at
+the hop limit and case 3's at a GPU thread with no recent sleep. A first-run walk-back bug was
+corrected before interpretation and its output kept separately; one supplementary read-only
+query added GPU-thread states and frame order. See the
+[results](tablet-offline-startup-handoff-trace-results.md). No source, build, test or device
+change. Stop for review before any further increment.

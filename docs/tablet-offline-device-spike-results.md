@@ -424,3 +424,14 @@ case 1 and schema-v3 are excluded from that summary. No controlled improvement o
 Fresh network/wake settings restored, own captures/helper ended, installed APK hash verified;
 shared emulator/other apps/Docker left running. Stop for review. WI-032 active, MI-02/physical
 Samsung/iPad mini/1C remain open; no optimization, WI-033, PR or main integration.
+
+## Startup wakeup analysis — 2026-10-22
+
+The analysis-only [wakeup pass](tablet-offline-startup-handoff-trace-results.md#wakeup-analysis--22-october-2026-analysis-only)
+read the two qualified traces again, with no device, build or install; evidence hashes are unchanged.
+In both cases the main thread sleeps through the delegate-exit-to-caller gap inside one frame's
+`postAndWait`, queued behind RenderThread's 2.75–2.88 s WebView GL draw of the previous frame,
+while WebView's in-process GPU thread is CPU-busy for about 92% of the gap. Why that draw is so
+slow is not established; the emulator's software graphics are a likely contributor (inferred).
+Emulator only, n=2; no fix, physical-device or MI-02 claim. WI-032 active; MI-02, physical
+Samsung/iPad mini validation and 1C remain open.

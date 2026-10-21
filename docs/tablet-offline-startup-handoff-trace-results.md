@@ -1,5 +1,93 @@
 # WI-032 — startup handoff tracing checkpoint
 
+## Wakeup analysis — 22 October 2026 (analysis only)
+
+The approved [wakeup analysis plan](tablet-offline-startup-wakeup-analysis-plan.md) read only
+the two qualified traces (cases 2/3) with the pinned `trace_processor_shell` v58.2. Nothing ran
+on the device, nothing was built or installed, and case 1 was excluded. All 132 retained
+evidence files hash identically before and after. Recomputed clock offsets and interval bounds
+equal the retained analysis, and every retained thread-state total reproduces within 0.001 ms.
+
+**Finding: during the gap, the main thread is blocked in one frame, waiting for RenderThread to
+finish a 2.7–2.9 s WebView draw of the previous frame.** Main is the thread that later runs the
+caller continuation, so it could not run it before that frame returned.
+
+| | Case 2 | Case 3 |
+|---|---:|---:|
+| Certain gap interior (delegate exit → caller) | 2,555.454 ms | 2,699.972 ms |
+| Main's `Choreographer#doFrame`, relative to gap start | −230.085 → 2,490.858 ms | −192.846 → 2,681.282 ms |
+| … its nested `draw-VRI[MainActivity]` → `postAndWait` | 2,717.295 ms, ends 2,490.648 | 2,872.501 ms, ends 2,681.236 |
+| Main's first running time inside the gap | 2,490.623 ms (woken by RenderThread) | 2,681.221 ms (woken by RenderThread) |
+| RenderThread's previous-frame draw (`DrawFrames`) | 233058: 2,749.501 ms | 237301: 2,882.150 ms |
+| … of which `WebViewFunctor::drawGl` | 2,615.602 ms | 2,739.654 ms |
+| RenderThread starts main's frame | 233067 at 2,490.522 ms | 237310 at 2,680.795 ms |
+| RenderThread running inside the gap | 176.633 ms | 179.591 ms |
+| `Chrome_InProcGp` (WebView in-process GPU thread) running / preempted / runnable / sleeping | 2,341.417 / 26.184 / 0.511 / 187.341 ms | 2,497.832 / 38.746 / 1.026 / 162.368 ms |
+| Busy time across 4 vCPUs / capacity | 2,970.7 / 10,221.8 ms | 3,081.5 / 10,799.9 ms |
+
+How the slices fit together:
+
+- Both long frames start about 200 ms before the worker delegate exits, while the storage worker
+  is still reading. The four RenderThread draws before each long one took 30–51 ms.
+- Android's [`DrawFrameTask::postAndWait`](https://github.com/aosp-mirror/platform_frameworks_base/blob/android16-release/libs/hwui/renderthread/DrawFrameTask.cpp)
+  queues the frame's `run()` on RenderThread and blocks the UI thread until `run()` signals.
+  RenderThread was still drawing the previous frame. It began main's frame 0.126 / 0.441 ms before
+  `postAndWait` ended, and main then ran for the first time in the gap.
+- Inside the long draw, RenderThread mostly sleeps in `WebViewFunctor::drawGl`. WebView's
+  in-process GPU thread runs for 91.6 / 92.5% of the gap and is rarely kept waiting for a CPU.
+  It emits no trace slices, so its internal work is not visible. RenderThread's own
+  `shader_compile` / `cache_miss` / `FillRectOp` slices are small (under 30 ms).
+- About 70% of the four vCPUs' capacity was idle. The draw is bound by one busy thread, not by
+  a saturated system. These are guest-visible figures; host scheduling of the emulator's vCPUs
+  is not observable.
+
+**End-of-gap waker (scenario 3).** Case 2: `VizWebView` (TID 25845, app process, process
+context) woke main 12.061 ms before the caller timestamp, after a 2.403 ms sleep. Case 3:
+`Chrome_IOThread` (TID 26164, app process, process context) woke it 10.750 ms before, after a
+0.479 ms sleep. Main then ran 12.003 / 10.193 ms before the caller timestamp. The two wakers
+differ. Both are short frame-pipeline handoffs after the long frame. Neither identifies who
+queued the continuation, which is not visible.
+
+**Waker chains (scenario 4).** Every hop lies inside the gap and passes through WebView/HWUI
+frame threads. Case 2: eight hops alternating `VizWebView` ↔ `RenderThread`; the eighth
+(`RenderThread`) was woken by `Chrome_InProcGp` at 2,336.177 ms; stopped at the hop limit.
+Case 3: `Chrome_IOThread` ← WebView renderer `Compositor` (sandboxed process; it had slept
+1,868.786 ms) ← main ← `VizWebView` ← `RenderThread` ← `VizWebView` ← `RenderThread` ←
+`Chrome_InProcGp`. It stopped at hop 8 because the GPU thread had no sleep in its last 400
+scheduler states.
+
+**Main-thread activity (scenario 5).** Case 2: 13 running segments, 24.509 ms in total, all at
+or after 2,490.623 ms. Seven started from a fresh wakeup: RenderThread 3, `VizWebView` 2,
+surfaceflinger `binder:555_3` 1, `Chrome_IOThread` 1. The rest resumed after being switched
+out while runnable. After release, main ran frame 233074, whose own `postAndWait` waited about
+33 ms for RenderThread, then vsync 233089, then the caller statement. Case 3: 7 segments,
+15.483 ms, all at or after 2,681.221 ms. Fresh wakeups: RenderThread, `VizWebView` and
+`Chrome_IOThread`, one each. After release it ran animation frame 237317, then the caller
+statement. An unclosed `IC.hideRequestFromApi` async slice on the app process spans both gaps.
+It has no end in the trace and is not interpreted.
+
+**Established, in both cases (n=2, emulator):** the delegate-exit-to-caller gap coincides with
+main sleeping inside one frame's `postAndWait`. That frame was queued behind RenderThread's
+2.75–2.88 s draw of the previous frame, almost all of it WebView GL drawing while WebView's
+in-process GPU thread was CPU-busy. Main cannot run the continuation until it is released.
+After release, a further 64.6 / 18.7 ms of frame work passes before the caller statement runs.
+
+**Not established:** why the GPU thread's work takes so long, since it has no slices. The
+emulator's software graphics are a likely contributor **(inferred)**. Also unknown: what the
+previous frame drew or what triggered it; when the continuation was queued for main; and
+whether a physical tablet with a hardware GPU behaves the same. This is thread-level
+correlation, not a managed-method, JIT or GC cause. It makes no improvement, physical-device or
+MI-02 claim and proposes no fix. The storage worker body (605–632 ms) is not the long part of
+these opens.
+
+Method notes: the first script run treated runnable rows that follow running rows as wakeups.
+It was corrected before any interpretation, and its output is kept under
+`preliminary-walkback-bug/`. One supplementary read-only query, within step 6's scope, added
+the GPU thread's states and the RenderThread/main frame order around the gap. Evidence:
+`.artifacts/wi032/startup-handoff-traces/wakeup-analysis/` (`analyse-wakeups.py`,
+`summary.json`, `case-2/3-wakeups.json`, every query's SQL/CSV/stderr, `hashes-before.txt` /
+`hashes-after.txt`).
+
 ## Outcome after the approved continuation
 
 The focused amendment is complete: **all three original offline opens are retained; cases 2/3
