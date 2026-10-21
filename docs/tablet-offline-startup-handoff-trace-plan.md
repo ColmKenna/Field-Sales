@@ -196,7 +196,8 @@ seven markers are present, but `config_write_into_file_discard` and
 `config_write_into_file_no_flush` were positive. Cases 2/3 and final searches were not run.
 Original evidence/errors remain retained; scoped cleanup is complete. WI-032 active; MI-02 open.
 
-**Focused amendment for approval:** keep the seven scenario intents and unchanged profileable
+**Focused amendment approved** by the developer's **approved** response after `4998512`:
+keep the seven scenario intents and unchanged profileable
 schema-v4 APK, SHA-256 `8b51486e7130e41e7ba9809e3b2f5b898a2b3d95c4e29b69616fa4d794964ec5`.
 Run only remaining original attempts **2 and 3**; case 1 stays incomplete and is never replaced.
 Change exactly these capture settings, keeping duration, sizes, categories, cutoff and strict
@@ -214,7 +215,8 @@ quality/marker checks unchanged:
 Perfetto's [buffer guidance](https://perfetto.dev/docs/concepts/buffers) supports periodic
 flushing, and its [configuration reference](https://perfetto.dev/docs/reference/trace-config-proto)
 defines these fields. A 10-second period avoids a high-frequency flush probe. Its overhead
-remains part of changed capture conditions. The correction has not been capture-validated.
+remains part of changed capture conditions. At amendment approval, the correction had not
+been capture-validated; its subsequent validation is recorded in the execution checkpoint below.
 Keep case 1's qualification separate from subsequent traces; no pooled improvement claim.
 
 On approval, verify unchanged source/APK identity, retained day/work, allocation/foreground,
@@ -230,4 +232,20 @@ its original report. Analyze only qualified interiors with explicit unknown/cloc
 actual TIDs. Non-reproduction is a reported limit, not a reason for extra launches. Finish
 with scoped cleanup, results/notes, commit/push and a review stop. Physical acceptance, 1C,
 optimization, production sign-in/Sync, PR/main integration and WI-033 stay outside this
-amendment. Approval is required before either remaining measured launch.
+amendment. This approval authorizes original cases 2/3, followed by the agreed review stop.
+
+## Approved amendment execution checkpoint — 21 October 2026
+
+Original cases 2/3 completed on unchanged source/APK `4998512`; case 2 passed before case 3.
+Both corrected captures pass strict error/data-loss, marker/TID and clock-bracket checks.
+The twenty terms ran once after case 3 and all independent expected counts verify.
+Case 1 stays failed-quality and is never replaced or included in qualified scheduler results.
+Case 2 reproduced the slow interval: 3,266.259 ms enclosing,
+631.518 ms worker and 2,563.652 ms continuation; main-thread
+sleep dominates its delegate-exit-to-caller interior, without establishing managed cause.
+See [complete results and limitations](tablet-offline-startup-handoff-trace-results.md).
+Actual network/wake state is restored, own captures/helper ended and installed APK hash matches.
+All seven agreed scenario intents were checked; three original opens are retained, with only
+two qualified traces. No source/build/test repeat or installation was needed; baseline remains
+2,358 .NET / 34 JS passes. Stop for review before any further increment. WI-032 active; MI-02,
+physical Samsung/iPad mini acceptance and 1C adoption remain open.

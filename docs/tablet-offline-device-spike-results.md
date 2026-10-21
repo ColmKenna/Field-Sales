@@ -396,7 +396,7 @@ No storage optimization or controlled comparison is claimed. The new APK/results
 separate; physical acceptance and 1C are pending, with WI-032 active. Emulator-5556 remains
 running; original network state is restored and the temporary wake helper exited.
 
-## Startup handoff tracing — 2026-10-21
+## Startup handoff tracing — initial quality stop, 2026-10-21 (historical)
 
 The [schema-v4 tracing checkpoint](tablet-offline-startup-handoff-trace-results.md) has
 2,358 .NET / 34 JS passes and one retained original offline cold open. It preserved edited
@@ -408,3 +408,19 @@ is retained; actual network/wake state restored and helper exited, shared emulat
 The focused plan amendment proposes a ring buffer/10-second flush for the two remaining
 original cases on the unchanged APK. It awaits approval; WI-032 active, MI-02/1C/physical
 Samsung/iPad validation remain open. No PR/main integration or optimization.
+
+## Approved startup-trace continuation — 2026-10-21
+
+The [schema-v4 results](tablet-offline-startup-handoff-trace-results.md) now retain all three
+original opens: case 1 remains failed-quality; cases 2/3 pass the corrected ring-buffer /
+10-second flush capture checks. All twenty final searches independently verify, with edited
+work and the stress generation preserved. Unchanged source/APK; no replacement, build,
+reinstall, download or source-suite repeat. Baseline remains 2,358 .NET / 34 JS passes.
+Case 2 reproduced 3,266.259 ms enclosing / 631.518 ms worker /
+2,563.652 ms continuation. Its delegate-exit-to-caller gap is mostly main-thread
+sleeping time; this does not establish the managed cause. Qualified-only n=2 enclosing
+median/worst 3,312.629/3,358.998 ms;
+case 1 and schema-v3 are excluded from that summary. No controlled improvement or physical claim.
+Fresh network/wake settings restored, own captures/helper ended, installed APK hash verified;
+shared emulator/other apps/Docker left running. Stop for review. WI-032 active, MI-02/physical
+Samsung/iPad mini/1C remain open; no optimization, WI-033, PR or main integration.

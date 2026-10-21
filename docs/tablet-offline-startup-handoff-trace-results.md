@@ -1,6 +1,131 @@
 # WI-032 — startup handoff tracing checkpoint
 
-## Outcome
+## Outcome after the approved continuation
+
+The focused amendment is complete: **all three original offline opens are retained; cases 2/3
+pass trace qualification, case 1 remains failed-quality, and all twenty final searches verify**.
+Only original cases 2/3 ran on the unchanged schema-v4 APK/source at `4998512`; no replacement,
+warm-up, rebuild, reinstall, fixture download, source test repeat or optimization occurred.
+The original **2,358 .NET / 34 JavaScript passes** remain the unchanged-source baseline.
+WI-032 stays active; MI-02, physical Samsung/iPad mini validation and adoption 1C remain open.
+
+Case 2 reproduced a **3,266.259 ms** local open: **631.518 ms**
+worker body and **2,563.652 ms** worker-end-to-existing-continuation interval.
+The delegate-exit-to-first-caller boundary accounts for **2,555.466 ms**.
+Within that interval's certain clock interior, main TID **25789** records
+**2,526.003 ms sleeping**, versus
+**24.509 ms running** and
+**4.941 ms runnable**.
+This narrows the observed gap to a mostly sleeping main thread before the caller timestamp.
+It does not identify the awaited work, queue, lock, managed method, JIT, GC or renderer cause.
+No managed stacks were captured; the delegate-exit boundary precedes actual Task completion.
+
+Case 3 records **3,358.998 ms** enclosing and **2,700.965 ms**
+continuation. The twenty terms ran once after case 3's capture ended; every match count agrees
+with the independent 2,000-Location oracle, including case, accents and apostrophe forms.
+Edited work, note, stress generation, manifest hashes/counts, owner and SQLite settings verify
+in both original reports. No logical payload scan or native peak-memory metric was available.
+
+| Original case | Trace quality | Enclosing ms | Dispatch ms | Worker ms | Continuation ms | Searches |
+|---|---|---:|---:|---:|---:|---:|
+| 1 | **Failed** | 841.554 | 111.214 | 721.205 | 8.233 | 0 |
+| 2 | Pass | 3,266.259 | 69.851 | 631.518 | 2,563.652 | 0 |
+| 3 | Pass | 3,358.998 | 47.733 | 605.409 | 2,700.965 | 20 |
+
+Qualified cases **2/3 only (n=2)**: enclosing median/worst
+**3,312.629/3,358.998 ms**;
+worker **618.464/631.518 ms**;
+continuation **2,632.308/2,700.965 ms**.
+**2/2** exceed the provisional three-second local-open proxy.
+Case 1 is excluded from this qualified summary and has no assigned scheduler time. No pooling
+with schema-v3, controlled improvement, first-paint or physical-device acceptance claim.
+
+## Qualified trace correlation and conditions
+
+Cases 2/3 used the approved `RING_BUFFER` and `flush_period_ms: 10000`, with unchanged
+60-second duration, 32 MiB buffer, 64 MiB file cap, categories and 45-second readiness cutoff.
+Both original traces have **zero positive error/data-loss diagnostics**; all nonzero info
+statistics are retained, including initial compact-scheduler skips and flush counters.
+Each has exactly seven attempt-specific markers, native PID/TID joins, same-thread sections
+inside their measured hooks, ordered raw boundaries and a nonempty clock-offset intersection.
+An independent bounds query places all seven markers inside each original trace; observed
+trace spans are 59,212.633 / 59,136.581 ms for cases 2/3 under the 60-second configuration.
+Case 2 passed before case 3 started. Case 1's original configuration/errors are unchanged.
+
+| Case | Worker-end to delegate-exit ms | Delegate-exit to caller ms | Caller to existing helper ms |
+|---|---:|---:|---:|
+| 2 | 0.180 | 2,555.466 | 8.006 |
+| 3 | 0.195 | 2,699.985 | 0.785 |
+
+The three intervals partition each report's existing continuation clock. Hook/recorder costs
+remain where measured; the first dispatch probe itself is intrusive (case 2 recorder entry
+54.788 ms plus hook 2.437 ms). These are instrumented observations, not production timings.
+
+Per-thread accounting below uses only the interior guaranteed by all raw/native clock
+brackets. Uncertain edges and uncovered time remain unknown. Each thread has its own wall-time
+accounting; **do not add the worker and main-thread rows**. `R` is runnable, `R+` runnable
+(preempted), and `S` sleeping, as described by [Perfetto's scheduler documentation](https://perfetto.dev/docs/data-sources/cpu-scheduling).
+Sleeping state alone does not identify a managed wait or its cause.
+
+| Case | Raw interval | TID | Running ms | R ms | R+ ms | S ms | Unknown / edge ms |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 2 | workerEndToDelegateExit | 25885 | 0.167 | 0.000 | 0.000 | 0.000 | 0.013 |
+| 2 | delegateExitToCaller | 25789 | 24.509 | 2.547 | 2.395 | 2,526.003 | 0.013 |
+| 2 | delegateExitToCaller | 25885 | 2.556 | 0.000 | 0.000 | 2,552.898 | 0.013 |
+| 2 | callerToExistingHelper | 25789 | 7.903 | 0.090 | 0.000 | 0.000 | 0.013 |
+| 3 | workerEndToDelegateExit | 26219 | 0.182 | 0.000 | 0.000 | 0.000 | 0.013 |
+| 3 | delegateExitToCaller | 26125 | 15.483 | 1.101 | 1.119 | 2,682.269 | 0.013 |
+| 3 | delegateExitToCaller | 26219 | 2.723 | 0.000 | 0.000 | 2,697.249 | 0.013 |
+| 3 | callerToExistingHelper | 26125 | 0.772 | 0.000 | 0.000 | 0.000 | 0.013 |
+
+| Case | Main PID/TID | Worker TID | Offset uncertainty ms | Android activity ms | Observed-ready bound ms | Post-input export bound ms |
+|---|---:|---:|---:|---:|---:|---:|
+| 2 | 25789 | 25885 | 0.012842 | 3,087.000 | 12,224.587 | 781.350 |
+| 3 | 26125 | 26219 | 0.012933 | 2,655.000 | 12,052.141 | 721.313 |
+
+The activity, host readiness-polling and post-input export clocks are separate; none is first
+paint or added to the enclosing local-open clock. Export excludes input duration. Captures
+ended before exports; case 3's search timings are report measurements outside its capture.
+Both exports opened the Android chooser and used Back after verifying it; no recipient chosen.
+
+| Case | RunId | AttemptId |
+|---|---|---|
+| 1 | `1bf6c31b-0951-4351-9104-fa93456e2a5d` | `e0c87ff6-c9e3-4ee4-b88c-75846adbbb4c` |
+| 2 | `611a64e0-843a-4c01-8a5e-0160bf2ea147` | `addba8f4-1170-4292-9eac-36820ecd0cdb` |
+| 3 | `98bd222f-5a28-47dc-95e2-66f39e578e80` | `eb5254da-0837-4331-82c7-7eb2cddc2358` |
+
+- Case 2: **3,421,542 bytes**, SHA-256 `8775df6b60d1ca1dd933e320513235068b9de687c181136dcba98c19b1320854`.
+- Case 3: **3,291,341 bytes**, SHA-256 `acaa75c351ebd325b98d2fcbe41bb20a9bdef324e7bf37e9358d54d9a2aa46ca`.
+
+The installed/archive APK SHA-256 remains
+`8b51486e7130e41e7ba9809e3b2f5b898a2b3d95c4e29b69616fa4d794964ec5` (**45,026,457 bytes**).
+Device/API/WebView/SQLite and retained stress identities below are unchanged. Fresh continuation
+preflight verified saved note `Emulator saved note WI-032`, no active trace/fixture host/task
+route, and spike foreground before any input. Fresh host point: **33,271,672 KiB total /
+11,730,448 KiB free**. Temporary airplane mode/Wi-Fi-off and wake support were re-established
+from the actual initial state. Only the spike process was stopped for each planned cold launch;
+OS caches and shared-host background load were uncontrolled.
+
+## Continuation cleanup and review boundary
+
+Fresh actual initial **airplane 0 / Wi-Fi 1 / stay-on 1**, originally awake, are restored.
+Own bounded trace sessions ended; the temporary Windows wake helper's PID/start-time identity
+and exit verify. Device trace/config/UI files were removed after matching local-copy hashes.
+Final installed APK hash matches; tcp:7206 is absent and no fixture host was started.
+The shared emulator-5556, other apps and Docker remain running; no reset/resize/restart or
+unrelated process/session operation occurred.
+
+Evidence: `.artifacts/wi032/startup-handoff-traces/continuation/summary.json`, fresh lifecycle
+records/cleanup proof, `trace-bounds-check.json`, and `emulator/case-2-*` / `case-3-*` with original reports/traces, SQL,
+CSV, stderr, configs, launch/UI/export records and completion gates. Prior case-1 controller,
+failed analysis, report, trace and cleanup proof remain intact. The separate continuation
+controller refuses existing original starts and never creates a case-1 completion marker.
+
+Stop for Human Tight-Loop review of this completed amendment. No extra launches, startup/storage
+fix, production sign-in/Sync, MI-62 decision, WI-033, PR or main integration is authorized by it.
+Physical Samsung/iPad mini evidence and 1C adoption remain later work.
+
+## Original first-case quality stop (historical)
 
 The [approved plan](tablet-offline-startup-handoff-trace-plan.md) stopped at its required
 quality gate after **one of three planned attempts**. Instrumentation is implemented and
@@ -51,11 +176,11 @@ native pin changed.
 | Approved scenario | Evidence / status |
 |---|---|
 | Unchanged local outcomes | Existing 38 tests passed before edits; traced real-SQLite preservation/order cases pass; original native case preserves generation, manifest and edited fingerprint. |
-| Truthful boundaries | Portable boundary/serialization checks and seven native marker/TID joins pass. Qualified scheduler accounting remains pending. |
+| Truthful boundaries | Portable boundary/serialization checks and seven native marker/TID joins pass. Qualified scheduler accounting for cases 2/3 is recorded above. |
 | Original failure wins | Real SQLite failure and throwing-hook cases preserve the original error/work; successful storage reads survive hook failures. |
 | Stable, partial export | Null availability and original serialized clocks verified; readiness/refresh separation retained; first original report exported. |
-| Three original opens / twenty final searches | **Incomplete:** one recorded; cases 2/3 and final searches not run after the quality stop. No replacement or optional logical scan. |
-| Trace-quality gate | **Stop enforced:** both configuration diagnostics retained, no scheduling latency assigned. Raw report shows non-reproduction in this one attempt. |
+| Three original opens / twenty final searches | **Complete with one unqualified trace:** three original opens retained, cases 2/3 qualified and twenty final search counts verified; no replacement or logical scan. |
+| Trace-quality gate | **Stop and amendment enforced:** case 1 remains failed-quality with no scheduling assignment; cases 2/3 pass strict checks and include the reproduced slow case. |
 | Scoped lifecycle | Original evidence retained; task trace ended, actual network/wake state restored, helper exited and shared emulator left running. |
 
 Baseline tablet suite **38/38** before edits; local-open cases **8/8**; final tablet suite
@@ -118,7 +243,7 @@ RunId `1bf6c31b-0951-4351-9104-fa93456e2a5d`; attempt
 Limits: 60 seconds, 32 MiB buffer, 64 MiB file cap. Local Trace Processor **v58.2-add693d8b**
 matches its official artifact's SHA-256. No trace upload or system installation.
 
-## Cleanup and next decision
+## First-case cleanup and amendment (historical)
 
 Actual original settings restored: **airplane 0 / Wi-Fi 1 / stay-on-while-plugged-in 1**;
 display was originally awake. Task session ended, route absent, fixture host never started,
