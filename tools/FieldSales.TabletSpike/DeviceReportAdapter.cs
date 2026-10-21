@@ -9,6 +9,20 @@ public sealed class DeviceReportAdapter
     private readonly Stopwatch startup = Stopwatch.StartNew();
     public string Root => Path.Combine(FileSystem.AppDataDirectory, "storage-spike");
     public double StartupElapsedMs => startup.Elapsed.TotalMilliseconds;
+    public LocalOpenNativeTrace TraceLocalOpen(string markerName)
+    {
+#if ANDROID
+        bool? enabled = OperatingSystem.IsAndroidVersionAtLeast(29) ? Android.OS.Trace.IsEnabled : null;
+        Android.OS.Trace.BeginSection(markerName);
+        try
+        {
+            return new(Android.OS.Process.MyTid(), Android.OS.Looper.MyLooper() == Android.OS.Looper.MainLooper, enabled);
+        }
+        finally { Android.OS.Trace.EndSection(); }
+#else
+        return new(null, null, null);
+#endif
+    }
     public DeviceConditions Conditions(string webView)
     {
 #if DEBUG

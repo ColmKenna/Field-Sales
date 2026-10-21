@@ -395,3 +395,16 @@ locates the dominant measured interval without identifying its renderer/runtime 
 No storage optimization or controlled comparison is claimed. The new APK/results remain
 separate; physical acceptance and 1C are pending, with WI-032 active. Emulator-5556 remains
 running; original network state is restored and the temporary wake helper exited.
+
+## Startup handoff tracing — 2026-10-21
+
+The [schema-v4 tracing checkpoint](tablet-offline-startup-handoff-trace-results.md) has
+2,358 .NET / 34 JS passes and one retained original offline cold open. It preserved edited
+work and records 841.554 ms enclosing / 721.205 ms worker / 8.233 ms continuation. Seven
+native markers/TID joins are present, but Perfetto flagged the controller's streaming DISCARD
+buffer and missing flush period. The strict quality gate stopped; cases 2/3 and final twenty
+searches were not run. No scheduling/root-cause or improvement claim. All original evidence
+is retained; actual network/wake state restored and helper exited, shared emulator running.
+The focused plan amendment proposes a ring buffer/10-second flush for the two remaining
+original cases on the unchanged APK. It awaits approval; WI-032 active, MI-02/1C/physical
+Samsung/iPad validation remain open. No PR/main integration or optimization.

@@ -126,11 +126,28 @@ else
     private async Task OpenLocal()
     {
         long started = Stopwatch.GetTimestamp();
-        var attempt = new LocalOpenAttempt(started);
+        var attempt = new LocalOpenAttempt(started, Device.TraceLocalOpen);
+        attempt.RecordTracePoint("uiDispatch", started);
         try
         {
-            try { await Task.Run(() => attempt.Read(() => Device.Root, owner)); }
-            finally { attempt.ObserveUiContinuation(); }
+            try
+            {
+                await Task.Run(() =>
+                {
+                    try { attempt.Read(() => Device.Root, owner); }
+                    finally
+                    {
+                        long exited = Stopwatch.GetTimestamp();
+                        attempt.RecordTracePoint("workerDelegateExit", exited);
+                    }
+                });
+            }
+            finally
+            {
+                long continued = Stopwatch.GetTimestamp();
+                attempt.RecordTracePoint("callerContinuation", continued);
+                attempt.ObserveUiContinuation();
+            }
             preflightError = null;
         }
         catch (Exception e) { preflightError = e.Message; }

@@ -2,6 +2,25 @@ using System.Diagnostics;
 
 namespace FieldSales.TabletSpike.Core;
 
+public sealed record LocalOpenNativeTrace(int? ThreadId, bool? AndroidMainThread, bool? Enabled);
+public sealed record LocalOpenTracePoint(string MarkerName, long CapturedTimestamp, double OffsetMs,
+    int ManagedThreadId, long? HookStartedTimestamp, long? HookCompletedTimestamp,
+    LocalOpenNativeTrace? Native, string? HookError);
+
+public sealed class LocalOpenTrace
+{
+    public Guid AttemptId { get; } = Guid.NewGuid();
+    public long TimestampFrequency => Stopwatch.Frequency;
+    public long? OriginTimestamp { get; internal set; }
+    public Dictionary<string, LocalOpenTracePoint?> Points { get; } = new()
+    {
+        ["uiDispatch"] = null, ["workerEntry"] = null, ["workerBodyEnd"] = null,
+        ["workerDelegateExit"] = null, ["callerContinuation"] = null,
+        ["continuationObserved"] = null, ["uiComplete"] = null
+    };
+    public string ClockScopes => "CapturedTimestamp is sampled before entering the point recorder; OffsetMs uses OriginTimestamp and TimestampFrequency, all from Stopwatch. Native marker execution is inside the hook timestamp bracket; helper entry before that bracket is not isolated scheduling. workerBodyEnd precedes the rest of the Read finally; workerDelegateExit is the caller finally after Read, before the remaining marker hook, delegate return and Task completion. callerContinuation is the first caller timestamp after await, before recorder and ObserveUiContinuation entry. continuationObserved retains the existing helper marker. uiComplete retains the enclosing clock endpoint; its hook follows that endpoint. Hook costs remain included wherever they occur, never subtracted as a performance correction. Thread identities describe each synchronous marker, not an assumed Android UI thread. Missing points/native fields/hook brackets are unavailable, not zero. Headless origin is worker entry; it has no UI/dispatch observations.";
+}
+
 public sealed class LocalOpenDiagnostics
 {
     public string ReadStatus { get; internal set; } = "not-started";
@@ -18,12 +37,14 @@ public sealed class LocalOpenDiagnostics
     public double? WorkerBodyMs { get; internal set; }
     public double? WorkerCompletionToUiContinuationMs { get; internal set; }
     public double? EnclosingLocalOpenMs { get; internal set; }
+    public LocalOpenTrace Trace { get; } = new();
     public string ClockScopes => "One Stopwatch timestamp origin for the UI operation. dispatchToWorkerEntryMs ends at the first instrumented worker marker; includes dispatch/setup and any startup/JIT before that marker, not isolated thread-pool queue time. stageMs contains disjoint completed worker stages, null when unfinished/unobserved; workspace includes resolving the platform root. snapshotInitialization includes connection/schema/native inspection; activeRead and unsentRead include their own connection/schema setup. reportEnumeration includes filename enumeration, modification-time sorting and selection. workerBodyMs encloses all stages, failure recording and instrumentation gaps. workerCompletionToUiContinuationMs ends at the first observed continuation, not rendering/first paint. enclosingLocalOpenMs retains databaseAndWorkReopen's scope through UI-field updates. Do not add enclosing clocks to their subsets. Headless reads leave dispatch/UI/enclosing clocks unavailable.";
 }
 
 // The caller dispatches this synchronous read sequence. No provider settings,
 // store operations or ordering differ from the original device worker.
-public sealed class LocalOpenAttempt(long? uiOperationStartedTimestamp = null)
+public sealed class LocalOpenAttempt(long? uiOperationStartedTimestamp = null,
+    Func<string, LocalOpenNativeTrace>? nativeMarker = null)
 {
     public LocalOpenDiagnostics Diagnostics { get; } = new();
     public SpikeWorkspace? Workspace { get; private set; }
@@ -40,9 +61,11 @@ public sealed class LocalOpenAttempt(long? uiOperationStartedTimestamp = null)
     {
         long workerStarted = Stopwatch.GetTimestamp();
         if (Diagnostics.ReadStatus != "not-started") throw new InvalidOperationException("A local-open attempt can only run once.");
+        Diagnostics.Trace.OriginTimestamp ??= uiOperationStartedTimestamp ?? workerStarted;
         if (uiOperationStartedTimestamp is long start)
             Diagnostics.DispatchToWorkerEntryMs = Stopwatch.GetElapsedTime(start, workerStarted).TotalMilliseconds;
         Diagnostics.ReadStatus = "reading";
+        RecordTracePoint("workerEntry", workerStarted);
         try
         {
             var workspace = Measure("workspace", () => new SpikeWorkspace(root(), owner));
@@ -74,6 +97,7 @@ public sealed class LocalOpenAttempt(long? uiOperationStartedTimestamp = null)
         {
             workerCompleted = Stopwatch.GetTimestamp();
             Diagnostics.WorkerBodyMs = Stopwatch.GetElapsedTime(workerStarted, workerCompleted.Value).TotalMilliseconds;
+            RecordTracePoint("workerBodyEnd", workerCompleted.Value);
         }
     }
 
@@ -94,15 +118,39 @@ public sealed class LocalOpenAttempt(long? uiOperationStartedTimestamp = null)
             throw new InvalidOperationException("A UI continuation requires one finished, UI-dispatched worker.");
         uiContinuation = observed;
         Diagnostics.WorkerCompletionToUiContinuationMs = Stopwatch.GetElapsedTime(workerCompleted.Value, observed).TotalMilliseconds;
+        RecordTracePoint("continuationObserved", observed);
     }
 
     public double CompleteUi()
     {
         if (uiOperationStartedTimestamp is not long start || uiContinuation is null || Diagnostics.EnclosingLocalOpenMs is not null)
             throw new InvalidOperationException("Complete the UI operation once, after observing its continuation.");
-        double elapsed = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        long completed = Stopwatch.GetTimestamp();
+        double elapsed = Stopwatch.GetElapsedTime(start, completed).TotalMilliseconds;
         Diagnostics.EnclosingLocalOpenMs = elapsed;
+        RecordTracePoint("uiComplete", completed);
         return elapsed;
+    }
+
+    public void RecordTracePoint(string name, long capturedTimestamp)
+    {
+        var trace = Diagnostics.Trace;
+        trace.OriginTimestamp ??= uiOperationStartedTimestamp ?? capturedTimestamp;
+        string markerName = $"wi032:{trace.AttemptId:N}:{name}";
+        int managedThreadId = Environment.CurrentManagedThreadId;
+        long? hookStarted = null, hookCompleted = null;
+        LocalOpenNativeTrace? native = null;
+        string? hookError = null;
+        if (nativeMarker is not null)
+        {
+            hookStarted = Stopwatch.GetTimestamp();
+            try { native = nativeMarker(markerName); }
+            catch (Exception error) { hookError = $"{error.GetType().FullName}: {error.Message}"; }
+            finally { hookCompleted = Stopwatch.GetTimestamp(); }
+        }
+        trace.Points[name] = new(markerName, capturedTimestamp,
+            Stopwatch.GetElapsedTime(trace.OriginTimestamp.Value, capturedTimestamp).TotalMilliseconds,
+            managedThreadId, hookStarted, hookCompleted, native, hookError);
     }
 
     // Startup/owner-switch reports are new outcomes. A refresh retains its own

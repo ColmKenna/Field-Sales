@@ -26,7 +26,7 @@ public sealed record SearchMeasurement(string Term, double QueryMs, double? Inpu
     int Matches, string Clock = "Stopwatch query; DOM submit-to-render-and-two-animation-frames via performance.now; automated terms start at JS invocation");
 public sealed class SpikeReport
 {
-    public string ReportSchema { get; init; } = "spike-measurements-v3";
+    public string ReportSchema { get; init; } = "spike-measurements-v4";
     public Guid RunId { get; init; } = Guid.NewGuid();
     public DateTimeOffset StartedUtc { get; init; } = DateTimeOffset.UtcNow;
     public required string Owner { get; init; }
