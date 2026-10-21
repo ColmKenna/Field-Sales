@@ -6,6 +6,10 @@ handoff, extended with the developer-authorized emulator diagnostics below. Sams
 (1B-B), iPad mini verification (1B-C) and the runtime/storage decision (1C) remain pending.
 WI-032 remains active; MI-02 is open.
 
+The subsequent [repeated emulator measurements](tablet-offline-emulator-repeat-results.md)
+record the five-run matrix, recovered controller timeout, full-AVD persistence correction and
+measurement limitations under separate nominal network-simulation conditions.
+
 ## What the runner evaluates
 
 The isolated MAUI Blazor Hybrid app uses package `com.fieldsales.tabletspike`, synthetic
@@ -232,7 +236,8 @@ authorizes this interim increment. No discovered wireless device was paired or o
   already installed Android 36 Google Play x86_64 image with the `medium_tablet` profile and a
   fresh 8 GB data partition. No existing AVD data was copied/resized/wiped. Android 16/API 36,
   same reported Google model/X64, WebView **133.0.6943.137**, 2560×1600/density 320, about
-  1.9 GB configured RAM; 7,005,068 KiB available after install. It ran headless with software
+  1.9 GB requested RAM (the emulator launch log actually raised this to **4,096 MiB**);
+  7,005,068 KiB available after install. It ran headless with software
   graphics (`swiftshader_indirect`); it does not represent Samsung ARM performance.
 - Corrected Release APK: `.artifacts/wi032/1b-android/com.fieldsales.tabletspike-Signed.apk`,
   **44,956,825 bytes**, SHA-256
@@ -328,18 +333,27 @@ cancelled and bad original startup reports remain separate. Transient UI-automat
 inspection failures were retried; the final report was retrieved from its local external file
 after confirming the share chooser. Nothing was shared to another app or person.
 
-The synthetic host and task-created AVD are stopped after retrieval; the AVD's installed fixed
-app, stress snapshot and edited note remain under `.artifacts/wi032/emulator-avds/` for reuse.
-Airplane mode was restored and task port mappings removed. The original emulator remains
-running with its other apps/data intact. To reuse the isolated AVD with the installed emulator:
+The synthetic host and task-created AVD were stopped after retrieval. The original handoff
+assumed the installed app/stress data would persist in `.artifacts/wi032/emulator-avds/`;
+the subsequent restart preflight found the package absent, so that whole-AVD persistence claim
+was unverified and is withdrawn. Package-only force-close/reopen evidence above is unchanged.
+The repeat increment pins a separate explicit user-data image and verifies full AVD restart
+persistence before its measurements, following the documented [emulator data-file options](https://developer.android.com/studio/run/emulator-commandline#advanced).
+Airplane mode was restored and task port mappings removed. At that checkpoint the original
+emulator was left running with its other apps/data intact. To reuse the isolated AVD with the installed emulator:
 
 ```powershell
 $env:ANDROID_AVD_HOME = 'D:/repos/Field-Sales/.artifacts/wi032/emulator-avds'
-Start-Process 'C:/Users/colmk/AppData/Local/Android/Sdk/emulator/emulator.exe' -WindowStyle Hidden -ArgumentList '-avd WI032_Tablet_API36 -port 5556 -no-audio -no-snapshot -gpu swiftshader_indirect'
-# After boot, start the synthetic host in another terminal and use the explicit serial:
+$env:ANDROID_HOME = 'C:/Program Files (x86)/Android/android-sdk'
+$spikeData = 'D:/repos/Field-Sales/.artifacts/wi032/emulator-avds/WI032_Tablet_API36.avd/measurement-userdata.img'
+$spikeSystem = 'C:/Program Files (x86)/Android/android-sdk/system-images/android-36/google_apis_playstore/x86_64'
+$spikeArguments = @('-avd', 'WI032_Tablet_API36', '-port', '5556', '-data', "`"$spikeData`"", '-sysdir', "`"$spikeSystem`"", '-memory', '4096', '-no-audio', '-no-snapshot', '-gpu', 'swiftshader_indirect')
+Start-Process 'C:/Users/colmk/AppData/Local/Android/Sdk/emulator/emulator.exe' -WindowStyle Hidden -ArgumentList $spikeArguments
+# After boot, start the synthetic host (this terminal stays occupied):
 pwsh -File scripts/tablet-spike.ps1 -Action Host
+# In a second terminal, use the explicit test serial:
 pwsh -File scripts/tablet-spike.ps1 -Action Reverse -DeviceSerial emulator-5556
-pwsh -File scripts/tablet-spike.ps1 -Action Launch -DeviceSerial emulator-5556 -Cold
+pwsh -File scripts/tablet-spike.ps1 -Action Launch -DeviceSerial emulator-5556 -Cold -ReportDirectory .artifacts/wi032/emulator-reuse
 ```
 
 Stop for review of this emulator increment. Samsung/iPad measurements and the physical five-run

@@ -39,6 +39,18 @@ ran baseline and pre-activation recovery, then lacked space for an APK update. A
 `WI032_Tablet_API36` AVD (`emulator-5556`) uses the already installed Android 36 image and a fresh
 8 GB data partition under `.artifacts/wi032/emulator-avds/`; no existing AVD data is copied.
 
+The developer's subsequent **proceed** accepts that first emulator checkpoint and continues
+the already agreed measurement scenarios on the substituted emulator. Run five replacement
+refreshes and five offline cold opens per baseline/target/stress profile, with twenty fixed
+searches after each refresh. Use the unchanged verified Release APK and retained edited work.
+For these repetitions select the host's nominal 10 Mbit/s plus initial 100 ms **application
+simulation**, recording it separately from the earlier unthrottled diagnostics; no physical
+link target is established. Record every attempted run, median/worst timings, failures and
+retained/allocated disk effects. Collect startup/activity logs and a first-observed-ready
+polling bound to investigate the slow initial cold open, without labeling that bound exact
+first-paint time. Stop for review after this measurement increment; physical acceptance,
+1C/MI-02 and production implementation remain pending. Reuse the task-owned AVD only.
+
 ## Proposed behavior and storage design
 
 1. A minimal runner selects a fixture server/profile and shows the selected synthetic owner,
@@ -217,6 +229,41 @@ Xcode/signing compatibility will be checked at the final iPad stage, as requeste
   catalogue authorization (WI-043), and the production Location search/screen (WI-034/035).
 - Production snapshot/Unsent encryption, account disablement and credential storage are not
   settled by a synthetic fixture app. No real staff or business data is used in this spike.
+
+## Proposed next diagnostic increment — pending review
+
+The repeat results expose an after-activation readiness timeout and expensive diagnostic scans.
+This proposal is **not approval to change the runner during the current measurement matrix**.
+Keep the old APK/reports and their failed/incomplete outcomes separate from any rebuilt runner.
+Begin with the unchanged 26 portable cases and characterization of correct status, preserved-work
+and physical-disk reporting behavior before changing those paths.
+
+1. In `tools/FieldSales.TabletSpike.Core/SpikeWorkspace.cs` and `SpikeMeasurements.cs`, keep
+   inexpensive physical database/WAL/SHM/transfer/Unsent samples in the timed path. Make logical
+   per-generation payload scanning an explicitly optional, separately timed diagnostic; report
+   unsampled logical totals as unavailable. Do not turn missing measurements into zero values.
+2. In `SnapshotTransferClient.cs` and `SnapshotSqliteStore.cs`, persist which operation is pending
+   and distinguish generation deletion, checkpointing and report finalization clocks. Preserve
+   incomplete state if the process stops during any of them. Keep atomic activation, owner
+   isolation, active/prior retention policy and native WAL/FULL configuration unchanged.
+3. In `tools/FieldSales.TabletSpike/Components/Pages/Benchmark.razor`, export the report without
+   requiring a logical scan first and label operation/UI completion scopes accurately. Retain
+   the local-ready startup guard. Diagnose the retention/checkpoint interval before proposing
+   a storage-policy or deletion-algorithm change.
+
+Human-Led scenarios to approve before that increment:
+
+- Reports distinguish sampled physical bytes from unavailable/optional logical totals; a large
+  downloaded day can be exported independently of the optional scan.
+- A process stop after activation while retention/checkpoint/report finalization is pending
+  retains the whole active generation and edited Unsent work; its saved refresh stays incomplete
+  and identifies the pending phase. Reopening does not manufacture a successful refresh report.
+- Phase and enclosing-operation clocks retain their stated scopes, including failed/incomplete
+  runs. The existing twenty-term search and hash/count checks remain unchanged.
+- All existing 26 portable scenarios and repository suites pass after source changes. Publish
+  and inspect a new Release APK, then run one focused stress replacement/recovery diagnostic
+  with the unchanged fixtures. Record any timeout and stop for review before repeating the full
+  matrix or making another storage change. Physical Samsung/iPad acceptance and 1C stay pending.
 
 ## Primary guidance checked
 
