@@ -26,7 +26,7 @@ public sealed record SearchMeasurement(string Term, double QueryMs, double? Inpu
     int Matches, string Clock = "Stopwatch query; DOM submit-to-render-and-two-animation-frames via performance.now; automated terms start at JS invocation");
 public sealed class SpikeReport
 {
-    public string ReportSchema { get; init; } = "spike-measurements-v2";
+    public string ReportSchema { get; init; } = "spike-measurements-v3";
     public Guid RunId { get; init; } = Guid.NewGuid();
     public DateTimeOffset StartedUtc { get; init; } = DateTimeOffset.UtcNow;
     public required string Owner { get; init; }
@@ -44,6 +44,7 @@ public sealed class SpikeReport
     public SqliteEnvironment? Sqlite { get; set; }
     public Dictionary<string, double> PhaseMs { get; } = [];
     public Dictionary<string, double> InterruptedPhaseMs { get; } = [];
+    public LocalOpenDiagnostics? LocalOpen { get; set; }
     public string ClockScopes => "PhaseMs contains completed operations; InterruptedPhaseMs contains caught unfinished attempts. Operation clocks exclude their pending-boundary report write and pause; hooks inside an operation are included. totalRefresh starts after the owner gate and ends before final atomic report publication; includes preparation, physical sampling and intermediate report writes; excludes optional logical scans and UI reopen. reportFinalization covers end samples and Unsent read; final atomic publication is excluded. refreshAwait includes runner publication and the UI continuation; refreshAndLocalReopenAwait also includes OpenLocal, neither measures first paint. databaseAndWorkReopen includes native/schema initialization, active/work/report-list reads, worker scheduling and UI continuation; not isolated database IO or whole cold launch. Phase subsets overlap their enclosing pipeline; do not sum them.";
     public List<DiskMeasurement> DiskSamples { get; } = [];
     public long PeakSampledDiskBytes => DiskSamples.Count == 0 ? 0 : DiskSamples.Max(d => d.TotalBytes);

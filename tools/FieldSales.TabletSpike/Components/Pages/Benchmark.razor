@@ -10,7 +10,12 @@
     <p>Download a fixture, keep saved work, and measure this tablet. No staff account is used.</p></header>
 
 @if (preflightError is not null)
-{ <section role="alert"><h2>SQLite preflight failed</h2><p>@preflightError</p></section> }
+{
+    <section role="alert"><h2>Local data read failed</h2><p>@preflightError</p>
+        <button disabled="@(report is null || diagnosing)" @onclick="Export">Export current report</button>
+        <p>@exportStatus</p>
+    </section>
+}
 else
 {
     <section>
@@ -81,6 +86,7 @@ else
     private UnsentState work = new(null, "", []);
     private SearchResult? result;
     private SpikeReport? report;
+    private LocalOpenAttempt? localOpen;
     private CancellationTokenSource? cancellation;
     private readonly ManualResetEventSlim pauseRelease = new(true);
     private bool hasPaused;
@@ -112,40 +118,37 @@ else
             firstRender = false;
             webView = await JS.InvokeAsync<string>("spike.userAgent");
             report ??= NewReport("offline reopen; process startup, OS cache uncontrolled");
-            if (store is not null) { report.Sqlite = store.Environment; report.Manifest = active?.Manifest; report.Generation = active?.Generation; }
-            report.PhaseMs["databaseAndWorkReopen"] = openMs;
-            report.UnsentFingerprintBefore = work.Fingerprint; report.UnsentFingerprintAfter = work.Fingerprint;
-            report.OriginalUnsentSha256 = work.OriginalFixtureSha256;
             // A successful offline-open diagnostic is distinct from an incomplete refresh.
-            report.Status = active is null ? "incomplete" : "offline-open-complete";
+            localOpen!.ApplyToNewReport(report);
             StateHasChanged();
         }
     }
     private async Task OpenLocal()
     {
-        var watch = Stopwatch.StartNew();
+        long started = Stopwatch.GetTimestamp();
+        var attempt = new LocalOpenAttempt(started);
         try
         {
-            await Task.Run(() =>
-            {
-                workspace = new(Device.Root, owner); store = new(workspace);
-                active = store.ReadActive(); work = new UnsentSqliteStore(workspace).Read();
-                savedReports = Directory.GetFiles(workspace.DirectoryPath, "report-*.json").OrderByDescending(File.GetLastWriteTimeUtc).ToArray();
-                selectedSavedReport = savedReports.FirstOrDefault() ?? "";
-            });
-            note = work.Items.FirstOrDefault(i => i.Kind == "Order")?.Note ?? "";
-            preflightError = null; status = active is null ? "Ready for the first fixture." : "Local data reopened. No server request was made.";
+            try { await Task.Run(() => attempt.Read(() => Device.Root, owner)); }
+            finally { attempt.ObserveUiContinuation(); }
+            preflightError = null;
         }
         catch (Exception e) { preflightError = e.Message; }
-        openMs = watch.Elapsed.TotalMilliseconds;
+        workspace = attempt.Workspace; store = attempt.Store; active = attempt.Active; work = attempt.Work;
+        savedReports = attempt.SavedReports; selectedSavedReport = attempt.SelectedSavedReport;
+        if (preflightError is null)
+        {
+            note = work.Items.FirstOrDefault(i => i.Kind == "Order")?.Note ?? "";
+            status = active is null ? "Ready for the first fixture." : "Local data reopened. No server request was made.";
+        }
+        openMs = attempt.CompleteUi();
+        localOpen = attempt;
     }
     private async Task SwitchOwner()
     {
         Preferences.Set("spike-owner", owner); result = null; report = null;
         await OpenLocal(); report = NewReport("owner switch; local reopen");
-        report.Sqlite = store?.Environment; report.Manifest = active?.Manifest; report.Generation = active?.Generation;
-        report.PhaseMs["databaseAndWorkReopen"] = openMs;
-        report.Status = active is null ? "incomplete" : "offline-open-complete";
+        localOpen!.ApplyToNewReport(report);
     }
     private SpikeReport NewReport(string state) => new()
     {
@@ -189,6 +192,7 @@ else
             try { await OpenLocal(); status = outcome; }
             finally
             {
+                report.LocalOpen = localOpen?.Diagnostics;
                 report.PhaseMs["refreshAndLocalReopenAwait"] = refreshWatch.Elapsed.TotalMilliseconds;
                 busy = false;
             }
@@ -230,9 +234,13 @@ else
     }
     private async Task Export()
     {
-        if (report is null || workspace is null) return;
+        if (report is null) return;
         diagnosing = true;
-        try { report.DiskSamples.Add(await Task.Run(() => workspace.Measure())); exportStatus = await Device.ExportAsync(report); }
+        try
+        {
+            if (workspace is not null) report.DiskSamples.Add(await Task.Run(() => workspace.Measure()));
+            exportStatus = await Device.ExportAsync(report);
+        }
         catch (Exception e) { exportStatus = e.Message; }
         finally { diagnosing = false; }
     }

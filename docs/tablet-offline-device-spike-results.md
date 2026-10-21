@@ -382,3 +382,16 @@ stress 3’s original in-memory report was recovered after the developer paused 
 No Download/search was repeated to replace a case. Scoped services stopped; the shared AVD
 remains running. Earlier failures remain recorded; physical-device acceptance and 1C are
 pending. WI-032 stays active. Stop for review before another increment.
+
+## Local-open diagnostics — 2026-10-21
+
+The [schema-v3 local-open results](tablet-offline-local-open-diagnostic-results.md) separate
+worker dispatch, five local-read stages, worker body and the first observed UI continuation.
+All 2,355 .NET / 34 JS checks passed. Five original offline cold opens retained the stress
+generation and edited work; twenty final searches verify. Open median/worst: 651.266/3,250.301 ms.
+In the reproduced outlier, the worker took 638.359 ms, followed by 2,582.253 ms before the UI
+continuation marker. Another 2,973.619 ms open has a 2,401.541 ms continuation interval. This
+locates the dominant measured interval without identifying its renderer/runtime cause.
+No storage optimization or controlled comparison is claimed. The new APK/results remain
+separate; physical acceptance and 1C are pending, with WI-032 active. Emulator-5556 remains
+running; original network state is restored and the temporary wake helper exited.
