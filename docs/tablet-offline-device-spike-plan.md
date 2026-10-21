@@ -269,6 +269,34 @@ This increment is now executed: the [phase diagnostic results](tablet-offline-ph
 record 2,350 .NET / 34 JS passes, the separate Release APK, one completed stress replacement,
 offline recovery and retained earlier failures. Stop for review before extending it.
 
+### Schema-v2 measurement continuation — 21 October 2026
+
+The developer's next **proceed** continues the already agreed five replacement refresh attempts
+and five offline package cold opens per baseline/target/stress profile on the verified,
+unchanged schema-v2 APK at `485e677`. Reuse the same fixtures, twenty search terms, edited work,
+application-simulated network, 900-second refresh observation cutoff and task-owned AVD.
+Record every attempt and incomplete/failure outcome; do not substitute favorable reruns.
+Retain all prior APK/results separately. No app, storage algorithm, retention/native setting,
+physical-device acceptance or 1C decision changes in this measurement increment.
+
+Use `.artifacts/wi032/schema-v2-repeat-session/` for fresh controller/trial/report evidence.
+Record the incoming active fixture at profile transitions: the session begins with retained
+stress data, and allocated database/free pages are not reset or shrunk for smaller profiles.
+Validate hashes/counts, edited work, all 300 searches, phase/enclosing clock scopes and null
+logical-scan metrics. Summarize all values and median/worst, separately identify any censored
+attempts, then stop committed/pushed for review. Existing 2,350 .NET / 34 JS source checks at
+`485e677` remain the source evidence; this measurement/docs increment does not rebuild or
+modify application code. Missing inputs: none for the substituted diagnostic; physical model/
+OS/device availability and final capacity/runtime decisions remain pending at their later gates.
+
+Completed: [schema-v2 repeated measurements](tablet-offline-schema-v2-repeat-results.md)
+records all thirty cases / 300 verified searches on the unchanged APK. The repeated shared-AVD
+foreground conflict was resolved when the developer paused the other task; stress 3’s original
+in-memory refresh/search report survived and its recovery export is separately identified.
+No Download/search was repeated to replace a case. Missing original controller clocks stay
+unavailable. Final scoped cleanup leaves the shared AVD running. Physical acceptance and
+1C remain pending; stop committed/pushed for review, with WI-032 active.
+
 ## Primary guidance checked
 
 - [MAUI supported platforms and iOS Mac requirement](https://learn.microsoft.com/en-us/dotnet/maui/supported-platforms?view=net-maui-10.0)

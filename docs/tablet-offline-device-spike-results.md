@@ -369,3 +369,16 @@ for generation deletion, with successful report exports and offline recovery; al
 and edited work verify. This single diagnostic does not supersede the prior matrix's failures or
 establish physical acceptance. See [the phase diagnostic results](tablet-offline-phase-diagnostic-results.md)
 for clock scopes, retained failure evidence, APK hash, conditions, cleanup and the review boundary.
+
+## Schema-v2 repetitions — 2026-10-21
+
+The [separate repeated-results document](tablet-offline-schema-v2-repeat-results.md) records
+all thirty measurements and 300 independently verified searches on the unchanged schema-v2
+APK. All fifteen refreshes completed and all fifteen offline opens retained edited work.
+Refresh median/worst: baseline 11.163/70.470 s, target 32.845/40.481 s,
+stress 205.773/248.178 s. 9/15 local-open operations exceed the provisional three-second
+proxy. Shared-emulator/controller interruptions and original unavailable clocks remain explicit;
+stress 3’s original in-memory report was recovered after the developer paused the other task.
+No Download/search was repeated to replace a case. Scoped services stopped; the shared AVD
+remains running. Earlier failures remain recorded; physical-device acceptance and 1C are
+pending. WI-032 stays active. Stop for review before another increment.
