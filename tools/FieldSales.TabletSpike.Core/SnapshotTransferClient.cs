@@ -86,57 +86,93 @@ public sealed class SpikeRunner(SpikeWorkspace workspace, HttpClient http)
             AtBoundary = name =>
             {
                 // Persist each recovery boundary once, without writing a report on every insert batch.
-                if (persistedBoundaries.Add(name)) File.WriteAllText(reportPath, report.ToJson());
+                if (persistedBoundaries.Add(name)) report.Save(reportPath);
                 innerHooks.AtBoundary?.Invoke(name);
             }
         };
         try
         {
-            var store = await Task.Run(() => new SnapshotSqliteStore(workspace), ct);
+            SnapshotSqliteStore store;
+            using (var operation = report.BeginOperation("localPreparation", forwarded))
+            {
+                store = await Task.Run(() => new SnapshotSqliteStore(workspace), ct);
+                operation.Complete();
+            }
             report.Sqlite = store.Environment;
             var unsent = new UnsentSqliteStore(workspace);
             var client = new SnapshotTransferClient(http);
-            var phase = Stopwatch.StartNew();
-            var manifest = await client.ManifestAsync(endpoint, workspace.Owner, ct);
-            report.Manifest = manifest;
-            report.PhaseMs["manifest"] = phase.Elapsed.TotalMilliseconds;
-            if (!await Task.Run(unsent.IsSeeded, ct))
+            FixtureManifest manifest;
+            using (var operation = report.BeginOperation("manifest", forwarded))
             {
-                byte[] fixture = await client.UnsentAsync(endpoint, manifest, ct);
-                await Task.Run(() => unsent.SeedOnce(fixture, manifest.Unsent), ct);
+                manifest = await client.ManifestAsync(endpoint, workspace.Owner, ct);
+                report.Manifest = manifest;
+                operation.Complete();
             }
-            var before = await Task.Run(unsent.Read, ct);
-            report.OriginalUnsentSha256 = before.OriginalFixtureSha256;
-            report.UnsentFingerprintBefore = before.Fingerprint;
+            using (var operation = report.BeginOperation("unsentPreparation", forwarded))
+            {
+                if (!await Task.Run(unsent.IsSeeded, ct))
+                {
+                    byte[] fixture = await client.UnsentAsync(endpoint, manifest, ct);
+                    await Task.Run(() => unsent.SeedOnce(fixture, manifest.Unsent), ct);
+                }
+                var before = await Task.Run(unsent.Read, ct);
+                report.OriginalUnsentSha256 = before.OriginalFixtureSha256;
+                report.UnsentFingerprintBefore = before.Fingerprint;
+                operation.Complete();
+            }
             report.DiskSamples.Add(await Task.Run(() => workspace.Measure(), ct));
-            phase.Restart();
             // Pause hooks can block deliberately, so the transfer also starts off the UI thread.
-            await Task.Run(() => client.DownloadAsync(endpoint, report.Network, workspace.TransferPath, manifest.Gzip, forwarded, ct), ct);
-            report.PhaseMs["httpTransferAndCompressedHash"] = phase.Elapsed.TotalMilliseconds;
+            using (var operation = report.BeginOperation("httpTransferAndCompressedHash", forwarded))
+            {
+                await Task.Run(() => client.DownloadAsync(endpoint, report.Network, workspace.TransferPath, manifest.Gzip, forwarded, ct), ct);
+                operation.Complete();
+            }
             report.DiskSamples.Add(await Task.Run(() => workspace.Measure(), ct));
             report.Generation = await store.ApplyAsync(workspace.TransferPath, manifest, report, forwarded, ct);
-            report.UnsentFingerprintAfter = (await Task.Run(unsent.Read, ct)).Fingerprint;
-            if (report.UnsentFingerprintBefore != report.UnsentFingerprintAfter)
-                throw new InvalidDataException("Unsent work changed during refresh.");
-            File.Delete(workspace.TransferPath);
+            using (var operation = report.BeginOperation("preservedWorkAndTransferCleanup", forwarded))
+            {
+                report.UnsentFingerprintAfter = (await Task.Run(unsent.Read, ct)).Fingerprint;
+                if (report.UnsentFingerprintBefore != report.UnsentFingerprintAfter)
+                    throw new InvalidDataException("Unsent work changed during refresh.");
+                File.Delete(workspace.TransferPath);
+                operation.Complete();
+            }
             report.DiskSamples.Add(await Task.Run(() => workspace.Measure(), ct));
-            report.Status = "complete";
         }
         catch (Exception exception)
         {
             report.Status = exception is OperationCanceledException ? "cancelled" : "failed";
             report.Error = $"{exception.GetType().Name}: {exception.Message}";
+            report.FailedOperation = report.PendingOperation;
             throw;
         }
         finally
         {
-            report.PhaseMs["totalRefresh"] = watch.Elapsed.TotalMilliseconds;
-            report.SampleMemory();
             try
             {
-                report.UnsentFingerprintAfter = (await Task.Run(() => new UnsentSqliteStore(workspace).Read())).Fingerprint;
-                report.DiskSamples.Add(await Task.Run(() => workspace.Measure()));
-                await File.WriteAllTextAsync(reportPath, report.ToJson());
+                using (var operation = await Task.Run(() => report.BeginOperation("reportFinalization", forwarded)))
+                {
+                    report.SampleMemory();
+                    report.UnsentFingerprintAfter = (await Task.Run(() => new UnsentSqliteStore(workspace).Read())).Fingerprint;
+                    report.DiskSamples.Add(await Task.Run(() => workspace.Measure()));
+                    operation.Complete();
+                }
+                // A killed process leaves an incomplete pending-publication checkpoint. Only the
+                // final atomic replacement publishes success. Its own write cannot time itself.
+                report.PendingOperation = "reportPublication";
+                report.PendingOperationStartedUtc = DateTimeOffset.UtcNow;
+                await Task.Run(() => forwarded.AtBoundary?.Invoke("pending-reportPublication"));
+                report.PhaseMs["totalRefresh"] = watch.Elapsed.TotalMilliseconds;
+                if (report.Status == "incomplete") report.Status = "complete";
+                report.PendingOperation = null; report.PendingOperationStartedUtc = null;
+                await Task.Run(() => report.Save(reportPath));
+            }
+            catch (Exception exception)
+            {
+                report.Status = "failed";
+                report.FailedOperation = report.PendingOperation ?? "reportPublication";
+                report.Error ??= $"{exception.GetType().Name}: {exception.Message}";
+                throw;
             }
             finally { gate.Release(); }
         }

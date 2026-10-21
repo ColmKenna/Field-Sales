@@ -52,13 +52,19 @@ public sealed class SnapshotSqliteStore
     private string Apply(string gzipPath, FixtureManifest manifest, SpikeReport report, SpikeHooks hooks, CancellationToken ct)
     {
         manifest.Validate(workspace.Owner);
-        var compressedWatch = Stopwatch.StartNew();
-        using (var compressed = File.OpenRead(gzipPath))
+        using (var operation = report.BeginOperation("localCompressedFileVerification", hooks))
+        {
+            using var compressed = File.OpenRead(gzipPath);
             if (compressed.Length != manifest.Gzip.Bytes || Convert.ToHexStringLower(SHA256.HashData(compressed)) != manifest.Gzip.Sha256.ToLowerInvariant())
                 throw new InvalidDataException("Compressed payload length/hash mismatch.");
-        report.PhaseMs["localCompressedFileVerification"] = compressedWatch.Elapsed.TotalMilliseconds;
+            operation.Complete();
+        }
         using var connection = Open();
-        Execute(connection, "DELETE FROM generations WHERE state='staged'");
+        using (var operation = report.BeginOperation("stagedGenerationDeletion", hooks))
+        {
+            Execute(connection, "DELETE FROM generations WHERE state='staged'");
+            operation.Complete();
+        }
         if (hooks.MaxDatabasePages is int maxPages) Execute(connection, $"PRAGMA max_page_count={maxPages}");
         string generation = Guid.NewGuid().ToString("N");
         using (var create = connection.CreateCommand())
@@ -68,6 +74,7 @@ public sealed class SnapshotSqliteStore
             create.Parameters.AddWithValue("$manifest", JsonSerializer.Serialize(manifest, FixtureManifest.JsonOptions));
             create.ExecuteNonQuery();
         }
+        using var pipeline = report.BeginOperation("decompressParseInsertAndProjectionIndexes", hooks);
         var watch = Stopwatch.StartNew();
         var counts = FixtureManifest.CountNames.ToDictionary(n => n, _ => 0L);
         SqliteTransaction? batch = null;
@@ -121,19 +128,22 @@ public sealed class SnapshotSqliteStore
             }, ct);
             batch?.Commit(); batch?.Dispose(); batch = null;
             report.MaxParserBufferBytes = parser.MaxBufferBytes;
-            report.PhaseMs["decompressParseInsertAndProjectionIndexes"] = watch.Elapsed.TotalMilliseconds;
+            pipeline.Complete();
             report.PhaseMs["pipelineSubset_decompressionReadAndHash"] = hashing.ReadAndHashMs;
             report.PhaseMs["pipelineSubset_entityCountInsertProjectionAndBatchCommit"] = rowWorkMs;
             report.PhaseMs["pipelineRemainder_parseDispatchAndOverhead"] = Math.Max(0, watch.Elapsed.TotalMilliseconds - hashing.ReadAndHashMs - rowWorkMs);
-            watch.Restart();
-            if (hashing.Bytes != manifest.Json.Bytes || hashing.FinishHash() != manifest.Json.Sha256.ToLowerInvariant() ||
-                counts.Any(pair => manifest.Counts[pair.Key] != pair.Value))
-                throw new InvalidDataException("Plain payload hash, length or nested counts mismatch.");
-            report.PhaseMs["plainHashAndCountVerification"] = watch.Elapsed.TotalMilliseconds;
+            using (var operation = report.BeginOperation("plainHashAndCountVerification", hooks))
+            {
+                if (hashing.Bytes != manifest.Json.Bytes || hashing.FinishHash() != manifest.Json.Sha256.ToLowerInvariant() ||
+                    counts.Any(pair => manifest.Counts[pair.Key] != pair.Value))
+                    throw new InvalidDataException("Plain payload hash, length or nested counts mismatch.");
+                operation.Complete();
+            }
             report.DiskSamples.Add(workspace.Measure());
             hooks.AtBoundary?.Invoke("before-activation");
             ct.ThrowIfCancellationRequested();
-            watch.Restart();
+            using (var operation = report.BeginOperation("activation", hooks))
+            {
             using (var transaction = connection.BeginTransaction())
             using (var activate = connection.CreateCommand())
             {
@@ -146,14 +156,21 @@ public sealed class SnapshotSqliteStore
                 ct.ThrowIfCancellationRequested();
                 transaction.Commit();
             }
-            report.PhaseMs["activation"] = watch.Elapsed.TotalMilliseconds;
+                operation.Complete();
+            }
             report.Generation = generation;
             hooks.AtBoundary?.Invoke("after-activation");
-            watch.Restart();
             // Keep active + immediately preceding completed generation. WAL readers retain their captured view.
-            Execute(connection, "DELETE FROM generations WHERE state='complete' AND id NOT IN (SELECT id FROM generations WHERE state='complete' ORDER BY completed DESC,id DESC LIMIT 2)");
-            Execute(connection, "PRAGMA wal_checkpoint(PASSIVE)");
-            report.PhaseMs["checkpointAndRetention"] = watch.Elapsed.TotalMilliseconds;
+            using (var operation = report.BeginOperation("completedGenerationDeletion", hooks))
+            {
+                Execute(connection, "DELETE FROM generations WHERE state='complete' AND id NOT IN (SELECT id FROM generations WHERE state='complete' ORDER BY completed DESC,id DESC LIMIT 2)");
+                operation.Complete();
+            }
+            using (var operation = report.BeginOperation("walCheckpoint", hooks))
+            {
+                Execute(connection, "PRAGMA wal_checkpoint(PASSIVE)");
+                operation.Complete();
+            }
             report.DiskSamples.Add(workspace.Measure());
             return generation;
         }

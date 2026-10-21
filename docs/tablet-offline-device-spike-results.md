@@ -358,3 +358,14 @@ pwsh -File scripts/tablet-spike.ps1 -Action Launch -DeviceSerial emulator-5556 -
 
 Stop for review of this emulator increment. Samsung/iPad measurements and the physical five-run
 matrix remain pending; WI-032 stays active. No iPad, 1C, production sign-in or WI-033 work started.
+
+## Reporting diagnostic — 2026-10-21
+
+The subsequently approved reporting increment uses a separate schema-v2 APK and evidence set.
+It removes logical scans from timed refresh/export paths, persists pending operation names and
+separates deletion, checkpoint and report-finalization clocks. All 2,350 .NET / 34 JavaScript
+tests pass. One focused stress refresh completed in 141.210 seconds, including 66.868 seconds
+for generation deletion, with successful report exports and offline recovery; all forty searches
+and edited work verify. This single diagnostic does not supersede the prior matrix's failures or
+establish physical acceptance. See [the phase diagnostic results](tablet-offline-phase-diagnostic-results.md)
+for clock scopes, retained failure evidence, APK hash, conditions, cleanup and the review boundary.

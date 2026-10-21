@@ -230,10 +230,10 @@ Xcode/signing compatibility will be checked at the final iPad stage, as requeste
 - Production snapshot/Unsent encryption, account disablement and credential storage are not
   settled by a synthetic fixture app. No real staff or business data is used in this spike.
 
-## Proposed next diagnostic increment — pending review
+## Approved diagnostic increment — 2026-10-21
 
 The repeat results expose an after-activation readiness timeout and expensive diagnostic scans.
-This proposal is **not approval to change the runner during the current measurement matrix**.
+The developer's subsequent **proceed** accepts this increment after the completed measurement matrix.
 Keep the old APK/reports and their failed/incomplete outcomes separate from any rebuilt runner.
 Begin with the unchanged 26 portable cases and characterization of correct status, preserved-work
 and physical-disk reporting behavior before changing those paths.
@@ -251,7 +251,7 @@ and physical-disk reporting behavior before changing those paths.
    the local-ready startup guard. Diagnose the retention/checkpoint interval before proposing
    a storage-policy or deletion-algorithm change.
 
-Human-Led scenarios to approve before that increment:
+Human-Led scenarios accepted with that approval:
 
 - Reports distinguish sampled physical bytes from unavailable/optional logical totals; a large
   downloaded day can be exported independently of the optional scan.
@@ -264,6 +264,10 @@ Human-Led scenarios to approve before that increment:
   and inspect a new Release APK, then run one focused stress replacement/recovery diagnostic
   with the unchanged fixtures. Record any timeout and stop for review before repeating the full
   matrix or making another storage change. Physical Samsung/iPad acceptance and 1C stay pending.
+
+This increment is now executed: the [phase diagnostic results](tablet-offline-phase-diagnostic-results.md)
+record 2,350 .NET / 34 JS passes, the separate Release APK, one completed stress replacement,
+offline recovery and retained earlier failures. Stop for review before extending it.
 
 ## Primary guidance checked
 

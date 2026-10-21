@@ -22,7 +22,7 @@ public sealed class DeviceReportAdapter
     }
     public Task<string> ExportAsync(SpikeReport report)
     {
-        report.SampleMemory();
+        // Preserve the runner's end-of-refresh sample; exporting later is a different clock scope.
         return ExportJsonAsync(report.ToJson(), $"tablet-spike-{report.RunId}.json");
     }
     public async Task<string> ExportJsonAsync(string json, string name)

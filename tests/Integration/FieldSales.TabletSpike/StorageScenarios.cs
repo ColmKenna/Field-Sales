@@ -32,7 +32,9 @@ public sealed class StorageScenarios
         Assert.Equal(4, product.RootElement.GetProperty("breadcrumbs").GetArrayLength());
         Assert.InRange(report.MaxParserBufferBytes, 1, 1024 * 1024);
         Assert.Equal(env.Work().Read().Fingerprint, report.UnsentFingerprintBefore);
-        Assert.Contains(report.DiskSamples, d => d.GenerationPayloadBytes.Count > 0);
+        // Logical diagnostics are opt-in; verify the payload metric without scanning in refresh.
+        Assert.All(report.DiskSamples, d => Assert.Null(d.GenerationPayloadBytes));
+        Assert.NotEmpty(env.Workspace().Measure(includeGenerationPayloads: true).GenerationPayloadBytes!);
     }
 
     [Theory]

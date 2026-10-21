@@ -18,13 +18,13 @@ else
         <div class="fields">
             <label>Server address<input @bind="server" disabled="@busy" placeholder="http://192.168.1.10:7206/" /></label>
             <label>Profile<select @bind="profile" disabled="@busy"><option>baseline</option><option>target</option><option>stress</option></select></label>
-            <label>Synthetic owner<select @bind="owner" @bind:after="SwitchOwner" disabled="@busy"><option>spike-rep-42</option><option>spike-rep-77</option></select></label>
+            <label>Synthetic owner<select @bind="owner" @bind:after="SwitchOwner" disabled="@(busy || diagnosing)"><option>spike-rep-42</option><option>spike-rep-77</option></select></label>
             <label>Network mode<select @bind="network" disabled="@busy"><option value="lan">LAN · unmeasured link</option><option value="10">Simulate 10 Mbit/s + initial 100 ms</option><option value="2">Simulate 2 Mbit/s + initial 100 ms</option></select></label>
             <label>Transport used<select @bind="transport" disabled="@busy"><option>LAN</option><option>USB adb reverse</option><option>Emulator bridge (diagnostic)</option></select></label>
-            <label>Test pause<select @bind="pause" disabled="@busy"><option value="">None</option><option>download</option><option>import</option><option>before-activation</option><option>after-activation</option></select></label>
+            <label>Test pause<select @bind="pause" disabled="@busy"><option value="">None</option><option>download</option><option>import</option><option>before-activation</option><option>after-activation</option><option>pending-completedGenerationDeletion</option><option>pending-walCheckpoint</option><option>pending-reportFinalization</option><option>pending-reportPublication</option></select></label>
         </div>
         <p class="hint">Simulations control the fixture host. Physical throughput and RTT remain unmeasured.</p>
-        <div class="actions"><button disabled="@(busy || store is null)" @onclick="Download">Download &amp; apply</button>
+        <div class="actions"><button disabled="@(busy || diagnosing || store is null)" @onclick="Download">Download &amp; apply</button>
             <button class="secondary" disabled="@(!busy)" @onclick="Cancel">Cancel</button>
             @if (paused) { <button class="secondary" @onclick="Resume">Resume test</button> }
         </div>
@@ -33,7 +33,7 @@ else
             <dt>Completed</dt><dd>@(active?.CompletedUtc.ToLocalTime().ToString("g") ?? "—")</dd>
             <dt>Stored fixture</dt><dd>@(active is null ? "—" : $"{active.Manifest.Profile}: {active.Manifest.Counts["products"]:N0} products, {active.Manifest.Counts["locations"]:N0} Locations")</dd>
             <dt>Native engine</dt><dd>@(store is null ? "Checking…" : $"SQLite {store.Environment.Version} · WAL · FULL")</dd>
-            <dt>Offline open</dt><dd>@($"{openMs:F1} ms database + work read; {Device.StartupElapsedMs:F0} ms since service startup (not full cold-launch time)")</dd></dl>
+            <dt>Offline open</dt><dd>@($"{openMs:F1} ms local-open operation including scheduling and UI continuation; {Device.StartupElapsedMs:F0} ms since service startup (not full cold-launch time)")</dd></dl>
     </section>
     <section>
         <h2>Location search</h2>
@@ -53,15 +53,17 @@ else
         @foreach (var item in work.Items)
         { <p><strong>@item.Kind</strong> — @item.Note</p> }
         <label>Order test note<textarea @bind="note" maxlength="4096"></textarea></label>
-        <div class="actions"><button class="secondary" disabled="@(busy || work.Items.Count == 0)" @onclick="SaveNote">Edit saved test note</button></div>
+        <div class="actions"><button class="secondary" disabled="@(busy || diagnosing || work.Items.Count == 0)" @onclick="SaveNote">Edit saved test note</button></div>
         <p class="hash">Fingerprint: @work.Fingerprint</p>
     </section>
     <section><h2>Measurement report</h2><p>Includes device, native engine, fixture hashes, phases, disk samples, saved work and search timings. Failed and incomplete runs keep their status.</p>
-        <button disabled="@(report is null || busy)" @onclick="Export">Export current report</button>
+        <p>Export samples physical file sizes. Logical JSON totals are unavailable until the optional scan runs. The scan can take minutes and is timed separately.</p>
+        <button disabled="@(report is null || busy || diagnosing)" @onclick="Export">Export current report</button>
+        <button class="secondary" disabled="@(report is null || busy || diagnosing)" @onclick="ScanLogicalPayloads">Scan logical payload sizes (optional)</button>
         @if (savedReports.Length > 0)
         {
             <label>Persisted refresh (includes interrupted runs)<select @bind="selectedSavedReport">@foreach (string path in savedReports) { <option value="@path">@Path.GetFileName(path)</option> }</select></label>
-            <button class="secondary" disabled="@busy" @onclick="ExportSaved">Export saved refresh</button>
+            <button class="secondary" disabled="@(busy || diagnosing)" @onclick="ExportSaved">Export saved refresh</button>
         }
         <p>@exportStatus</p></section>
 }
@@ -71,7 +73,7 @@ else
     private string transport = "LAN";
     private string status = "Opening local data…", term = "", note = "", exportStatus = "", webView = "unavailable until WebView initializes";
     private string? preflightError;
-    private bool busy, paused, searching, localReady, firstRender = true;
+    private bool busy, paused, searching, diagnosing, localReady, firstRender = true;
     private double openMs;
     private SpikeWorkspace? workspace;
     private SnapshotSqliteStore? store;
@@ -156,6 +158,7 @@ else
         busy = true; hasPaused = false; paused = false; pauseRelease.Set(); searchesDuringRefresh.Clear();
         cancellation?.Dispose(); cancellation = new();
         report = NewReport(active is null ? "fresh; OS cache uncontrolled" : "replacement; OS cache uncontrolled");
+        var refreshWatch = Stopwatch.StartNew();
         string selectedPause = pause;
         try
         {
@@ -179,10 +182,16 @@ else
         catch (Exception e) { status = $"Refresh failed: {e.Message}"; report.Status = "failed"; report.Error ??= e.Message; }
         finally
         {
+            report.PhaseMs["refreshAwait"] = refreshWatch.Elapsed.TotalMilliseconds;
             report.Searches.AddRange(searchesDuringRefresh);
-            busy = false; paused = false; pauseRelease.Set();
+            paused = false; pauseRelease.Set();
             string outcome = status;
-            await OpenLocal(); status = outcome;
+            try { await OpenLocal(); status = outcome; }
+            finally
+            {
+                report.PhaseMs["refreshAndLocalReopenAwait"] = refreshWatch.Elapsed.TotalMilliseconds;
+                busy = false;
+            }
         }
     }
     private void Cancel() { cancellation?.Cancel(); pauseRelease.Set(); }
@@ -222,14 +231,31 @@ else
     private async Task Export()
     {
         if (report is null || workspace is null) return;
+        diagnosing = true;
         try { report.DiskSamples.Add(await Task.Run(() => workspace.Measure())); exportStatus = await Device.ExportAsync(report); }
         catch (Exception e) { exportStatus = e.Message; }
+        finally { diagnosing = false; }
+    }
+    private async Task ScanLogicalPayloads()
+    {
+        if (report is null || workspace is null) return;
+        diagnosing = true; exportStatus = "Scanning logical payload sizes…";
+        try
+        {
+            var sample = await Task.Run(() => workspace.Measure(includeGenerationPayloads: true));
+            report.DiskSamples.Add(sample);
+            exportStatus = sample.GenerationPayloadScanMs is double ms ? $"Optional logical scan: {ms:F1} ms. Export to include it." : "Logical totals unavailable: no snapshot database.";
+        }
+        catch (Exception e) { exportStatus = e.Message; }
+        finally { diagnosing = false; }
     }
     private async Task ExportSaved()
     {
         if (!savedReports.Contains(selectedSavedReport)) return;
+        diagnosing = true;
         try { exportStatus = await Device.ExportJsonAsync(await File.ReadAllTextAsync(selectedSavedReport), Path.GetFileName(selectedSavedReport)); }
         catch (Exception e) { exportStatus = e.Message; }
+        finally { diagnosing = false; }
     }
     public void Dispose() { cancellation?.Cancel(); pauseRelease.Set(); cancellation?.Dispose(); pendingPaint?.Completion.TrySetCanceled(); }
 }
