@@ -172,5 +172,5 @@ serial selection and package installation. The existing project declares Android
 The [console-delivery-next-item skill](C:/Users/colmk/.codex/skills/console-delivery-next-item/SKILL.md)
 requires Human-Led scenarios to be agreed **before implementation begins**, and tight-loop
 execution **one increment at a time, stopping after each**. This concrete pilot and seven
-scenario intents await **Approved**; selecting physical validation and USB established the
-direction/transport, not approval of this newly defined pilot.
+scenario intents were approved by the developer's **Approved** after pushed plan `a817897`.
+That approval authorizes only checkpoint 1B-B1, followed by its review stop.
