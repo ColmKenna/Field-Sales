@@ -435,3 +435,17 @@ while WebView's in-process GPU thread is CPU-busy for about 92% of the gap. Why 
 slow is not established; the emulator's software graphics are a likely contributor (inferred).
 Emulator only, n=2; no fix, physical-device or MI-02 claim. WI-032 active; MI-02, physical
 Samsung/iPad mini validation and 1C remain open.
+
+## Physical Samsung baseline pilot — 22 October 2026
+
+The [1B-B1 pilot results](tablet-offline-samsung-baseline-pilot-results.md) record three original
+physical runs on Samsung Tab S6 Lite SM-P610, Android 13/API 33, Arm64, WebView 155.0.8059.43,
+using the unchanged schema-v4 Release APK. Fresh/replacement refreshes: 9.660/9.770 s.
+One offline local open: 698.538 ms, including 637.404 ms worker / 8.755 ms continuation.
+All sixty search term/order/count checks pass; worst observed-visible time 246.700 ms at
+500 Locations. Edited work and replacement generation survive; zero fixture requests offline.
+The developer confirms smooth scrolling/taps. Actual settings restored, own services/helpers
+ended, installed APK/data retained. Source baseline remains 2,358 .NET / 34 JS; no rebuild
+or suite repeat. This is a baseline pilot, not the full Samsung matrix or a controlled
+comparison with the stress emulator traces. WI-032 active; MI-02, recovery/iPad/1C pending.
+Stop for review before the proposed repeated baseline/target/stress physical matrix.

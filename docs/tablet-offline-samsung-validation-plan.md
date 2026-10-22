@@ -174,3 +174,22 @@ requires Human-Led scenarios to be agreed **before implementation begins**, and 
 execution **one increment at a time, stopping after each**. This concrete pilot and seven
 scenario intents were approved by the developer's **Approved** after pushed plan `a817897`.
 That approval authorizes only checkpoint 1B-B1, followed by its review stop.
+
+## Execution checkpoint — 22 October 2026
+
+**1B-B1 complete; review pending.** All three original reports and sixty searches independently
+verify on the selected physical Samsung, with no replacement attempts. Fresh baseline refresh
+9.660 s; edited-work replacement 9.770 s; offline local open 698.538 ms (worker 637.404 ms,
+continuation 8.755 ms). Worst observed-visible search 246.700 ms; all sixty below one second.
+Saved note/fingerprint and replacement generation survive the offline cold open; host fixture
+request count stays at five. The developer confirms scrolling and taps respond smoothly.
+All seven agreed scenario intents are checked in the
+[pilot results](tablet-offline-samsung-baseline-pilot-results.md), including clock and condition
+limits, original report identities, guard history and human observation.
+
+Initial lock-screen wait ended only after the developer confirmed unlock. Installed APK hash
+matches the archived Release artifact before/after; no app/source/build/test change. Actual
+airplane 0 / Wi-Fi 1 / stay-on 0 restored, own host/wake helper ended, route absent; app/data
+retained and other apps/devices/services untouched. Baseline 2,358 .NET / 34 JS evidence reused.
+Stop for review before 1B-B2 or any further physical work. WI-032 active; full Samsung matrix,
+recovery cases, iPad mini, MI-02 and 1C remain pending.
