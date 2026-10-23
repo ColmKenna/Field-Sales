@@ -116,3 +116,10 @@ sign-in/Sync; PR or main integration.
 Missing information: none. The human must keep the tablet connected, unlocked and untouched
 during the run. A cable or port that also charges the tablet would make the run more reliable.
 This scope, the ten cases and the eight scenario intents await **Approved**.
+
+## Execution checkpoint — 23 October 2026
+
+The developer replied **Approved** and re-authorized USB debugging. All ten cases passed. The first
+runner attempt stopped before C3 started because a scrolled dropdown hid "None"; the helper was
+fixed and the run resumed at C3 without repeating C1 or C2. Results:
+[tablet-offline-samsung-recovery-results.md](tablet-offline-samsung-recovery-results.md). Stop for review.

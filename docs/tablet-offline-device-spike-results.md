@@ -465,3 +465,16 @@ survived every case. Stress first stopped at its 3 GiB entry guard (2,077,944 Ki
 developer freed space, a continuation passed the guard and completed. The fixture host was rebuilt
 from unchanged source with developer approval. The developer reports "Smooth" at target and
 stress. WI-032 active; recovery/iPad, MI-02 and 1C remain open. Stop for review.
+
+## Samsung recovery, cancellation and owner isolation — 23 October 2026
+
+The [1B-B3 results](tablet-offline-samsung-recovery-results.md) record ten passing cases on the
+same Samsung and APK. Cancel during a real partial download and a real partial import kept the
+previous whole generation and edited work, and a clean retry completed. A package-only force-close
+before activation reopened the whole previous generation; one after activation reopened the whole
+new generation. A populated second owner (77) stayed fully isolated from owner 42 across switches
+and a cold launch. 13 original reports were independently verified, with zero fixture requests
+during reopens or switches. Observations: deleting a retained stress generation took 69.7 s inside
+a baseline refresh, and a force-close after activation leaves older copies until the next refresh.
+A controller bug (a scrolled dropdown) stopped the run before C3 and was fixed without repeating
+any case. WI-032 active; the iPad check, MI-02 and 1C remain. Stop for review.
