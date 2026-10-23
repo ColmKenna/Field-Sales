@@ -449,3 +449,17 @@ ended, installed APK/data retained. Source baseline remains 2,358 .NET / 34 JS; 
 or suite repeat. This is a baseline pilot, not the full Samsung matrix or a controlled
 comparison with the stress emulator traces. WI-032 active; MI-02, recovery/iPad/1C pending.
 Stop for review before the proposed repeated baseline/target/stress physical matrix.
+
+## Repeated physical Samsung measurements — 23 October 2026
+
+The [1B-B2 repeat results](tablet-offline-samsung-repeat-results.md) record baseline and target on
+the same Samsung SM-P610 and unchanged schema-v4 Release APK: five replacements and five offline
+process-cold opens each. That gives 20 original reports and 200 searches, all independently
+verified, with none replaced. Refresh median/worst: baseline 8.831/10.582 s, target
+56.554/63.647 s (4/5 target refreshes under the 60 s proxy). Offline local open
+median/worst: 497.881/751.074 ms and 508.107/822.577 ms. All 200 observed-visible searches were
+under one second (worst 308.6 ms). There were zero fixture requests offline, and edited work
+survived every case. Stress was not started: 2,077,944 KiB was free, below the approved 3 GiB
+entry guard. The fixture host was rebuilt from unchanged source with developer approval.
+The developer reports "Smooth". WI-032 active; stress capacity, recovery/iPad, MI-02 and 1C remain
+open. Stop for review.

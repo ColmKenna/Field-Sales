@@ -198,3 +198,14 @@ The [console-delivery-next-item skill](C:/Users/colmk/.codex/skills/console-deli
 requires Human-Led scenarios to be agreed **before implementation begins** and tight-loop
 execution **one increment at a time, stopping after each**. The pilot approval ended at
 1B-B1. This concrete 1B-B2 scope, eight scenario intents and capacity policy await **Approved**.
+
+## Execution checkpoint — 23 October 2026
+
+The developer replied **Approved** to this plan and authorized USB debugging. The developer then
+chose to use the fixture host rebuilt at `5a05963` from unchanged spike source, because the
+pilot's host binaries had been overwritten and could not be reproduced. A first runner attempt
+stopped before any case when the unpowered tablet's screen timed out. The screen timeout was
+raised for the run under the wake-support allowance and restored at cleanup. Baseline and target
+then completed all ten cases each. Stress stopped at its entry guard (2,077,944 KiB < 3 GiB) with
+all ten stress cases unstarted. Results: [tablet-offline-samsung-repeat-results.md](tablet-offline-samsung-repeat-results.md).
+Stop for review.
