@@ -313,3 +313,10 @@ unavailable. Final scoped cleanup leaves the shared AVD running. Physical accept
 The developer's **approve** accepted the scenario matrix/design and authorized 1B-A. This approval
 boundary follows the [console-delivery-next-item skill](C:/Users/colmk/.codex/skills/console-delivery-next-item/SKILL.md):
 “they must be agreed as part of plan approval **before** implementation begins.”
+
+### Scope amendment — 23 October 2026
+
+The developer chose to **decide 1C sooner**, on the physical Samsung evidence and before the iPad
+mini check. The iPad check is deferred as a confirmation before any iPad use (inferred unless the
+developer says otherwise). The decision options and evidence are in
+[tablet-offline-1c-decision.md](tablet-offline-1c-decision.md).
