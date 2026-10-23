@@ -207,5 +207,8 @@ pilot's host binaries had been overwritten and could not be reproduced. A first 
 stopped before any case when the unpowered tablet's screen timed out. The screen timeout was
 raised for the run under the wake-support allowance and restored at cleanup. Baseline and target
 then completed all ten cases each. Stress stopped at its entry guard (2,077,944 KiB < 3 GiB) with
-all ten stress cases unstarted. Results: [tablet-offline-samsung-repeat-results.md](tablet-offline-samsung-repeat-results.md).
+all ten stress cases unstarted. As the capacity policy allows, the developer then freed space on the
+tablet. A stress-only continuation re-verified readiness, passed the guard at 12,482,340 KiB and
+completed all ten stress cases with the same per-case controller logic. The matrix is complete:
+30 original reports and 300 searches. Results: [tablet-offline-samsung-repeat-results.md](tablet-offline-samsung-repeat-results.md).
 Stop for review.

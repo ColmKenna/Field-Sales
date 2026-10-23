@@ -2,26 +2,27 @@
 
 ## Outcome — 23 October 2026
 
-Approved increment **1B-B2 ran to its planned end with a capacity stop before stress**.
-Baseline and target each completed **five replacements and five offline process-cold opens**:
-**20 original reports, 100 replacement-search observations per profile (200 in all)**,
-every one independently verified. No case was replaced, retried or skipped. **Stress was not
-started:** /data had **2,077,944 KiB** free at its entry check, below the approved
-**3,145,728 KiB (3 GiB)** guard. This is the plan's explicit partial outcome:
-**20 of 30 reports and 200 of 300 searches**. The developer reports scrolling, taps and search
-as **“Smooth”** on the target data after the run.
+Approved increment **1B-B2 is complete for all three profiles**. Baseline, target and stress
+each completed **five replacements and five offline process-cold opens**: **30 original reports
+and 300 search observations**, every one independently verified. No case was replaced, retried
+or skipped. Stress first **stopped at its entry guard** (2,077,944 KiB free, below
+3,145,728 KiB). After the developer freed space, a stress-only continuation passed the same guard
+at **12,482,340 KiB** and ran all ten stress cases. The developer reports
+scrolling, taps and search as **“Smooth”** on both the target and the stress data.
 
-| Profile | Refresh · offline cases | Refresh s median / worst | Refresh &lt; 60 s | Offline local open ms median / worst | Local open &lt; 3 s | Android activity ms median / worst | Searches &lt; 1 s | Observed-visible ms median / worst | Query ms median / worst | Peak sampled storage bytes |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| baseline | 5/5 · 5/5 | 8.831 / 10.582 | 5/5 | 497.881 / 751.074 | 5/5 | 1,367 / 2,133 | 100/100 | 102.5 / 308.6 | 5.066 / 11.043 | 99,314,442 |
-| target | 5/5 · 5/5 | 56.554 / 63.647 | 4/5 | 508.107 / 822.577 | 5/5 | 1,383 / 2,064 | 100/100 | 110.4 / 291.7 | 4.946 / 21.537 | 413,320,936 |
+| Profile | Locations | Refresh · offline cases | Refresh s median / worst | Refresh &lt; 60 s | Offline local open ms median / worst | Local open &lt; 3 s | Android activity ms median / worst | Searches &lt; 1 s | Observed-visible ms median / worst | Query ms median / worst | Peak sampled storage bytes |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| baseline | 500 | 5/5 · 5/5 | 8.831 / 10.582 | 5/5 | 497.881 / 751.074 | 5/5 | 1,367 / 2,133 | 100/100 | 102.5 / 308.6 | 5.066 / 11.043 | 99,314,442 |
+| target | 500 | 5/5 · 5/5 | 56.554 / 63.647 | 4/5 | 508.107 / 822.577 | 5/5 | 1,383 / 2,064 | 100/100 | 110.4 / 291.7 | 4.946 / 21.537 | 413,320,936 |
+| stress | 2,000 | 5/5 · 5/5 | 227.296 / 228.802 | 0/5 | 527.450 / 1,082.774 | 5/5 | 1,580 / 2,393 | 100/100 | 116.4 / 293.5 | 11.085 / 72.825 | 2,096,320,078 |
 
-All 200 observed-visible searches are below the source's **one-second** target at 500
-Locations. Every offline local open is below the candidate **three-second** proxy. All baseline
-refreshes and **four of five target refreshes** are below the candidate **60-second** proxy:
-`target-r5` took **63.647 s**. Medians and worsts use n=5 per profile
-(n=100 for searches); no pilot, emulator or other-schema measurement is pooled. **WI-032 stays
-active; stress capacity, recovery cases, the iPad check, MI-02 and adoption 1C remain open.**
+All **300** observed-visible searches are below one second, including the **100 at 2,000
+Locations**; the source's one-second target applies to 500 Locations, and stress is a
+diagnostic beyond it. All **15** offline local opens are below the candidate three-second proxy.
+Against the candidate 60-second refresh proxy: baseline **5/5**, target **4/5** (`target-r5`
+63.647 s), stress **0/5** (median 227.296 s). Medians and
+worsts use n=5 per profile (n=100 for searches). No pilot, emulator or other-schema measurement
+is pooled. **WI-032 stays active; recovery cases, the iPad check, MI-02 and adoption 1C remain open.**
 
 ## Per-case results
 
@@ -40,6 +41,11 @@ publication, UI continuation and the local reopen. Phase subsets overlap and are
 | target-r3 | same-profile replacement | 55.803 | 5.187 | 46.721 | 3,582.8 | 55.836 | 23.0 | 21.537 | 132.9 | 410,660,160 |
 | target-r4 | same-profile replacement | 56.554 | 5.198 | 48.296 | 2,640.2 | 56.607 | 37.8 | 8.690 | 140.4 | 413,320,936 |
 | target-r5 | same-profile replacement | 63.647 | 5.188 | 49.687 | 8,134.5 | 63.699 | 36.3 | 8.837 | 282.6 | 413,246,776 |
+| stress-r1 | first stress refresh replaces target | 215.538 | 26.834 | 169.332 | 17,773.6 | 215.670 | 37.4 | 48.568 | 293.5 | 976,456,822 |
+| stress-r2 | same-profile replacement | 222.122 | 26.724 | 179.379 | 15,330.0 | 222.151 | 17.5 | 19.902 | 146.1 | 1,514,226,382 |
+| stress-r3 | same-profile replacement | 228.802 | 26.710 | 173.081 | 28,078.2 | 228.844 | 27.6 | 72.825 | 165.2 | 2,096,320,078 |
+| stress-r4 | same-profile replacement | 228.564 | 26.723 | 179.114 | 21,965.4 | 228.596 | 19.1 | 67.851 | 146.3 | 2,091,673,310 |
+| stress-r5 | same-profile replacement | 227.296 | 26.731 | 175.362 | 24,504.8 | 227.401 | 90.0 | 53.004 | 144.7 | 2,096,135,270 |
 
 Offline local-open clocks come from each report; the Android activity clock is `am start -W`
 TotalTime; the readiness bound runs from before `am start` until UI inspection succeeds and
@@ -57,79 +63,93 @@ includes the host's uiautomator polling. None is first paint, and they are not a
 | target-o3 | COLD | 503.682 | 445.100 | 17.188 | 34.483 | 1,326 | 7,585.262 |
 | target-o4 | COLD | 542.794 | 494.666 | 9.720 | 34.414 | 1,383 | 7,756.050 |
 | target-o5 | COLD | 508.107 | 448.712 | 17.358 | 35.120 | 1,288 | 7,489.604 |
+| stress-o1 | COLD | 1,082.774 | 1,014.140 | 12.566 | 52.024 | 2,393 | 9,604.322 |
+| stress-o2 | COLD | 540.115 | 490.175 | 8.681 | 38.834 | 1,824 | 8,114.765 |
+| stress-o3 | COLD | 527.450 | 479.470 | 8.280 | 34.493 | 1,580 | 7,837.401 |
+| stress-o4 | COLD | 485.698 | 431.403 | 10.126 | 40.537 | 1,509 | 7,715.889 |
+| stress-o5 | COLD | 509.017 | 463.635 | 9.241 | 33.888 | 1,420 | 7,483.875 |
 
 ### Observations, not established causes
 
-- Target refresh time is dominated by import: entity insert/projection/commit took
-  **30.4–42.6 s** of each target refresh. HTTP plus hash (about 5.2 s for
-  6,294,888 gzip bytes) is consistent with the application's 10 Mbit/s simulation.
-- The first target refresh, replacing baseline, was the fastest (47.386 s).
-  Same-profile target replacements took 55.803–63.647 s. Completed
-  generation deletion ranged **0.835–8.135 s**. `target-r5`'s
-  8.135 s deletion was its largest difference from the other replacements.
-  With n=5 and uncontrolled storage/background conditions, the cause is not established.
-- The first offline open of each batch (751.1, 822.6 ms) was slower than the
-  following eight (492.1–542.8 ms). OS caching is uncontrolled.
-  This run does not establish a cause.
-- These physical runs did not reproduce the stress-scale emulator's multi-second local-open
-  continuation; worker-to-continuation stayed at 8.630–17.358 ms.
-  Stress was not run, so the scale at which that emulator gap appeared remains untested here.
+- **Import dominates refresh time.** Entity insert/projection/commit took
+  30.4–42.6 s per target refresh and
+  131.4–140.6 s per stress refresh. HTTP plus hash
+  (5.2–5.3 s target, 26.7–26.8 s stress) matches the
+  application's 10 Mbit/s simulation for 6,294,888 and 33,229,222 gzip bytes.
+- **Old-generation deletion grows with scale and varies:** 0.835–8.135 s
+  at target and 15.330–28.078 s at stress. `target-r5`'s
+  8.135 s deletion was its largest difference from the other target replacements.
+  The first target refresh, replacing the smaller baseline, was the fastest target case.
+- **The first offline open of each batch was the slowest** (751.1, 822.6, 1,082.8 ms,
+  baseline/target/stress); the other twelve took 485.7–542.8 ms. OS caching is uncontrolled.
+- **No multi-second local-open continuation on this tablet.** Worker-to-continuation stayed at
+  8.280–17.358 ms across all 15 opens, including 8.280–12.566 ms at stress. The
+  stress-scale emulator traces showed about 2.5–2.7 s there. This is consistent with the earlier
+  inference that the emulator gap is a software-graphics effect. It is n=5 on one device and is
+  not a controlled comparison.
+- **Stress storage:** peak sampled storage reached 2,096,320,078 bytes. Free /data fell from
+  12,484,880 to 11,059,272 KiB across the five stress refreshes. These are
+  point samples, not continuous peaks.
 
 ## Device, artifacts and conditions
 
 Samsung **Tab S6 Lite SM-P610**, explicit USB serial **R52T30AZZXZ**, physical device
 (`ro.kernel.qemu=0`), Android **13/API 33**, **Arm64**, active WebView
 **155.0.8059.43**, all matching every report. The installed Release schema-v4 APK is unchanged:
-**45,026,457 bytes**, SHA-256 `8b51486e7130e41e7ba9809e3b2f5b898a2b3d95c4e29b69616fa4d794964ec5`, verified at preflight
-and cleanup and matching the archive. Native SQLite **3.53.3 / WAL / FULL**. No app, test, package
-or spike-source change (spike paths unchanged since `4998512`), no reinstall, reset, cache clear
-or data removal, and no Perfetto capture or logical scan.
+**45,026,457 bytes**, SHA-256 `8b51486e7130e41e7ba9809e3b2f5b898a2b3d95c4e29b69616fa4d794964ec5`, verified at preflight,
+both readiness steps and both cleanups, and matching the archive. Native SQLite **3.53.3 / WAL /
+FULL**. No app, test, package or spike-source change (spike paths unchanged since `4998512`), no
+reinstall, reset, cache clear or app-data removal, and no Perfetto capture or logical scan.
 
 **Fixture host deviation (developer-approved).** The pilot's Debug host binaries were
 overwritten by the 23 October merge-verification build. Rebuilding with five candidate source
 revisions did not reproduce their hashes. The developer chose the host rebuilt at `5a05963`
-from unchanged spike source (`1.0.0+5a05963b2355d9d692d5c8a4f12476d08c645c7e`); its hashes are recorded
-separately in `host-artifact-hashes.json` and `host-provenance.json`. The host's job, serving
-fixtures with the application-level simulation, uses unchanged source; the tablet build is
-unaffected. Host and tablet results should still be read as a separate run from the pilot.
+from unchanged spike source (`1.0.0+5a05963b2355d9d692d5c8a4f12476d08c645c7e`). Its hashes are recorded separately in
+`host-artifact-hashes.json` and `host-provenance.json`, and were re-verified before the stress
+continuation. The tablet build is unaffected; read these results as a separate run from the pilot.
 
 Fixtures (seed 42, as of 2026-10-20) were verified against their manifests: baseline
 5,000 products / 500 Locations / 60,000 history lines (1,570,674 gzip bytes); target
-25,000 / 500 / 120,000 (6,294,888 gzip bytes); stress 100,000 / 2,000 / 1,440,000
-(33,229,222 gzip bytes; not downloaded). Every replacement verified profile, owner
-`spike-rep-42`, server `http://127.0.0.1:7206/`, **USB adb reverse**, **Simulate 10 Mbit/s +
-initial 100 ms** and pause **None** before Download & apply. The simulation runs over USB; it
-does not certify physical throughput or RTT.
+25,000 / 500 / 120,000 (6,294,888); stress 100,000 / 2,000 / 1,440,000 (33,229,222). Every
+replacement verified profile, owner `spike-rep-42`, server `http://127.0.0.1:7206/`,
+**USB adb reverse**, **Simulate 10 Mbit/s + initial 100 ms** and pause **None** before
+Download & apply. The simulation runs over USB; it does not certify physical throughput or RTT.
 
 For each offline batch only the owned route was removed, airplane mode enabled, Wi-Fi disabled
-and `Active default network: none` confirmed. Fixture requests stayed at
-**10** across baseline's batch and **20** across target's
-(two per refresh): **zero new requests** during any offline open. Offline reports keep the
-app's reset Network selector default; actual offline conditions come from these device and
-host records.
+and `Active default network: none` confirmed. Fixture requests were unchanged across every batch:
+baseline 10, target 20 (one host log for both), stress
+10 (its own host log), two per refresh. That is **zero new requests** during any offline open.
 
 Free /data points: preflight **2,373,076 KiB**, baseline entry **2,372,004**,
-target entry **2,367,020**, stress entry **2,077,944 KiB**. Device memory
-at preflight: 3,797,324 KiB total / 1,206,476 KiB available. Battery 91% → 85%, temperature
-17.9 °C → 21.7 °C. The tablet was discharging throughout: this USB connection does not
-power it. End-of-refresh `Process.WorkingSet64` samples were 244,023,296–332,685,312 bytes.
-Offline working set is unavailable. Storage values are point samples, not continuous peaks.
+target entry **2,367,020**, first stress entry **2,077,944**, stress continuation
+entry **12,482,340**, after the last stress refresh **11,059,272 KiB**.
+Device memory at preflight: 3,797,324 KiB total / 1,206,476 KiB available. Battery
+91% → 85% (17.9 → 21.7 °C) for baseline/target and 81% → 76%
+(20.4 → 22.8 °C) for stress. The tablet discharged throughout: this USB connection does
+not power it. End-of-refresh `Process.WorkingSet64` samples: 244,023,296–332,685,312 bytes
+(baseline/target), 189,071,360–237,322,240 bytes (stress). Offline working set is unavailable.
 
 **First attempt aborted before any case.** Because the tablet is not powered over USB,
 `stay_on_while_plugged_in` had no effect, and the screen timed out between readiness and the
-matrix start. The runner's foreground guard refused all input. With the plan's temporary
-wake-support allowance, the screen timeout was raised from 120,000 ms to 1,800,000 ms for the
-run (restored at cleanup). A wake key returned the screen before the 10-minute lock delay, and the
-spike was brought forward again (HOT, same process) as setup. Readiness and re-focus were not
-measured. Records are in `attempt-1-aborted/`, `screen-timeout-before.json` and `wake-support.json`.
+matrix start. The runner's foreground guard refused all input. Under the plan's temporary
+wake-support allowance, the screen timeout was raised from 120,000 ms to 1,800,000 ms for each run,
+and both cleanups restored it. Records: `attempt-1-aborted/`, `wake-support*.json`.
+
+**Stress continuation.** The capacity stop record (`cases/stress-entry-stop.json`) is retained
+unchanged. After the developer freed space, the tablet briefly disappeared from USB entirely;
+Windows listed no Samsung device until it was reconnected. Fresh readiness then verified identity,
+APK, WebView, host artifact hashes, the retained target generation, the saved-work fingerprint
+and note, and the stored target fixture. `stress-run.ps1` runs the same per-case functions as
+`run-matrix.ps1`, copied verbatim, with its own host log, route, wake and cleanup records.
 
 ## Saved work, generations and searches
 
 The retained pilot generation `ee25e3ce860d4f4fae65d191ff1252a5`, note **Samsung saved note
 WI-032** and fingerprint `89e54f6dc96aa4bdef76ff5efc96146553352e8c2d513463ca85c236c4747af9` were verified before the first case.
 Every report's before/after fingerprint matches the independently reconstructed canonical
-work object. Each refresh produced a new generation from its predecessor; each offline open
-shows the latest successful refresh's generation. The target data and the edited work remain on the tablet.
+work object. Each refresh produced a new generation from its predecessor across all three
+profiles. Each offline open shows the latest successful refresh's generation. The stress data
+and the edited work remain on the tablet.
 
 | Case | RunId | Generation | Original report SHA-256 |
 |---|---|---|---|
@@ -153,39 +173,50 @@ shows the latest successful refresh's generation. The target data and the edited
 | target-o3 | `da590065-6698-4d09-8cda-abd66f1b7674` | `8f4acbfc67bf4facaae3053653b55fdd` | `1d849dd8e64f34cea20d6122dff88ef5468e94e7eea058763eb712e0ed1b941a` |
 | target-o4 | `dca682c4-5396-494e-829c-e9e9c31d02f8` | `8f4acbfc67bf4facaae3053653b55fdd` | `e530cb0f1cb642ce9187bab5969e03e700f486c7d4bf9d441dbeae21241808e7` |
 | target-o5 | `35eab50a-33d3-4b88-a442-abaf2fd144e3` | `8f4acbfc67bf4facaae3053653b55fdd` | `94ef9a65b9ab2a333af809a9a91b094b2332a364289ed58edd6172327207f34c` |
+| stress-r1 | `a177bf67-33d2-408d-8cf7-c6824bf8e058` | `4d8249c6880d47ccb8838d681e6c5bc1` | `14331ad8f74aa912e1562809f2a3de309f335ed1a0a2ab905b504b024510962a` |
+| stress-r2 | `63a81937-e422-4358-9fd1-9a6b6fddaa1d` | `ff47a71f59254ffabec45a7e6e42cdd7` | `083cdc7bef70783900e748e8c685fe71607fc1445cea71677f14a6f3877d344d` |
+| stress-r3 | `b53e5750-9348-4da2-ba99-c1e7b5a78fb6` | `58a6058d6662485fbbb8becaa83be90e` | `9d0da973f023dcd7a3455d43fa0643982909a47366a2985135de01cd9a3e03c6` |
+| stress-r4 | `2be279da-0638-4fb4-abec-44f3a0884585` | `cc119f8e2e9b4e568d243f89ed43ebea` | `1223e7d0e2523775be74c910e608c4ffe9993c41b3b524ed3700791d5bc76f8a` |
+| stress-r5 | `0d46a636-d1a9-4486-a460-d0ed44b3bdc7` | `f710c61654d94a6bb31189647e7b1858` | `40716a3d393594c741704f247a7b0ffabeb6d194a299e1b24beeb12ab2c2f39c` |
+| stress-o1 | `cd612389-fbfc-4038-a51e-51c8c47f0169` | `f710c61654d94a6bb31189647e7b1858` | `f0648012e7bccb6cb2cd43105a913fda120b6564d6801aeefc928813b95afa79` |
+| stress-o2 | `7638ef2c-b7bc-40bf-8703-5d9b97070afa` | `f710c61654d94a6bb31189647e7b1858` | `71ee32899de5e88da29ebffb2d37da957ab6f7f516d93c61140f3c1253778207` |
+| stress-o3 | `308bbd8d-c147-4a31-852d-4609bb49f8cd` | `f710c61654d94a6bb31189647e7b1858` | `63a09db0f978d80e783adecf883f3477aa1c2f08de6966d89ecce80803013935` |
+| stress-o4 | `a8c68f01-306d-455c-8f7c-26154e08d340` | `f710c61654d94a6bb31189647e7b1858` | `7eff90cf1bf32c39de9de272e6b0f897f3e071a18fe520507b5ed227821e02fc` |
+| stress-o5 | `0692f558-fbf9-404a-bd52-f4ed38ba489f` | `f710c61654d94a6bb31189647e7b1858` | `7d00a692b4120f173ad35a9b1786eac77eb3590a9c4d6d2bca822acf5d54ca11` |
 
 Each refresh ran the twenty fixed terms once, in order. Expected counts are computed
-independently from the generator's six-name/six-town cycle at 500 Locations, normalizing accents,
-case and apostrophes. All 200 counts agree. Query and observed-visible clocks remain separate.
-Observed-visible timing runs from the JS call to after render; it is not keystroke-to-photon.
+independently from the generator's six-name/six-town cycle at 500 or 2,000 Locations,
+normalizing accents, case and apostrophes. All 300 counts agree. Query and observed-visible clocks
+remain separate; observed-visible timing runs from the JS call to after render and is not
+keystroke-to-photon.
 
 ## Scenario verification
 
 | Agreed intent | Result / evidence |
 |---|---|
-| Keep the selected device and artifacts | Pass with the approved host deviation: same serial/model/OS/ABI/WebView, installed and archived APK, fixture and Unsent hashes; no rebuild of the app, reinstall, reset or other device. |
-| Stop before a profile when headroom is insufficient | Pass: baseline and target entry passed the 1 GiB guard. Stress stayed unstarted at 2,077,944 KiB &lt; 3 GiB, and all ten stress cases are listed as unstarted. Nothing was deleted and no fixture was shrunk. |
-| Keep every original attempt | Pass: 10 refreshes started and 10 completed. Each has its own persisted start, outcome, report and verified new generation, plus manifest/hash/count checks. No failures occurred and none was replaced. |
-| Keep edited work across profiles and reopens | Pass: the canonical fingerprint/note and original Unsent identity persist through all 20 cases, including the baseline-to-target transition. |
-| Return expected matches | Pass: 20 ordered terms per refresh, 200 independent count checks at 500 Locations, separate query and visible clocks. |
-| Reopen the recorded day offline and process-cold | Pass: 10 COLD launches, no route or default network, no fixture requests, latest generation and saved work every time, seven raw local-open points each. |
-| Record conditions and unknowns | Pass: per-profile counts, separate clocks, the one 60-second proxy miss, numeric aggregates with denominators, point-sampled storage, unavailable offline memory, the aborted first attempt and the developer's “Smooth”. |
-| Restore only owned resources | Pass: airplane 0 / Wi-Fi 1 / stay-on 0 / screen timeout 120,000 ms restored, owned route removed, host and wake helper verified exited, temporary UI dump copied then removed, APK and saved work retained. |
+| Keep the selected device and artifacts | Pass with the approved host deviation: same serial/model/OS/ABI/WebView, installed and archived APK, fixture and Unsent hashes; no app rebuild, reinstall, reset or other device. |
+| Stop before a profile when headroom is insufficient | Pass: baseline and target entry passed 1 GiB. Stress stopped unstarted at 2,077,944 KiB &lt; 3 GiB without deleting data or shrinking fixtures. It ran only after the developer freed space and the guard passed at 12,482,340 KiB. |
+| Keep every original attempt | Pass: 15 refreshes started and completed. Each has its own persisted start, outcome, report and verified new generation, plus manifest/hash/count checks. No failures; none replaced. |
+| Keep edited work across profiles and reopens | Pass: canonical fingerprint/note and original Unsent identity persist through all 30 cases, including both profile transitions. |
+| Return expected matches | Pass: 20 ordered terms per refresh and 300 independent count checks at 500/2,000 Locations, with separate query and visible clocks. |
+| Reopen the recorded day offline and process-cold | Pass: 15 COLD launches with no route, no default network and no fixture request. Each showed the latest generation and saved work, with seven raw local-open points. |
+| Record conditions and unknowns | Pass: per-profile counts, separate clocks, every proxy miss, numeric aggregates with denominators, point-sampled storage, unavailable offline memory, the aborted first attempt, the capacity stop and continuation, and the developer's “Smooth” at target and stress. |
+| Restore only owned resources | Pass, twice: airplane 0 / Wi-Fi 1 / stay-on 0 / screen timeout 120,000 ms restored, owned route removed, host and wake helper verified exited, temporary UI dump copied then removed, APK and saved work retained. |
 
 ## Lifecycle and evidence
 
-Readiness brought the already-running spike forward (not a cold launch), started the owned
+Each run started with readiness: it brought the spike forward (not measured), started the owned
 host on `127.0.0.1:7206`, created the serial's USB reverse route and a bounded PC wake helper.
-Cleanup restored the recorded settings and stopped only those identified processes. Other apps,
-devices and shared services were not operated.
+Each cleanup restored the recorded settings and stopped only those identified processes. Other
+apps, devices and shared services were not operated.
 
 Evidence: `.artifacts/wi032/samsung-repeat-session/`, including `summary.json`,
-`validate-report.py`, the 20 original reports, per-case start/ready/observation/validation and
-launch records, UI dumps, space points, host logs and hashes, device conditions, the human
-observation and cleanup proof. Unchanged-source verification remains **2,358 .NET / 34
+`validate-report.py`, the 30 original reports, per-case start/ready/observation/validation and
+launch records, UI dumps, space points, both host logs, hashes, device conditions, both human
+observations and both cleanup proofs. Unchanged-source verification remains **2,358 .NET / 34
 JavaScript passes at `4998512`**; this measurement increment did not rebuild the app or repeat
 the source suites.
 
-Stop for Human Tight-Loop review. Open items: stress needs about 1 GiB more free space, or a
-decision on the guard. Recovery/cancellation/owner-isolation cases, the iPad mini/Mac check,
-MI-02 and adoption 1C remain later work. No optimization, PR, merge or main integration follows.
+Stop for Human Tight-Loop review. Remaining physical work: recovery, cancellation and
+owner-isolation cases; the iPad mini/Mac check; then MI-02 and adoption 1C. No optimization, PR,
+merge or main integration follows.

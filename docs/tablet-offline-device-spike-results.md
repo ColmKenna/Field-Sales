@@ -452,14 +452,16 @@ Stop for review before the proposed repeated baseline/target/stress physical mat
 
 ## Repeated physical Samsung measurements — 23 October 2026
 
-The [1B-B2 repeat results](tablet-offline-samsung-repeat-results.md) record baseline and target on
-the same Samsung SM-P610 and unchanged schema-v4 Release APK: five replacements and five offline
-process-cold opens each. That gives 20 original reports and 200 searches, all independently
-verified, with none replaced. Refresh median/worst: baseline 8.831/10.582 s, target
-56.554/63.647 s (4/5 target refreshes under the 60 s proxy). Offline local open
-median/worst: 497.881/751.074 ms and 508.107/822.577 ms. All 200 observed-visible searches were
-under one second (worst 308.6 ms). There were zero fixture requests offline, and edited work
-survived every case. Stress was not started: 2,077,944 KiB was free, below the approved 3 GiB
-entry guard. The fixture host was rebuilt from unchanged source with developer approval.
-The developer reports "Smooth". WI-032 active; stress capacity, recovery/iPad, MI-02 and 1C remain
-open. Stop for review.
+The [1B-B2 repeat results](tablet-offline-samsung-repeat-results.md) record baseline, target and
+stress on the same Samsung SM-P610 and unchanged schema-v4 Release APK. Each profile had five
+replacements and five offline process-cold opens. That gives 30 original reports and 300
+searches, all independently verified, with none replaced. Refresh median/worst: baseline
+8.831/10.582 s, target 56.554/63.647 s, stress 227.296/228.802 s. Under the 60 s proxy: 5/5, 4/5
+and 0/5. Offline local open median/worst: 497.881/751.074, 508.107/822.577 and 527.450/1,082.774 ms
+(15/15 under 3 s). All 300 observed-visible searches were under one second, including at 2,000
+Locations (worst 308.6 ms). Offline worker-to-continuation stayed at 8–17 ms, so the emulator's
+multi-second stress gap did not appear. There were zero fixture requests offline, and edited work
+survived every case. Stress first stopped at its 3 GiB entry guard (2,077,944 KiB free); after the
+developer freed space, a continuation passed the guard and completed. The fixture host was rebuilt
+from unchanged source with developer approval. The developer reports "Smooth" at target and
+stress. WI-032 active; recovery/iPad, MI-02 and 1C remain open. Stop for review.
