@@ -7,14 +7,14 @@
 @if (Model.Permissions is not { } permissions)
 {
     <h1>Group permissions</h1>
-    <p>Choose a Restriction Group to grant permission to a trained cohort.</p>
+    <p>Choose a Restriction Group to grant or remove permissions for a cohort.</p>
     @if (Model.Groups.Count == 0) { <p>No active Restriction Groups exist yet.</p> }
     else
     {
         <ul class="geography-list permission-reps">
         @foreach (var group in Model.Groups)
         {
-            <li><a asp-page="./GroupPermissions" asp-route-groupId="@group.RestrictionGroupId">@group.Name</a></li>
+            <li><a asp-page="./GroupPermissions" asp-route-groupId="@group.RestrictionGroupId">@group.Name</a> @if (group.Archived) { <span class="permission-archived">Archived</span> }</li>
         }
         </ul>
     }
@@ -24,20 +24,32 @@ else
     <div class="permission-heading"><h1>@permissions.Group.Name</h1><p>Group permissions</p></div>
     @if (TempData["CohortPermissionNotice"] is string notice) { <p role="status">@notice</p> }
     @if (!ViewData.ModelState.IsValid) { <div asp-validation-summary="All" role="alert"></div> }
+    @if (Model.RemovalReview is { } review)
+    {
+        <partial name="_PermissionRemovalReview" model="@(new FieldSales.Web.Coverage.PermissionRemovalReviewModel(review,
+            Url.Page("./GroupPermissions", new { groupId = permissions.Group.RestrictionGroupId, remove = true })!))" />
+    }
+    else
+    {
     @if (permissions.Group.Archived)
     {
         <p class="permission-view-only">Archived — existing permissions have no effect while archived. No new permissions can be granted.</p>
     }
-    <p>Grant permission to the reps who completed training. Changes take effect at each rep's next Sync.</p>
+    <nav class="permission-modes" aria-label="Permission action">
+        @if (!permissions.Group.Archived)
+        { <a asp-page="./GroupPermissions" asp-route-groupId="@permissions.Group.RestrictionGroupId" aria-current="@(Model.Remove ? null : "page")">Grant permissions</a> }
+        <a asp-page="./GroupPermissions" asp-route-groupId="@permissions.Group.RestrictionGroupId" asp-route-remove="true" aria-current="@(Model.Remove ? "page" : null)">Remove permissions</a>
+    </nav>
+    <p>@(Model.Remove ? "Select the reps whose permission should be removed. You will review the consequence before saving." : "Grant permission to the reps who completed training. Changes take effect at each rep's next Sync.")</p>
     @if (permissions.Reps.Count == 0) { <p>No field salespeople are available.</p> }
     else
     {
-        <form method="post" asp-page-handler="Grant" class="permission-cohort">
+        <form method="post" asp-page-handler="@(Model.Remove ? "Remove" : "Grant")" class="permission-cohort">
             <input type="hidden" name="GroupId" value="@permissions.Group.RestrictionGroupId" />
             <div class="permission-table" role="region" aria-label="Rep permissions" tabindex="0">
                 <table>
                     <caption>Rep permissions for @permissions.Group.Name</caption>
-                    <thead><tr><th scope="col">Rep</th><th scope="col">Status</th><th scope="col">Last change</th><th scope="col">Grant</th></tr></thead>
+                    <thead><tr><th scope="col">Rep</th><th scope="col">Status</th><th scope="col">Last change</th><th scope="col">@(Model.Remove ? "Remove" : "Grant")</th></tr></thead>
                     <tbody>
                     @for (int index = 0; index < permissions.Reps.Count; index++)
                     {
@@ -49,13 +61,13 @@ else
                             <td>
                                 <input type="hidden" name="Reps[@index].RepSubject" value="@row.Rep.Subject" />
                                 <input type="hidden" name="Reps[@index].ExpectedLastChangeId" value="@row.LastChange?.Id" />
-                                @if (row.CanGrant)
+                                @if (Model.Remove ? row.CanRemove : row.CanGrant)
                                 {
-                                    <label><input type="checkbox" name="Reps[@index].Selected" value="true" /> Grant to @row.Rep.Name</label>
+                                    <label><input type="checkbox" name="Reps[@index].Selected" value="true" /> @(Model.Remove ? "Remove from" : "Grant to") @row.Rep.Name</label>
                                 }
                                 else
                                 {
-                                    <span class="permission-locked">@(row.Granted ? "Already granted" : !row.Active ? "Not active" : "View only")</span>
+                                    <span class="permission-locked">@(Model.Remove ? (row.Granted ? "View only" : "Not granted") : row.Granted ? "Already granted" : !row.Active ? "Not active" : "View only")</span>
                                 }
                             </td>
                         </tr>
@@ -63,14 +75,15 @@ else
                     </tbody>
                 </table>
             </div>
-            @if (permissions.Reps.Any(row => row.CanGrant))
+            @if (permissions.Reps.Any(row => Model.Remove ? row.CanRemove : row.CanGrant))
             {
                 <div class="permission-cohort-action">
                     <label asp-for="Reason">Reason for all selected reps (optional)</label>
                     <textarea asp-for="Reason" maxlength="1000" rows="2"></textarea>
-                    <button type="submit" class="button">Grant to selected reps</button>
+                    <button type="submit" class="button">@(Model.Remove ? "Review removal" : "Grant to selected reps")</button>
                 </div>
             }
         </form>
+    }
     }
 }

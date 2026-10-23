@@ -214,6 +214,35 @@ The reserved ports are proposals until the item that adds the project confirms t
 - An In Progress order line for such a product (valid when captured) is a WI-043 obligation: no
   orders or tablet exist yet.
 
+## WI-031 removal consequence (2026-10-19, developer)
+
+The developer selected **keep the rep count, omit the order-line count, and say existing unsent
+lines will still send**, plus **a review step with Confirm removal and Cancel**. They then replied
+**Approved** to the implementation plan and 17 Human-Led scenarios. This authorizes the single-rep
+increment only; stop for review before cohort removal, and stop again after that increment.
+
+On 2026-10-20 the developer replied **Continue WI-031**, accepting the pushed single-rep checkpoint
+`0ded5cc` and authorizing the planned cohort increment. Stop for review after its tests/previews;
+the final verification/completion increment follows acceptance of that checkpoint.
+
+The developer's subsequent **Continue WI-031** on 2026-10-20 accepts the pushed cohort checkpoint
+`948e68f` and authorizes final full-suite verification, acceptance evidence, status done and final
+commit/push. No PR creation or integration was requested. The reviewed single-rep copy uses neutral
+“their next Sync” because the directory has no pronoun data.
+
+- MI-44 is settled for WI-031's wording only. The order-line-count portions of CV009-E/F are
+  superseded by this decision. No guessed/last-known count and no new tablet/order telemetry.
+- Single: "Colm will lose Pharmacy-only medicines at his next Sync. Any lines already on unsent
+  orders will still send." Cohort: "3 reps will lose Pharmacy-only medicines at their next Sync.
+  Any lines already on their unsent orders will still send."
+- Review writes nothing. Confirm uses a protected BFF review binding actor, group, reps, expected
+  last-change ids and optional reason; lifetime 30 minutes. Changed permissions require fresh review.
+  Existing API authorization, record and writer remain authoritative; confirmation is the website flow.
+- Archived-group wording explains that it already grants no access and restoration will not restore
+  the removed permission. Inactive holders remain removable. Reason rules and grant behavior remain.
+- Cohort removal will reuse the existing rule/writer and be atomic, with Grant/Remove modes on the
+  group page. It is a later increment; the single-rep checkpoint does not authorize it.
+
 ## WI-030 cohort grants (2026-10-19, developer, plan approval)
 
 The developer replied **approved** to the WI-030 implementation plan and its 15 Scenario Review

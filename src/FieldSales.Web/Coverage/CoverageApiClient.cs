@@ -52,8 +52,13 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
 
     public Task<DirectoryResult<PermissionRepChoice[]>> PermissionRepsAsync(CancellationToken ct) =>
         SendAsync<PermissionRepChoice[]>(HttpMethod.Get, "/coverage/permissions/reps", null, ct);
-    public Task<DirectoryResult<PermissionGroupChoice[]>> PermissionGroupsAsync(CancellationToken ct) =>
-        SendAsync<PermissionGroupChoice[]>(HttpMethod.Get, "/coverage/permissions/groups", null, ct);
+    public async Task<DirectoryResult<PermissionGroupChoice[]>> PermissionGroupsAsync(CancellationToken ct, bool includeArchived = false)
+    {
+        var result = await SendAsync<PermissionGroupChoice[]>(HttpMethod.Get,
+            "/coverage/permissions/groups" + (includeArchived ? "?includeArchived=true" : ""), null, ct);
+        return result.Success && !includeArchived && result.Value!.Any(group => group.Archived)
+            ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
     public async Task<DirectoryResult<GroupPermissionsPage>> GroupPermissionsAsync(Guid group, CancellationToken ct)
     {
         var result = await SendAsync<GroupPermissionsPage>(HttpMethod.Get, "/coverage/permissions/groups/" + group, null, ct);
@@ -64,6 +69,19 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
     {
         var result = await SendAsync<CohortPermissionGrantResult>(HttpMethod.Post,
             "/coverage/permissions/groups/" + group + "/grants", value, ct);
+        if (!result.Success) return result;
+        var changes = result.Value!.Changes;
+        var expected = value.Reps.Select(row => row.RepSubject).ToHashSet(StringComparer.Ordinal);
+        return result.Value.RestrictionGroupId != group || changes.Count != value.Reps.Count
+            || !expected.SetEquals(changes.Select(row => row.Rep.Subject))
+            || changes.Any(row => row.Reason != (string.IsNullOrWhiteSpace(value.Reason) ? null : value.Reason.Trim()))
+            ? new(HttpStatusCode.ServiceUnavailable) : result;
+    }
+    public async Task<DirectoryResult<CohortPermissionRemovalResult>> RemoveCohortPermissionAsync(Guid group,
+        RemoveCohortPermissionRequest value, CancellationToken ct)
+    {
+        var result = await SendAsync<CohortPermissionRemovalResult>(HttpMethod.Post,
+            "/coverage/permissions/groups/" + group + "/removals", value, ct);
         if (!result.Success) return result;
         var changes = result.Value!.Changes;
         var expected = value.Reps.Select(row => row.RepSubject).ToHashSet(StringComparer.Ordinal);
@@ -175,10 +193,11 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
                 PermissionRepChoice[] reps => reps.All(row => row is not null && ValidChoice(row.Rep))
                     && reps.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == reps.Length,
                 RepPermissionsPage permissions => ValidPermissions(permissions),
-                PermissionGroupChoice[] groups => groups.All(row => ValidPermissionGroup(row) && !row.Archived)
+                PermissionGroupChoice[] groups => groups.All(ValidPermissionGroup)
                     && groups.Select(row => row.RestrictionGroupId).Distinct().Count() == groups.Length,
                 GroupPermissionsPage permissions => ValidGroupPermissions(permissions),
-                CohortPermissionGrantResult granted => ValidCohortGrant(granted),
+                CohortPermissionGrantResult granted => ValidCohortChanges(granted.RestrictionGroupId, granted.Changes, RestrictionPermissionChangeKind.Granted),
+                CohortPermissionRemovalResult removed => ValidCohortChanges(removed.RestrictionGroupId, removed.Changes, RestrictionPermissionChangeKind.Removed),
                 RestrictionPermissionChangeDetails change => ValidPermissionChange(change),
                 AssignmentImpactDetails preview => ValidPreview(preview),
                 AssignmentReviewOptions options => options.Reps is not null && options.Targets is not null && options.Assignments is not null
@@ -325,16 +344,18 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
             && (row.LastChange is null ? !row.Granted : ValidPermissionChange(row.LastChange)
                 && row.LastChange.Rep.Subject == row.Rep.Subject && row.LastChange.RestrictionGroupId == page.Group.RestrictionGroupId
                 && row.Granted == (row.LastChange.Change == RestrictionPermissionChangeKind.Granted))
+            && !(row.CanGrant && row.CanRemove) && (!row.CanRemove || row.Granted)
             && (!row.CanGrant || row.Active && !row.Granted && !page.Group.Archived))
         && page.Reps.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == page.Reps.Count;
-    private static bool ValidCohortGrant(CohortPermissionGrantResult value) => value.RestrictionGroupId != Guid.Empty
-        && value.Changes is { Count: > 0 } && value.Changes.All(row => ValidPermissionChange(row)
-            && row.RestrictionGroupId == value.RestrictionGroupId && row.Change == RestrictionPermissionChangeKind.Granted)
-        && value.Changes.Select(row => row.Id).Distinct().Count() == value.Changes.Count
-        && value.Changes.Select(row => row.Sequence).Distinct().Count() == value.Changes.Count
-        && value.Changes.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == value.Changes.Count
-        && value.Changes.Select(row => row.Actor).Distinct().Count() == 1
-        && value.Changes.Select(row => row.ChangedAt).Distinct().Count() == 1;
+    private static bool ValidCohortChanges(Guid group, IReadOnlyList<RestrictionPermissionChangeDetails>? changes,
+        RestrictionPermissionChangeKind change) => group != Guid.Empty
+        && changes is { Count: > 0 } && changes.All(row => ValidPermissionChange(row)
+            && row.RestrictionGroupId == group && row.Change == change)
+        && changes.Select(row => row.Id).Distinct().Count() == changes.Count
+        && changes.Select(row => row.Sequence).Distinct().Count() == changes.Count
+        && changes.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == changes.Count
+        && changes.Select(row => row.Actor).Distinct().Count() == 1
+        && changes.Select(row => row.ChangedAt).Distinct().Count() == 1;
     private static bool ValidHistoryOwner(HistoryOwnerDetails? value, Guid locationId) => value is null
         || ValidIdentity(value.Rep) && value.Source is { Target: { } target } source && source.AssignmentId != Guid.Empty
         && Enum.IsDefined(target.Level) && target.UnitId != Guid.Empty && !string.IsNullOrWhiteSpace(source.Name)

@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext;
 using static FieldSales.Web.Tests.RestrictionPermissionCohortTests;
+using static FieldSales.Web.Tests.PermissionRemovalCohortTests;
 
 namespace FieldSales.Web.Tests;
 
@@ -79,6 +80,60 @@ public sealed class RestrictionPermissionCohortSafetyTests(CoverageReadApplicati
         using (var removedRole = await GrantAsync(manager, groups[1], ["aoife"]))
             Assert.Equal(HttpStatusCode.Forbidden, removedRole.StatusCode);
         Assert.Equal((2, 2), await _host.CountsAsync());
+        Assert.False(app.Staff.SawTransaction);
+    }
+
+    [Theory]
+    [InlineData(1)] [InlineData(2)]
+    public async Task Should_RollBackAllRemovals_When_APersistenceFailureOccursPartWay(int failAfter)
+    {
+        var group = (await _host.ResetAsync(Pharmacy))[0];
+        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        using var seed = await GrantAsync(office, group, ["aoife", "brian", "colm"]);
+        Assert.Equal(HttpStatusCode.OK, seed.StatusCode);
+        var held = (await seed.Content.ReadFromJsonAsync<CohortPermissionGrantResult>())!.Changes;
+        _failure.FailAfter = failAfter;
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => RemoveAsync(office, group, held));
+        Assert.Equal("Injected failure after saving part of a cohort.", error.Message);
+        // Read inside the failed transaction, then from a fresh scope after rollback.
+        Assert.Equal((3 + failAfter, 3 - failAfter), _failure.WrittenBeforeFailure);
+        Assert.Equal((3, 3), await _host.CountsAsync());
+        foreach (var old in held)
+            Assert.Equal(old, Assert.Single((await RestrictionPermissionHost.PageAsync(office, old.Rep.Subject)).Groups).LastChange);
+        using var retry = await RemoveAsync(office, group, held);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        Assert.Equal((6, 0), await _host.CountsAsync());
+    }
+
+    [Fact]
+    public async Task Should_KeepReportingLinesLocked_When_RemovalRacesWithATeamChange()
+    {
+        var group = (await _host.ResetAsync(Pharmacy))[0];
+        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        using var seed = await GrantAsync(office, group, ["aoife", "colm"]);
+        Assert.Equal(HttpStatusCode.OK, seed.StatusCode);
+        var held = (await seed.Content.ReadFromJsonAsync<CohortPermissionGrantResult>())!.Changes;
+        using var manager = _host.ApiAs("niamh", BusinessRoles.SalesManager);
+        // Authority is checked before any write, including when an old review crosses a team change.
+        await MoveAsync(office, "colm", "another-manager");
+        using (var denied = await RemoveAsync(manager, group, held)) Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        Assert.Equal((2, 2), await _host.CountsAsync());
+        await MoveAsync(office, "colm", "niamh");
+        string version = await _host.ReportingVersionAsync("colm");
+        _host.Gate.Armed = true;
+        var removal = RemoveAsync(manager, group, held);
+        Task<HttpResponseMessage>? move = null;
+        try
+        {
+            await _host.Gate.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            move = office.PutAsJsonAsync("/coverage/reporting-lines/colm", new SetRepReportingLineRequest("another-manager", version));
+            await WaitUntilARequestIsBlockedAsync();
+            Assert.False(move.IsCompleted);
+        }
+        finally { _host.Gate.Release.TrySetResult(); }
+        using (var saved = await removal) Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        using (var moved = await move!) Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
+        Assert.Equal((4, 0), await _host.CountsAsync());
         Assert.False(app.Staff.SawTransaction);
     }
 
