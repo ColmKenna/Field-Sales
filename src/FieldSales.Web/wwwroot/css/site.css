@@ -153,3 +153,9 @@ p { line-height: 1.6; }
 .permission-cohort-action { display: grid; gap: .6rem; max-width: 36rem; }
 .permission-cohort-action textarea { width: 100%; box-sizing: border-box; padding: .6rem; font: inherit; }
 .permission-cohort-action button { justify-self: start; max-width: 100%; overflow-wrap: anywhere; }
+.permission-removal-review { padding: 1.25rem; border: 1px solid #d7dee6; border-radius: .6rem; background: #fff; overflow-wrap: anywhere; }
+.permission-removal-review h2 { margin-top: 0; }
+.permission-removal-consequence { font-size: 1.1rem; }
+.permission-removal-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.permission-modes { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+.permission-modes [aria-current="page"] { font-weight: 700; text-decoration-thickness: .15em; }

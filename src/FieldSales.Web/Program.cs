@@ -34,6 +34,7 @@ if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("
 builder.Services.AddSingleton<SqlTicketStore>();
 builder.Services.AddScoped<StaffAreaService>();
 builder.Services.AddSingleton<AccessChangedTokenService>();
+builder.Services.AddSingleton<FieldSales.Web.Coverage.PermissionRemovalReviews>();
 builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, TicketStoreCookieOptions>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
