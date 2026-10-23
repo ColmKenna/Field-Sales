@@ -56,6 +56,9 @@ and where it came up. Don't change an entry without a new human decision; add a 
 Still open and owned by later items: `{{TABLET_CLIENT_STACK}}` (MI-01) and the other
 `missingInformation` entries in `plan-data.js`. They don't block WI-001.
 
+**Amendment (2026-10-23, developer, WI-032 1C):** `{{TABLET_CLIENT_STACK}}` = **.NET MAUI Blazor
+Hybrid on .NET 10**. See § WI-032 tablet runtime and storage (1C).
+
 ## Naming
 
 The top level is `FieldSales`, and every project is `FieldSales.<Name>`:
@@ -327,3 +330,29 @@ scenario matrix as written in `WI-029.md`.
   the remaining implementation and verification plan without another routine
   approval pause. Feature-branch delivery includes its push; main integration
   remains a separate request.
+
+## WI-032 tablet runtime and storage (1C) (2026-10-23, developer)
+
+The developer chose to decide 1C on the physical Samsung evidence before the iPad check, then
+picked the recommended option for each decision in `docs/tablet-offline-1c-decision.md`. This
+applies to WI-032's production slice and the items it blocks (WI-033, -034, -037, -039, -041,
+-043, -048 and later tablet work).
+
+- **Runtime (MI-01):** the tablet app is .NET MAUI Blazor Hybrid on .NET 10.
+- **Storage (MI-02):** SQLite through Microsoft.Data.Sqlite with pinned native 3.53.3 and a preflight
+  that refuses another native build, in WAL mode with synchronous FULL. Each signed-in rep has one
+  bound snapshot; a staged import is fully verified before a single-transaction switch, and the
+  previous snapshot stays until then. Unsent work lives in a separate database that refresh never
+  rewrites. Storage work runs off the UI thread. **Old-copy cleanup runs after the switch** in
+  bounded batches and resumes on the next open.
+- **Targets:** at target scale (25,000 products / 500 Locations / 120,000 history lines) on
+  SM-P610-class hardware: offline open under 3 s, refresh under 90 s, and 500-Location search under
+  1 s (source requirement). Target scale is the planning assumption until real volumes are known.
+- **iPad:** the iPad mini/Mac check is deferred until before any iPad use. An iPad failure reopens
+  this decision for iOS only.
+- **Still proposals, to confirm in the WI-032 production plan:** the free-space check before refresh
+  (twice the snapshot DB size plus 512 MiB), backup exclusion with Android file-based encryption, and
+  snapshot contract details (field list, schema ownership, version compatibility, cross-database
+  consistency, clock rollback).
+- The spike tool stays isolated under `tools/FieldSales.TabletSpike*`; production code needs its
+  own approved plan and Human-Led scenarios. Console `missingInformation` entries are not edited.

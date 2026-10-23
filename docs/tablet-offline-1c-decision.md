@@ -110,3 +110,21 @@ spike to its production slice: the tablet app shell with staff sign-in, snapshot
 server builder, Sync with staged swap, the separate Unsent store and the 24-hour local session.
 That work needs its own plan and Human-Led scenario approval. The spike tool stays isolated, and no
 production code changes until that plan is approved.
+
+## Decision — 23 October 2026 (developer)
+
+- **D1 runtime: A.** The production tablet app uses **.NET MAUI Blazor Hybrid on .NET 10**.
+  `{{TABLET_CLIENT_STACK}}` resolves to this. iOS remains subject to the iPad check (D4).
+- **D2 storage: B.** Adopt the spike's storage model, as listed under D2, with **old-copy cleanup
+  moved off the refresh**: the refresh ends at the verified switch, old copies are deleted
+  afterwards in bounded batches, and unfinished cleanup resumes when the app next opens.
+- **D3 targets: A.** On SM-P610-class hardware at target scale (25,000 products / 500 Locations /
+  120,000 history lines): **offline open under 3 s, refresh under 90 s**, and the source's
+  **500-Location search under 1 s**. Target scale remains the planning assumption until real volumes
+  are known.
+- **D4 iPad: A.** The iPad mini/Mac check is deferred until **before any iPad use**. 1C stands for
+  Android; an iPad failure reopens 1C for iOS only.
+
+The proposed defaults (capacity check, data protection and where the contract details are settled)
+were presented and not overridden. They remain **proposals** to confirm in the WI-032
+production-slice plan, not settled decisions.
