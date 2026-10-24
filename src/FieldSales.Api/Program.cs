@@ -3,6 +3,7 @@ using FieldSales.StaffAccess;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Directory;
 using FieldSales.Api.Coverage;
+using FieldSales.Api.TabletSync;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ builder.Services.AddScoped<RestrictionPermissionWriter>();
 builder.Services.AddScoped<RestrictionPermissionStore>();
 builder.Services.AddScoped<RestrictionPermissionCohortStore>();
 builder.Services.AddScoped<ReportingLineStore>();
+builder.Services.AddScoped<TabletSnapshotBuilder>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddLocationCoordinates(builder.Configuration);
 builder.Services.AddScoped<ContactStore>();
@@ -134,6 +136,10 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.All)
         .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
+    options.AddPolicy(TabletSyncEndpoints.Policy, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(BusinessRoles.FieldSalesperson)
+        .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
     options.AddPolicy("ManageCoverage", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.SalesManager, BusinessRoles.HeadOfficeUser)
@@ -166,6 +172,7 @@ app.MapCustomerEndpoints();
 app.MapCoverageEndpoints();
 app.MapDirectoryTypeEndpoints();
 app.MapContactEndpoints();
+app.MapTabletSyncEndpoints();
 app.MapDefaultEndpoints();
 app.Run();
 
