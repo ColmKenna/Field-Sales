@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Duende.IdentityServer.EntityFramework.DbContexts;
 using FieldSales.Identity.Data;
+using FieldSales.Snapshot.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -48,6 +49,9 @@ public sealed class TemplateAdoptionBaselineTests
         await using AsyncServiceScope scope = host.Services.CreateAsyncScope();
         ConfigurationDbContext configuration = scope.ServiceProvider.GetRequiredService<ConfigurationDbContext>();
 
+        // Exactly the staff website and (WI-032) the tablet app; no template sample client is seeded.
+        Assert.Equal(new[] { Config.StaffWebClientId, TabletClientContract.ClientId },
+            await configuration.Clients.Select(c => c.ClientId).OrderBy(id => id).ToArrayAsync());
         Duende.IdentityServer.EntityFramework.Entities.Client staffClient = await configuration.Clients
             .AsNoTracking()
             .Include(c => c.AllowedGrantTypes)
@@ -55,7 +59,7 @@ public sealed class TemplateAdoptionBaselineTests
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutRedirectUris)
             .Include(c => c.ClientSecrets)
-            .SingleAsync();
+            .SingleAsync(c => c.ClientId == Config.StaffWebClientId);
 
         Assert.Equal(Config.StaffWebClientId, staffClient.ClientId);
         Assert.True(staffClient.RequirePkce);

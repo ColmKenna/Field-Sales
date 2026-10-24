@@ -102,7 +102,7 @@ public static class SeedData
     {
         List<string> existingClientIds = await configDb.Clients.Select(c => c.ClientId).ToListAsync();
 
-        foreach (Client client in Config.Clients(clients, tokenLifetimes))
+        foreach (Client client in Config.Clients(clients, tokenLifetimes).Append(Config.TabletClient(tokenLifetimes)))
             if (!existingClientIds.Contains(client.ClientId))
                 configDb.Clients.Add(client.ToEntity());
 

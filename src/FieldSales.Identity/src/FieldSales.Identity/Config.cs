@@ -1,3 +1,4 @@
+using FieldSales.Snapshot.Contracts;
 using FieldSales.StaffAccess;
 using Duende.IdentityServer;
 using Duende.IdentityServer.Models;
@@ -67,6 +68,37 @@ public static class Config
                 UserClaims = { "role" }
             }
         };
+
+    /// <summary>
+    ///     The tablet app (WI-032, P7): a public native client signing in through the system browser with PKCE.
+    ///     Its one-time refresh token expires 24 hours after sign-in, so online sign-in matches the tablet's
+    ///     24-hour offline window; access, identity and code lifetimes follow configuration like the website's.
+    /// </summary>
+    public static Client TabletClient(TokenLifetimes tokenLifetimes) => new()
+    {
+        ClientId = TabletClientContract.ClientId,
+        ClientName = TabletClientContract.ClientName,
+        AllowedGrantTypes = GrantTypes.Code,
+        RequirePkce = true,
+        RequireClientSecret = false,
+        RedirectUris = { TabletClientContract.RedirectUri },
+        PostLogoutRedirectUris = { TabletClientContract.PostLogoutRedirectUri },
+        AllowedScopes =
+        {
+            IdentityServerConstants.StandardScopes.OpenId,
+            IdentityServerConstants.StandardScopes.Profile,
+            "roles",
+            ApiScopeName
+        },
+        AllowOfflineAccess = true,
+        RefreshTokenUsage = TokenUsage.OneTimeOnly,
+        RefreshTokenExpiration = TokenExpiration.Absolute,
+        AbsoluteRefreshTokenLifetime = (int)TabletClientContract.SignInLifetime.TotalSeconds,
+        RequireConsent = false,
+        AccessTokenLifetime = tokenLifetimes.AccessTokenLifetimeSeconds,
+        IdentityTokenLifetime = tokenLifetimes.IdentityTokenLifetimeSeconds,
+        AuthorizationCodeLifetime = tokenLifetimes.AuthorizationCodeLifetimeSeconds
+    };
 
     public static IEnumerable<Client> Clients(IReadOnlyList<SeedClientSpec> clients, TokenLifetimes tokenLifetimes) =>
         clients.Select(spec => new Client

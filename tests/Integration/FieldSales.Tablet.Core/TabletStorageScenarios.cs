@@ -30,7 +30,7 @@ public sealed class TabletStorageScenarios : IDisposable
         _tablet.Server.Serve(EncodedSnapshot.From(evening));
         SyncOutcome outcome = await _tablet.Sync().SyncAsync();
         Assert.Equal(SyncStatus.Completed, outcome.Status);
-        Assert.Equal($"Last synced {_tablet.Clock.GetUtcNow().ToLocalTime():HH:mm}", outcome.Message);
+        Assert.Equal($"Last synced {TimeZoneInfo.ConvertTime(_tablet.Clock.GetUtcNow(), _tablet.Clock.LocalTimeZone):HH:mm}", outcome.Message);
         // Never a mix: Home reads only the new generation, and the previous one is kept whole until cleanup.
         SnapshotStore store = _tablet.Sync().Store;
         Assert.Equal(outcome.Active!.Generation, store.ReadActive()!.Generation);

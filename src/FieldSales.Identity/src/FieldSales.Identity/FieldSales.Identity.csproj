@@ -27,6 +27,7 @@
         <ProjectReference Include="..\..\..\FieldSales.ServiceDefaults\FieldSales.ServiceDefaults.csproj"/>
         <ProjectReference Include="..\..\..\FieldSales.Identity.Admin.Services\FieldSales.Identity.Admin.Services.csproj"/>
         <ProjectReference Include="..\..\..\FieldSales.StaffAccess\FieldSales.StaffAccess.csproj"/>
+        <ProjectReference Include="..\..\..\FieldSales.Snapshot.Contracts\FieldSales.Snapshot.Contracts.csproj"/>
     </ItemGroup>
 
 </Project>

@@ -41,6 +41,8 @@ public sealed partial class TabletSync(RepWorkspace workspace, HttpClient http, 
     public const long ReserveBytes = 512L * 1024 * 1024;
     internal const long MaximumGzipBytes = 512L * 1024 * 1024;
 
+    private readonly TimeProvider time = clock ?? TimeProvider.System;
+
     public SnapshotStore Store { get; } = new(workspace, clock);
 
     public async Task<SyncOutcome> SyncAsync(SnapshotHooks? hooks = null, CancellationToken ct = default)
@@ -55,7 +57,8 @@ public sealed partial class TabletSync(RepWorkspace workspace, HttpClient http, 
             (SyncOutcome? refused, ExpectedSnapshot? expected) = await DownloadAsync(token, hooks, ct);
             if (refused is not null) return refused;
             ActiveSnapshot active = await Store.ApplyAsync(workspace.TransferPath, expected!, hooks, ct);
-            return new(SyncStatus.Completed, SyncMessages.Completed(active.CompletedUtc.ToLocalTime()), active);
+            // "Last synced" is shown in the tablet's own time zone.
+            return new(SyncStatus.Completed, SyncMessages.Completed(TimeZoneInfo.ConvertTime(active.CompletedUtc, time.LocalTimeZone)), active);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
