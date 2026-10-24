@@ -12,6 +12,7 @@
         <Project Path="src/FieldSales.Quantities/FieldSales.Quantities.csproj" />
         <Project Path="src/FieldSales.ReferenceData/FieldSales.ReferenceData.csproj" />
         <Project Path="src/FieldSales.StaffAccess/FieldSales.StaffAccess.csproj" />
+        <Project Path="src/FieldSales.Tablet.Core/FieldSales.Tablet.Core.csproj" />
     </Folder>
     <Folder Name="/tests/Unit/">
         <Project Path="tests/Unit/FieldSales.Api/FieldSales.Api.UnitTests.csproj" />
@@ -25,6 +26,8 @@
         <Project Path="tests/Integration/FieldSales.DemoData/FieldSales.DemoData.IntegrationTests.csproj" />
         <Project Path="tests/Integration/FieldSales.SnapshotSpike/FieldSales.SnapshotSpike.IntegrationTests.csproj" />
         <Project Path="tests/Integration/FieldSales.TabletSpike/FieldSales.TabletSpike.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Tablet.Core/FieldSales.Tablet.Core.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Tablet.Core.CrashHost/FieldSales.Tablet.Core.CrashHost.csproj" />
     </Folder>
     <Folder Name="/tests/E2E/" />
     <Folder Name="/tools/">
