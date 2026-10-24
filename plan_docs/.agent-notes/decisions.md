@@ -356,3 +356,20 @@ applies to WI-032's production slice and the items it blocks (WI-033, -034, -037
   consistency, clock rollback).
 - The spike tool stays isolated under `tools/FieldSales.TabletSpike*`; production code needs its
   own approved plan and Human-Led scenarios. Console `missingInformation` entries are not edited.
+
+## WI-032 production slice (2026-10-24, developer, plan approval)
+
+The developer replied **Approved** to `docs/tablet-sync-production-plan.md`, covering decisions
+P1–P13, contract v1 fields, five increments with review stops and 25 Human-Led scenarios (MI-62
+undecided).
+
+- **Snapshot contract owner: the developer (ColmKenna)**, as T-4.1.1's owner. One snapshot version
+  change at a time, each reviewed by the owner. Every later card changing
+  `FieldSales.Snapshot.Contracts` states its version bump: minor for additive fields, major for
+  anything removed or changed.
+- **Tablet identity client** `fieldsales-tablet`: public, authorization code with PKCE, system
+  browser, `offline_access`. **Refresh-token absolute lifetime 24 hours** (developer, replacing the
+  proposed 12). Refreshing never extends the 24-hour local window (I3.1).
+- **1C defaults confirmed:** free-space check before Sync (twice the snapshot DB plus 512 MiB),
+  snapshot and Unsent databases excluded from Android backup, Android file-based encryption.
+- The developer will install the ASP.NET development certificate on the Samsung in increment 4.
