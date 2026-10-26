@@ -25,6 +25,15 @@ public static class SyncMessages
     public const string Failed = "Sync didn't finish. Your data and saved work on this tablet are unchanged.";
     public const string Cancelled = "Sync was cancelled. Your data and saved work on this tablet are unchanged.";
     public static string Completed(DateTimeOffset localCompleted) => $"Last synced {localCompleted:HH:mm}";
+
+    /// <summary>Home's "Last synced 07:42"; a sync from an earlier day also shows its date.</summary>
+    public static string LastSynced(DateTimeOffset completedUtc, TimeProvider clock)
+    {
+        DateTimeOffset completed = TimeZoneInfo.ConvertTime(completedUtc, clock.LocalTimeZone);
+        DateTimeOffset now = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone);
+        return completed.Date == now.Date ? Completed(completed)
+            : $"Last synced {completed.ToString("d MMM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}";
+    }
 }
 
 /// <summary>Supplies the signed-in rep's current access token, or null when a connected sign-in is needed.</summary>

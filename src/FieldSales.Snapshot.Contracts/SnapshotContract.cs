@@ -29,7 +29,8 @@ public static class SnapshotContract
 
     public const string UpdateRequiredTitle = "Update the Field Sales app to sync";
 
-    public static JsonSerializerOptions JsonOptions { get; } = new(JsonSerializerDefaults.Web);
+    /// <summary>Web defaults with source-generated metadata, so trimmed tablet Release builds keep (de)serialization.</summary>
+    public static JsonSerializerOptions JsonOptions => SnapshotJsonContext.Default.Options;
 
     /// <summary>Parses the tablet's accepted majors; null when the header is missing or malformed.</summary>
     public static IReadOnlyList<int>? ParseAcceptedMajors(string? header)

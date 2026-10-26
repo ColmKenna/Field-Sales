@@ -1,0 +1,60 @@
+@page "/"
+@implements IDisposable
+@inject TabletApp Tablet
+@inject NavigationManager Navigation
+
+@* I-03 · Tablet entry and return. The locked states never show a rep's name, Locations or work. *@
+<section class="entry">
+    <h1>Sign in on this tablet</h1>
+    @if (entry is null)
+    {
+        <p>Opening your day…</p>
+    }
+    else
+    {
+        <p class="lead">@entry.Message</p>
+        @if (entry.Screen == EntryScreen.SignIn)
+        {
+            <button class="primary" disabled="@busy" @onclick="SignInAsync">Continue to staff sign-in</button>
+        }
+        else
+        {
+            <button class="secondary" disabled="@busy" @onclick="RefreshAsync">Try again</button>
+        }
+        @if (problem is not null)
+        {
+            <p class="problem" role="alert">@problem</p>
+        }
+    }
+</section>
+
+@code {
+    private TabletEntry? entry;
+    private string? problem;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tablet.Resumed += OnResumed;
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        entry = await Tablet.EnterAsync();
+        if (entry.Screen == EntryScreen.Home) Navigation.NavigateTo("/home");
+        else if (entry.Screen == EntryScreen.Sync) Navigation.NavigateTo("/sync");
+    }
+
+    private async Task SignInAsync()
+    {
+        busy = true;
+        problem = await Tablet.SignInAsync();
+        busy = false;
+        await RefreshAsync();
+    }
+
+    private void OnResumed() => _ = InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); });
+
+    public void Dispose() => Tablet.Resumed -= OnResumed;
+}

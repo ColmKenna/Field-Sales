@@ -28,6 +28,10 @@ public sealed class TabletSessionScenarios : IDisposable
         Assert.Equal(("Last synced 07:42", "Bearer access-1"), (synced.Message, _tablet.Server.Requests[^1].Authorization));
         TabletEntry home = await _tablet.Device.EnterAsync(connected: true);
         Assert.Equal((EntryScreen.Home, "colm"), (home.Screen, home.RepSubject));
+        ActiveSnapshot day = new SnapshotStore(_tablet.Device.Workspace("colm")).ReadActive()!;
+        Assert.Equal("Last synced 07:42", SyncMessages.LastSynced(day.CompletedUtc, _tablet.Clock));
+        _tablet.Clock.UtcNow = SessionTablet.Morning.AddDays(1);
+        Assert.Equal("Last synced 1 Oct 07:42", SyncMessages.LastSynced(day.CompletedUtc, _tablet.Clock));
         Assert.Equal(["C shop 0000", "C shop 0001", "C shop 0002"],
             new SnapshotStore(_tablet.Device.Workspace("colm")).ReadLocations().Select(location => location.Name));
     }

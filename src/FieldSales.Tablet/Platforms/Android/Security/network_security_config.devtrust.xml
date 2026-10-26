@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Development builds only (P8): this PC's ASP.NET development certificate is trusted for localhost,
+     which reaches the PC through adb reverse. Everything else uses system certificate authorities only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">localhost</domain>
+        <trust-anchors>
+            <certificates src="@raw/fieldsales_dev_cert" />
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

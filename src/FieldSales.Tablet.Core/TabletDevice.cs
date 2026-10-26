@@ -103,10 +103,10 @@ internal static class TokenStore
     private static string Key(string subject) => $"fieldsales.tokens.{subject}";
 
     public static Task SaveAsync(ISecureStore secure, string subject, StoredTokens tokens) =>
-        secure.SetAsync(Key(subject), JsonSerializer.Serialize(tokens));
+        secure.SetAsync(Key(subject), JsonSerializer.Serialize(tokens, TabletJsonContext.Default.StoredTokens));
 
     public static async Task<StoredTokens?> ReadAsync(ISecureStore secure, string subject) =>
-        await secure.GetAsync(Key(subject)) is { } json ? JsonSerializer.Deserialize<StoredTokens>(json) : null;
+        await secure.GetAsync(Key(subject)) is { } json ? JsonSerializer.Deserialize(json, TabletJsonContext.Default.StoredTokens) : null;
 
     public static void Clear(ISecureStore secure, string subject) => secure.Remove(Key(subject));
 }
