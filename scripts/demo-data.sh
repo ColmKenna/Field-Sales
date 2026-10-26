@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 demo_volume="fieldsales-demo-sqlserver-data"
 
 if [[ $# -ne 1 ]]; then
-    echo "Usage: $0 <start|seed|status|reset>" >&2
+    echo "Usage: $0 <start|seed|scale|status|reset>" >&2
     exit 2
 fi
 
@@ -13,7 +13,7 @@ case "$1" in
     start)
         exec dotnet run --project "$repo_root/src/FieldSales.AppHost" --launch-profile demo
         ;;
-    seed|status)
+    seed|scale|status)
         # Check the demo container is running before invoking the fixed local endpoint.
         running="$(docker ps --filter "volume=$demo_volume" --format '{{.ID}}')"
         if [[ -z "$running" ]]; then
@@ -43,7 +43,7 @@ case "$1" in
         echo "Removed demo databases, sample data, and demo sessions. Start the demo profile to recreate empty databases."
         ;;
     *)
-        echo "Usage: $0 <start|seed|status|reset>" >&2
+        echo "Usage: $0 <start|seed|scale|status|reset>" >&2
         exit 2
         ;;
 esac

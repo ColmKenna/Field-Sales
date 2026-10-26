@@ -39,6 +39,11 @@
         Tablet.ResumeCleanup(entry.RepSubject!);
     }
 
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (home is not null) TabletTiming.HomeShown(home.Locations.Count);
+    }
+
     private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(); StateHasChanged(); });
 
     public void Dispose() => Tablet.Resumed -= OnResumed;

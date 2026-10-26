@@ -373,3 +373,12 @@ undecided).
 - **1C defaults confirmed:** free-space check before Sync (twice the snapshot DB plus 512 MiB),
   snapshot and Unsent databases excluded from Android backup, Android file-based encryption.
 - The developer will install the ASP.NET development certificate on the Samsung in increment 4.
+
+## WI-032 increment 4b (2026-10-26, developer)
+
+- **Scenario 18 (24 hours elapsed) on the Samsung:** the developer changes the tablet date forward in
+  Settings and back afterwards. No test hook is added to the app.
+- **Scenario 25 (budgets at target scale):** a dev-only DemoData `scale` command (seed batch
+  `scale-v1`) adds 500 shops for Colm in Swords and 25,000 products with 800 categories and 75,000
+  prices. The app logs `open`, `sync` and `cleanup` durations under `FieldSalesTiming`. Recorded in
+  `docs/tablet-sync-production-plan.md`.

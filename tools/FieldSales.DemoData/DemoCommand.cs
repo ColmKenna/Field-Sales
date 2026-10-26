@@ -16,9 +16,9 @@ internal static class DemoCommand
 {
     public static async Task<int> Main(string[] args)
     {
-        if (args.Length != 1 || args[0] is not ("seed" or "status"))
+        if (args.Length != 1 || args[0] is not ("seed" or "scale" or "status"))
         {
-            Console.Error.WriteLine("Usage: dotnet run --project tools/FieldSales.DemoData -- <seed|status>");
+            Console.Error.WriteLine("Usage: dotnet run --project tools/FieldSales.DemoData -- <seed|scale|status>");
             Console.Error.WriteLine("Start and reset the isolated environment with scripts/demo-data.sh.");
             return 2;
         }
@@ -73,6 +73,12 @@ internal static class DemoCommand
                     scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>(), staffPassword!));
                 Report("Catalogue", await DemoScenarioSeeder.SeedCatalogueAsync(catalogue));
                 Report("Directory and coverage", await DemoScenarioSeeder.SeedDirectoryAsync(directory));
+            }
+            if (args[0] == "scale")
+            {
+                // WI-032 scenario 25: the tablet's target scale for Colm, on top of the sample seed.
+                Report("Scale catalogue", await DemoScaleSeeder.SeedCatalogueAsync(catalogue));
+                Report("Scale shops", await DemoScaleSeeder.SeedDirectoryAsync(directory));
             }
             foreach (var (name, db) in new (string, DbContext)[] { ("Staff", identity), ("Catalogue", catalogue), ("Directory", directory) })
                 Console.WriteLine($"{name}: {(await DemoSeedBatch.IsSeededAsync(db) ? "seeded" : "not seeded")}");

@@ -119,6 +119,17 @@ Commits use `feat(wi-032): …` and `Refs: WI-032, T-4.1.1, REP-US-001, IAM-US-0
 
 The 500-Location search budget is re-verified by T-4.2.1 (search), which owns that screen.
 
+**Increment 4b amendment (developer decisions, 2026-10-26):**
+- **Scenario 18 on the device:** the developer moves the Samsung's date forward more than 24 hours in
+  Settings, checks that the sign-in screen appears and that Unsent work is kept, then sets the date back.
+  The app keeps no test hook for this.
+- **Scenario 25 at target scale:** a dev-only DemoData command, `./scripts/demo-data.sh scale`, adds
+  its own seed batch (`scale-v1`) on top of the sample seed. The batch adds 500 shops in Swords for Colm,
+  25,000 products in 800 categories, and today's price plus two future prices for each product
+  (75,000 prices). It is applied once and never changes the sample records.
+  The app writes `open` (process start to the first Home with the shops list), `sync` and
+  `cleanup` durations to the Android log under the `FieldSalesTiming` tag. The rep sees none of this.
+
 ## Out of scope, risks and missing information
 
 Out of scope: uploading work (T-4.1.2), sync failure causes (T-4.1.3), sign-in resume (T-4.6.1),

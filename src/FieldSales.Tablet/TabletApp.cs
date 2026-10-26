@@ -23,6 +23,7 @@ public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IS
     /// <summary>The connected sign-in in the system browser. Returns a message to show, or null once the day starts.</summary>
     public async Task<string?> SignInAsync()
     {
+        TabletTiming.RepActed();
         TabletSignInFlow flow = new(endpoints.Identity, endpoints.Api, clock);
         PendingSignIn pending = flow.Start();
         try
@@ -44,9 +45,17 @@ public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IS
     /// <summary>Downloads the rep's day; copies retired by the switch are deleted afterwards in the background (D2-B).</summary>
     public async Task<SyncOutcome> SyncAsync(string rep)
     {
+        TabletTiming.RepActed();
         TabletSync sync = Sync(rep);
+        long started = clock.GetTimestamp();
         SyncOutcome outcome = await sync.SyncAsync();
-        _ = Task.Run(() => sync.CleanupAsync());
+        TabletTiming.Synced(outcome, clock.GetElapsedTime(started));
+        _ = Task.Run(async () =>
+        {
+            long cleanup = clock.GetTimestamp();
+            await sync.CleanupAsync();
+            TabletTiming.CleanedUp(clock.GetElapsedTime(cleanup));
+        });
         return outcome;
     }
 

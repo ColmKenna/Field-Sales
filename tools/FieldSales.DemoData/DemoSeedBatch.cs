@@ -8,7 +8,7 @@ public static class DemoSeedBatch
 
     // Each database commits its sample records and receipt together. A failed run can
     // be retried without duplicating completed batches or overwriting testing changes.
-    public static async Task<bool> RunAsync(DbContext db, Func<Task> seed)
+    public static async Task<bool> RunAsync(DbContext db, Func<Task> seed, string name = SeedName)
     {
         await using var transaction = await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlRawAsync("""
@@ -21,7 +21,7 @@ public static class DemoSeedBatch
                     Name nvarchar(100) NOT NULL PRIMARY KEY,
                     CreatedAt datetimeoffset NOT NULL);
             """);
-        if (await IsSeededAsync(db))
+        if (await IsSeededAsync(db, name))
         {
             await transaction.CommitAsync();
             return false;
@@ -29,18 +29,18 @@ public static class DemoSeedBatch
         await seed();
         await db.SaveChangesAsync();
         await db.Database.ExecuteSqlInterpolatedAsync(
-            $"INSERT INTO dbo.__FieldSalesDemoSeeds (Name, CreatedAt) VALUES ({SeedName}, {DateTimeOffset.UtcNow})");
+            $"INSERT INTO dbo.__FieldSalesDemoSeeds (Name, CreatedAt) VALUES ({name}, {DateTimeOffset.UtcNow})");
         await transaction.CommitAsync();
         return true;
     }
 
-    public static async Task<bool> IsSeededAsync(DbContext db)
+    public static async Task<bool> IsSeededAsync(DbContext db, string name = SeedName)
     {
         int exists = await db.Database.SqlQueryRaw<int>("""
             SELECT CASE WHEN OBJECT_ID(N'dbo.__FieldSalesDemoSeeds', N'U') IS NULL
                 THEN 0 ELSE 1 END AS [Value]
             """).SingleAsync();
         return exists == 1 && await db.Database.SqlQuery<int>(
-            $"SELECT COUNT(*) AS [Value] FROM dbo.__FieldSalesDemoSeeds WHERE Name = {SeedName}").SingleAsync() == 1;
+            $"SELECT COUNT(*) AS [Value] FROM dbo.__FieldSalesDemoSeeds WHERE Name = {name}").SingleAsync() == 1;
     }
 }
