@@ -59,6 +59,43 @@ The Sync time is dominated by the 25,003-product catalogue, which every rep down
 - The app's "Field Sales" header is partly hidden under the Android status bar on this tablet. It is cosmetic and not part of this card's acceptance.
 - Sign-in uses the system browser, as designed. Because `prompt=login` is set, the login page opened empty for the second rep.
 
+## Final verification (increment 5)
+
+Run 2026-10-26 on the branch at `e9395da` with Docker running.
+
+| Project | Passed |
+|---|---|
+| Unit: Api, Identity Admin, Web | 180, 258, 228 |
+| Integration: Api | 129 |
+| Integration: DemoData | 4 |
+| Integration: Identity Admin | 799 |
+| Integration: SnapshotSpike | 22 |
+| Integration: Tablet.Core | 49 |
+| Integration: TabletSpike | 41 |
+| Integration: Web | 848 |
+| **Total** | **2,558, no failures** |
+
+`FieldSales.slnx` builds with 0 errors. The only warnings are NuGet vulnerability advisories (NU1902, NU1903) on existing packages. The tablet APK
+(`FieldSales.Tablet.slnx`, Release, dev-trust) builds cleanly; its hash differs from the installed one because signing makes builds non-reproducible,
+and the code is unchanged since the installed build.
+
+## Card acceptance criteria, one by one
+
+| Criterion | Status | Evidence |
+|---|---|---|
+| With signal, Sync downloads the Morning Snapshot and Home shows "Last synced" | **Met** | Device S1; API tests for scenarios 1 to 8; Core `Should_ReplaceTheSnapshotInOnePiece_When_DownloadCompletes` |
+| A snapshot download never alters Unsent items | **Met** | Core `Should_NeverAlterUnsentWork_When_ASnapshotIsDownloaded`, `Should_KeepTheOldSnapshotAndUnsentWork_When_DownloadIsInterrupted` and the cancelled-sync twin; crash-host kill tests |
+| No signal shows "No connection — your work is saved on this tablet" | **Met** | Device check; Core `Should_ShowNoConnectionMessage_When_SyncHasNoSignal` |
+| Reopen offline inside 24 hours; after 24 hours Home waits for connected sign-in and saved work remains | **Met for the app's side** | Device S2 and S4; Core `Should_ReopenAndCaptureOffline_When_ConnectedSignInWasTwoHoursAgo`, `Should_KeepUnsentWorkAndRequireSignIn_When_TwentyFourHoursHaveElapsed`, `Should_NotExtendTheWindow_When_TheAppIsReopenedOffline`, `Should_LockHome_When_TheDeviceClockReadsBeforeTheLastSignIn` |
+
+"Capture" here means the separate Unsent store stays available and is kept; the capture screens themselves belong to the Unsent capture cards (E5) and are out of
+this slice, as the plan says. Scenario 24 (MI-62, a fully disabled account) is deliberately undecided and has no behaviour or test.
+
+## Open item before WI-032 can be marked done
+
+The 1C decision's open budget (under 3 s at target scale) is borderline when measured from process start (2.8 to 3.9 s). The developer decides whether
+the budget means that measure or the data open (1.1 s in the spike), or asks for optimisation of the Home list first.
+
 ## Tablet state after the session
 
 Wifi on, screen timeout back to 120 s, automatic date and time on (the clock matched the PC within a second), the pushed certificate removed,
