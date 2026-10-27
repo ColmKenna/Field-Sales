@@ -1,0 +1,43 @@
+@page "/products/{Id:guid}"
+@inherits OfflineCataloguePage
+
+<section class="product-detail">
+    <a href="/products">Back to products</a>
+    @if (!Ready)
+    {
+        <h1>Product</h1><p role="status">Opening product…</p>
+    }
+    else if (detail is null)
+    {
+        <h1>Product unavailable</h1><p>This product isn't in your downloaded day.</p>
+    }
+    else
+    {
+        <h1>@detail.Product.Code · @detail.Product.Name</h1>
+        <p class="breadcrumb">@string.Join(" › ", detail.Breadcrumb)</p>
+        <p>Unit: @detail.Product.Unit</p>
+        <h2>Attributes</h2>
+        @if (detail.Attributes.Count == 0) { <p>No attributes recorded.</p> }
+        else
+        {
+            <dl class="product-attributes">
+                @foreach (var fact in detail.Attributes)
+                {
+                    <dt>@fact.Name@(fact.IsArchived ? " (archived)" : "")</dt><dd>@fact.Value</dd>
+                }
+            </dl>
+        }
+    }
+</section>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private OfflineProductDetail? detail;
+    protected override void Clear() => detail = null;
+    protected override async Task ReadAsync(string rep, Func<bool> isCurrent)
+    {
+        Guid id = Id;
+        OfflineProductDetail? read = await Task.Run(() => Tablet.ReadProduct(rep, id));
+        if (isCurrent()) detail = read;
+    }
+}

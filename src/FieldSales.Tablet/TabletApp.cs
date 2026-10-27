@@ -77,5 +77,8 @@ public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IS
         return new(active is null ? "No downloaded day yet" : SyncMessages.LastSynced(active.CompletedUtc, clock), store.ReadLocations());
     }
 
+    public OfflineProductPage ReadProducts(string rep, int page) => new SnapshotStore(device.Workspace(rep), clock).ReadProducts(page);
+    public OfflineProductDetail? ReadProduct(string rep, Guid id) => new SnapshotStore(device.Workspace(rep), clock).ReadProduct(id);
+
     private TabletSync Sync(string rep) => new(device.Workspace(rep), endpoints.Api, device.Tokens(rep, endpoints.Identity), space, clock);
 }

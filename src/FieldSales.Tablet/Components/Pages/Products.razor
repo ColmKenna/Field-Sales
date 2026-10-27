@@ -1,0 +1,39 @@
+@page "/products"
+@inherits OfflineCataloguePage
+
+<section class="catalogue">
+    <a href="/home">Back to Home</a>
+    <h1>Products</h1>
+    @if (!Ready)
+    {
+        <p role="status">Opening products…</p>
+    }
+    else if (products is not null)
+    {
+        @if (products.Products.Count == 0) { <p>No products in your downloaded day.</p> }
+        <ul class="product-list">
+            @foreach (var product in products.Products)
+            {
+                <li @key="product.Id"><a href="@($"/products/{product.Id}")"><strong>@product.Code</strong><span>@product.Name</span></a></li>
+            }
+        </ul>
+        <nav aria-label="Product pages" class="product-pages">
+            <button class="secondary" disabled="@(page == 0)" @onclick="PreviousAsync">Previous</button>
+            <span>Page @(page + 1)</span>
+            <button class="secondary" disabled="@(!products.HasNext)" @onclick="NextAsync">Next</button>
+        </nav>
+    }
+</section>
+
+@code {
+    private int page;
+    private OfflineProductPage? products;
+    protected override void Clear() => products = null;
+    protected override async Task ReadAsync(string rep, Func<bool> isCurrent)
+    {
+        OfflineProductPage read = await Task.Run(() => Tablet.ReadProducts(rep, page));
+        if (isCurrent()) products = read;
+    }
+    private async Task PreviousAsync() { if (page > 0) { page--; await RefreshAsync(); } }
+    private async Task NextAsync() { if (products?.HasNext == true) { page++; await RefreshAsync(); } }
+}
