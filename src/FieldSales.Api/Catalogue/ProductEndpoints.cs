@@ -60,7 +60,8 @@ public static class ProductEndpoints
                     await ActiveChoicesAsync(db.ProductProfiles, cancellationToken),
                     await ActiveChoicesAsync(db.Brands, cancellationToken),
                     await ActiveChoicesAsync(db.Suppliers, cancellationToken),
-                    await ActiveChoicesAsync(db.RestrictionGroups, cancellationToken))));
+                    await ActiveChoicesAsync(db.RestrictionGroups, cancellationToken)),
+                await ActiveChoicesAsync(db.AttributeNames, cancellationToken)));
         });
 
         products.MapGet("/search", ProductSearchQuery.SearchAsync);
@@ -68,6 +69,7 @@ public static class ProductEndpoints
         products.MapPut("/{id:guid}/unit", SetUnitAsync);
         products.MapPost("/{id:guid}/base-prices", AddBasePriceAsync);
         products.MapPut("/{id:guid}/classification", SetClassificationAsync);
+        products.MapPost("/{id:guid}/attributes", AddAttributeAsync);
     }
 
     private static Task<ProductReferenceItem[]> ActiveChoicesAsync<T>(IQueryable<T> items,
@@ -88,13 +90,32 @@ public static class ProductEndpoints
                 _ => Results.NoContent()
             };
         }
-        catch (DbUpdateConcurrencyException) { return ClassificationConflict(); }
+        catch (DbUpdateConcurrencyException) { return ReferenceConflict(); }
         catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 547 or 1205 })
-        { return ClassificationConflict(); }
-        catch (SqlException exception) when (exception.Number == 1205) { return ClassificationConflict(); }
+        { return ReferenceConflict(); }
+        catch (SqlException exception) when (exception.Number == 1205) { return ReferenceConflict(); }
     }
 
-    private static IResult ClassificationConflict() => Results.Conflict(new ProductSaveError(string.Empty,
+    private static async Task<IResult> AddAttributeAsync(Guid id, AddProductAttributeRequest request,
+        ProductReferenceAssignments assignments, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await assignments.SaveAttributeAsync(id, request, cancellationToken);
+            return result.Status switch
+            {
+                ProductAttributeSaveStatus.Missing => Results.NotFound(),
+                ProductAttributeSaveStatus.Invalid => Results.ValidationProblem(result.Errors!.ToDictionary(pair => pair.Key, pair => pair.Value)),
+                _ => Results.NoContent()
+            };
+        }
+        catch (DbUpdateConcurrencyException) { return ReferenceConflict(); }
+        catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: 547 or 1205 })
+        { return ReferenceConflict(); }
+        catch (SqlException exception) when (exception.Number == 1205) { return ReferenceConflict(); }
+    }
+
+    private static IResult ReferenceConflict() => Results.Conflict(new ProductSaveError(string.Empty,
         "The product or a selected reference changed. Reload the record before continuing."));
 
     private static async Task<IResult> CreateAsync(CreateProductRequest request, CatalogueDbContext db,

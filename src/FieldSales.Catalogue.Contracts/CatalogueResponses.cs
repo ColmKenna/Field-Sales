@@ -18,7 +18,8 @@ public sealed record ProductDetails(ProductItem Product, IReadOnlyList<CategoryB
     ProductPriceItem? CurrentPrice, IReadOnlyList<ProductPriceItem> PriceHistory,
     IReadOnlyList<ProductAttribute> Attributes, IReadOnlyList<ProductBrandItem>? Brands = null,
     ProductReferenceItem? Profile = null, ProductReferenceItem? Supplier = null,
-    ProductReferenceItem? RestrictionGroup = null, ProductClassificationChoices? ClassificationChoices = null);
+    ProductReferenceItem? RestrictionGroup = null, ProductClassificationChoices? ClassificationChoices = null,
+    IReadOnlyList<ProductReferenceItem>? AttributeNameChoices = null);
 public sealed record ProductValidationErrors(Dictionary<string, string[]> Errors);
 public sealed record ProductSaveError(string Field, string Error);
 public sealed record CatalogueError(string Error);

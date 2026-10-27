@@ -38,6 +38,14 @@ p { line-height: 1.6; }
 .product-record { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; margin-block: 2rem; }
 .product-record section { padding: 1.25rem; border: 1px solid #d7dee6; border-radius: .6rem; background: #fff; }
 .product-record h2 { margin-top: 0; font-size: 1.1rem; }
+.attribute-form { display: grid; gap: .75rem; }
+.attribute-form label { display: block; margin-bottom: .35rem; font-weight: 600; }
+.attribute-form select, .attribute-form textarea { width: 100%; min-height: 2.75rem; padding: .6rem; border: 1px solid #b9c8d6; border-radius: .3rem; font: inherit; }
+.attribute-form textarea { resize: vertical; }
+.attribute-form select:focus-visible, .attribute-form textarea:focus-visible { outline: 3px solid #e48f2b; outline-offset: 2px; }
+.attribute-form .field-validation-valid, .attribute-form .validation-summary-valid { display: none; }
+.attribute-form .button { justify-self: start; }
+#attributes-heading ~ dl dd { white-space: pre-wrap; overflow-wrap: anywhere; }
 .product-form [data-unit-fields], .product-form fieldset { display: grid; gap: .5rem; }
 .product-form fieldset { margin: .75rem 0; padding: 1rem; border: 1px solid #b9c8d6; }
 .product-form [hidden] { display: none; }

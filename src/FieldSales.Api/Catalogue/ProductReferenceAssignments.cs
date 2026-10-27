@@ -7,9 +7,35 @@ public enum ProductClassificationSaveStatus { Saved, Missing, Invalid }
 public sealed record ProductClassificationSaveResult(ProductClassificationSaveStatus Status,
     IReadOnlyDictionary<string, string[]>? Errors = null);
 
+public enum ProductAttributeSaveStatus { Saved, Missing, Invalid }
+public sealed record ProductAttributeSaveResult(ProductAttributeSaveStatus Status,
+    IReadOnlyDictionary<string, string[]>? Errors = null);
+
 /// <summary>Loads references and updates products inside the same serializable transaction as retirement.</summary>
 public sealed class ProductReferenceAssignments(CatalogueDbContext db)
 {
+    public Task<ProductAttributeSaveResult> SaveAttributeAsync(Guid productId, AddProductAttributeRequest request,
+        CancellationToken cancellationToken = default) =>
+        CatalogueTransactions.RunAsync(db, IsolationLevel.Serializable, async transaction =>
+    {
+        var product = await db.Products.Include(product => product.AttributeValues)
+            .SingleOrDefaultAsync(product => product.Id == productId, cancellationToken);
+        if (product is null) return new ProductAttributeSaveResult(ProductAttributeSaveStatus.Missing);
+        var name = request.NameId is Guid id
+            ? await db.AttributeNames.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) : null;
+        Dictionary<string, string[]> errors = [];
+        if (request.NameId is null) errors["NameId"] = ["Choose an attribute name."];
+        else if (name is null) errors["NameId"] = ["The selected attribute name no longer exists. Choose another."];
+        else if (name.IsArchived) errors["NameId"] = ["This attribute name is archived. Choose an active attribute name."];
+        if (request.Value is null) errors["Value"] = ["Supply an attribute value; an empty value is allowed."];
+        if (errors.Count != 0) return new ProductAttributeSaveResult(ProductAttributeSaveStatus.Invalid, errors);
+
+        product.AddAttribute(name!, request.Value!);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new ProductAttributeSaveResult(ProductAttributeSaveStatus.Saved);
+    }, cancellationToken);
+
     public Task<ProductClassificationSaveResult> SaveClassificationAsync(Guid productId,
         SetProductClassificationRequest request, CancellationToken cancellationToken = default) =>
         CatalogueTransactions.RunAsync(db, IsolationLevel.Serializable, async transaction =>

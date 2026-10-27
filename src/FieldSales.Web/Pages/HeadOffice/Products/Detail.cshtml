@@ -162,6 +162,32 @@
                 }
             </dl>
         }
+        <form method="post" asp-page-handler="Attribute" class="attribute-form">
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <div class="form-field">
+                <label asp-for="Attribute!.NameId">Attribute name</label>
+                <select asp-for="Attribute!.NameId" aria-describedby="attribute-help">
+                    <option value="">Choose an attribute name</option>
+                    @if (Model.Attribute!.NameId is Guid selected && !Model.AttributeNameChoices.Any(item => item.Id == selected))
+                    {
+                        <option value="@selected" disabled>Selection unavailable</option>
+                    }
+                    @foreach (var item in Model.AttributeNameChoices)
+                    {
+                        <option value="@item.Id">@item.Name</option>
+                    }
+                </select>
+                <span asp-validation-for="Attribute!.NameId" role="alert"></span>
+            </div>
+            <div class="form-field">
+                <label asp-for="Attribute!.Value">Value</label>
+                <textarea asp-for="Attribute!.Value" rows="2" aria-describedby="attribute-help"></textarea>
+                <span asp-validation-for="Attribute!.Value" role="alert"></span>
+            </div>
+            <p id="attribute-help">Choose a name from the reference list and add this product's value. Archived names stay on existing rows.</p>
+            @if (Model.AttributeNameChoices.Count == 0) { <p>No active attribute names are available.</p> }
+            <button type="submit" class="button" disabled="@(Model.AttributeNameChoices.Count == 0)">Add attribute</button>
+        </form>
     </section>
 </div>
 <p><a asp-page="Create">Create another product</a></p>
