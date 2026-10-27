@@ -388,3 +388,7 @@ undecided).
 - The D3 budget "open under 3 s at target scale" means the rep-felt open: Android starting the app to the shops list on screen (not only the
   data open the spike measured). The Home list is drawn with `Virtualize` so only visible rows render. Measured on the Samsung: 2.82 to 2.99 s
   over five cold opens (thin margin); startup cost, not the list, is now the main part.
+
+## WI-032 completion and startup speed (2026-10-27, developer)
+
+- WI-032 accepted and marked `done`. The cold-open speed is deferred: "If I find the speed an issue later I will tackle it then." No further startup work is planned in this card.
