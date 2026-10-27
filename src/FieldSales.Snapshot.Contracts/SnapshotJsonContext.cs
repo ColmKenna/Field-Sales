@@ -10,6 +10,7 @@ namespace FieldSales.Snapshot.Contracts;
 [JsonSerializable(typeof(SnapshotLocation))]
 [JsonSerializable(typeof(SnapshotCategory))]
 [JsonSerializable(typeof(SnapshotProduct))]
+[JsonSerializable(typeof(SnapshotProductAttribute))]
 [JsonSerializable(typeof(SnapshotBasePrice))]
 [JsonSerializable(typeof(SnapshotContact))]
 public sealed partial class SnapshotJsonContext : JsonSerializerContext;

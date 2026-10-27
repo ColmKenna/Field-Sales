@@ -210,7 +210,7 @@ public sealed class TabletSnapshotApiTests(SqlServerFixture fixture) : IAsyncLif
         using HttpResponseMessage response = await TabletSnapshotApplication.RequestAsync(client, SnapshotContract.Path, majors);
         Assert.Equal(expected, response.StatusCode);
         if (expected == HttpStatusCode.OK)
-            Assert.Equal("1.0", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
+            Assert.Equal("1.1", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
         if (expected == HttpStatusCode.NotAcceptable)
             Assert.Equal(SnapshotContract.UpdateRequiredTitle, (await response.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
     }
