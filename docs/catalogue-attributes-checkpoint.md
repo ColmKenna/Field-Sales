@@ -2,6 +2,9 @@
 
 Date: 2026-10-27. Source: T-1.6.2 / PRD-US-004 S2.
 
+The developer approved this checkpoint. Implementation is now complete; the sections below
+preserve the evidence at the pause. Final results are in [catalogue-attributes-delivery.md](catalogue-attributes-delivery.md).
+
 ## Authorization and scope
 
 The developer approved the plan and scenarios, then said `Apply`. The feature branch is
