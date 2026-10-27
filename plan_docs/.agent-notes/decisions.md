@@ -382,3 +382,9 @@ undecided).
   `scale-v1`) adds 500 shops for Colm in Swords and 25,000 products with 800 categories and 75,000
   prices. The app logs `open`, `sync` and `cleanup` durations under `FieldSalesTiming`. Recorded in
   `docs/tablet-sync-production-plan.md`.
+
+## WI-032 open-time budget (2026-10-27, developer)
+
+- The D3 budget "open under 3 s at target scale" means the rep-felt open: Android starting the app to the shops list on screen (not only the
+  data open the spike measured). The Home list is drawn with `Virtualize` so only visible rows render. Measured on the Samsung: 2.82 to 2.99 s
+  over five cold opens (thin margin); startup cost, not the list, is now the main part.

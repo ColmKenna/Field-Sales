@@ -25,6 +25,12 @@ public static class TabletTiming
 #endif
     }
 
+    /// <summary>The two parts of Home's own work before the list draws: the 24-hour check, then reading the shops.</summary>
+    public static void HomePrepared(TimeSpan entry, TimeSpan read)
+    {
+        if (openPending) Write($"home entry ms={(long)entry.TotalMilliseconds} read ms={(long)read.TotalMilliseconds}");
+    }
+
     public static void Synced(SyncOutcome outcome, TimeSpan elapsed) =>
         Write($"sync ms={(long)elapsed.TotalMilliseconds} status={outcome.Status} counts={outcome.Active?.Manifest.Counts}");
 

@@ -91,12 +91,29 @@ and the code is unchanged since the installed build.
 "Capture" here means the separate Unsent store stays available and is kept; the capture screens themselves belong to the Unsent capture cards (E5) and are out of
 this slice, as the plan says. Scenario 24 (MI-62, a fully disabled account) is deliberately undecided and has no behaviour or test.
 
-## Open item before WI-032 can be marked done
+## Open budget re-measured after the Home list change (developer decision, 2026-10-27)
 
-The 1C decision's open budget (under 3 s at target scale) is borderline when measured from process start (2.8 to 3.9 s). The developer decides whether
-the budget means that measure or the data open (1.1 s in the spike), or asks for optimisation of the Home list first.
+**Decision (developer):** the 3 s budget means what the rep experiences: from Android starting the app to the shops list on screen (meaning A).
+
+**Change:** Home now draws only the rows on screen (`Virtualize`, fixed 64 px rows) instead of all 502 at once, and the app logs a breakdown of Home's own work.
+
+Five cold opens on the Samsung with the new build (502 shops, the same demo data), from the `FieldSalesTiming` log:
+
+| Cold open | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| Process start to shops list | 2,988 ms | 2,868 ms | 2,877 ms | 2,862 ms | 2,817 ms |
+| Home's sign-in check | 257 ms | 284 ms | 276 ms | 281 ms | 257 ms |
+| Home's read of the shops | 154 ms | 158 ms | 162 ms | 161 ms | 165 ms |
+
+All five are under 3 s (average 2.88 s), but the margin is thin: the slowest is 12 ms under. Before the change the same measure gave 3.9 s (first start), 2.9 s, 3.0 s and, offline, 2.8 s.
+Home's own work (the check plus the read) is about 0.43 s, so roughly 2.4 s is Android starting the process and the .NET, MAUI and web view startup before
+Home's code runs. Paging the list helped only a little; the budget is met on this tablet today, but a slower day or device could miss it, and further gains
+have to come from startup cost, not the list. The list still scrolls through all 502 shops (checked to the last one). Sync on the new build took 30.7 s against the 90 s budget.
+
+An Android emulator was tried first. It cannot stand in for the Samsung's timings, and Chrome's first-run froze it until it was given 4 GB of RAM, so
+it was not used for any figure here.
 
 ## Tablet state after the session
 
 Wifi on, screen timeout back to 120 s, automatic date and time on (the clock matched the PC within a second), the pushed certificate removed,
-adb reverse removed, and the app's data cleared by scenario 17. The APK stays installed.
+adb reverse removed. After the 2026-10-27 re-measurement the app is signed in as Colm with a downloaded day; the APK with the paged list stays installed.

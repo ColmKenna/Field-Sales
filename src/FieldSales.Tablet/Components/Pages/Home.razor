@@ -1,4 +1,6 @@
 @page "/home"
+@using System.Diagnostics
+@using Microsoft.AspNetCore.Components.Web.Virtualization
 @implements IDisposable
 @inject TabletApp Tablet
 @inject NavigationManager Navigation
@@ -13,17 +15,21 @@
             <button class="secondary" @onclick='() => Navigation.NavigateTo("/sync")'>Sync</button>
         </header>
         <h2>Your shops (@home.Locations.Count)</h2>
-        <ul class="locations">
-            @foreach (HomeLocation location in home.Locations)
-            {
-                <li @key="location.Id"><strong>@location.Name</strong><span>@location.TownName · @location.CustomerName</span></li>
-            }
-        </ul>
+        @* Only the rows on screen are drawn, so opening stays quick at 500 or more shops (D3 budget). *@
+        <div class="locations" role="list">
+            <Virtualize TItem="HomeLocation" Items="shops" ItemSize="@RowHeight" OverscanCount="6">
+                <ItemContent Context="location">
+                    <div class="location" role="listitem" @key="location.Id"><strong>@location.Name</strong><span>@location.TownName · @location.CustomerName</span></div>
+                </ItemContent>
+            </Virtualize>
+        </div>
     </section>
 }
 
 @code {
+    private const float RowHeight = 64;
     private HomeView? home;
+    private List<HomeLocation> shops = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -33,9 +39,13 @@
 
     private async Task GuardAsync()
     {
+        long started = Stopwatch.GetTimestamp();
         TabletEntry entry = await Tablet.EnterAsync();
         if (entry.Screen != EntryScreen.Home) { home = null; Navigation.NavigateTo("/"); return; }
+        TimeSpan entered = Stopwatch.GetElapsedTime(started);
         home = Tablet.ReadHome(entry.RepSubject!);
+        shops = [.. home.Locations];
+        TabletTiming.HomePrepared(entered, Stopwatch.GetElapsedTime(started) - entered);
         Tablet.ResumeCleanup(entry.RepSubject!);
     }
 
