@@ -30,14 +30,19 @@ public sealed class SnapshotHooks
 /// retires any staged generation an interrupted import left behind; <see cref="PurgeRetiredAsync"/> then
 /// finishes any deletion still owed, including after the app stopped part-way.
 /// </remarks>
-public sealed class SnapshotStore
+public sealed partial class SnapshotStore
 {
     public const int RetainedGenerations = 2;
     internal const int BatchRows = 128;
     internal const int PurgeBatchRows = 2000;
     internal const long MaximumPlainBytes = 1L << 30;
     internal static readonly int[] ReadableMajors = [SnapshotContract.CurrentMajor];
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
+    private const string AttributeSchema = """
+        CREATE TABLE product_attributes(generation TEXT NOT NULL REFERENCES generations(id), product_id TEXT NOT NULL,
+            position INTEGER NOT NULL CHECK(position >= 0), name TEXT NOT NULL, value TEXT NOT NULL,
+            is_archived INTEGER NOT NULL CHECK(is_archived IN (0,1)), PRIMARY KEY(generation, product_id, position));
+        """;
     private const string Schema = """
         CREATE TABLE generations(id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('staged','complete','retired')),
             manifest TEXT NOT NULL, completed TEXT);
@@ -54,7 +59,7 @@ public sealed class SnapshotStore
             effective_from TEXT NOT NULL, amount TEXT NOT NULL, PRIMARY KEY(generation, product_id, effective_from));
         """;
     // Child tables are emptied before the generation row; the active pointer never names a retired generation.
-    private static readonly string[] ChildTables = ["base_prices", "products", "categories", "locations"];
+    private static readonly string[] ChildTables = ["product_attributes", "base_prices", "products", "categories", "locations"];
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly RepWorkspace workspace;
     private readonly TimeProvider clock;
@@ -74,7 +79,8 @@ public sealed class SnapshotStore
     private SqliteConnection Open()
     {
         SqliteConnection connection = SqliteEngine.Open(workspace.SnapshotPath);
-        SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema);
+        try { SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema + AttributeSchema, AttributeSchema); }
+        catch { connection.Dispose(); throw; }
         return connection;
     }
 
@@ -115,6 +121,7 @@ public sealed class SnapshotStore
             SELECT g.id, g.state,
                 (SELECT COUNT(*) FROM locations WHERE generation=g.id) + (SELECT COUNT(*) FROM categories WHERE generation=g.id)
                 + (SELECT COUNT(*) FROM products WHERE generation=g.id) + (SELECT COUNT(*) FROM base_prices WHERE generation=g.id)
+                + (SELECT COUNT(*) FROM product_attributes WHERE generation=g.id)
             FROM generations g ORDER BY g.completed, g.id
             """;
         using SqliteDataReader reader = command.ExecuteReader();
@@ -180,8 +187,18 @@ public sealed class SnapshotStore
                     throw new InvalidDataException("The downloaded snapshot does not match its content hash.");
             }
             SnapshotCounts declared = manifest!.Counts;
-            if (declared != new SnapshotCounts(counts["locations"], counts["categories"], counts["products"], counts["basePrices"]))
+            if (declared != new SnapshotCounts(counts["locations"], counts["categories"], counts["products"], counts["basePrices"], counts["productAttributes"]))
                 throw new InvalidDataException("The downloaded snapshot is incomplete: its counts do not match.");
+            using (SqliteCommand references = connection.CreateCommand())
+            {
+                references.CommandText = """
+                    SELECT EXISTS(SELECT 1 FROM product_attributes v LEFT JOIN products p
+                        ON p.generation=v.generation AND p.id=v.product_id WHERE v.generation=$g AND p.id IS NULL)
+                    """;
+                references.Parameters.AddWithValue("$g", generation);
+                if ((long)references.ExecuteScalar()! != 0)
+                    throw new InvalidDataException("An attribute refers to a product outside this snapshot.");
+            }
             hooks.AtBoundary?.Invoke("before-activation");
             ct.ThrowIfCancellationRequested();
             DateTimeOffset completed = clock.GetUtcNow();
@@ -227,12 +244,14 @@ public sealed class SnapshotStore
         string[] version = (manifest.Version ?? "").Split('.');
         if (manifest.Schema != SnapshotContract.Schema || version.Length != 2
             || !int.TryParse(version[0], NumberStyles.None, CultureInfo.InvariantCulture, out int major)
+            || !int.TryParse(version[1], NumberStyles.None, CultureInfo.InvariantCulture, out int minor)
             || !ReadableMajors.Contains(major))
             throw new InvalidDataException("This app cannot read the downloaded snapshot version.");
         if (manifest.RepSubject != workspace.RepSubject)
             throw new InvalidDataException("The downloaded snapshot belongs to another rep.");
         if (manifest.Counts is null || manifest.Counts.Locations < 0 || manifest.Counts.Categories < 0
-            || manifest.Counts.Products < 0 || manifest.Counts.BasePrices < 0)
+            || manifest.Counts.Products < 0 || manifest.Counts.BasePrices < 0 || manifest.Counts.ProductAttributes < 0
+            || (minor == 0 && manifest.Counts.ProductAttributes != 0))
             throw new InvalidDataException("The snapshot manifest is invalid.");
     }
 
@@ -272,12 +291,26 @@ public sealed class SnapshotStore
                 Add("$category", product.CategoryId.ToString()); Add("$unit", product.Unit); Add("$step", Number(product.QuantityStep));
                 Add("$minimum", Number(product.MinimumQuantity)); Add("$parent", product.ParentProductId?.ToString());
                 break;
-            default:
+            case "productAttributes":
+                if (new[] { "productId", "position", "name", "value", "isArchived" }.Any(field => !entity.TryGetProperty(field, out _)))
+                    throw new InvalidDataException("An attribute row is missing a required field.");
+                SnapshotProductAttribute attribute = Entity<SnapshotProductAttribute>(entity);
+                if (string.IsNullOrWhiteSpace(attribute.Name) || attribute.Value is null || attribute.Position < 0)
+                    throw new InvalidDataException("An attribute row is invalid.");
+                insert.CommandText = """
+                    INSERT INTO product_attributes(generation, product_id, position, name, value, is_archived)
+                    VALUES($g, $product, $position, $name, $value, $archived)
+                    """;
+                Add("$product", attribute.ProductId.ToString()); Add("$position", attribute.Position);
+                Add("$name", attribute.Name); Add("$value", attribute.Value); Add("$archived", attribute.IsArchived ? 1 : 0);
+                break;
+            case "basePrices":
                 SnapshotBasePrice price = Entity<SnapshotBasePrice>(entity);
                 insert.CommandText = "INSERT INTO base_prices(generation, product_id, effective_from, amount) VALUES($g, $product, $from, $amount)";
                 Add("$product", price.ProductId.ToString()); Add("$from", price.EffectiveFrom.ToString("O", CultureInfo.InvariantCulture));
                 Add("$amount", Number(price.Amount));
                 break;
+            default: throw new InvalidDataException("Unknown snapshot family.");
         }
         insert.ExecuteNonQuery();
     }

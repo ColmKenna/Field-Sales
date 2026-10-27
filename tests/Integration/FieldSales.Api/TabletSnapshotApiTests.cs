@@ -41,6 +41,42 @@ public sealed class TabletSnapshotApiTests(SqlServerFixture fixture) : IAsyncLif
     public Task DisposeAsync() => _app.DisposeAsync();
 
     [Fact]
+    public async Task Should_IncludeOrderedFactsAndExcludeRestrictedFacts_When_RepSyncsAgain()
+    {
+        Category category = await _app.CategoryAsync("Facts");
+        Guid product = await _app.ProductAsync("SUN-0342", "Sun Lotion", category.Id);
+        var group = await _app.RestrictionGroupAsync("Pharmacy-only medicines");
+        Guid hidden = await _app.ProductAsync("PRIVATE", "Restricted", category.Id, group: group);
+        await using (var scope = _app.Api.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
+            var names = new[] { AttributeName.Create("Weight"), AttributeName.Create("Shelf life"), AttributeName.Create("Barcode") };
+            db.AttributeNames.AddRange(names);
+            var visible = await db.Products.SingleAsync(item => item.Id == product);
+            foreach (var pair in names.Zip(new[] { "200 g", "24 months", "5391234567890" })) visible.AddAttribute(pair.First, pair.Second);
+            var restricted = await db.Products.SingleAsync(item => item.Id == hidden);
+            restricted.AddAttribute(names[0], "PRIVATE VALUE");
+            await db.SaveChangesAsync();
+        }
+        TabletSnapshot first = await _app.SyncAsync("colm");
+        Assert.Equal(["200 g", "24 months", "5391234567890"], first.ProductAttributes!.Select(row => row.Value));
+        Assert.Equal([0, 1, 2], first.ProductAttributes!.Select(row => row.Position));
+        Assert.All(first.ProductAttributes!, row => Assert.Equal(product, row.ProductId));
+        Assert.DoesNotContain(first.Products, row => row.Id == hidden);
+        await using (var scope = _app.Api.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
+            var weight = await db.AttributeNames.SingleAsync(item => item.Name == "Weight");
+            weight.Rename("Mass"); weight.Archive();
+            await db.SaveChangesAsync();
+        }
+        TabletSnapshot next = await _app.SyncAsync("colm");
+        Assert.Equal(new SnapshotProductAttribute(product, 0, "Mass", "200 g", true), next.ProductAttributes![0]);
+        Assert.DoesNotContain(next.ProductAttributes!, row => row.ProductId == hidden || row.Value == "PRIVATE VALUE");
+        Assert.Equal(3, next.Manifest.Counts.ProductAttributes);
+    }
+
+    [Fact]
     public async Task Should_ContainOnlyTheRepsAssignedLocations_When_BuildingTheSnapshot()
     {
         Geography places = await _app.SeedGeographyAsync();
@@ -353,7 +389,7 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
         Assert.Equal(SnapshotContract.Schema, snapshot.Manifest.Schema);
         Assert.Equal(Header(response, SnapshotContract.VersionHeader), snapshot.Manifest.Version);
         Assert.Equal(new SnapshotCounts(snapshot.Locations.Count, snapshot.Categories.Count, snapshot.Products.Count,
-            snapshot.BasePrices.Count), snapshot.Manifest.Counts);
+            snapshot.BasePrices.Count, snapshot.ProductAttributes?.Count ?? 0), snapshot.Manifest.Counts);
         return snapshot;
     }
 

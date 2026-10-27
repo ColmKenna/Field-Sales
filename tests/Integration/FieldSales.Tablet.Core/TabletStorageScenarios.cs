@@ -294,7 +294,7 @@ public sealed class TabletStorageScenarios : IDisposable
         {
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version=2";
+            command.CommandText = "PRAGMA user_version=3";
             command.ExecuteNonQuery();
         }
         Assert.Throws<InvalidOperationException>(() => new SnapshotStore(workspace));

@@ -23,11 +23,11 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
         DateTimeOffset builtUtc = clock.GetUtcNow();
         DateOnly buildDate = ProductEndpoints.Today(clock);
         SnapshotLocation[] locations = await ReadLocationsAsync(repSubject, ct);
-        (SnapshotCategory[] categories, SnapshotProduct[] products, SnapshotBasePrice[] prices) =
+        (SnapshotCategory[] categories, SnapshotProduct[] products, SnapshotBasePrice[] prices, SnapshotProductAttribute[] attributes) =
             await ReadCatalogueAsync(buildDate, ct);
         var manifest = new SnapshotManifest(SnapshotContract.Schema, SnapshotContract.CurrentVersion, repSubject,
-            builtUtc, buildDate, new(locations.Length, categories.Length, products.Length, prices.Length));
-        return new(manifest, locations, categories, products, prices);
+            builtUtc, buildDate, new(locations.Length, categories.Length, products.Length, prices.Length, attributes.Length));
+        return new(manifest, locations, categories, products, prices, attributes);
     }
 
     private Task<SnapshotLocation[]> ReadLocationsAsync(string repSubject, CancellationToken ct) =>
@@ -61,7 +61,7 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
                 .ToArray();
         }, ct);
 
-    private Task<(SnapshotCategory[], SnapshotProduct[], SnapshotBasePrice[])> ReadCatalogueAsync(DateOnly buildDate,
+    private Task<(SnapshotCategory[], SnapshotProduct[], SnapshotBasePrice[], SnapshotProductAttribute[])> ReadCatalogueAsync(DateOnly buildDate,
         CancellationToken ct) =>
         CatalogueTransactions.RunAsync(catalogue, IsolationLevel.Serializable, async _ =>
         {
@@ -72,6 +72,14 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
                     product.MinimumQuantity, product.ParentProductId
                 }).ToArrayAsync(ct);
             HashSet<Guid> included = [.. products.Select(product => product.Id)];
+            // Use the same inclusion predicate and catalogue transaction as the products themselves.
+            SnapshotProductAttribute[] attributes = await (from value in catalogue.ProductAttributeValues.AsNoTracking()
+                join product in catalogue.Products on value.ProductId equals product.Id
+                join name in catalogue.AttributeNames on value.AttributeNameId equals name.Id
+                where product.RestrictionGroupId == null
+                orderby value.ProductId, value.Position
+                select new SnapshotProductAttribute(value.ProductId, value.Position, name.Name, value.Value, name.IsArchived))
+                .ToArrayAsync(ct);
             var prices = await (from price in catalogue.ProductBasePrices.AsNoTracking()
                                 join product in catalogue.Products on price.ProductId equals product.Id
                                 where product.RestrictionGroupId == null
@@ -103,6 +111,6 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
                         product.Unit, product.QuantityStep, product.MinimumQuantity,
                         product.ParentProductId is Guid parent && included.Contains(parent) ? parent : null))
                     .OrderBy(product => product.Code, StringComparer.Ordinal).ThenBy(product => product.Id).ToArray(),
-                basePrices);
+                basePrices, attributes);
         }, ct);
 }

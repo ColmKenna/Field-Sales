@@ -6,16 +6,71 @@ using System.Text.RegularExpressions;
 using FieldSales.StaffAccess;
 using FieldSales.Web.Data;
 using FieldSales.Web.Security;
+using FieldSales.Tablet.Core;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext;
 using Product = CatalogueApi::FieldSales.Api.Catalogue.Product;
 using AttributeName = CatalogueApi::FieldSales.Api.Catalogue.AttributeName;
+using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbContext;
 
 namespace FieldSales.Web.Tests;
 
 public sealed class ProductAttributeIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
+    [Fact]
+    public async Task Should_ShowHeadOfficeFactsOfflineAfterSync_When_RepDownloadsTheUpdatedProduct()
+    {
+        Seed seed = await SeedAsync();
+        await using var api = app.Api.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<DirectoryDbContext>();
+            services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>()
+                .UseSqlServer(app.ConnectionString).Options));
+        }));
+        await using (var scope = api.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
+        await using (StaffWebsiteFactory website = app.CreateWebsite(api))
+        {
+            using HttpClient browser = website.CreateBrowser();
+            await SignInAsync(browser);
+            foreach (var pair in seed.Names.Zip(new[] { "200 g", "24 months", "5391234567890" }))
+            {
+                using var response = await AddAsync(browser, seed, await PageAsync(browser, seed), pair.First.Id.ToString(), pair.Second);
+                Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+            }
+        }
+        using HttpClient tokenClient = app.CreateApiClient();
+        string token = tokenClient.DefaultRequestHeaders.Authorization!.Parameter!;
+        app.Roles.SetRoles("niamh", StaffRoles.FieldSalesperson);
+        using HttpClient download = api.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+        string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "wi033-flow", Guid.NewGuid().ToString("N"));
+        RepWorkspace workspace = new(root, "niamh");
+        try
+        {
+            UnsentStore unsent = new(workspace);
+            unsent.Save(new(Guid.NewGuid(), UnsentKind.Call, DateTimeOffset.UtcNow, "{\"outcome\":\"Visited\"}"));
+            string fingerprint = unsent.Fingerprint();
+            TabletSync sync = new(workspace, download, new FlowTokens(token), new DriveStorageSpace());
+            SyncOutcome outcome = await sync.SyncAsync();
+            Assert.Equal(SyncStatus.Completed, outcome.Status);
+            download.Dispose(); // The next read uses the persisted snapshot, with no server available.
+            var reopened = new SnapshotStore(workspace);
+            var detail = reopened.ReadProduct(seed.Id)!;
+            Assert.Equal(["Weight", "Shelf life", "Barcode"], detail.Attributes.Select(row => row.Name));
+            Assert.Equal(["200 g", "24 months", "5391234567890"], detail.Attributes.Select(row => row.Value));
+            Assert.Equal(3, reopened.ReadActive()!.Manifest.Counts.ProductAttributes);
+            Assert.Equal(fingerprint, unsent.Fingerprint());
+        }
+        finally
+        {
+            app.Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
+            System.IO.Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task Should_ShowSourceNameValueRowsAcrossRestart_When_HeadOfficeAddsAttributes()
     {
@@ -213,5 +268,9 @@ public sealed class ProductAttributeIntegrationTests(ProductApplication app) : I
     private sealed record Seed(Guid Id, AttributeName[] Names)
     {
         public string Path => $"/HeadOffice/Products/{Id}";
+    }
+    private sealed class FlowTokens(string token) : IAccessTokenSource
+    {
+        public Task<string?> GetAccessTokenAsync(CancellationToken ct) => Task.FromResult<string?>(token);
     }
 }
