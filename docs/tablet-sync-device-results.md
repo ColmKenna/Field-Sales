@@ -113,6 +113,39 @@ have to come from startup cost, not the list. The list still scrolls through all
 An Android emulator was tried first. It cannot stand in for the Samsung's timings, and Chrome's first-run froze it until it was given 4 GB of RAM, so
 it was not used for any figure here.
 
+## Startup work: one entry check and step timings (developer chose options 1 and 2, 2026-10-27)
+
+**Option 1, check once.** A cold start used to run the 24-hour check on the sign-in page and again on Home. Entry now hands the result it just checked to the next
+screen (`EntryHandOff` in Core), once and for at most 5 seconds on the device's own timer, so a changed date cannot extend it. A screen reached any other way
+(resume, back, later navigation) still checks for itself, and a missing or stale hand-off always means "check again". Six unit tests cover this, and a
+mutation check (dropping the freshness test) is caught.
+
+**Option 2, step timings.** `FieldSalesTiming` now logs the milliseconds since Android started the process at each step of a cold open.
+
+**Old build against new build, same tablet, same state** (interleaved: old, new, old, new; one throwaway launch after each install, then three cold opens;
+Chrome closed and background apps cleared first):
+
+| | Old build (6 opens) | New build (6 opens) |
+|---|---|---|
+| App start to shops list | 5.69 to 5.92 s, average 5.78 s | 5.45 to 5.52 s, average 5.48 s |
+| Home's sign-in check | about 320 ms | 4 ms |
+
+The saving is about 0.3 s, the repeated check. The step timings of the new build show where the rest goes:
+
+| Step (from process start) | Time |
+|---|---|
+| App created, built, main page created | 0.2 s, 0.4 s, 0.6 s |
+| Entry screen reached (web view and Blazor starting) | about 3.1 s |
+| Entry's first sign-in check done | about 4.5 s (the check itself is about 1.4 s) |
+| Home reached, then shops list drawn | about 4.8 s, then about 5.5 s |
+
+**Caution on the absolute numbers.** On this day the Samsung ran about twice as slowly as in the earlier session (Home's database read took about 390 ms, against about 160 ms an
+hour earlier, in code this change does not touch), so these times are not comparable with the 2.8 to 3.0 s readings above. Only the old-against-new difference is
+reliable. Applying the 0.3 s saving to the earlier readings suggests about 2.6 s on the tablet in its faster state, but that was not measured.
+
+**What the first check costs.** It reads two values from Android's Keystore-backed secure storage and opens the stored day's database, and on a cold start it
+also pays first-use setup of both. Speeding it up further would mean changing how the 24-hour window is stored, which is a security decision for the developer, so it was not changed.
+
 ## Tablet state after the session
 
 Wifi on, screen timeout back to 120 s, automatic date and time on (the clock matched the PC within a second), the pushed certificate removed,

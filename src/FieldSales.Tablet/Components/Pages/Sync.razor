@@ -39,12 +39,12 @@
     protected override async Task OnInitializedAsync()
     {
         Tablet.Resumed += OnResumed;
-        await GuardAsync();
+        await GuardAsync(Tablet.EnterOnArrivalAsync);
     }
 
-    private async Task GuardAsync()
+    private async Task GuardAsync(Func<Task<TabletEntry>> enter)
     {
-        TabletEntry entry = await Tablet.EnterAsync();
+        TabletEntry entry = await enter();
         if (entry.Screen is not (EntryScreen.Sync or EntryScreen.Home)) { Navigation.NavigateTo("/"); return; }
         rep = entry.RepSubject!;
         home = Tablet.ReadHome(rep);
@@ -61,7 +61,7 @@
         home = Tablet.ReadHome(rep!);
     }
 
-    private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(); StateHasChanged(); });
+    private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
 
     public void Dispose() => Tablet.Resumed -= OnResumed;
 }

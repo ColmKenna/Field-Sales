@@ -18,7 +18,15 @@ public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IS
 
     public bool Connected => Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
 
+    private readonly EntryHandOff handOff = new(clock, TimeSpan.FromSeconds(5));
+
     public Task<TabletEntry> EnterAsync() => device.EnterAsync(Connected);
+
+    /// <summary>Entry checked the 24-hour rule and is about to open the next screen; that screen can skip repeating the check.</summary>
+    public void HandOff(TabletEntry entry) => handOff.Offer(entry);
+
+    /// <summary>A screen reached straight from entry: the entry just checked, or a fresh check if it was not handed over in time.</summary>
+    public Task<TabletEntry> EnterOnArrivalAsync() => handOff.Take() is { } entry ? Task.FromResult(entry) : EnterAsync();
 
     /// <summary>The connected sign-in in the system browser. Returns a message to show, or null once the day starts.</summary>
     public async Task<string?> SignInAsync()

@@ -35,6 +35,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        TabletTiming.Mark("entry");
         Tablet.Resumed += OnResumed;
         await RefreshAsync();
     }
@@ -42,8 +43,13 @@
     private async Task RefreshAsync()
     {
         entry = await Tablet.EnterAsync();
-        if (entry.Screen == EntryScreen.Home) Navigation.NavigateTo("/home");
-        else if (entry.Screen == EntryScreen.Sync) Navigation.NavigateTo("/sync");
+        TabletTiming.Mark("checked");
+        if (entry.Screen is EntryScreen.Home or EntryScreen.Sync)
+        {
+            // The next screen opens straight from this check, so it need not repeat it.
+            Tablet.HandOff(entry);
+            Navigation.NavigateTo(entry.Screen == EntryScreen.Home ? "/home" : "/sync");
+        }
     }
 
     private async Task SignInAsync()

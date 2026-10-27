@@ -33,14 +33,15 @@
 
     protected override async Task OnInitializedAsync()
     {
+        TabletTiming.Mark("home");
         Tablet.Resumed += OnResumed;
-        await GuardAsync();
+        await GuardAsync(Tablet.EnterOnArrivalAsync);
     }
 
-    private async Task GuardAsync()
+    private async Task GuardAsync(Func<Task<TabletEntry>> enter)
     {
         long started = Stopwatch.GetTimestamp();
-        TabletEntry entry = await Tablet.EnterAsync();
+        TabletEntry entry = await enter();
         if (entry.Screen != EntryScreen.Home) { home = null; Navigation.NavigateTo("/"); return; }
         TimeSpan entered = Stopwatch.GetElapsedTime(started);
         home = Tablet.ReadHome(entry.RepSubject!);
@@ -54,7 +55,7 @@
         if (home is not null) TabletTiming.HomeShown(home.Locations.Count);
     }
 
-    private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(); StateHasChanged(); });
+    private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
 
     public void Dispose() => Tablet.Resumed -= OnResumed;
 }

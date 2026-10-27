@@ -8,6 +8,7 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        TabletTiming.Mark("create");
         MauiAppBuilder builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>().ConfigureFonts(fonts => fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"));
         builder.Services.AddMauiBlazorWebView();
@@ -28,7 +29,9 @@ public static class MauiProgram
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 #endif
-        return builder.Build();
+        MauiApp app = builder.Build();
+        TabletTiming.Mark("built");
+        return app;
     }
 }
 
