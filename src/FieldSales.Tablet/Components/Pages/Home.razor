@@ -1,0 +1,61 @@
+@page "/home"
+@using System.Diagnostics
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@implements IDisposable
+@inject TabletApp Tablet
+@inject NavigationManager Navigation
+
+@* T-02 · Home (this slice: when the rep last synced and the downloaded Locations). Search and the Location screen arrive with T-4.2.x. *@
+@if (home is not null)
+{
+    <section class="home">
+        <header class="home-header">
+            <h1>Today</h1>
+            <p class="last-sync">@home.LastSynced</p>
+            <button class="secondary" @onclick='() => Navigation.NavigateTo("/sync")'>Sync</button>
+        </header>
+        <h2>Your shops (@home.Locations.Count)</h2>
+        @* Only the rows on screen are drawn, so opening stays quick at 500 or more shops (D3 budget). *@
+        <div class="locations" role="list">
+            <Virtualize TItem="HomeLocation" Items="shops" ItemSize="@RowHeight" OverscanCount="6">
+                <ItemContent Context="location">
+                    <div class="location" role="listitem" @key="location.Id"><strong>@location.Name</strong><span>@location.TownName · @location.CustomerName</span></div>
+                </ItemContent>
+            </Virtualize>
+        </div>
+    </section>
+}
+
+@code {
+    private const float RowHeight = 64;
+    private HomeView? home;
+    private List<HomeLocation> shops = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        TabletTiming.Mark("home");
+        Tablet.Resumed += OnResumed;
+        await GuardAsync(Tablet.EnterOnArrivalAsync);
+    }
+
+    private async Task GuardAsync(Func<Task<TabletEntry>> enter)
+    {
+        long started = Stopwatch.GetTimestamp();
+        TabletEntry entry = await enter();
+        if (entry.Screen != EntryScreen.Home) { home = null; Navigation.NavigateTo("/"); return; }
+        TimeSpan entered = Stopwatch.GetElapsedTime(started);
+        home = Tablet.ReadHome(entry.RepSubject!);
+        shops = [.. home.Locations];
+        TabletTiming.HomePrepared(entered, Stopwatch.GetElapsedTime(started) - entered);
+        Tablet.ResumeCleanup(entry.RepSubject!);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (home is not null) TabletTiming.HomeShown(home.Locations.Count);
+    }
+
+    private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
+
+    public void Dispose() => Tablet.Resumed -= OnResumed;
+}

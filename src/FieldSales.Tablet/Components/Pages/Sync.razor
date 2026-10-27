@@ -1,0 +1,67 @@
+@page "/sync"
+@implements IDisposable
+@inject TabletApp Tablet
+@inject NavigationManager Navigation
+
+@* T-01 · Sync (this slice: last sync, Sync now, progress and why a Sync did not run). Unsent sections arrive with T-4.3.1. *@
+<section class="sync">
+    <h1>Sync</h1>
+    @if (home is not null)
+    {
+        <p class="last-sync">@home.LastSynced</p>
+        <div class="sync-region">
+            @if (busy)
+            {
+                <p role="status">Downloading your day…</p>
+            }
+            else
+            {
+                <button class="primary" disabled="@(!Tablet.Connected)" @onclick="SyncAsync">Sync now</button>
+            }
+        </div>
+        @if (message is not null)
+        {
+            <p class="problem" role="status">@message</p>
+        }
+        @if (home.Locations.Count > 0)
+        {
+            <button class="link" @onclick='() => Navigation.NavigateTo("/home")'>Back to Home</button>
+        }
+    }
+</section>
+
+@code {
+    private string? rep;
+    private HomeView? home;
+    private string? message;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tablet.Resumed += OnResumed;
+        await GuardAsync(Tablet.EnterOnArrivalAsync);
+    }
+
+    private async Task GuardAsync(Func<Task<TabletEntry>> enter)
+    {
+        TabletEntry entry = await enter();
+        if (entry.Screen is not (EntryScreen.Sync or EntryScreen.Home)) { Navigation.NavigateTo("/"); return; }
+        rep = entry.RepSubject!;
+        home = Tablet.ReadHome(rep);
+        if (!Tablet.Connected) message = SyncMessages.NoConnection;
+    }
+
+    private async Task SyncAsync()
+    {
+        busy = true; message = null;
+        SyncOutcome outcome = await Tablet.SyncAsync(rep!);
+        busy = false;
+        if (outcome.Completed) { Navigation.NavigateTo("/home"); return; }
+        message = outcome.Message;
+        home = Tablet.ReadHome(rep!);
+    }
+
+    private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
+
+    public void Dispose() => Tablet.Resumed -= OnResumed;
+}

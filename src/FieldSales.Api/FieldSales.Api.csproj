@@ -23,6 +23,7 @@
     <ProjectReference Include="..\FieldSales.ReferenceData\FieldSales.ReferenceData.csproj" />
     <ProjectReference Include="..\FieldSales.Catalogue.Contracts\FieldSales.Catalogue.Contracts.csproj" />
     <ProjectReference Include="..\FieldSales.Directory.Contracts\FieldSales.Directory.Contracts.csproj" />
+    <ProjectReference Include="..\FieldSales.Snapshot.Contracts\FieldSales.Snapshot.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

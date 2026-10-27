@@ -107,6 +107,41 @@ public sealed class DemoSeedTests(DemoSqlServer server) : IClassFixture<DemoSqlS
         Assert.Equal(4, await first.Products.CountAsync());
     }
 
+    // WI-032 scenario 25: the tablet's target scale, at small sizes here (the command uses 25,000 and 500).
+    [Fact]
+    public async Task Should_AddScaleForColm_When_ScaleRunsAfterTheSample()
+    {
+        await using var catalogue = server.Catalogue();
+        await using var directory = server.Directory();
+        await catalogue.Database.MigrateAsync();
+        await directory.Database.MigrateAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => DemoScaleSeeder.SeedDirectoryAsync(directory, locations: 15));
+        Assert.True(await DemoScenarioSeeder.SeedCatalogueAsync(catalogue));
+        Assert.True(await DemoScenarioSeeder.SeedDirectoryAsync(directory));
+        DateOnly today = new(2026, 10, 1);
+
+        Assert.True(await DemoScaleSeeder.SeedCatalogueAsync(catalogue, products: 50, today: today));
+        Assert.True(await DemoScaleSeeder.SeedDirectoryAsync(directory, locations: 15));
+        Assert.False(await DemoScaleSeeder.SeedCatalogueAsync(catalogue, products: 50, today: today));
+        Assert.False(await DemoScaleSeeder.SeedDirectoryAsync(directory, locations: 15));
+
+        Assert.Equal(50, await catalogue.Products.CountAsync(product => product.Code.StartsWith("SCALE-")));
+        Assert.Equal(800, await catalogue.Categories.CountAsync(category => category.Name.StartsWith("Scale ")));
+        Product first = await catalogue.Products.Include(product => product.BasePrices).SingleAsync(product => product.Code == "SCALE-00001");
+        Assert.Equal(new[] { today.AddDays(-10), today.AddDays(30), today.AddDays(90) },
+            first.BasePrices.Select(price => price.EffectiveFrom).Order());
+        Assert.Null(first.RestrictionGroupId);
+
+        Location[] shops = await directory.Locations.AsNoTracking().Where(location => location.Name.StartsWith("Scale shop")).ToArrayAsync();
+        Assert.Equal(15, shops.Length);
+        Assert.All(shops, shop => Assert.NotNull(shop.MainContactId));
+        Assert.Equal(2, await directory.Customers.CountAsync(customer => customer.Name.StartsWith("Scale Retail")));
+        // The resolver, not the seeder, decides ownership: every scale shop is Colm's through Swords.
+        var owners = await new FieldSales.Api.Coverage.CoverageOwnershipReader(directory).ReadAllAsync(CancellationToken.None);
+        Assert.All(shops, shop => Assert.Equal(DemoStaffSeeder.ColmSubject, owners.Owners[shop.Id]!.RepSubject));
+        Assert.Equal(15, await directory.AssignmentHistory.CountAsync(entry => entry.Reason == "Scale test coverage"));
+    }
+
     private static ServiceProvider IdentityServices(string connection)
     {
         var services = new ServiceCollection();

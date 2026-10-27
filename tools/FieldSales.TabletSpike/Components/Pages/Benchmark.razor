@@ -1,0 +1,286 @@
+@page "/"
+@using System.Diagnostics
+@using FieldSales.TabletSpike.Core
+@inject DeviceReportAdapter Device
+@inject HttpClient Http
+@inject IJSRuntime JS
+@implements IDisposable
+
+<header><span class="eyebrow">WI-032 · synthetic data only</span><h1>Offline storage lab</h1>
+    <p>Download a fixture, keep saved work, and measure this tablet. No staff account is used.</p></header>
+
+@if (preflightError is not null)
+{
+    <section role="alert"><h2>Local data read failed</h2><p>@preflightError</p>
+        <button disabled="@(report is null || diagnosing)" @onclick="Export">Export current report</button>
+        <p>@exportStatus</p>
+    </section>
+}
+else
+{
+    <section>
+        <h2>Fixture</h2>
+        <div class="fields">
+            <label>Server address<input @bind="server" disabled="@busy" placeholder="http://192.168.1.10:7206/" /></label>
+            <label>Profile<select @bind="profile" disabled="@busy"><option>baseline</option><option>target</option><option>stress</option></select></label>
+            <label>Synthetic owner<select @bind="owner" @bind:after="SwitchOwner" disabled="@(busy || diagnosing)"><option>spike-rep-42</option><option>spike-rep-77</option></select></label>
+            <label>Network mode<select @bind="network" disabled="@busy"><option value="lan">LAN · unmeasured link</option><option value="10">Simulate 10 Mbit/s + initial 100 ms</option><option value="2">Simulate 2 Mbit/s + initial 100 ms</option></select></label>
+            <label>Transport used<select @bind="transport" disabled="@busy"><option>LAN</option><option>USB adb reverse</option><option>Emulator bridge (diagnostic)</option></select></label>
+            <label>Test pause<select @bind="pause" disabled="@busy"><option value="">None</option><option>download</option><option>import</option><option>before-activation</option><option>after-activation</option><option>pending-completedGenerationDeletion</option><option>pending-walCheckpoint</option><option>pending-reportFinalization</option><option>pending-reportPublication</option></select></label>
+        </div>
+        <p class="hint">Simulations control the fixture host. Physical throughput and RTT remain unmeasured.</p>
+        <div class="actions"><button disabled="@(busy || diagnosing || store is null)" @onclick="Download">Download &amp; apply</button>
+            <button class="secondary" disabled="@(!busy)" @onclick="Cancel">Cancel</button>
+            @if (paused) { <button class="secondary" @onclick="Resume">Resume test</button> }
+        </div>
+        <p role="status" aria-live="polite">@status</p>
+        <dl><dt>Active generation</dt><dd>@(active?.Generation ?? "No downloaded data")</dd>
+            <dt>Completed</dt><dd>@(active?.CompletedUtc.ToLocalTime().ToString("g") ?? "—")</dd>
+            <dt>Stored fixture</dt><dd>@(active is null ? "—" : $"{active.Manifest.Profile}: {active.Manifest.Counts["products"]:N0} products, {active.Manifest.Counts["locations"]:N0} Locations")</dd>
+            <dt>Native engine</dt><dd>@(store is null ? "Checking…" : $"SQLite {store.Environment.Version} · WAL · FULL")</dd>
+            <dt>Offline open</dt><dd>@($"{openMs:F1} ms local-open operation including scheduling and UI continuation; {Device.StartupElapsedMs:F0} ms since service startup (not full cold-launch time)")</dd></dl>
+    </section>
+    <section>
+        <h2>Location search</h2>
+        <form id="search-form" @onsubmit="Search" @onsubmit:preventDefault>
+            <label>Name or Town<input id="search-term" maxlength="256" @bind="term" /></label>
+            <div class="actions"><button disabled="@(store is null || searching)" type="submit">Search</button>
+                <button disabled="@(store is null || searching)" class="secondary" type="button" @onclick="BenchmarkSearch">Run 20 search terms</button></div>
+        </form>
+        @if (result is not null)
+        {
+            <p id="search-results-status">@result.TotalMatches matches · first @result.Items.Count shown · query @result.QueryMs.ToString("F2") ms</p>
+            <ul class="results">@foreach (var location in result.Items) { <li @key="location.Id"><strong>@location.Name</strong><span>@location.Town</span></li> }</ul>
+        }
+    </section>
+    <section>
+        <h2>Saved test work</h2><p class="hint">Separate owner database. Refreshing the fixture must preserve these notes.</p>
+        @foreach (var item in work.Items)
+        { <p><strong>@item.Kind</strong> — @item.Note</p> }
+        <label>Order test note<textarea @bind="note" maxlength="4096"></textarea></label>
+        <div class="actions"><button class="secondary" disabled="@(busy || diagnosing || work.Items.Count == 0)" @onclick="SaveNote">Edit saved test note</button></div>
+        <p class="hash">Fingerprint: @work.Fingerprint</p>
+    </section>
+    <section><h2>Measurement report</h2><p>Includes device, native engine, fixture hashes, phases, disk samples, saved work and search timings. Failed and incomplete runs keep their status.</p>
+        <p>Export samples physical file sizes. Logical JSON totals are unavailable until the optional scan runs. The scan can take minutes and is timed separately.</p>
+        <button disabled="@(report is null || busy || diagnosing)" @onclick="Export">Export current report</button>
+        <button class="secondary" disabled="@(report is null || busy || diagnosing)" @onclick="ScanLogicalPayloads">Scan logical payload sizes (optional)</button>
+        @if (savedReports.Length > 0)
+        {
+            <label>Persisted refresh (includes interrupted runs)<select @bind="selectedSavedReport">@foreach (string path in savedReports) { <option value="@path">@Path.GetFileName(path)</option> }</select></label>
+            <button class="secondary" disabled="@(busy || diagnosing)" @onclick="ExportSaved">Export saved refresh</button>
+        }
+        <p>@exportStatus</p></section>
+}
+
+@code {
+    private string server = "http://127.0.0.1:7206/", profile = "baseline", owner = "spike-rep-42", network = "lan", pause = "";
+    private string transport = "LAN";
+    private string status = "Opening local data…", term = "", note = "", exportStatus = "", webView = "unavailable until WebView initializes";
+    private string? preflightError;
+    private bool busy, paused, searching, diagnosing, localReady, firstRender = true;
+    private double openMs;
+    private SpikeWorkspace? workspace;
+    private SnapshotSqliteStore? store;
+    private ActiveSnapshot? active;
+    private UnsentState work = new(null, "", []);
+    private SearchResult? result;
+    private SpikeReport? report;
+    private LocalOpenAttempt? localOpen;
+    private CancellationTokenSource? cancellation;
+    private readonly ManualResetEventSlim pauseRelease = new(true);
+    private bool hasPaused;
+    private readonly List<SearchMeasurement> searchesDuringRefresh = [];
+    private string[] savedReports = [];
+    private string selectedSavedReport = "";
+    private (double Start, TaskCompletionSource<double> Completion)? pendingPaint;
+
+    protected override async Task OnInitializedAsync()
+    {
+        server = Preferences.Get("spike-server", server);
+        profile = Preferences.Get("spike-profile", profile);
+        owner = Preferences.Get("spike-owner", owner);
+        await OpenLocal();
+        localReady = true;
+    }
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (pendingPaint is { } paint)
+        {
+            pendingPaint = null;
+            try { paint.Completion.TrySetResult(await JS.InvokeAsync<double>("spike.afterPaintElapsed", paint.Start)); }
+            catch (Exception e) { paint.Completion.TrySetException(e); }
+        }
+        // Blazor can render while OnInitializedAsync is still awaiting the local read.
+        // Capture the reopen report only after that read has populated all measured state.
+        if (firstRender && localReady)
+        {
+            firstRender = false;
+            webView = await JS.InvokeAsync<string>("spike.userAgent");
+            report ??= NewReport("offline reopen; process startup, OS cache uncontrolled");
+            // A successful offline-open diagnostic is distinct from an incomplete refresh.
+            localOpen!.ApplyToNewReport(report);
+            StateHasChanged();
+        }
+    }
+    private async Task OpenLocal()
+    {
+        long started = Stopwatch.GetTimestamp();
+        var attempt = new LocalOpenAttempt(started, Device.TraceLocalOpen);
+        attempt.RecordTracePoint("uiDispatch", started);
+        try
+        {
+            try
+            {
+                await Task.Run(() =>
+                {
+                    try { attempt.Read(() => Device.Root, owner); }
+                    finally
+                    {
+                        long exited = Stopwatch.GetTimestamp();
+                        attempt.RecordTracePoint("workerDelegateExit", exited);
+                    }
+                });
+            }
+            finally
+            {
+                long continued = Stopwatch.GetTimestamp();
+                attempt.RecordTracePoint("callerContinuation", continued);
+                attempt.ObserveUiContinuation();
+            }
+            preflightError = null;
+        }
+        catch (Exception e) { preflightError = e.Message; }
+        workspace = attempt.Workspace; store = attempt.Store; active = attempt.Active; work = attempt.Work;
+        savedReports = attempt.SavedReports; selectedSavedReport = attempt.SelectedSavedReport;
+        if (preflightError is null)
+        {
+            note = work.Items.FirstOrDefault(i => i.Kind == "Order")?.Note ?? "";
+            status = active is null ? "Ready for the first fixture." : "Local data reopened. No server request was made.";
+        }
+        openMs = attempt.CompleteUi();
+        localOpen = attempt;
+    }
+    private async Task SwitchOwner()
+    {
+        Preferences.Set("spike-owner", owner); result = null; report = null;
+        await OpenLocal(); report = NewReport("owner switch; local reopen");
+        localOpen!.ApplyToNewReport(report);
+    }
+    private SpikeReport NewReport(string state) => new()
+    {
+        Owner = owner, Device = Device.Conditions(webView), CacheState = state,
+        Network = network == "lan" ? new($"{transport}; physical conditions unmeasured") : new($"application-level-simulation over {transport}", double.Parse(network), 100)
+    };
+    private async Task Download()
+    {
+        if (workspace is null) return;
+        busy = true; hasPaused = false; paused = false; pauseRelease.Set(); searchesDuringRefresh.Clear();
+        cancellation?.Dispose(); cancellation = new();
+        report = NewReport(active is null ? "fresh; OS cache uncontrolled" : "replacement; OS cache uncontrolled");
+        var refreshWatch = Stopwatch.StartNew();
+        string selectedPause = pause;
+        try
+        {
+            var baseUri = new Uri(server.EndsWith('/') ? server : server + "/");
+            var endpoint = new Uri(baseUri, $"fixtures/{owner[10..]}/{profile}/");
+            Preferences.Set("spike-server", server); Preferences.Set("spike-profile", profile);
+            status = "Downloading and validating synthetic data…";
+            await new SpikeRunner(workspace, Http).RefreshAsync(endpoint, report, new()
+            {
+                AtBoundary = boundary =>
+                {
+                    if (boundary != selectedPause || hasPaused) return;
+                    hasPaused = true; pauseRelease.Reset();
+                    _ = InvokeAsync(() => { paused = true; status = $"Paused at {boundary}. Force-close only this spike app, or Resume test."; StateHasChanged(); });
+                    pauseRelease.Wait(cancellation.Token);
+                }
+            }, cancellation.Token);
+            status = "Refresh complete. All payload counts and hashes verified.";
+        }
+        catch (OperationCanceledException) { status = "Cancelled. Reopen local data to inspect the active generation."; }
+        catch (Exception e) { status = $"Refresh failed: {e.Message}"; report.Status = "failed"; report.Error ??= e.Message; }
+        finally
+        {
+            report.PhaseMs["refreshAwait"] = refreshWatch.Elapsed.TotalMilliseconds;
+            report.Searches.AddRange(searchesDuringRefresh);
+            paused = false; pauseRelease.Set();
+            string outcome = status;
+            try { await OpenLocal(); status = outcome; }
+            finally
+            {
+                report.LocalOpen = localOpen?.Diagnostics;
+                report.PhaseMs["refreshAndLocalReopenAwait"] = refreshWatch.Elapsed.TotalMilliseconds;
+                busy = false;
+            }
+        }
+    }
+    private void Cancel() { cancellation?.Cancel(); pauseRelease.Set(); }
+    private void Resume() { paused = false; status = "Resuming…"; pauseRelease.Set(); }
+    private async Task Search()
+    {
+        if (store is null) return;
+        searching = true;
+        try
+        {
+            double begin = await JS.InvokeAsync<double>("spike.searchStart");
+            result = await Task.Run(() => store.Search(term));
+            var paint = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
+            pendingPaint = (begin, paint);
+            StateHasChanged();
+            double visible = await paint.Task;
+            report ??= NewReport("local search diagnostic");
+            var measurement = new SearchMeasurement(term, result.QueryMs, visible, result.TotalMatches);
+            if (busy) searchesDuringRefresh.Add(measurement); else report.Searches.Add(measurement);
+        }
+        catch (Exception e) { status = e.Message; }
+        finally { searching = false; }
+    }
+    private async Task BenchmarkSearch()
+    {
+        foreach (string search in SearchTerms.Benchmark) { term = search; await Search(); }
+        status = "Twenty search terms recorded. Export the report.";
+    }
+    private async Task SaveNote()
+    {
+        if (workspace is null) return;
+        var order = work.Items.Single(i => i.Kind == "Order");
+        await Task.Run(() => new UnsentSqliteStore(workspace).EditNote(order.Id, note));
+        work = await Task.Run(() => new UnsentSqliteStore(workspace).Read());
+        status = "Saved test note updated.";
+    }
+    private async Task Export()
+    {
+        if (report is null) return;
+        diagnosing = true;
+        try
+        {
+            if (workspace is not null) report.DiskSamples.Add(await Task.Run(() => workspace.Measure()));
+            exportStatus = await Device.ExportAsync(report);
+        }
+        catch (Exception e) { exportStatus = e.Message; }
+        finally { diagnosing = false; }
+    }
+    private async Task ScanLogicalPayloads()
+    {
+        if (report is null || workspace is null) return;
+        diagnosing = true; exportStatus = "Scanning logical payload sizes…";
+        try
+        {
+            var sample = await Task.Run(() => workspace.Measure(includeGenerationPayloads: true));
+            report.DiskSamples.Add(sample);
+            exportStatus = sample.GenerationPayloadScanMs is double ms ? $"Optional logical scan: {ms:F1} ms. Export to include it." : "Logical totals unavailable: no snapshot database.";
+        }
+        catch (Exception e) { exportStatus = e.Message; }
+        finally { diagnosing = false; }
+    }
+    private async Task ExportSaved()
+    {
+        if (!savedReports.Contains(selectedSavedReport)) return;
+        diagnosing = true;
+        try { exportStatus = await Device.ExportJsonAsync(await File.ReadAllTextAsync(selectedSavedReport), Path.GetFileName(selectedSavedReport)); }
+        catch (Exception e) { exportStatus = e.Message; }
+        finally { diagnosing = false; }
+    }
+    public void Dispose() { cancellation?.Cancel(); pauseRelease.Set(); cancellation?.Dispose(); pendingPaint?.Completion.TrySetCanceled(); }
+}

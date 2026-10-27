@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="tools/FieldSales.TabletSpike.Core/FieldSales.TabletSpike.Core.csproj" />
+  <Project Path="tools/FieldSales.TabletSpike/FieldSales.TabletSpike.csproj" />
+</Solution>
