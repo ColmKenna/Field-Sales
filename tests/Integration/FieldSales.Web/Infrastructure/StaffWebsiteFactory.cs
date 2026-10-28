@@ -20,6 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
@@ -63,6 +64,13 @@ public sealed class StaffWebsiteFactory : WebApplicationFactory<Program>
             }));
         builder.ConfigureTestServices(services =>
         {
+            // Exercise the real retry decisions without waiting through production backoff.
+            // Retry policy itself is also covered by CatalogueHttpContractTests.
+            services.PostConfigureAll<HttpStandardResilienceOptions>(options =>
+            {
+                options.Retry.Delay = TimeSpan.Zero;
+                options.Retry.UseJitter = false;
+            });
             services.RemoveAll<StaffWebDbContext>();
             services.AddScoped(_ => new StaffWebDbContext(
                 new DbContextOptionsBuilder<StaffWebDbContext>().UseSqlite(_connection).Options));
