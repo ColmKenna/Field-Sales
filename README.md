@@ -407,6 +407,18 @@ npm install
 npm run test:admin-ui
 ```
 
+The remaining front-end and demo reset checks run from the repository root:
+
+```sh
+node --test tests/Unit/FieldSales.Web/product-unit-form.test.mjs
+python3 tests/demo-data-script.test.py
+```
+
+The Python checks require Bash and supply a mock Docker executable; they do not
+delete real Docker storage. CI runs all three commands before SQL integration tests.
+For a reproducible JavaScript dependency install, use `npm ci --ignore-scripts`
+in the Identity front-end package directory.
+
 ---
 
 ## Configuration Reference
