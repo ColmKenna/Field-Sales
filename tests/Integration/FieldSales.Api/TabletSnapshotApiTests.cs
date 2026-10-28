@@ -33,12 +33,17 @@ namespace FieldSales.Api.Tests;
 
 // WI-032 increment 1: the server-side Morning Snapshot, contract v1 (scenarios 1–8 and 23's download part).
 [Collection(SqlServerCollection.Name)]
-public sealed class TabletSnapshotApiTests(SqlServerFixture fixture) : IAsyncLifetime
+public sealed class TabletSnapshotApiTests(TabletSnapshotFixture fixture) : IClassFixture<TabletSnapshotFixture>, IAsyncLifetime
 {
-    private readonly TabletSnapshotApplication _app = new(fixture.CreateConnectionString("TabletSnapshot"));
+    private readonly TabletSnapshotApplication _app = fixture.Application;
+    private bool _initialized;
 
-    public Task InitializeAsync() => _app.InitializeAsync();
-    public Task DisposeAsync() => _app.DisposeAsync();
+    public async Task InitializeAsync()
+    {
+        await _app.ResetAsync();
+        _initialized = true;
+    }
+    public Task DisposeAsync() => _initialized ? _app.ResetAsync() : Task.CompletedTask;
 
     [Fact]
     public async Task Should_IncludeOrderedFactsAndExcludeRestrictedFacts_When_RepSyncsAgain()
@@ -293,6 +298,44 @@ public sealed class TabletSnapshotApiTests(SqlServerFixture fixture) : IAsyncLif
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
     }
 
+    [Fact]
+    public async Task Should_LeaveSchemaAndAccessUsable_When_ResettingSnapshotScenario()
+    {
+        var places = await _app.SeedGeographyAsync();
+        await _app.CustomerAsync("Reset shop", places.Arklow.Id);
+        await _app.AssignAsync("colm", TerritoryLevel.County, places.Wicklow.Id);
+        var category = await _app.CategoryAsync("Reset category");
+        await _app.ProductAsync("RESET", "Reset product", category.Id);
+        Assert.Single((await _app.SyncAsync("colm")).Products);
+        _app.Roles.Unavailable = true;
+
+        await _app.ResetAsync();
+
+        Assert.False(_app.Roles.Unavailable);
+        var empty = await _app.SyncAsync("colm");
+        Assert.Empty(empty.Products);
+        Assert.Empty(empty.Locations);
+        await using var scope = _app.Api.Services.CreateAsyncScope();
+        var directory = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
+        var catalogue = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
+        Assert.Empty(await directory.Database.GetPendingMigrationsAsync());
+        Assert.Empty(await catalogue.Database.GetPendingMigrationsAsync());
+        await directory.Database.OpenConnectionAsync();
+        await using var guards = directory.Database.GetDbConnection().CreateCommand();
+        guards.CommandText = """
+            SELECT (SELECT COUNT(*) FROM sys.triggers WHERE parent_class = 1 AND is_disabled = 1)
+                 + (SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled = 1 OR is_not_trusted = 1)
+                 + (SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled = 1 OR is_not_trusted = 1);
+            """;
+        Assert.Equal(0, Convert.ToInt32(await guards.ExecuteScalarAsync()));
+        // Reusing a natural key confirms that the prior graph was removed.
+        await _app.CategoryAsync("Reset category");
+        var next = await _app.SeedGeographyAsync();
+        Guid shop = await _app.CustomerAsync("Reset shop", next.Arklow.Id);
+        await _app.AssignAsync("colm", TerritoryLevel.County, next.Wicklow.Id);
+        Assert.Equal(shop, Assert.Single((await _app.SyncAsync("colm")).Locations).Id);
+    }
+
     private static string[] Breadcrumb(IReadOnlyDictionary<Guid, SnapshotCategory> categories, Guid id)
     {
         List<string> names = [];
@@ -303,51 +346,81 @@ public sealed class TabletSnapshotApiTests(SqlServerFixture fixture) : IAsyncLif
 
 public sealed record Geography(GeographyItem Wicklow, GeographyItem Arklow, GeographyItem Rathdrum, GeographyItem Gorey);
 
+public sealed class TabletSnapshotFixture(SqlServerFixture sql) : IAsyncLifetime
+{
+    public TabletSnapshotApplication Application { get; } = new(sql.CreateConnectionString("TabletSnapshot"));
+    public Task InitializeAsync() => Application.InitializeAsync();
+    public Task DisposeAsync() => Application.DisposeAsync();
+}
+
 public sealed class TabletSnapshotApplication(string connectionString) : IAsyncLifetime
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
     public SnapshotRoleLookup Roles { get; } = new();
-    public WebApplicationFactory<Program> Api { get; private set; } = null!;
+    private WebApplicationFactory<Program>? _api;
+    private SnapshotDatabaseReset? _reset;
+    public WebApplicationFactory<Program> Api => _api ?? throw new InvalidOperationException("Snapshot application is not initialized.");
 
     public async Task InitializeAsync()
     {
-        Api = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        try
         {
-            builder.UseEnvironment("Testing");
-            builder.ConfigureLogging(logging => logging.ClearProviders());
-            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            _api = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             {
-                ["Authentication:Authority"] = Issuer,
-                ["ConnectionStrings:CatalogueDb"] = connectionString,
-                ["ConnectionStrings:DirectoryDb"] = connectionString
-            }));
-            builder.ConfigureTestServices(services =>
-            {
-                services.RemoveAll<CatalogueDbContext>();
-                services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
-                    .UseSqlServer(connectionString).Options));
-                services.RemoveAll<DirectoryDbContext>();
-                services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>()
-                    .UseSqlServer(connectionString).Options));
-                services.RemoveAll<IStaffRoleLookup>();
-                services.AddSingleton<IStaffRoleLookup>(Roles);
-                services.RemoveAll<TimeProvider>();
-                services.AddSingleton<TimeProvider>(new SnapshotClock());
-                services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+                builder.UseEnvironment("Testing");
+                builder.ConfigureLogging(logging => logging.ClearProviders());
+                builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    OpenIdConnectConfiguration configuration = new() { Issuer = Issuer };
-                    configuration.SigningKeys.Add(SigningKey);
-                    options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+                    ["Authentication:Authority"] = Issuer,
+                    ["ConnectionStrings:CatalogueDb"] = connectionString,
+                    ["ConnectionStrings:DirectoryDb"] = connectionString
+                }));
+                builder.ConfigureTestServices(services =>
+                {
+                    services.RemoveAll<CatalogueDbContext>();
+                    services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>()
+                        .UseSqlServer(connectionString).Options));
+                    services.RemoveAll<DirectoryDbContext>();
+                    services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>()
+                        .UseSqlServer(connectionString).Options));
+                    services.RemoveAll<IStaffRoleLookup>();
+                    services.AddSingleton<IStaffRoleLookup>(Roles);
+                    services.RemoveAll<TimeProvider>();
+                    services.AddSingleton<TimeProvider>(new SnapshotClock());
+                    services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+                    {
+                        OpenIdConnectConfiguration configuration = new() { Issuer = Issuer };
+                        configuration.SigningKeys.Add(SigningKey);
+                        options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+                    });
                 });
             });
-        });
-        await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
-        await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
+            await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
+            await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
+            _reset = new SnapshotDatabaseReset(connectionString);
+            await _reset.InitializeAsync();
+        }
+        catch (Exception setupError)
+        {
+            try { await DisposeAsync(); }
+            catch (Exception cleanupError) { setupError.Data["FixtureCleanupFailure"] = cleanupError; }
+            throw;
+        }
     }
 
-    public async Task DisposeAsync() => await Api.DisposeAsync();
+    public async Task ResetAsync()
+    {
+        await (_reset ?? throw new InvalidOperationException("Snapshot schema is not initialized.")).ResetAsync();
+        Roles.Reset();
+    }
+
+    public async Task DisposeAsync()
+    {
+        var api = Interlocked.Exchange(ref _api, null);
+        if (api is not null) await api.DisposeAsync();
+    }
 
     public HttpClient ClientAs(string subject, string[] roles, bool withScope = true)
     {
@@ -557,6 +630,7 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
     {
         private readonly Dictionary<string, string[]> _roles = new(StringComparer.Ordinal);
         public bool Unavailable { get; set; }
+        public void Reset() { lock (_roles) { _roles.Clear(); Unavailable = false; } }
         public void Set(string subject, params string[] roles) { lock (_roles) _roles[subject] = roles; }
         public Task<StaffRoleLookupResult> GetRolesAsync(string accessToken, string subject, CancellationToken cancellationToken)
         {
