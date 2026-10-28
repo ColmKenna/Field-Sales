@@ -127,21 +127,3 @@ public sealed class RestrictionPermissionHost : IAsyncDisposable
 }
 
 // Pauses the next catalogue commit until released, so a test can act while a permission write holds its locks.
-public sealed class CommitGate : DbTransactionInterceptor
-{
-    private int _armed;
-    public bool Armed { set => Volatile.Write(ref _armed, value ? 1 : 0); }
-    public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    public override async ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction,
-        TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
-    {
-        if (Interlocked.Exchange(ref _armed, 0) == 1)
-        {
-            Reached.TrySetResult();
-            await Release.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-        }
-        return result;
-    }
-}

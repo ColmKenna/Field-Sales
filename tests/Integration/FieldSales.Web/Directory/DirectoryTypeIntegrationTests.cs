@@ -18,29 +18,6 @@ using ContactTypeUsageSource = CatalogueApi::FieldSales.Api.Directory.ContactTyp
 
 namespace FieldSales.Web.Tests;
 
-public sealed class DirectoryTypeApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
-{
-    protected override bool UseTestLocationUsage => false;
-    public DirectoryTypeTestContacts Contacts { get; } = new();
-    public string Registration { get; set; } = "valid";
-    private string? _catalogueConnectionString;
-    protected override void ConfigureAdditionalServices(IServiceCollection services, string connectionString)
-    {
-        foreach (var descriptor in services.Where(service => service.IsKeyedService
-            && Equals(service.ServiceKey, "directory-types") && service.KeyedImplementationType == typeof(ContactTypeUsageSource)).ToArray())
-            services.Remove(descriptor);
-        if (Registration != "missing") services.AddKeyedSingleton<IReferenceUsageSource>("directory-types", Contacts);
-        if (Registration == "duplicate") services.AddKeyedSingleton<IReferenceUsageSource>("directory-types", new DirectoryTypeTestContacts());
-        _catalogueConnectionString ??= new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "DirectoryTypeCatalogueTests_" + Guid.NewGuid().ToString("N") }.ConnectionString;
-        services.RemoveAll<CatalogueDbContext>();
-        services.AddScoped(_ => new CatalogueDbContext(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(_catalogueConnectionString).Options));
-    }
-    protected override async Task InitializeAdditionalAsync()
-    {
-        await using var scope = Api.Services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
-    }
-}
 
 [Collection(DirectorySqlServerCollection.Name)]
 public sealed class DirectoryTypeIntegrationTests(DirectoryTypeApplication app) : IClassFixture<DirectoryTypeApplication>
