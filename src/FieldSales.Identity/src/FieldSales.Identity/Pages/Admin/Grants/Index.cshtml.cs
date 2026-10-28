@@ -34,8 +34,8 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        var pagination = Pagination.From(PageNumber, _options.DefaultPageSize);
-        PageNumber = pagination.PageNumber;
+        Pagination pagination = _options.CreatePagination(PageNumber, out int pageNumber);
+        PageNumber = pageNumber;
 
         var filter = GrantFilter.Create(SubjectId, ClientId, TypeFilter);
         Grants = await _grantListService.GetGrantsAsync(

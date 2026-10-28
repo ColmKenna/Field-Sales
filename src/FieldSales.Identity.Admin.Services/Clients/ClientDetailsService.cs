@@ -25,7 +25,7 @@ public partial class ClientDetailsService(
 
     public const string DisabledAtPropertyKey = "admin:disabledAt";
     public const int MinimumDisabledDaysBeforeDelete = 90;
-    private readonly IAuditWriter _auditWriter = auditWriter;
+    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.Client);
     private readonly IClientConfigurationValidator _clientConfigurationValidator = clientConfigurationValidator;
 
     private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
@@ -74,19 +74,4 @@ public partial class ClientDetailsService(
         target.Clear();
         foreach (TValue value in values) target.Add(create(value));
     }
-
-    private Task AuditDeniedAsync(AuditAction action, AuditReasonCode reasonCode, string targetId, string targetName,
-        string details, CancellationToken cancellationToken)
-        => _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, action, AuditOutcome.Denied, reasonCode,
-            targetId, targetName, Details: details), cancellationToken);
-
-    private Task<T> ExecuteAuditedAsync<T>(
-        AuditAction action,
-        string targetId,
-        string targetName,
-        Func<AuditOperation, Task<T>> operation,
-        CancellationToken cancellationToken) =>
-        AuditOperation.RunAsync(_auditWriter, AuditCategory.Client, action, targetId, targetName, operation, cancellationToken);
-
 }

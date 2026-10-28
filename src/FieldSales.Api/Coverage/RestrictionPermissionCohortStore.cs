@@ -25,7 +25,7 @@ public sealed class RestrictionPermissionCohortStore(CatalogueDbContext catalogu
         var managers = await directory.RepReportingLines.AsNoTracking()
             .ToDictionaryAsync(row => row.RepSubject, row => row.ManagerSubject, StringComparer.Ordinal, ct);
         var (subject, roles) = Actor(actor);
-        return await CatalogueTransactions.RunAsync<GroupPermissionsPage?>(catalogue, IsolationLevel.Serializable, async _ =>
+        return await CatalogueTransactions.RunAsync<GroupPermissionsPage?>(catalogue, IsolationLevel.Serializable, async () =>
         {
             var group = await catalogue.RestrictionGroups.AsNoTracking().SingleOrDefaultAsync(row => row.Id == groupId, ct);
             if (group is null) return null;

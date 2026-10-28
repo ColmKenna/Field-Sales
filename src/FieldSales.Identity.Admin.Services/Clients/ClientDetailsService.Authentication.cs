@@ -56,7 +56,7 @@ public partial class ClientDetailsService
 
     public Task<AdminMutationResult> UpdateClientAuthenticationAsync(ClientId clientId,
         ClientAuthenticationInputModel input, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.UpdateAuthentication,
             clientId.Value,
             clientId.Value,
@@ -199,16 +199,15 @@ public partial class ClientDetailsService
         if (!outcome.Succeeded)
             return await DenyAuthenticationFailedAsync(clientId, targetName, outcome, cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.UpdateAuthentication, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            clientId, targetName, Details: "Updated authentication settings"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.UpdateAuthentication, clientId, targetName,
+            "Updated authentication settings", cancellationToken);
         return outcome;
     }
 
     private async Task<AdminMutationResult> DenyAuthenticationValidationFailureAsync(
         string clientId, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdateAuthentication, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await _audit.DeniedAsync(AuditAction.UpdateAuthentication, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client authentication validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
@@ -219,7 +218,7 @@ public partial class ClientDetailsService
         AuditReasonCode reason = outcome.Status == AdminMutationStatus.NotFound
             ? AuditReasonCode.NotFound
             : AuditReasonCode.ValidationFailed;
-        await AuditDeniedAsync(AuditAction.UpdateAuthentication, reason, clientId, targetName,
+        await _audit.DeniedAsync(AuditAction.UpdateAuthentication, reason, clientId, targetName,
             outcome.ErrorMessage ?? "Client authentication validation failed.", cancellationToken);
         return outcome;
     }

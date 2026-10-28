@@ -13,11 +13,11 @@ public partial class UserDetailsService(
     IAuditWriter auditWriter,
     IHttpContextAccessor httpContextAccessor) : IUserDetailsService
 {
+    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.User);
     private readonly IAuditWriter _auditWriter = auditWriter;
     private readonly IBackChannelLogoutService _backChannelLogoutService = backChannelLogoutService;
     private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
     private readonly PersistedGrantDbContext _persistedGrantDbContext = persistedGrantDbContext;
     private readonly ReservedClaimTypePolicy _reservedClaimTypes = reservedClaimTypes;
     private readonly IIdentityUserAdministrationStore _store = store;
-
 }

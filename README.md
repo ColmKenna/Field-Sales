@@ -388,8 +388,13 @@ Use the provided PowerShell script to build self-contained EF Core migration exe
 # Whole solution
 dotnet test FieldSales.slnx
 
-# The admin services, page models, and integration suites
-dotnet test FieldSales.Identity.Admin.Tests/FieldSales.Identity.Admin.Tests.csproj
+# Admin page models and services
+dotnet test tests/Unit/FieldSales.Identity.Admin/FieldSales.Identity.Admin.UnitTests.csproj
+dotnet test tests/Integration/FieldSales.Identity.Admin/FieldSales.Identity.Admin.IntegrationTests.csproj
+
+# The same category split used by CI (after building the solution)
+dotnet test FieldSales.slnx --filter "Category=Unit" --no-build
+dotnet test FieldSales.slnx --filter "Category!=Unit" --no-build -m:1 --settings sqlserver.runsettings --blame-hang-timeout 2m
 ```
 
 **Docker must be running.** A portion of the suite provisions real SQL Server containers via
@@ -397,13 +402,41 @@ Testcontainers to cover migration adoption, concurrency, and cross-instance beha
 in-memory provider cannot represent. Without a container runtime those tests fail to connect
 rather than skipping.
 
-Front-end component tests for the admin console pages are run separately with Node:
+The Web integration project has two SQL collections: Catalogue and Directory.
+Each owns and disposes one SQL Server container; the collections can run concurrently,
+and scenarios within a collection run sequentially. Application fixtures retain separate
+database catalogs. HTTP-only tests do not require these collections. Web scenarios are
+grouped under `Catalogue`, `Directory`, `Coverage`, and `Security`, with shared fixtures
+in `Infrastructure`. Pure tablet entry-handoff checks live in the tablet unit project.
+
+CI runs the API, admin, Web, and supporting integration suites in four independent
+lanes on separate runners. Each lane builds its selected projects. The required
+`Build & Test` check aggregates every integration lane and the build/unit/script job,
+so a failed or cancelled lane cannot produce a successful aggregate check.
+See [test performance and isolation](docs/test-performance.md) for fixture behaviour
+and measured local timings.
+
+Front-end component tests for the admin console pages live in
+`tests/Unit/FieldSales.Identity.Admin/JavaScript` and run separately with Node.
+Their dependencies and test commands are defined in the Identity host's front-end package:
 
 ```pwsh
-cd FieldSales.Identity/src/FieldSales.Identity
-npm install
+cd src/FieldSales.Identity/src/FieldSales.Identity
+npm ci --ignore-scripts
 npm run test:admin-ui
 ```
+
+The remaining front-end and demo reset checks run from the repository root:
+
+```sh
+node --test tests/Unit/FieldSales.Web/product-unit-form.test.mjs
+python3 tests/demo-data-script.test.py
+```
+
+The Python checks require Bash and supply a mock Docker executable; they do not
+delete real Docker storage. CI runs all three commands in its build/unit/script lane.
+For a reproducible JavaScript dependency install, use `npm ci --ignore-scripts`
+in the Identity front-end package directory.
 
 ---
 

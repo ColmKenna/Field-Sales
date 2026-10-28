@@ -7,9 +7,12 @@ on:
     branches: [ main, template-prepare ]
 
 jobs:
-  build-and-test:
-    name: Build & Test
+  fast-checks:
+    name: Build, unit and script checks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,10 +31,80 @@ jobs:
       - name: Run unit tests (Fast Fail)
         run: dotnet test FieldSales.slnx --filter "Category=Unit" --no-build --verbosity normal
 
-      # SQL Server-backed tests (migration adoption, concurrency, secret-reveal instance
-      # handoff) run for real here, not skipped — GitHub-hosted ubuntu runners ship Docker
-      # already running, which Testcontainers needs. A silent skip would mean CI stops
-      # proving the thing most likely to break: real schema migrations against real SQL Server.
-      - name: Run integration test suite
-        run: dotnet test FieldSales.slnx --filter "Category!=Unit" --no-build -m:1 --settings sqlserver.runsettings --verbosity normal
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: src/FieldSales.Identity/src/FieldSales.Identity/package-lock.json
 
+      - name: Install JavaScript test dependencies
+        working-directory: src/FieldSales.Identity/src/FieldSales.Identity
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm ci --ignore-scripts
+
+      - name: Run admin JavaScript tests
+        working-directory: src/FieldSales.Identity/src/FieldSales.Identity
+        run: npm run test:admin-ui
+
+      - name: Run Web JavaScript tests
+        run: node --test tests/Unit/FieldSales.Web/product-unit-form.test.mjs
+
+      - name: Run demo reset script tests (mocked Docker)
+        run: python3 tests/demo-data-script.test.py
+
+  integration:
+    name: Integration (${{ matrix.id }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: api
+            projects: tests/Integration/FieldSales.Api/FieldSales.Api.IntegrationTests.csproj
+          - id: admin
+            projects: tests/Integration/FieldSales.Identity.Admin/FieldSales.Identity.Admin.IntegrationTests.csproj
+          - id: web
+            projects: tests/Integration/FieldSales.Web/FieldSales.Web.IntegrationTests.csproj
+          - id: supporting
+            projects: >-
+              tests/Integration/FieldSales.DemoData/FieldSales.DemoData.IntegrationTests.csproj
+              tests/Integration/FieldSales.SnapshotSpike/FieldSales.SnapshotSpike.IntegrationTests.csproj
+              tests/Integration/FieldSales.Tablet.Core/FieldSales.Tablet.Core.IntegrationTests.csproj
+              tests/Integration/FieldSales.TabletSpike/FieldSales.TabletSpike.IntegrationTests.csproj
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # Separate runners preserve each suite's SQL memory budget and collection isolation.
+      - name: Build and run integration projects
+        env:
+          TEST_PROJECTS: ${{ matrix.projects }}
+        run: |
+          for project in $TEST_PROJECTS; do
+            dotnet test "$project" --filter "Category!=Unit" -m:1 --settings sqlserver.runsettings --blame-hang-timeout 2m --logger trx --results-directory TestResults/${{ matrix.id }} --verbosity normal
+          done
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-${{ matrix.id }}
+          path: TestResults/${{ matrix.id }}/
+
+  # Preserve the existing required-check name; it must include every matrix lane.
+  build-and-test:
+    name: Build & Test
+    if: always()
+    needs: [fast-checks, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every test lane to pass
+        env:
+          FAST_RESULT: ${{ needs.fast-checks.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+        run: test "$FAST_RESULT" = success && test "$INTEGRATION_RESULT" = success

@@ -105,7 +105,11 @@ public sealed class StorageScenarios
             BatchWritten = rows => { if (phase == "import") { partial = rows > 0; cancellation.Cancel(); } }
         };
         var endpoint = await env.StartHost();
-        var report = env.Report(network: new("application-level-simulation", 0.1));
+        // Transfer cancellation needs a partial download; import cancellation happens at
+        // BatchWritten, so it must not spend time simulating a slow connection first.
+        var report = env.Report(network: phase == "transfer"
+            ? new("application-level-simulation", 0.1)
+            : new("loopback-unthrottled"));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new SpikeRunner(env.Workspace(), env.Http).RefreshAsync(endpoint, report, hooks, cancellation.Token));
         Assert.True(partial); Assert.Equal("cancelled", report.Status);
         Assert.Equal(active, env.Store().ReadActive()!.Generation);
@@ -272,8 +276,13 @@ public sealed class StorageScenarios
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalid.StatusCode);
         using var forbidden = await env.Http.GetAsync(new Uri(endpoint, "snapshot.json"));
         Assert.Equal(System.Net.HttpStatusCode.NotFound, forbidden.StatusCode);
-        using var interrupted = await env.Http.GetAsync(new Uri(endpoint, "payload?stopAfter=100"), HttpCompletionOption.ResponseHeadersRead);
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => interrupted.Content.ReadAsByteArrayAsync());
+        // A TCP reset can surface before headers arrive or while reading the body,
+        // depending on the platform. Both must reject the interrupted transfer.
+        await Assert.ThrowsAnyAsync<HttpRequestException>(async () =>
+        {
+            using var interrupted = await env.Http.GetAsync(new Uri(endpoint, "payload?stopAfter=100"), HttpCompletionOption.ResponseHeadersRead);
+            await interrupted.Content.ReadAsByteArrayAsync();
+        });
     }
 
     [Fact]

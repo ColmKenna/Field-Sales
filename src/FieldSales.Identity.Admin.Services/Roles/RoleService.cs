@@ -10,7 +10,7 @@ public class RoleService(
 {
     // We pass SysAdminRole as the protected role that cannot be deleted.
     private const string ProtectedRoleName = ProtectedAdminRoles.SysAdmin;
-    private readonly IAuditWriter _auditWriter = auditWriter;
+    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.Role);
     private readonly IRoleAdministrationStore _store = store;
 
     public Task<ListResult<RoleListItem>> GetRolesAsync(
@@ -24,27 +24,25 @@ public class RoleService(
     public async Task<RoleCreateResult> CreateRoleAsync(RoleCreateInputModel input,
         CancellationToken cancellationToken = default)
     {
-        return await AuditOperation.RunAsync<RoleCreateResult>(_auditWriter, AuditCategory.Role, AuditAction.Create, null, input.Name, async audit =>
+        return await _audit.RunAsync<RoleCreateResult>(AuditAction.Create, null, input.Name, async audit =>
         {
             (RoleCreateOutcome Status, RoleId? RoleId, string? ErrorMessage) outcome =
                 await _store.CreateRoleAsync(input, cancellationToken);
             switch (outcome.Status)
             {
                 case RoleCreateOutcome.NameCollision:
-                    await AuditDeniedAsync(AuditAction.Create, AuditReasonCode.NameCollision, null, input.Name,
+                    await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NameCollision, null, input.Name,
                         "A role with that name already exists.", cancellationToken);
                     return RoleCreateResult.Failed("A role with that name already exists.");
 
                 case RoleCreateOutcome.ValidationFailed:
-                    await AuditDeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, null, input.Name,
+                    await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, null, input.Name,
                         outcome.ErrorMessage ?? "Validation failed.", cancellationToken);
                     return RoleCreateResult.Failed(outcome.ErrorMessage ?? "Validation failed.");
             }
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Role, AuditAction.Create, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                outcome.RoleId, input.Name,
-                Details: "Role created"), cancellationToken);
+            await _audit.SucceededAsync(AuditAction.Create, outcome.RoleId, input.Name,
+                "Role created", cancellationToken);
 
             return RoleCreateResult.Succeeded(outcome.RoleId!.Value);
         }, cancellationToken);
@@ -52,7 +50,7 @@ public class RoleService(
 
     public async Task<AdminMutationResult> DeleteRoleAsync(RoleId roleId, CancellationToken cancellationToken = default)
     {
-        return await AuditOperation.RunAsync<AdminMutationResult>(_auditWriter, AuditCategory.Role, AuditAction.Delete, roleId.Value, roleId.Value, async audit =>
+        return await _audit.RunAsync<AdminMutationResult>(AuditAction.Delete, roleId.Value, roleId.Value, async audit =>
         {
             (RoleDeleteOutcome Status, string TargetName) outcome =
                 await _store.DeleteRoleAsync(roleId, ProtectedRoleName, cancellationToken);
@@ -60,37 +58,28 @@ public class RoleService(
             switch (outcome.Status)
             {
                 case RoleDeleteOutcome.RoleNotFound:
-                    await AuditDeniedAsync(AuditAction.Delete, AuditReasonCode.NotFound, roleId, outcome.TargetName,
+                    await _audit.DeniedAsync(AuditAction.Delete, AuditReasonCode.NotFound, roleId, outcome.TargetName,
                         "Role not found.", cancellationToken);
                     return new AdminMutationResult(AdminMutationStatus.NotFound,
                         new ValidationErrorDictionary().AddError(string.Empty, "Role not found."));
 
                 case RoleDeleteOutcome.ProtectedRoleBlocked:
-                    await AuditDeniedAsync(AuditAction.Delete, AuditReasonCode.ProtectedResource, roleId,
+                    await _audit.DeniedAsync(AuditAction.Delete, AuditReasonCode.ProtectedResource, roleId,
                         outcome.TargetName,
                         "Cannot delete protected role.", cancellationToken);
                     return AdminMutationResult.DeniedResult(string.Empty, "You cannot delete this protected role.");
 
                 case RoleDeleteOutcome.ValidationFailed:
-                    await AuditDeniedAsync(AuditAction.Delete, AuditReasonCode.ValidationFailed, roleId,
+                    await _audit.DeniedAsync(AuditAction.Delete, AuditReasonCode.ValidationFailed, roleId,
                         outcome.TargetName,
                         "Failed to delete role.", cancellationToken);
                     return AdminMutationResult.ValidationFailure(string.Empty, "Failed to delete role.");
             }
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Role, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                roleId, outcome.TargetName,
-                Details: "Role deleted manually by administrator"), cancellationToken);
+            await _audit.SucceededAsync(AuditAction.Delete, roleId, outcome.TargetName,
+                "Role deleted manually by administrator", cancellationToken);
 
             return AdminMutationResult.Success();
         }, cancellationToken);
     }
-
-    private Task AuditDeniedAsync(AuditAction action, AuditReasonCode reasonCode, string? targetId, string? targetName,
-        string details, CancellationToken cancellationToken)
-        => _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Role, action, AuditOutcome.Denied, reasonCode,
-            targetId, targetName, Details: details), cancellationToken);
-
 }

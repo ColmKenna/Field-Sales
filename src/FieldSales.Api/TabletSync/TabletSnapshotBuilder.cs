@@ -63,7 +63,7 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
 
     private Task<(SnapshotCategory[], SnapshotProduct[], SnapshotBasePrice[], SnapshotProductAttribute[])> ReadCatalogueAsync(DateOnly buildDate,
         CancellationToken ct) =>
-        CatalogueTransactions.RunAsync(catalogue, IsolationLevel.Serializable, async _ =>
+        CatalogueTransactions.RunAsync(catalogue, IsolationLevel.Serializable, async () =>
         {
             var products = await catalogue.Products.AsNoTracking().Where(product => product.RestrictionGroupId == null)
                 .Select(product => new

@@ -15,6 +15,15 @@ public static class CatalogueTransactions
             return await operation(transaction);
         });
 
+    public static Task<T> RunAsync<T>(CatalogueDbContext db, IsolationLevel isolationLevel,
+        Func<Task<T>> operation, CancellationToken cancellationToken) =>
+        RunAsync(db, isolationLevel, async transaction =>
+        {
+            T result = await operation();
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }, cancellationToken);
+
     public static Task RunAsync(CatalogueDbContext db, IsolationLevel isolationLevel,
         Func<IDbContextTransaction, Task> operation, CancellationToken cancellationToken) =>
         RunAsync(db, isolationLevel, async transaction => { await operation(transaction); return true; }, cancellationToken);

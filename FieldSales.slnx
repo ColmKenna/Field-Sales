@@ -18,6 +18,7 @@
         <Project Path="tests/Unit/FieldSales.Api/FieldSales.Api.UnitTests.csproj" />
         <Project Path="tests/Unit/FieldSales.Identity.Admin/FieldSales.Identity.Admin.UnitTests.csproj" />
         <Project Path="tests/Unit/FieldSales.Web/FieldSales.Web.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Tablet.Core/FieldSales.Tablet.Core.UnitTests.csproj" />
     </Folder>
     <Folder Name="/tests/Integration/">
         <Project Path="tests/Integration/FieldSales.Api/FieldSales.Api.IntegrationTests.csproj" />

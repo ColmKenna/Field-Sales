@@ -60,7 +60,7 @@ public partial class ClientDetailsService
     }
 
     public Task<bool> ToggleClientStatusAsync(ClientId clientId, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.SetEnabled,
             clientId.Value,
             clientId.Value,
@@ -113,25 +113,22 @@ public partial class ClientDetailsService
         if (!found)
             return await DenyToggleStatusNotFoundAsync(clientId, cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.SetEnabled, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            clientId, targetName,
-            Details: $"Client status changed to {(enabled ? "Enabled" : "Disabled")}"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.SetEnabled, clientId, targetName,
+            $"Client status changed to {(enabled ? "Enabled" : "Disabled")}", cancellationToken);
 
         return true;
-
     }
 
     private async Task<bool> DenyToggleStatusNotFoundAsync(string clientId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.SetEnabled, AuditReasonCode.NotFound, clientId, clientId,
+        await _audit.DeniedAsync(AuditAction.SetEnabled, AuditReasonCode.NotFound, clientId, clientId,
             $"Client '{clientId}' was not found.", cancellationToken);
         return false;
     }
 
     public Task<ClientDeleteResult>
         DeleteClientAsync(ClientId clientId, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.Delete,
             clientId.Value,
             clientId.Value,
@@ -186,18 +183,15 @@ public partial class ClientDetailsService
         if (!outcome.Success)
             return await DenyDeleteClientFailedAsync(clientId, clientName, outcome, cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            clientId, clientName,
-            Details: $"Deleted client '{clientName}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.Delete, clientId, clientName,
+            $"Deleted client '{clientName}'", cancellationToken);
 
         return outcome;
-
     }
 
     private async Task<ClientDeleteResult> DenyDeleteClientNotFoundAsync(string clientId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.Delete, AuditReasonCode.NotFound, clientId, clientId,
+        await _audit.DeniedAsync(AuditAction.Delete, AuditReasonCode.NotFound, clientId, clientId,
             "Client not found.", cancellationToken);
         return ClientDeleteResult.Failed(
             "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
@@ -206,14 +200,14 @@ public partial class ClientDetailsService
     private async Task<ClientDeleteResult> DenyDeleteClientFailedAsync(
         string clientId, string clientName, ClientDeleteResult outcome, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.Delete, AuditReasonCode.From(outcome.ReasonCode), clientId, clientName,
+        await _audit.DeniedAsync(AuditAction.Delete, AuditReasonCode.From(outcome.ReasonCode), clientId, clientName,
             outcome.ErrorMessage!, cancellationToken);
         return outcome;
     }
 
     public Task<AdminMutationResult> UpdateClientBasicsAsync(ClientId clientId, string clientName, string? description,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.UpdateBasics,
             clientId.Value,
             clientName ?? clientId.Value,
@@ -262,19 +256,16 @@ public partial class ClientDetailsService
 
         await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.UpdateBasics, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            clientId, trimmedName,
-            Details: $"Updated basic settings for client '{trimmedName}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.UpdateBasics, clientId, trimmedName,
+            $"Updated basic settings for client '{trimmedName}'", cancellationToken);
 
         return AdminMutationResult.Success();
-
     }
 
     private async Task<AdminMutationResult> DenyBasicsValidationFailureAsync(
         string clientId, string trimmedName, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdateBasics, AuditReasonCode.ValidationFailed, clientId, trimmedName,
+        await _audit.DeniedAsync(AuditAction.UpdateBasics, AuditReasonCode.ValidationFailed, clientId, trimmedName,
             "Client basics validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
@@ -282,7 +273,7 @@ public partial class ClientDetailsService
     private async Task<AdminMutationResult> DenyBasicsClientNotFoundAsync(
         string clientId, string trimmedName, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdateBasics, AuditReasonCode.NotFound, clientId, trimmedName,
+        await _audit.DeniedAsync(AuditAction.UpdateBasics, AuditReasonCode.NotFound, clientId, trimmedName,
             $"Client '{clientId}' was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }
@@ -290,7 +281,7 @@ public partial class ClientDetailsService
     private async Task<AdminMutationResult> DenyBasicsInvalidConfigurationAsync(
         string clientId, string trimmedName, string validationError, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdateBasics, AuditReasonCode.ValidationFailed, clientId, trimmedName,
+        await _audit.DeniedAsync(AuditAction.UpdateBasics, AuditReasonCode.ValidationFailed, clientId, trimmedName,
             "Client basics validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure("Input.ClientName", validationError);
     }

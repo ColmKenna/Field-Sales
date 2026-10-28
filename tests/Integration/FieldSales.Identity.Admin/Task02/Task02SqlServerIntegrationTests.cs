@@ -220,16 +220,16 @@ public sealed class Task02SqlServerIntegrationTests
 
         try
         {
-            using var start = new Barrier(3);
-            Task<RoleChangeResult>[] attempts = userIds.Select(userId => Task.Run(async () =>
+            using var start = new ConcurrentTestStart(2);
+            Task<RoleChangeResult>[] attempts = userIds.Select(userId => start.Run(async () =>
             {
                 await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
                 IUserDetailsService service = scope.ServiceProvider.GetRequiredService<IUserDetailsService>();
-                start.SignalAndWait();
+                await start.ReadyAsync();
                 return await service.RemoveRoleAsync(UserId.Create(userId), Config.SysAdminRole);
             })).ToArray();
 
-            start.SignalAndWait();
+            await start.CompleteAsync(attempts);
             RoleChangeResult[] results = await Task.WhenAll(attempts);
 
             Assert.Single(results, result => result.Success);
@@ -288,23 +288,23 @@ public sealed class Task02SqlServerIntegrationTests
             await db.SaveChangesAsync();
         });
 
-        using var start = new Barrier(3);
-        var enable = Task.Run(async () =>
+        using var start = new ConcurrentTestStart(2);
+        var enable = start.Run(async () =>
         {
             await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
             ClientDetailsService service = scope.ServiceProvider.GetRequiredService<ClientDetailsService>();
-            start.SignalAndWait();
+            await start.ReadyAsync();
             return await service.ToggleClientStatusAsync(ClientId.Create(clientId));
         });
-        var delete = Task.Run(async () =>
+        var delete = start.Run(async () =>
         {
             await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
             ClientDetailsService service = scope.ServiceProvider.GetRequiredService<ClientDetailsService>();
-            start.SignalAndWait();
+            await start.ReadyAsync();
             return await service.DeleteClientAsync(ClientId.Create(clientId));
         });
 
-        start.SignalAndWait();
+        await start.CompleteAsync(enable, delete);
         await Task.WhenAll(enable, delete);
 
         await _factory.RunInScopeAsync(async services =>
@@ -380,16 +380,16 @@ public sealed class Task02SqlServerIntegrationTests
         });
         int[] secretIds = (await GetSecretIdsAsync(clientId)).Select(s => s.Id).ToArray();
 
-        using var start = new Barrier(3);
-        Task<ClientSecretRevokeResult>[] attempts = secretIds.Select(secretId => Task.Run(async () =>
+        using var start = new ConcurrentTestStart(2);
+        Task<ClientSecretRevokeResult>[] attempts = secretIds.Select(secretId => start.Run(async () =>
         {
             await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
             ClientDetailsService service = scope.ServiceProvider.GetRequiredService<ClientDetailsService>();
-            start.SignalAndWait();
+            await start.ReadyAsync();
             return await service.RevokeClientSecretAsync(ClientId.Create(clientId), secretId);
         })).ToArray();
 
-        start.SignalAndWait();
+        await start.CompleteAsync(attempts);
         ClientSecretRevokeResult[] results = await Task.WhenAll(attempts);
 
         Assert.Single(results, result => result.Success);

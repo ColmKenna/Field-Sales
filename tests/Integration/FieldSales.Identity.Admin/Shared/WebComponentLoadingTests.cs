@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using AngleSharp;
 using AngleSharp.Dom;
+using Microsoft.AspNetCore.Mvc.Testing;
 using FieldSales.Identity.Admin.Tests.Infrastructure;
 
 namespace FieldSales.Identity.Admin.Tests.Shared;
@@ -11,7 +12,7 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///     a page that uses a component without declaring it would silently fail to hydrate.
 ///     These guard that pairing.
 /// </summary>
-public class WebComponentLoadingTests
+public class WebComponentLoadingTests(AdminWebFactory factory) : IClassFixture<AdminWebFactory>
 {
     private const string TableModule = "ck-responsive-table-webcomponent/index.esm.js";
     private const string TabsModule = "ck-tabs-webcomponent/index.esm.js";
@@ -59,10 +60,10 @@ public class WebComponentLoadingTests
             $"{Path.GetFileName(path)}: uses <ck-tabs>={usesTabs} but declares Tabs={declaresTabs}");
     }
 
-    private static async Task<(bool Table, bool Tabs, IDocument Document)> LoadAsync(string url)
+    private async Task<(bool Table, bool Tabs, IDocument Document)> LoadAsync(string url)
     {
-        using var factory = new AdminWebFactory();
-        HttpResponseMessage response = await factory.CreateClient().GetAsync(url);
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        using HttpResponseMessage response = await client.GetAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         string html = await response.Content.ReadAsStringAsync();
@@ -109,8 +110,8 @@ public class WebComponentLoadingTests
     [Fact]
     public async Task ScriptOrder_KeepsModulesAheadOfThePageInitialiser()
     {
-        using var factory = new AdminWebFactory();
-        string html = await factory.CreateClient().GetStringAsync("/Admin/Clients");
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        string html = await client.GetStringAsync("/Admin/Clients");
 
         int module = html.IndexOf(TableModule, StringComparison.Ordinal);
         int adminJs = html.IndexOf("/js/admin.js", StringComparison.Ordinal);

@@ -37,7 +37,7 @@ public sealed class RestrictionPermissionStore(CatalogueDbContext catalogue, Dir
         var (subject, roles) = Actor(actor);
         bool canChange = RestrictionPermissionRule.CanChange(subject, roles, rep, manager);
         bool active = IsActiveRep(person);
-        return await CatalogueTransactions.RunAsync<RepPermissionsPage?>(catalogue, IsolationLevel.Serializable, async _ =>
+        return await CatalogueTransactions.RunAsync<RepPermissionsPage?>(catalogue, IsolationLevel.Serializable, async () =>
         {
             var held = (await catalogue.RestrictionPermissions.AsNoTracking().Where(row => row.RepSubject == rep)
                 .Select(row => row.RestrictionGroupId).ToArrayAsync(ct)).ToHashSet();

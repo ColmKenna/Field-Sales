@@ -11,7 +11,7 @@ public partial class UserDetailsService
 {
     public Task<UserAccessRevokeResult> RevokeUserAccessAsync(UserActionContext context,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(AuditAction.RevokeUserAccess, context.Target.Value, audit => RevokeUserAccessCoreAsync(context, audit, cancellationToken), cancellationToken);
+        _audit.RunAsync(AuditAction.RevokeUserAccess, context.Target.Value, audit => RevokeUserAccessCoreAsync(context, audit, cancellationToken), cancellationToken);
 
     private async Task<UserAccessRevokeResult> RevokeUserAccessCoreAsync(UserActionContext context,
         AuditOperation audit, CancellationToken cancellationToken)
@@ -50,11 +50,8 @@ public partial class UserDetailsService
             return (clientIds, revokedCount);
         }, cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.User, AuditAction.RevokeUserAccess, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                userId, targetName,
-                Details: $"Rotated the security stamp and revoked {revokedCount} persisted grant(s)"),
-            cancellationToken);
+        await _audit.SucceededAsync(AuditAction.RevokeUserAccess, userId, targetName,
+            $"Rotated the security stamp and revoked {revokedCount} persisted grant(s)", cancellationToken);
 
         // External I/O is deliberately outside both database transactions. A failed client
         // notification cannot roll back the committed security-stamp rotation or grant deletion.
@@ -81,7 +78,7 @@ public partial class UserDetailsService
 
     private async Task<UserAccessRevokeResult> DenyRevokeAccessUserNotFoundAsync(UserId userId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.RevokeUserAccess, AuditReasonCode.NotFound, userId, userId,
+        await _audit.DeniedAsync(AuditAction.RevokeUserAccess, AuditReasonCode.NotFound, userId, userId,
             "User not found.", cancellationToken);
         return UserAccessRevokeResult.Failed("User not found.", AdminMutationStatus.NotFound);
     }
@@ -90,7 +87,7 @@ public partial class UserDetailsService
     {
         string message =
             "You cannot revoke your own access from this page. Ask another administrator to do this if needed.";
-        await AuditDeniedAsync(AuditAction.RevokeUserAccess, AuditReasonCode.SelfAction, userId, targetName,
+        await _audit.DeniedAsync(AuditAction.RevokeUserAccess, AuditReasonCode.SelfAction, userId, targetName,
             message, cancellationToken);
         return UserAccessRevokeResult.Failed(message);
     }

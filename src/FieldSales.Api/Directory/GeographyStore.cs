@@ -130,13 +130,10 @@ public sealed class GeographyStore(DirectoryDbContext db, GeographyUsageReader u
         if (!active) throw new GeographyValidationException(level == "counties" ? "Choose an active region." : "Choose an active county.");
     }
 
-    public async Task<GeographyImportResult> ImportAsync(IReadOnlyList<GeographySeedRow> rows, CancellationToken ct)
-    {
+    public Task<GeographyImportResult> ImportAsync(IReadOnlyList<GeographySeedRow> rows, CancellationToken ct) =>
         // Retrying SQL providers require the complete transaction inside their execution strategy.
-        return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        GeographyTransactions.RunAsync(db, async () =>
         {
-            db.ChangeTracker.Clear();
-            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             Dictionary<string, Region> regions = (await db.Regions.ToListAsync(ct)).ToDictionary(item => item.NormalizedName);
             Dictionary<(Guid, string), County> counties = (await db.Counties.ToListAsync(ct)).ToDictionary(item => (item.RegionId, item.NormalizedName));
             Dictionary<(Guid, string), Town> towns = (await db.Towns.ToListAsync(ct)).ToDictionary(item => (item.CountyId, item.NormalizedName));
@@ -178,10 +175,8 @@ public sealed class GeographyStore(DirectoryDbContext db, GeographyUsageReader u
                 towns.Add(townKey, town); db.Towns.Add(town); townsAdded++;
             }
             await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
             return new GeographyImportResult(regionsAdded, countiesAdded, townsAdded, alreadyPresent, coordinatesUpdated);
-        });
-    }
+        }, ct);
 
     public static GeographyItem Item(GeographyEntity entity, Guid? parentId = null) =>
         new(entity.Id, entity.Name, parentId, Convert.ToBase64String(entity.Version), entity.IsArchived,
@@ -189,17 +184,4 @@ public sealed class GeographyStore(DirectoryDbContext db, GeographyUsageReader u
 
     private static Guid? ParentId(GeographyEntity entity) => entity switch
     { County county => county.RegionId, Town town => town.CountyId, _ => null };
-}
-
-internal static class GeographyTransactions
-{
-    public static Task<T> RunAsync<T>(DirectoryDbContext db, Func<Task<T>> operation, CancellationToken ct) =>
-        db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
-        {
-            db.ChangeTracker.Clear();
-            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-            T result = await operation();
-            await transaction.CommitAsync(ct);
-            return result;
-        });
 }

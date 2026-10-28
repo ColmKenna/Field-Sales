@@ -55,7 +55,7 @@ public partial class ClientDetailsService
 
     public Task<AdminMutationResult> UpdateClientPermissionsAsync(ClientId clientId, ScopeSet allowedScopes,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.UpdatePermissions,
             clientId.Value,
             clientId.Value,
@@ -137,22 +137,21 @@ public partial class ClientDetailsService
         if (!outcome.Succeeded)
             return await DenyPermissionsFailedAsync(clientId, targetName, outcome, cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.UpdatePermissions, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            clientId, targetName, Details: "Updated allowed scopes"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.UpdatePermissions, clientId, targetName,
+            "Updated allowed scopes", cancellationToken);
         return outcome;
     }
 
     private async Task<AdminMutationResult> DenyPermissionsClientIdRequiredAsync(string clientId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await _audit.DeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client permissions validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure("Id", "Client ID is required.");
     }
 
     private async Task<AdminMutationResult> DenyPermissionsScopeTooLongAsync(string clientId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await _audit.DeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client permissions validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(
             "Input.AllowedScopes",
@@ -165,7 +164,7 @@ public partial class ClientDetailsService
         AuditReasonCode reason = outcome.Status == AdminMutationStatus.NotFound
             ? AuditReasonCode.NotFound
             : AuditReasonCode.ValidationFailed;
-        await AuditDeniedAsync(AuditAction.UpdatePermissions, reason, clientId, targetName,
+        await _audit.DeniedAsync(AuditAction.UpdatePermissions, reason, clientId, targetName,
             outcome.ErrorMessage ?? "Client permissions validation failed.", cancellationToken);
         return outcome;
     }

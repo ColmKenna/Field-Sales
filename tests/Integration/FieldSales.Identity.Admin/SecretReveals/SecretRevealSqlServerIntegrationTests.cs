@@ -66,19 +66,19 @@ public sealed class SecretRevealSqlServerIntegrationTests
                 new SecretRevealTarget(SecretRevealPurpose.ApiResourceSecretGenerated, "concurrent.api"),
                 "one-consumer-only");
 
-        using var start = new Barrier(3);
-        Task<SecretRevealConsumeResult>[] attempts = Enumerable.Range(0, 2).Select(_ => Task.Run(async () =>
+        using var start = new ConcurrentTestStart(2);
+        Task<SecretRevealConsumeResult>[] attempts = Enumerable.Range(0, 2).Select(_ => start.Run(async () =>
         {
             await using ServiceProvider instance = BuildInstance("concurrent-actor");
             await using AsyncServiceScope scope = instance.CreateAsyncScope();
             ISecretRevealService service = scope.ServiceProvider.GetRequiredService<ISecretRevealService>();
-            start.SignalAndWait();
+            await start.ReadyAsync();
             return await service.ConsumeAsync(
                 new SecretRevealTarget(SecretRevealPurpose.ApiResourceSecretGenerated, "concurrent.api"),
                 ticket.Handle);
         })).ToArray();
 
-        start.SignalAndWait();
+        await start.CompleteAsync(attempts);
         SecretRevealConsumeResult[] results = await Task.WhenAll(attempts);
 
         Assert.Single(results, result =>

@@ -18,7 +18,7 @@ public partial class ClientCreateService(
 {
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     public const string PresetPropertyKey = "admin:preset";
-    private readonly IAuditWriter _auditWriter = auditWriter;
+    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.Client);
     private readonly IClientConfigurationValidator _clientConfigurationValidator = clientConfigurationValidator;
 
     private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
@@ -49,7 +49,8 @@ public partial class ClientCreateService(
     {
         string targetId = input?.ClientId?.Trim() ?? string.Empty;
         string targetName = input?.ClientName?.Trim() ?? targetId;
-        return ExecuteAuditedAsync(
+        return _audit.RunAsync(
+            AuditAction.Create,
             targetId,
             targetName,
             audit => CreateClientCoreAsync(input!, audit, cancellationToken),
@@ -61,7 +62,8 @@ public partial class ClientCreateService(
     {
         string targetId = input?.ClientId?.Trim() ?? string.Empty;
         string targetName = input?.ClientName?.Trim() ?? targetId;
-        return ExecuteAuditedAsync(
+        return _audit.RunAsync(
+            AuditAction.Create,
             targetId,
             targetName,
             audit => CloneClientCoreAsync(sourceClientId, input!, audit, cancellationToken),
@@ -357,9 +359,7 @@ public partial class ClientCreateService(
         {
             _configurationDbContext.Clients.Add(client);
             await _configurationDbContext.SaveChangesAsync(cancellationToken);
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Client, AuditAction.Create, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                client.ClientId, client.ClientName, Details: details), cancellationToken);
+            await _audit.SucceededAsync(AuditAction.Create, client.ClientId, client.ClientName, details, cancellationToken);
             return ClientCreateResult.Succeeded(client.ClientId, plaintextSecret);
         }
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
@@ -368,30 +368,17 @@ public partial class ClientCreateService(
         }
     }
 
-    private Task<ClientCreateResult> ExecuteAuditedAsync(
-        string targetId,
-        string targetName,
-        Func<AuditOperation, Task<ClientCreateResult>> operation,
-        CancellationToken cancellationToken) =>
-        AuditOperation.RunAsync(_auditWriter, AuditCategory.Client, AuditAction.Create, targetId, targetName, operation, cancellationToken);
-
-    private Task AuditDeniedAsync(AuditReasonCode reasonCode, string targetId, string targetName, string details,
-        CancellationToken cancellationToken)
-        => _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.Create, AuditOutcome.Denied, reasonCode,
-            targetId, targetName, Details: details), cancellationToken);
-
     private async Task<ClientCreateResult> DenySourceClientNotFoundAsync(
         string sourceClientId, string? clientId, string? clientName, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditReasonCode.NotFound, clientId ?? string.Empty, clientName ?? string.Empty,
+        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NotFound, clientId ?? string.Empty, clientName ?? string.Empty,
             $"Source client '{sourceClientId}' was not found.", cancellationToken);
         return ClientCreateResult.Failed("Source client not found.");
     }
 
     private async Task<ClientCreateResult> DenyClientIdInUseAsync(string clientId, string clientName, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditReasonCode.NameCollision, clientId, clientName,
+        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NameCollision, clientId, clientName,
             $"A client with ID '{clientId}' already exists.", cancellationToken);
         return ClientCreateResult.Failed("ClientId", $"A client with ID '{clientId}' already exists.",
             AdminMutationStatus.Conflict);
@@ -400,7 +387,7 @@ public partial class ClientCreateService(
     private async Task<ClientCreateResult> DenyInvalidClientConfigurationAsync(
         string clientId, string clientName, string? errorMessage, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditReasonCode.ValidationFailed, clientId, clientName,
+        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId, clientName,
             errorMessage ?? "Invalid client configuration.", cancellationToken);
         return ClientCreateResult.Failed(errorMessage ?? "Invalid client configuration.");
     }
@@ -408,14 +395,14 @@ public partial class ClientCreateService(
     private async Task<ClientCreateResult> DenyClientCreationValidationFailureAsync(
         string? clientId, string? clientName, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditReasonCode.ValidationFailed, clientId ?? string.Empty, clientName ?? string.Empty,
+        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId ?? string.Empty, clientName ?? string.Empty,
             "Client creation validation failed.", cancellationToken);
         return ClientCreateResult.Failed(errors);
     }
 
     private async Task<ClientCreateResult> DenyMissingOpenIdAsync(string clientId, string clientName, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditReasonCode.ValidationFailed, clientId, clientName,
+        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId, clientName,
             "Client creation requires the 'openid' identity resource.", cancellationToken);
         return ClientCreateResult.Failed(
             "AllowedScopes",

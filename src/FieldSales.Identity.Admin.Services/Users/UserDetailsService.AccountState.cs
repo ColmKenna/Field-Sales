@@ -10,7 +10,7 @@ public partial class UserDetailsService
 {
     public Task<PasswordResetResult> ResetPasswordAsync(UserId userId, string newPassword,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.ResetPassword,
             userId.Value,
             audit => ResetPasswordCoreAsync(userId, newPassword, audit, cancellationToken),
@@ -27,35 +27,33 @@ public partial class UserDetailsService
         switch (outcome.Status)
         {
             case PasswordResetStatus.UserNotFound:
-                await AuditDeniedAsync(AuditAction.ResetPassword, AuditReasonCode.NotFound, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.ResetPassword, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
                 return PasswordResetResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case PasswordResetStatus.ValidationFailed:
-                await AuditDeniedAsync(AuditAction.ResetPassword, AuditReasonCode.ValidationFailed, userId,
+                await _audit.DeniedAsync(AuditAction.ResetPassword, AuditReasonCode.ValidationFailed, userId,
                     outcome.TargetName,
                     outcome.ErrorMessage!, cancellationToken);
                 return PasswordResetResult.Failed(outcome.ErrorMessage!);
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.User, AuditAction.ResetPassword, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            userId, outcome.TargetName,
-            Details: "Password was reset by administrator"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.ResetPassword, userId, outcome.TargetName,
+            "Password was reset by administrator", cancellationToken);
 
         return PasswordResetResult.Succeeded();
     }
 
     private async Task<PasswordResetResult> DenyPasswordRequiredAsync(UserId userId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.ResetPassword, AuditReasonCode.ValidationFailed, userId, userId,
+        await _audit.DeniedAsync(AuditAction.ResetPassword, AuditReasonCode.ValidationFailed, userId, userId,
             "Password is required.", cancellationToken);
         return PasswordResetResult.Failed("Password is required.");
     }
 
     public Task<UserSuspendResult> SuspendUserAsync(UserActionContext context,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.SuspendUser,
             context.Target.Value,
             audit => SuspendUserCoreAsync(context, audit, cancellationToken),
@@ -70,32 +68,30 @@ public partial class UserDetailsService
         switch (outcome.Status)
         {
             case UserSuspendStatus.UserNotFound:
-                await AuditDeniedAsync(AuditAction.SuspendUser, AuditReasonCode.NotFound, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.SuspendUser, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
                 return UserSuspendResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case UserSuspendStatus.SelfActionBlocked:
-                await AuditDeniedAsync(AuditAction.SuspendUser, AuditReasonCode.SelfAction, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.SuspendUser, AuditReasonCode.SelfAction, userId, outcome.TargetName,
                     "Cannot suspend your own account.", cancellationToken);
                 return UserSuspendResult.Failed("You cannot suspend your own account.");
 
             case UserSuspendStatus.ValidationFailed:
-                await AuditDeniedAsync(AuditAction.SuspendUser, AuditReasonCode.ValidationFailed, userId,
+                await _audit.DeniedAsync(AuditAction.SuspendUser, AuditReasonCode.ValidationFailed, userId,
                     outcome.TargetName,
                     "Failed to suspend user.", cancellationToken);
                 return UserSuspendResult.Failed("Failed to suspend user.");
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.User, AuditAction.SuspendUser, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            userId, outcome.TargetName,
-            Details: "User suspended manually by administrator"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.SuspendUser, userId, outcome.TargetName,
+            "User suspended manually by administrator", cancellationToken);
 
         return UserSuspendResult.Succeeded();
     }
 
     public Task<UserUnlockResult> UnlockUserAsync(UserId userId, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(AuditAction.Unlock, userId.Value, audit => UnlockUserCoreAsync(userId, audit, cancellationToken), cancellationToken);
+        _audit.RunAsync(AuditAction.Unlock, userId.Value, audit => UnlockUserCoreAsync(userId, audit, cancellationToken), cancellationToken);
 
     private async Task<UserUnlockResult> UnlockUserCoreAsync(UserId userId, AuditOperation audit, CancellationToken cancellationToken)
     {
@@ -107,30 +103,25 @@ public partial class UserDetailsService
         switch (result.Status)
         {
             case UserUnlockStatus.NotFound:
-                await _auditWriter.WriteAsync(new AdminAuditEvent(
-                    AuditCategory.User, AuditAction.Unlock, AuditOutcome.Denied, AuditReasonCode.NotFound,
-                    userId, targetName, Details: "User not found."), cancellationToken);
+                await _audit.DeniedAsync(AuditAction.Unlock, AuditReasonCode.NotFound,
+                    userId, targetName, "User not found.", cancellationToken);
                 return result;
 
             case UserUnlockStatus.Failed:
-                await _auditWriter.WriteAsync(new AdminAuditEvent(
-                    AuditCategory.User, AuditAction.Unlock, AuditOutcome.Denied, AuditReasonCode.ValidationFailed,
-                    userId, targetName,
-                    Details: string.Join(" ", result.Errors)), cancellationToken);
+                await _audit.DeniedAsync(AuditAction.Unlock, AuditReasonCode.ValidationFailed,
+                    userId, targetName, string.Join(" ", result.Errors), cancellationToken);
                 return result;
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.User, AuditAction.Unlock, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            userId, targetName,
-            Details: $"Unlocked user '{targetName}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.Unlock, userId, targetName,
+            $"Unlocked user '{targetName}'", cancellationToken);
 
         return result;
     }
 
     public Task<UserDeleteResult> DeleteUserAsync(UserActionContext context,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.DeleteUser,
             context.Target.Value,
             audit => DeleteUserCoreAsync(context, audit, cancellationToken),
@@ -145,17 +136,17 @@ public partial class UserDetailsService
         switch (outcome.Status)
         {
             case UserDeleteStatus.UserNotFound:
-                await AuditDeniedAsync(AuditAction.DeleteUser, AuditReasonCode.NotFound, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.DeleteUser, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
                 return UserDeleteResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case UserDeleteStatus.SelfActionBlocked:
-                await AuditDeniedAsync(AuditAction.DeleteUser, AuditReasonCode.SelfAction, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.DeleteUser, AuditReasonCode.SelfAction, userId, outcome.TargetName,
                     "Cannot delete your own account.", cancellationToken);
                 return UserDeleteResult.Failed("You cannot delete your own account.");
 
             case UserDeleteStatus.ValidationFailed:
-                await AuditDeniedAsync(AuditAction.DeleteUser, AuditReasonCode.ValidationFailed, userId,
+                await _audit.DeniedAsync(AuditAction.DeleteUser, AuditReasonCode.ValidationFailed, userId,
                     outcome.TargetName,
                     "Failed to delete user.", cancellationToken);
                 return UserDeleteResult.Failed("Failed to delete user.");
@@ -185,14 +176,12 @@ public partial class UserDetailsService
         }
         catch (Exception ex)
         {
-            await AuditFailedAsync(AuditAction.RemoveGrantsOnUserDelete, userId, outcome.TargetName, ex,
+            await _audit.FailedAsync(AuditAction.RemoveGrantsOnUserDelete, userId, outcome.TargetName, ex,
                 cancellationToken);
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.User, AuditAction.DeleteUser, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            userId, outcome.TargetName,
-            Details: "User deleted manually by administrator"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.DeleteUser, userId, outcome.TargetName,
+            "User deleted manually by administrator", cancellationToken);
 
         return UserDeleteResult.Succeeded();
     }

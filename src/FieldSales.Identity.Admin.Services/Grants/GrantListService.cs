@@ -13,7 +13,7 @@ public class GrantListService(
     IAuditWriter auditWriter, TimeProvider? timeProvider = null) : IGrantListService
 {
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private readonly IAuditWriter _auditWriter = auditWriter;
+    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.Grant);
     private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
     private readonly PersistedGrantDbContext _persistedGrantDbContext = persistedGrantDbContext;
 
@@ -125,7 +125,7 @@ public class GrantListService(
     }
 
     public Task<RevokeGrantResult> RevokeGrantAsync(GrantKey key, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.Revoke,
             key.Value ?? string.Empty,
             key.Value ?? string.Empty,
@@ -141,9 +141,8 @@ public class GrantListService(
 
         if (grant is null)
         {
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.Grant, AuditAction.Revoke, AuditOutcome.Denied, AuditReasonCode.NotFound,
-                keyStr, keyStr, Details: "Grant not found."), cancellationToken);
+            await _audit.DeniedAsync(AuditAction.Revoke, AuditReasonCode.NotFound,
+                keyStr, keyStr, "Grant not found.", cancellationToken);
             return RevokeGrantResult.NotFound;
         }
 
@@ -151,16 +150,14 @@ public class GrantListService(
         _persistedGrantDbContext.PersistedGrants.Remove(grant);
         await _persistedGrantDbContext.SaveChangesAsync(cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Grant, AuditAction.Revoke, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            keyStr, grant.SubjectId ?? keyStr,
-            Details: $"Revoked grant for client '{grant.ClientId}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.Revoke, keyStr, grant.SubjectId ?? keyStr,
+            $"Revoked grant for client '{grant.ClientId}'", cancellationToken);
 
         return RevokeGrantResult.Revoked;
     }
 
     public Task<int> RevokeGrantsBySubjectAsync(UserId subjectId, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.BulkRevoke,
             subjectId.Value ?? string.Empty,
             subjectId.Value ?? string.Empty,
@@ -179,17 +176,11 @@ public class GrantListService(
             .Where(g => g.SubjectId == subjectIdStr)
             .ExecuteDeleteAsync(cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Grant, AuditAction.BulkRevoke, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            subjectIdStr, subjectIdStr,
-            Details: $"Revoked {revokedCount} persisted grant(s) for subject '{subjectIdStr}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.BulkRevoke, subjectIdStr, subjectIdStr,
+            $"Revoked {revokedCount} persisted grant(s) for subject '{subjectIdStr}'", cancellationToken);
 
         return revokedCount;
     }
-
-    private Task<T> ExecuteAuditedAsync<T>(AuditAction action, string targetId, string targetName,
-        Func<AuditOperation, Task<T>> operation, CancellationToken cancellationToken) =>
-        AuditOperation.RunAsync(_auditWriter, AuditCategory.Grant, action, targetId, targetName, operation, cancellationToken);
 
     private sealed record GrantListRow(
         string Key,

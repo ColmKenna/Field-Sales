@@ -37,6 +37,15 @@ public class AuthenticationInputModel
 
 public class AuthenticationModel(IClientAuthenticationService clientAuthenticationService) : PageModel
 {
+    private static readonly string[] SecondTabPrefixes =
+    [
+        "Input.RedirectUris",
+        "Input.PostLogoutRedirectUris",
+        "Input.FrontChannelLogoutUri",
+        "Input.BackChannelLogoutUri",
+        "Input.CorsOrigins"
+    ];
+
     private readonly IClientAuthenticationService _clientAuthenticationService = clientAuthenticationService;
 
     [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
@@ -50,11 +59,11 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(Id))
+        if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
         ClientAuthenticationModel? authentication =
-            await _clientAuthenticationService.GetClientAuthenticationAsync(ClientId.Create(Id), cancellationToken);
+            await _clientAuthenticationService.GetClientAuthenticationAsync(clientId, cancellationToken);
         if (authentication is null)
             return NotFound();
 
@@ -65,7 +74,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(Id))
+        if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
         NormalizeCollectionInputs();
@@ -73,9 +82,8 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
 
         if (!ModelState.IsValid)
         {
-            ActiveTabIndex = FormPresentation.ValidationTab(ModelState.Where(entry => entry.Value!.Errors.Count > 0).Select(entry => entry.Key), "Input.RedirectUris", "Input.PostLogoutRedirectUris", "Input.FrontChannelLogoutUri", "Input.BackChannelLogoutUri", "Input.CorsOrigins");
-
-            return await ReloadPageAsync(cancellationToken);
+            ActiveTabIndex = ModelState.ValidationTab(SecondTabPrefixes);
+            return await ReloadPageAsync(clientId, cancellationToken);
         }
 
         var input = new ClientAuthenticationInputModel
@@ -93,15 +101,15 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
         };
 
         AdminMutationResult result =
-            await _clientAuthenticationService.UpdateClientAuthenticationAsync(ClientId.Create(Id), input, cancellationToken);
+            await _clientAuthenticationService.UpdateClientAuthenticationAsync(clientId, input, cancellationToken);
         if (result.Status == AdminMutationStatus.NotFound)
             return NotFound();
 
         if (!result.Succeeded)
         {
-            AddErrorsToModelState(result.Errors);
-            ActiveTabIndex = FormPresentation.ValidationTab(result.Errors.Keys, "Input.RedirectUris", "Input.PostLogoutRedirectUris", "Input.FrontChannelLogoutUri", "Input.BackChannelLogoutUri", "Input.CorsOrigins");
-            return await ReloadPageAsync(cancellationToken);
+            ModelState.AddErrors(result.Errors);
+            ActiveTabIndex = FormPresentation.ValidationTab(result.Errors.Keys, SecondTabPrefixes);
+            return await ReloadPageAsync(clientId, cancellationToken);
         }
 
         return RedirectToPage("./Details", new { id = Id });
@@ -109,9 +117,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
 
     private void LoadFromModel(ClientAuthenticationModel authentication)
     {
-        ClientNameDisplay = authentication.ClientName;
-        HasDrifted = authentication.HasDrifted;
-        DriftDetails = authentication.DriftDetails;
+        ApplyMetadata(authentication);
 
         Input.RequirePkce = authentication.RequirePkce;
         Input.RequireClientSecret = authentication.RequireClientSecret;
@@ -174,21 +180,21 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
                 "Back-channel logout URI must be an absolute HTTP or HTTPS URL.");
     }
 
-    private async Task<IActionResult> ReloadPageAsync(CancellationToken cancellationToken)
+    private async Task<IActionResult> ReloadPageAsync(ClientId clientId, CancellationToken cancellationToken)
     {
         ClientAuthenticationModel? authentication =
-            await _clientAuthenticationService.GetClientAuthenticationAsync(ClientId.Create(Id), cancellationToken);
+            await _clientAuthenticationService.GetClientAuthenticationAsync(clientId, cancellationToken);
         if (authentication is null)
             return NotFound();
 
-        ClientNameDisplay = authentication.ClientName;
-        HasDrifted = authentication.HasDrifted;
-        DriftDetails = authentication.DriftDetails;
+        ApplyMetadata(authentication);
         return Page();
     }
 
-    private void AddErrorsToModelState(IReadOnlyDictionary<string, string[]> errors)
+    private void ApplyMetadata(ClientAuthenticationModel authentication)
     {
-        ModelState.AddErrors(errors);
+        ClientNameDisplay = authentication.ClientName;
+        HasDrifted = authentication.HasDrifted;
+        DriftDetails = authentication.DriftDetails;
     }
 }
