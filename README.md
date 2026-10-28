@@ -409,6 +409,13 @@ database catalogs. HTTP-only tests do not require these collections. Web scenari
 grouped under `Catalogue`, `Directory`, `Coverage`, and `Security`, with shared fixtures
 in `Infrastructure`. Pure tablet entry-handoff checks live in the tablet unit project.
 
+CI runs the API, admin, Web, and supporting integration suites in four independent
+lanes on separate runners. Each lane builds its selected projects. The required
+`Build & Test` check aggregates every integration lane and the build/unit/script job,
+so a failed or cancelled lane cannot produce a successful aggregate check.
+See [test performance and isolation](docs/test-performance.md) for fixture behaviour
+and measured local timings.
+
 Front-end component tests for the admin console pages live in
 `tests/Unit/FieldSales.Identity.Admin/JavaScript` and run separately with Node.
 Their dependencies and test commands are defined in the Identity host's front-end package:
@@ -427,7 +434,7 @@ python3 tests/demo-data-script.test.py
 ```
 
 The Python checks require Bash and supply a mock Docker executable; they do not
-delete real Docker storage. CI runs all three commands before SQL integration tests.
+delete real Docker storage. CI runs all three commands in its build/unit/script lane.
 For a reproducible JavaScript dependency install, use `npm ci --ignore-scripts`
 in the Identity front-end package directory.
 

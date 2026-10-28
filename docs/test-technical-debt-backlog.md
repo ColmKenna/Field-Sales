@@ -48,7 +48,11 @@ npm run test:admin-ui
 
 The Python tests require Bash and use a mock Docker executable. On a Windows CRLF checkout, execute them from a Linux LF checkout; the validation run used an ignored LF-normalized copy in Ubuntu. SQL integration validation requires Docker access and successful NuGet restore. `Category!=Unit` intentionally includes untagged integration checks; project names alone do not control CI selection.
 
-## Verification record
+## Original remediation verification (before performance work)
+
+Subsequent performance work is documented in [test-performance.md](test-performance.md),
+including the parallel CI lanes and updated verification counts. The results below
+are retained as the baseline for that work.
 
 - Whole solution build: passed, zero warnings and errors.
 - CI unit selection: 663 passed.
@@ -81,11 +85,23 @@ These items are not silently included in this implementation and must be revalid
 
 | ID | Historical topic | Current review qualification |
 |---|---|---|
-| TEST-TD-005 | Repeated host startup in HTML tests | No targeted timing comparison established a worthwhile change; shared-host state has a cost |
 | TEST-TD-008 | Task02 fixture/collection naming | Remains a lower-priority naming follow-up |
 | TEST-TD-009 | Different method naming styles | Two clear conventions are used; style uniformity alone is not debt |
 | TEST-TD-010 | Unused packages/dependency warnings | No .NET dependency audit/removal was selected |
 | TEST-TD-012 | Fake category API duplication/drift | Real API/SQL category persistence and rename paths are also tested; no mock-only coverage gap was established |
+
+## Performance follow-up
+
+The subsequent five performance changes are implemented and verified in
+[test-performance.md](test-performance.md). This also remediates **TEST-TD-005** for
+the two read-only admin presentation groups: measured repeated host startup was
+replaced with class-scoped hosts and fresh per-request clients. Migration and
+mutating admin scenarios retain their original isolation.
+
+The current suite has **2,633 passing C# cases**, including all previous 2,631 cases
+and two new regression checks, plus 23 JavaScript checks and five Python checks.
+CI integration projects now run in four independent lanes, while the existing
+required `Build & Test` check aggregates every lane and the build/unit/script job.
 
 ## Newly discovered candidate
 
