@@ -22,47 +22,39 @@ public sealed class AdminWebFactoryTests
     [Fact]
     public void Should_NotMutateProcessEnvironmentVariables_When_FactoryIsInstantiatedAndUsed()
     {
-        // Ensure none of the target environment variables are set in the current process
-        foreach (string variableName in MonitoredEnvironmentVariables)
+        var before = CaptureEnvironment();
+        using (var factory = new AdminWebFactory())
         {
-            Assert.Null(Environment.GetEnvironmentVariable(variableName));
+            AssertEnvironmentUnchanged(before);
         }
-
-        using var factory = new AdminWebFactory();
-
-        // Environment variables must still be null after factory instantiation and static type initialization
-        foreach (string variableName in MonitoredEnvironmentVariables)
-        {
-            Assert.Null(Environment.GetEnvironmentVariable(variableName));
-        }
+        AssertEnvironmentUnchanged(before);
     }
 
     [Fact]
     public async Task Should_ProvideRequiredConfigurationInMemory_When_HostIsStarted()
     {
-        using var factory = new AdminWebFactory();
-
-        await factory.RunInScopeAsync(sp =>
+        var before = CaptureEnvironment();
+        using (var factory = new AdminWebFactory())
         {
-            var config = sp.GetRequiredService<IConfiguration>();
+            await factory.RunInScopeAsync(sp =>
+            {
+                var config = sp.GetRequiredService<IConfiguration>();
 
-            Assert.Equal("https://localhost:7203", config["Clients:StaffWebUri"]);
-            Assert.Equal("secret", config["Clients:StaffWebSecret"]);
-            Assert.Equal("Password123!", config["Seed:SysAdminPassword"]);
-            Assert.Equal("admin@sales.local", config["Seed:SysAdminEmail"]);
-            Assert.Equal("Password123!", config["Seed:TestUserPassword"]);
-            Assert.Equal("Server=localhost;Database=dummy;", config["ConnectionStrings:IdentityDb"]);
-            Assert.Equal("Server=localhost;Database=dummy;", config["ConnectionStrings:IdentityConfigDb"]);
-            Assert.Equal("Server=localhost;Database=dummy;", config["ConnectionStrings:IdentityOperationalDb"]);
+                Assert.Equal("https://localhost:7203", config["Clients:StaffWebUri"]);
+                Assert.Equal("secret", config["Clients:StaffWebSecret"]);
+                Assert.Equal("Password123!", config["Seed:SysAdminPassword"]);
+                Assert.Equal("admin@sales.local", config["Seed:SysAdminEmail"]);
+                Assert.Equal("Password123!", config["Seed:TestUserPassword"]);
+                Assert.Equal("Server=localhost;Database=dummy;", config["ConnectionStrings:IdentityDb"]);
+                Assert.Equal("Server=localhost;Database=dummy;", config["ConnectionStrings:IdentityConfigDb"]);
+                Assert.Equal("Server=localhost;Database=dummy;", config["ConnectionStrings:IdentityOperationalDb"]);
 
-            return Task.CompletedTask;
-        });
+                return Task.CompletedTask;
+            });
 
-        // Ensure process environment remains unpolluted after running the host
-        foreach (string variableName in MonitoredEnvironmentVariables)
-        {
-            Assert.Null(Environment.GetEnvironmentVariable(variableName));
+            AssertEnvironmentUnchanged(before);
         }
+        AssertEnvironmentUnchanged(before);
     }
 
     [Fact]
@@ -73,5 +65,14 @@ public sealed class AdminWebFactoryTests
 
         HttpResponseMessage response = await client.GetAsync("/Account/Login");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+    private static Dictionary<string, string?> CaptureEnvironment() =>
+        MonitoredEnvironmentVariables.ToDictionary(name => name, Environment.GetEnvironmentVariable);
+
+    private static void AssertEnvironmentUnchanged(IReadOnlyDictionary<string, string?> before)
+    {
+        foreach (var (name, value) in before)
+            Assert.True(string.Equals(value, Environment.GetEnvironmentVariable(name), StringComparison.Ordinal),
+                $"Factory lifecycle changed process setting {name}.");
     }
 }
