@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\FieldSales.Web\FieldSales.Web.csproj" />
     <ProjectReference Include="..\..\..\src\FieldSales.Api\FieldSales.Api.csproj" Aliases="CatalogueApi" />
+    <ProjectReference Include="..\..\..\src\FieldSales.Tablet.Core\FieldSales.Tablet.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

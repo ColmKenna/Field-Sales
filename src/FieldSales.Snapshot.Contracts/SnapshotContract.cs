@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace FieldSales.Snapshot.Contracts;
 
@@ -12,7 +13,7 @@ public static class SnapshotContract
 {
     public const string Schema = "field-sales-snapshot";
     public const int CurrentMajor = 1;
-    public const int CurrentMinor = 0;
+    public const int CurrentMinor = 1;
     public static string CurrentVersion => $"{CurrentMajor}.{CurrentMinor}";
 
     /// <summary>The majors this server can build, newest first.</summary>
@@ -58,12 +59,15 @@ public static class SnapshotContract
 public sealed record SnapshotManifest(string Schema, string Version, string RepSubject, DateTimeOffset BuiltUtc,
     DateOnly BuildDate, SnapshotCounts Counts);
 
-public sealed record SnapshotCounts(int Locations, int Categories, int Products, int BasePrices);
+public sealed record SnapshotCounts(int Locations, int Categories, int Products, int BasePrices,
+    int ProductAttributes = 0);
 
 /// <summary>Version 1 of the rep's Morning Snapshot.</summary>
 public sealed record TabletSnapshot(SnapshotManifest Manifest, IReadOnlyList<SnapshotLocation> Locations,
     IReadOnlyList<SnapshotCategory> Categories, IReadOnlyList<SnapshotProduct> Products,
-    IReadOnlyList<SnapshotBasePrice> BasePrices);
+    IReadOnlyList<SnapshotBasePrice> BasePrices,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotProductAttribute>? ProductAttributes = null);
 
 /// <summary>An assigned Location. Locations hold no address lines yet, so its address is Town and Eircode.</summary>
 public sealed record SnapshotLocation(Guid Id, string Name, Guid CustomerId, string CustomerName, SnapshotTown Town,
@@ -83,3 +87,8 @@ public sealed record SnapshotProduct(Guid Id, string Code, string Name, Guid Cat
 
 /// <summary>A base price in effect on the build date, or one dated after it.</summary>
 public sealed record SnapshotBasePrice(Guid ProductId, DateOnly EffectiveFrom, decimal Amount);
+
+/// <summary>A product's ordered name/value row, added in 1.1. Only included products have rows.</summary>
+/// <remarks>Separate rows keep import bounded per attribute, even when a product has many attributes.
+/// A 1.0 snapshot has no attribute family; names and values retain their saved text.</remarks>
+public sealed record SnapshotProductAttribute(Guid ProductId, int Position, string Name, string Value, bool IsArchived);

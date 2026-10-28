@@ -17,12 +17,32 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
     [BindProperty] public decimal? QuantityStep { get; set; }
     [BindProperty] public decimal? MinimumQuantity { get; set; }
     [BindProperty] public ProductClassificationInput? Classification { get; set; }
+    [BindProperty] public ProductAttributeInput? Attribute { get; set; }
+    public IReadOnlyList<ProductReferenceItem> AttributeNameChoices { get; private set; } = [];
     public IReadOnlyList<ProductReferenceItem> ProfileChoices { get; private set; } = [];
     public IReadOnlyList<ProductReferenceItem> BrandChoices { get; private set; } = [];
     public IReadOnlyList<ProductReferenceItem> SupplierChoices { get; private set; } = [];
     public IReadOnlyList<ProductReferenceItem> RestrictionGroupChoices { get; private set; } = [];
 
     public Task<IActionResult> OnGetAsync(Guid id) => ShowAsync(id, populate: true);
+
+    public async Task<IActionResult> OnPostAttributeAsync(Guid id)
+    {
+        // Each record form validates only the fields it submits.
+        foreach (string key in ModelState.Keys.Where(key => key != nameof(Attribute)
+                     && !key.StartsWith(nameof(Attribute) + ".", StringComparison.Ordinal)).ToArray())
+            ModelState.Remove(key);
+        Attribute ??= new();
+        if (!ModelState.IsValid) return await ShowAsync(id, populate: true);
+        var result = await catalogue.AddProductAttributeAsync(id, new(Attribute.NameId, Attribute.Value),
+            HttpContext.RequestAborted);
+        if (result.Status == AddProductAttributeStatus.Saved) return RedirectToPage("Detail", new { id });
+        if (result.Status == AddProductAttributeStatus.Missing) return NotFound();
+        if (result.Status != AddProductAttributeStatus.Invalid || result.Errors is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        ModelState.AddErrors(result.Errors, nameof(Attribute));
+        return await ShowAsync(id, populate: true);
+    }
 
     public async Task<IActionResult> OnPostClassificationAsync(Guid id)
     {
@@ -88,6 +108,8 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
         if (!read.Found) return read.FailureResult();
         ProductDetails details = read.Value!;
         Details = details;
+        AttributeNameChoices = details.AttributeNameChoices ?? [];
+        Attribute ??= new();
         Classification ??= ProductClassificationInput.From(details);
         var choices = details.ClassificationChoices;
         ProfileChoices = Choices(choices?.Profiles, details.Profile is { } profile ? [profile] : [], [Classification.ProfileId]);

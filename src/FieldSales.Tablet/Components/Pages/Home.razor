@@ -13,6 +13,7 @@
             <h1>Today</h1>
             <p class="last-sync">@home.LastSynced</p>
             <button class="secondary" @onclick='() => Navigation.NavigateTo("/sync")'>Sync</button>
+            <a class="catalogue-link" href="/products">Products</a>
         </header>
         <h2>Your shops (@home.Locations.Count)</h2>
         @* Only the rows on screen are drawn, so opening stays quick at 500 or more shops (D3 budget). *@

@@ -47,16 +47,22 @@ public sealed record SqliteEngine(string Version, string SourceId, string Journa
     }
 
     /// <summary>Applies a store's schema once, and refuses a database written by a newer app.</summary>
-    internal static void EnsureSchema(SqliteConnection connection, int version, string schema)
+    internal static void EnsureSchema(SqliteConnection connection, int version, string schema, string? upgradeFromPrevious = null)
     {
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
         long current = (long)command.ExecuteScalar()!;
         if (current == version) return;
-        if (current != 0)
+        if (current != 0 && (current != version - 1 || upgradeFromPrevious is null))
             throw new InvalidOperationException($"This tablet's local data uses format {current}; this app reads format {version}.");
         using var transaction = connection.BeginTransaction();
-        Execute(connection, schema, transaction);
+        // Another connection may have upgraded while this one waited for the write lock.
+        command.Transaction = transaction;
+        current = (long)command.ExecuteScalar()!;
+        if (current == version) return;
+        if (current != 0 && (current != version - 1 || upgradeFromPrevious is null))
+            throw new InvalidOperationException($"This tablet's local data uses format {current}; this app reads format {version}.");
+        Execute(connection, current == 0 ? schema : upgradeFromPrevious!, transaction);
         Execute(connection, $"PRAGMA user_version={version}", transaction);
         transaction.Commit();
     }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Globalization;
 using FieldSales.Snapshot.Contracts;
 
 namespace FieldSales.Tablet.Core;
@@ -11,7 +12,8 @@ namespace FieldSales.Tablet.Core;
 /// </remarks>
 internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferBytes = 1024 * 1024)
 {
-    internal static readonly string[] Families = ["locations", "categories", "products", "basePrices"];
+    private static readonly string[] OriginalFamilies = ["locations", "categories", "products", "basePrices"];
+    internal static readonly string[] Families = [.. OriginalFamilies, "productAttributes"];
     private byte[] buffer = new byte[Math.Min(64 * 1024, maximumBufferBytes)];
     private int start, length;
     private bool final;
@@ -22,6 +24,7 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
         RequireToken(JsonTokenType.StartObject, ct);
         HashSet<string> seen = new(StringComparer.Ordinal);
         bool hasManifest = false;
+        bool requiresAttributes = false;
         while (true)
         {
             var (token, name) = Token(ct);
@@ -31,8 +34,10 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
             if (name == "manifest")
             {
                 using JsonDocument value = ValueOrArrayEnd(ct) ?? throw new InvalidDataException("The snapshot manifest is missing.");
-                manifest(value.RootElement.Deserialize<SnapshotManifest>(SnapshotContract.JsonOptions)
-                    ?? throw new InvalidDataException("The snapshot manifest is empty."));
+                SnapshotManifest received = value.RootElement.Deserialize<SnapshotManifest>(SnapshotContract.JsonOptions)
+                    ?? throw new InvalidDataException("The snapshot manifest is empty.");
+                manifest(received);
+                requiresAttributes = int.Parse(received.Version.Split('.')[1], CultureInfo.InvariantCulture) >= 1;
                 hasManifest = true;
             }
             else if (Families.Contains(name))
@@ -49,7 +54,8 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
             }
             else Skip(ct);
         }
-        if (!hasManifest || Families.Any(family => !seen.Contains(family)))
+        if (!hasManifest || OriginalFamilies.Any(family => !seen.Contains(family))
+            || (requiresAttributes && !seen.Contains("productAttributes")))
             throw new InvalidDataException("The snapshot is missing a required field.");
         // Read to the end so the plain hash covers every byte.
         while (true)
