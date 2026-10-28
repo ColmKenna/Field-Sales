@@ -10,7 +10,7 @@ public partial class ApiResourceEditorService
 {
     public Task<AdminMutationResult> SetEnabledAsync(ScopeName name, bool enabled,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.SetEnabled,
             name.Value,
             name.Value,
@@ -31,17 +31,14 @@ public partial class ApiResourceEditorService
         entity.Enabled = enabled;
         await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.ApiResource, AuditAction.SetEnabled, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            name, name,
-            Details: $"Set API Resource enabled status to {enabled}"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.SetEnabled, name, name,
+            $"Set API Resource enabled status to {enabled}", cancellationToken);
 
         return AdminMutationResult.Success();
-
     }
 
     public Task<AdminMutationResult> DeleteAsync(ScopeName name, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.Delete,
             name.Value,
             name.Value,
@@ -61,12 +58,9 @@ public partial class ApiResourceEditorService
         _configurationDbContext.ApiResources.Remove(entity);
         await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.ApiResource, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            name, name,
-            Details: $"Deleted API Resource '{name}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.Delete, name, name,
+            $"Deleted API Resource '{name}'", cancellationToken);
 
         return AdminMutationResult.Success();
-
     }
 }

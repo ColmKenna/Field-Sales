@@ -27,11 +27,11 @@ public class PermissionsModel(IClientPermissionsService clientPermissionsService
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(Id))
+        if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
         ClientPermissionsModel? permissions =
-            await _clientPermissionsService.GetClientPermissionsAsync(ClientId.Create(Id), cancellationToken);
+            await _clientPermissionsService.GetClientPermissionsAsync(clientId, cancellationToken);
         if (permissions is null)
             return NotFound();
 
@@ -42,28 +42,18 @@ public class PermissionsModel(IClientPermissionsService clientPermissionsService
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(Id))
+        if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
         AdminMutationResult result = await _clientPermissionsService.UpdateClientPermissionsAsync(
-            ClientId.Create(Id), ScopeSet.FromStrings(Input.AllowedScopes), cancellationToken);
+            clientId, ScopeSet.FromStrings(Input.AllowedScopes), cancellationToken);
         if (result.Status == AdminMutationStatus.NotFound)
             return NotFound();
 
         if (!result.Succeeded)
         {
             ModelState.AddErrors(result.Errors);
-
-            ClientPermissionsModel? permissions =
-                await _clientPermissionsService.GetClientPermissionsAsync(ClientId.Create(Id), cancellationToken);
-            if (permissions is null)
-                return NotFound();
-
-            ClientNameDisplay = permissions.ClientName;
-            IsInteractive = permissions.IsInteractive;
-            AvailableIdentityScopes = permissions.AvailableIdentityScopes;
-            AvailableApiScopes = permissions.AvailableApiScopes;
-            return Page();
+            return await ReloadPageAsync(clientId, cancellationToken);
         }
 
         return RedirectToPage("./Details", new { id = Id });
@@ -71,11 +61,26 @@ public class PermissionsModel(IClientPermissionsService clientPermissionsService
 
     private void LoadFromModel(ClientPermissionsModel permissions)
     {
+        ApplyMetadata(permissions);
+        Input.AllowedScopes = permissions.AllowedScopes;
+    }
+
+    private async Task<IActionResult> ReloadPageAsync(ClientId clientId, CancellationToken cancellationToken)
+    {
+        ClientPermissionsModel? permissions =
+            await _clientPermissionsService.GetClientPermissionsAsync(clientId, cancellationToken);
+        if (permissions is null)
+            return NotFound();
+
+        ApplyMetadata(permissions);
+        return Page();
+    }
+
+    private void ApplyMetadata(ClientPermissionsModel permissions)
+    {
         ClientNameDisplay = permissions.ClientName;
         IsInteractive = permissions.IsInteractive;
         AvailableIdentityScopes = permissions.AvailableIdentityScopes;
         AvailableApiScopes = permissions.AvailableApiScopes;
-
-        Input.AllowedScopes = permissions.AllowedScopes;
     }
 }

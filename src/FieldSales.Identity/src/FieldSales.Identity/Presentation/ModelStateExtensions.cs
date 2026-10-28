@@ -14,4 +14,9 @@ public static class ModelStateExtensions
             foreach (string message in messages) state.AddModelError(key, message);
         }
     }
+
+    public static int ValidationTab(this ModelStateDictionary state, params string[] secondTabPrefixes) =>
+        FormPresentation.ValidationTab(
+            state.Where(entry => entry.Value is { Errors.Count: > 0 }).Select(entry => entry.Key),
+            secondTabPrefixes);
 }

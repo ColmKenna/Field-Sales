@@ -152,18 +152,12 @@ public sealed class EfIdentityUserAdministrationStore(
                 await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
             IdentityResult result = await _userManager.AddToRoleAsync(user, role);
-            if (!result.Succeeded)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                string errorMessage = result.Describe();
-
-                return new RoleAdditionOutcome(RoleAdditionStatus.ValidationFailed, targetName, errorMessage);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new RoleAdditionOutcome(RoleAdditionStatus.Added, targetName, null);
+            return await CompleteIdentityMutationAsync(
+                transaction,
+                result,
+                () => new RoleAdditionOutcome(RoleAdditionStatus.Added, targetName, null),
+                errorMessage => new RoleAdditionOutcome(RoleAdditionStatus.ValidationFailed, targetName, errorMessage),
+                cancellationToken);
         });
     }
 
@@ -225,17 +219,12 @@ public sealed class EfIdentityUserAdministrationStore(
             }
 
             IdentityResult result = await _userManager.RemoveFromRoleAsync(user, roleEntity.Name!);
-            if (!result.Succeeded)
-            {
-                string errorMessage = result.Describe();
-
-                await transaction.RollbackAsync(cancellationToken);
-                return new RoleRemovalOutcome(RoleRemovalStatus.ValidationFailed, targetName, false, errorMessage);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return new RoleRemovalOutcome(RoleRemovalStatus.Succeeded, targetName, true, null);
+            return await CompleteIdentityMutationAsync(
+                transaction,
+                result,
+                () => new RoleRemovalOutcome(RoleRemovalStatus.Succeeded, targetName, true, null),
+                errorMessage => new RoleRemovalOutcome(RoleRemovalStatus.ValidationFailed, targetName, false, errorMessage),
+                cancellationToken);
         });
     }
 
@@ -269,18 +258,12 @@ public sealed class EfIdentityUserAdministrationStore(
             }
 
             IdentityResult result = await _userManager.AddClaimAsync(user, new Claim(claimType, claimValue));
-            if (!result.Succeeded)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                string errorMessage = result.Describe();
-
-                return new ClaimMutationOutcome(ClaimMutationStatus.ValidationFailed, targetName, errorMessage);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new ClaimMutationOutcome(ClaimMutationStatus.Applied, targetName, null);
+            return await CompleteIdentityMutationAsync(
+                transaction,
+                result,
+                () => new ClaimMutationOutcome(ClaimMutationStatus.Applied, targetName, null),
+                errorMessage => new ClaimMutationOutcome(ClaimMutationStatus.ValidationFailed, targetName, errorMessage),
+                cancellationToken);
         });
     }
 
@@ -301,18 +284,12 @@ public sealed class EfIdentityUserAdministrationStore(
                 await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
             IdentityResult result = await _userManager.RemoveClaimAsync(user, new Claim(claimType, claimValue));
-            if (!result.Succeeded)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                string errorMessage = result.Describe();
-
-                return new ClaimMutationOutcome(ClaimMutationStatus.ValidationFailed, targetName, errorMessage);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new ClaimMutationOutcome(ClaimMutationStatus.Applied, targetName, null);
+            return await CompleteIdentityMutationAsync(
+                transaction,
+                result,
+                () => new ClaimMutationOutcome(ClaimMutationStatus.Applied, targetName, null),
+                errorMessage => new ClaimMutationOutcome(ClaimMutationStatus.ValidationFailed, targetName, errorMessage),
+                cancellationToken);
         });
     }
 
@@ -366,93 +343,87 @@ public sealed class EfIdentityUserAdministrationStore(
             string token = await _userManager.GeneratePasswordResetTokenAsync(user);
             IdentityResult result = await _userManager.ResetPasswordAsync(user, token, newPassword);
 
-            if (!result.Succeeded)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                string errorMessage = result.Describe();
-
-                return new PasswordResetOutcome(PasswordResetStatus.ValidationFailed, targetName, errorMessage);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new PasswordResetOutcome(PasswordResetStatus.Succeeded, targetName, null);
+            return await CompleteIdentityMutationAsync(
+                transaction,
+                result,
+                () => new PasswordResetOutcome(PasswordResetStatus.Succeeded, targetName, null),
+                errorMessage => new PasswordResetOutcome(PasswordResetStatus.ValidationFailed, targetName, errorMessage),
+                cancellationToken);
         });
     }
 
-    public async Task<UserSuspendOutcome> SuspendUserAsync(
-        UserActionContext context, CancellationToken cancellationToken = default)
+    public Task<UserSuspendOutcome> SuspendUserAsync(
+        UserActionContext context, CancellationToken cancellationToken = default) =>
+        ExecuteSelfGuardedMutationAsync(
+            context,
+            user => _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue),
+            userIdStr => new UserSuspendOutcome(UserSuspendStatus.UserNotFound, userIdStr),
+            targetName => new UserSuspendOutcome(UserSuspendStatus.SelfActionBlocked, targetName),
+            targetName => new UserSuspendOutcome(UserSuspendStatus.ValidationFailed, targetName),
+            targetName => new UserSuspendOutcome(UserSuspendStatus.Succeeded, targetName),
+            cancellationToken);
+
+    public Task<UserDeleteOutcome> DeleteUserAsync(
+        UserActionContext context, CancellationToken cancellationToken = default) =>
+        // Note: Since DeleteAsync doesn't always automatically persist everything depending on how UserManager is configured, 
+        // ensure DB is saved.
+        ExecuteSelfGuardedMutationAsync(
+            context,
+            _userManager.DeleteAsync,
+            userIdStr => new UserDeleteOutcome(UserDeleteStatus.UserNotFound, userIdStr),
+            targetName => new UserDeleteOutcome(UserDeleteStatus.SelfActionBlocked, targetName),
+            targetName => new UserDeleteOutcome(UserDeleteStatus.ValidationFailed, targetName),
+            targetName => new UserDeleteOutcome(UserDeleteStatus.Succeeded, targetName),
+            cancellationToken);
+
+    private Task<TOutcome> ExecuteSelfGuardedMutationAsync<TOutcome>(
+        UserActionContext context,
+        Func<ApplicationUser, Task<IdentityResult>> mutateAsync,
+        Func<string, TOutcome> onNotFound,
+        Func<string, TOutcome> onSelfBlocked,
+        Func<string, TOutcome> onValidationFailed,
+        Func<string, TOutcome> onSucceeded,
+        CancellationToken cancellationToken)
     {
-        UserId userId = context.Target;
-        string userIdStr = userId.Value ?? string.Empty;
+        string userIdStr = context.Target.Value ?? string.Empty;
         string? actingUserIdStr = context.ActingUser?.Value;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return IdentityTransactions.RetryAsync(_dbContext, async () =>
         {
             ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
-            if (user is null) return new UserSuspendOutcome(UserSuspendStatus.UserNotFound, userIdStr);
+            if (user is null) return onNotFound(userIdStr);
 
             string targetName = user.UserName ?? user.Id;
-
-            if (UserActionPolicy.IsSelf(actingUserIdStr, user.Id))
-            {
-                return new UserSuspendOutcome(UserSuspendStatus.SelfActionBlocked, targetName);
-            }
+            if (UserActionPolicy.IsSelf(actingUserIdStr, user.Id)) return onSelfBlocked(targetName);
 
             await using IDbContextTransaction transaction =
                 await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-            IdentityResult result = await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
-            if (!result.Succeeded)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-
-                return new UserSuspendOutcome(UserSuspendStatus.ValidationFailed, targetName);
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new UserSuspendOutcome(UserSuspendStatus.Succeeded, targetName);
+            IdentityResult result = await mutateAsync(user);
+            return await CompleteIdentityMutationAsync(
+                transaction,
+                result,
+                () => onSucceeded(targetName),
+                _ => onValidationFailed(targetName),
+                cancellationToken);
         });
     }
 
-    public async Task<UserDeleteOutcome> DeleteUserAsync(
-        UserActionContext context, CancellationToken cancellationToken = default)
+    private async Task<TOutcome> CompleteIdentityMutationAsync<TOutcome>(
+        IDbContextTransaction transaction,
+        IdentityResult result,
+        Func<TOutcome> onSuccess,
+        Func<string, TOutcome> onFailure,
+        CancellationToken cancellationToken)
     {
-        UserId userId = context.Target;
-        string userIdStr = userId.Value ?? string.Empty;
-        string? actingUserIdStr = context.ActingUser?.Value;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        if (!result.Succeeded)
         {
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
-            if (user is null) return new UserDeleteOutcome(UserDeleteStatus.UserNotFound, userIdStr);
+            await transaction.RollbackAsync(cancellationToken);
+            return onFailure(result.Describe());
+        }
 
-            string targetName = user.UserName ?? user.Id;
-
-            if (UserActionPolicy.IsSelf(actingUserIdStr, user.Id))
-            {
-                return new UserDeleteOutcome(UserDeleteStatus.SelfActionBlocked, targetName);
-            }
-
-            await using IDbContextTransaction transaction =
-                await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-            IdentityResult result = await _userManager.DeleteAsync(user);
-            if (!result.Succeeded)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-
-                return new UserDeleteOutcome(UserDeleteStatus.ValidationFailed, targetName);
-            }
-
-            // Note: Since DeleteAsync doesn't always automatically persist everything depending on how UserManager is configured, 
-            // ensure DB is saved.
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new UserDeleteOutcome(UserDeleteStatus.Succeeded, targetName);
-        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return onSuccess();
     }
 
     private static IQueryable<ApplicationUser> ApplyFilter(IQueryable<ApplicationUser> query, string? filter)

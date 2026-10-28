@@ -3,10 +3,11 @@ using Microsoft.Data.Sqlite;
 
 namespace FieldSales.Tablet.Core;
 
-/// <summary>The native SQLite engine this app was tested with (1C): 3.53.3 in WAL mode with synchronous FULL.</summary>
+/// <summary>The native SQLite engine this app was tested with (1C): 3.53.3+ in WAL mode with synchronous FULL.</summary>
 public sealed record SqliteEngine(string Version, string SourceId, string JournalMode, long Synchronous)
 {
     public const string RequiredVersion = "3.53.3";
+    private static readonly Version MinimumVersion = new(3, 53, 3);
     private static readonly Lazy<bool> Initialized = new(() => { SQLitePCL.Batteries_V2.Init(); return true; });
 
     internal static SqliteConnection Open(string path)
@@ -21,7 +22,10 @@ public sealed record SqliteEngine(string Version, string SourceId, string Journa
         return connection;
     }
 
-    /// <summary>Fails when a different native build, journal mode or durability setting is in use.</summary>
+    internal static bool IsSupportedVersion(string? version) =>
+        System.Version.TryParse(version, out var parsed) && parsed >= MinimumVersion;
+
+    /// <summary>Fails when an older native build, journal mode or durability setting is in use.</summary>
     internal static SqliteEngine Preflight(SqliteConnection connection)
     {
         string Scalar(string sql)
@@ -32,7 +36,7 @@ public sealed record SqliteEngine(string Version, string SourceId, string Journa
         }
         var engine = new SqliteEngine(Scalar("SELECT sqlite_version()"), Scalar("SELECT sqlite_source_id()"),
             Scalar("PRAGMA journal_mode"), long.Parse(Scalar("PRAGMA synchronous"), CultureInfo.InvariantCulture));
-        if (engine.Version != RequiredVersion || engine.JournalMode != "wal" || engine.Synchronous != 2)
+        if (!IsSupportedVersion(engine.Version) || engine.JournalMode != "wal" || engine.Synchronous != 2)
             throw new InvalidOperationException(
                 $"Local storage check failed: SQLite {engine.Version}, {engine.JournalMode}, synchronous={engine.Synchronous}.");
         return engine;

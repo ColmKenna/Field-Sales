@@ -28,8 +28,8 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        ListQuery query = ListQuery.ForPage(Filter, PageNumber, _options.DefaultPageSize);
-        PageNumber = query.Pagination.PageNumber;
+        ListQuery query = _options.CreateListQuery(Filter, PageNumber, out int pageNumber);
+        PageNumber = pageNumber;
 
         ApiScopes = await _apiScopeListService.GetApiScopesAsync(query, cancellationToken);
     }

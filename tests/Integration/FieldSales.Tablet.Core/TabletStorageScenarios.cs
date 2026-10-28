@@ -285,6 +285,18 @@ public sealed class TabletStorageScenarios : IDisposable
         Assert.Equal(("3.53.3", "wal", 2L), (engine.Version, engine.JournalMode, engine.Synchronous));
     }
 
+    [Theory]
+    [InlineData("3.50.3", false)]
+    [InlineData("3.53.2", false)]
+    [InlineData("invalid", false)]
+    [InlineData("3.53.3", true)]
+    [InlineData("3.53.4", true)]
+    [InlineData("3.54.0", true)]
+    public void Should_RequireAtLeastMinimumSqliteVersion_When_CheckingEngineVersion(string version, bool expected)
+    {
+        Assert.Equal(expected, SqliteEngine.IsSupportedVersion(version));
+    }
+
     [Fact]
     public void Should_RefuseToOpen_When_LocalDataIsFromANewerApp()
     {

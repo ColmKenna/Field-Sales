@@ -9,7 +9,7 @@ namespace FieldSales.Identity.Services.Apis;
 
 public partial class ApiResourceEditorService : IApiResourceEditorService
 {
-    private readonly IAuditWriter _auditWriter;
+    private readonly CategoryAudit _audit;
     private readonly ConfigurationDbContext _configurationDbContext;
     private readonly TimeProvider _timeProvider;
 
@@ -19,7 +19,7 @@ public partial class ApiResourceEditorService : IApiResourceEditorService
         TimeProvider? timeProvider = null)
     {
         _configurationDbContext = configurationDbContext;
-        _auditWriter = auditWriter;
+        _audit = AuditOperation.For(auditWriter, AuditCategory.ApiResource);
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -71,29 +71,9 @@ public partial class ApiResourceEditorService : IApiResourceEditorService
         };
     }
 
-    private Task AuditDeniedAsync(AuditAction action, AuditReasonCode reasonCode, string targetId, string targetName,
-        string details, CancellationToken cancellationToken)
-        => _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.ApiResource, action, AuditOutcome.Denied, reasonCode,
-            targetId, targetName, Details: details), cancellationToken);
-
-    private Task AuditSucceededAsync(AuditAction action, string targetId, string targetName, string details,
-        CancellationToken cancellationToken)
-        => _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.ApiResource, action, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            targetId, targetName, Details: details), cancellationToken);
-
-    private Task<T> ExecuteAuditedAsync<T>(
-        AuditAction action,
-        string targetId,
-        string targetName,
-        Func<AuditOperation, Task<T>> operation,
-        CancellationToken cancellationToken) =>
-        AuditOperation.RunAsync(_auditWriter, AuditCategory.ApiResource, action, targetId, targetName, operation, cancellationToken);
-
     private async Task<AdminMutationResult> DenyResourceNotFoundAsync(AuditAction action, string name, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(action, AuditReasonCode.NotFound, name, name,
+        await _audit.DeniedAsync(action, AuditReasonCode.NotFound, name, name,
             $"API Resource '{name}' was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }

@@ -7,7 +7,7 @@ public partial class UserDetailsService
 {
     public Task<ClaimChangeResult> AddClaimAsync(UserId userId, UserClaim claim,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.AddClaim,
             userId.Value,
             audit => AddClaimCoreAsync(userId, claim.Type ?? string.Empty, claim.Value ?? string.Empty, audit, cancellationToken),
@@ -44,28 +44,26 @@ public partial class UserDetailsService
             case ClaimMutationStatus.AlreadyExists:
                 {
                     const string message = "This exact claim is already assigned to the user.";
-                    await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId,
+                    await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId,
                         outcome.TargetName,
                         message, cancellationToken);
                     return ClaimChangeResult.Failed(message);
                 }
 
             case ClaimMutationStatus.UserNotFound:
-                await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.NotFound, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
                 return ClaimChangeResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case ClaimMutationStatus.ValidationFailed:
-                await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId,
+                await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId,
                     outcome.TargetName,
                     outcome.ErrorMessage!, cancellationToken);
                 return ClaimChangeResult.Failed(outcome.ErrorMessage!);
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.User, AuditAction.AddClaim, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            userId, outcome.TargetName,
-            Details: $"Added claim type '{type}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.AddClaim, userId, outcome.TargetName,
+            $"Added claim type '{type}'", cancellationToken);
 
         return ClaimChangeResult.Succeeded();
     }
@@ -73,7 +71,7 @@ public partial class UserDetailsService
     private async Task<ClaimChangeResult> DenyClaimTypeTooLongAsync(UserId userId, CancellationToken cancellationToken)
     {
         string message = $"Claim type cannot exceed {ValidationConstants.MaxClaimTypeLength} characters.";
-        await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId, userId,
+        await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId, userId,
             message, cancellationToken);
         return ClaimChangeResult.Failed(message);
     }
@@ -81,7 +79,7 @@ public partial class UserDetailsService
     private async Task<ClaimChangeResult> DenyClaimValueRequiredAsync(UserId userId, CancellationToken cancellationToken)
     {
         const string message = "Claim value is required.";
-        await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId, userId,
+        await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId, userId,
             message, cancellationToken);
         return ClaimChangeResult.Failed(message);
     }
@@ -89,7 +87,7 @@ public partial class UserDetailsService
     private async Task<ClaimChangeResult> DenyClaimValueTooLongAsync(UserId userId, CancellationToken cancellationToken)
     {
         string message = $"Claim value cannot exceed {ValidationConstants.MaxClaimValueLength} characters.";
-        await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId, userId,
+        await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, userId, userId,
             message, cancellationToken);
         return ClaimChangeResult.Failed(message);
     }
@@ -99,14 +97,14 @@ public partial class UserDetailsService
         string message =
             $"'{type}' is a reserved claim type and cannot be assigned here. Roles are granted on the Roles tab; " +
             "identity and security claims are issued by the framework.";
-        await AuditDeniedAsync(AuditAction.AddClaim, AuditReasonCode.ReservedClaimType, userId, userId,
+        await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ReservedClaimType, userId, userId,
             message, cancellationToken);
         return ClaimChangeResult.Failed(message);
     }
 
     public Task<ClaimChangeResult> RemoveClaimAsync(UserId userId, UserClaim claim,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.RemoveClaim,
             userId.Value,
             audit => RemoveClaimCoreAsync(userId, claim.Type ?? string.Empty, claim.Value ?? string.Empty,
@@ -128,28 +126,26 @@ public partial class UserDetailsService
         switch (outcome.Status)
         {
             case ClaimMutationStatus.UserNotFound:
-                await AuditDeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.NotFound, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
                 return ClaimChangeResult.Failed("User not found.", AdminMutationStatus.NotFound);
 
             case ClaimMutationStatus.ValidationFailed:
-                await AuditDeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.ValidationFailed, userId,
+                await _audit.DeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.ValidationFailed, userId,
                     outcome.TargetName,
                     outcome.ErrorMessage!, cancellationToken);
                 return ClaimChangeResult.Failed(outcome.ErrorMessage!);
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.User, AuditAction.RemoveClaim, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            userId, outcome.TargetName,
-            Details: $"Removed claim type '{type}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.RemoveClaim, userId, outcome.TargetName,
+            $"Removed claim type '{type}'", cancellationToken);
 
         return ClaimChangeResult.Succeeded();
     }
 
     private async Task<ClaimChangeResult> DenyClaimTypeRequiredAsync(AuditAction action, UserId userId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(action, AuditReasonCode.ValidationFailed, userId, userId,
+        await _audit.DeniedAsync(action, AuditReasonCode.ValidationFailed, userId, userId,
             "Claim type is required.", cancellationToken);
         return ClaimChangeResult.Failed("Claim type is required.");
     }

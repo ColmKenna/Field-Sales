@@ -20,7 +20,7 @@ public partial class ApiResourceEditorService
     public Task<SaveApiResourceBasicsResult> SaveBasicsAsync(
         SaveApiResourceBasicsCommand command,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             command?.OriginalName is null ? AuditAction.Create : AuditAction.UpdateBasics,
             (command?.Name ?? command?.OriginalName)?.Value ?? string.Empty,
             command?.DisplayName ?? (command?.Name ?? command?.OriginalName)?.Value ?? string.Empty,
@@ -92,7 +92,7 @@ public partial class ApiResourceEditorService
         ApiResourceBasicsValidationErrors validationErrors,
         CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(
+        await _audit.DeniedAsync(
             action,
             AuditReasonCode.ValidationFailed,
             name,
@@ -161,7 +161,7 @@ public partial class ApiResourceEditorService
         string originalName,
         CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(
+        await _audit.DeniedAsync(
             action,
             AuditReasonCode.NotFound,
             originalName,
@@ -183,7 +183,7 @@ public partial class ApiResourceEditorService
         {
             await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            await AuditSucceededAsync(
+            await _audit.SucceededAsync(
                 action,
                 name,
                 displayName ?? name,
@@ -206,7 +206,7 @@ public partial class ApiResourceEditorService
         string? displayName,
         CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(
+        await _audit.DeniedAsync(
             action,
             AuditReasonCode.NameCollision,
             name,

@@ -7,7 +7,7 @@ public partial class UserDetailsService
 {
     public Task<RoleChangeResult> AddRoleAsync(UserId userId, string role,
         CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.AddRole,
             userId.Value,
             audit => AddRoleCoreAsync(userId, role ?? string.Empty, audit, cancellationToken),
@@ -22,12 +22,12 @@ public partial class UserDetailsService
         switch (outcome.Status)
         {
             case RoleAdditionStatus.UserNotFound:
-                await AuditDeniedAsync(AuditAction.AddRole, AuditReasonCode.NotFound, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.AddRole, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "User not found.", cancellationToken);
                 return RoleChangeResult.Failed("User not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
 
             case RoleAdditionStatus.RoleNotFound:
-                await AuditDeniedAsync(AuditAction.AddRole, AuditReasonCode.NotFound, userId, outcome.TargetName,
+                await _audit.DeniedAsync(AuditAction.AddRole, AuditReasonCode.NotFound, userId, outcome.TargetName,
                     "Role not found.", cancellationToken);
                 return RoleChangeResult.Failed("Role not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
 
@@ -35,22 +35,20 @@ public partial class UserDetailsService
                 return RoleChangeResult.Succeeded();
 
             case RoleAdditionStatus.ValidationFailed:
-                await AuditDeniedAsync(AuditAction.AddRole, AuditReasonCode.ValidationFailed, userId,
+                await _audit.DeniedAsync(AuditAction.AddRole, AuditReasonCode.ValidationFailed, userId,
                     outcome.TargetName,
                     outcome.ErrorMessage!, cancellationToken);
                 return RoleChangeResult.Failed(outcome.ErrorMessage!);
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.User, AuditAction.AddRole, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-            userId, outcome.TargetName,
-            Details: $"Added role '{role}'"), cancellationToken);
+        await _audit.SucceededAsync(AuditAction.AddRole, userId, outcome.TargetName,
+            $"Added role '{role}'", cancellationToken);
 
         return RoleChangeResult.Succeeded();
     }
 
     public Task<RoleChangeResult> RemoveRoleAsync(UserId userId, string role,
-        CancellationToken cancellationToken = default) => ExecuteAuditedAsync(AuditAction.RemoveRole, userId.Value,
+        CancellationToken cancellationToken = default) => _audit.RunAsync(AuditAction.RemoveRole, userId.Value,
             audit => RemoveRoleCoreAsync(userId, role, audit, cancellationToken), cancellationToken);
 
     private async Task<RoleChangeResult> RemoveRoleCoreAsync(UserId userId, string role, AuditOperation audit,
@@ -73,13 +71,13 @@ public partial class UserDetailsService
         switch (outcome.Status)
         {
             case RoleRemovalStatus.UserNotFound:
-                await AuditDeniedAsync(AuditAction.RemoveRole, AuditReasonCode.NotFound, userId.Value, targetName,
+                await _audit.DeniedAsync(AuditAction.RemoveRole, AuditReasonCode.NotFound, userId.Value, targetName,
                     "User not found.", cancellationToken);
                 return RoleChangeResult.Failed("User not found.", AuditReasonCode.NotFound,
                     AdminMutationStatus.NotFound);
 
             case RoleRemovalStatus.RoleNotFound:
-                await AuditDeniedAsync(AuditAction.RemoveRole, AuditReasonCode.NotFound, userId.Value, targetName,
+                await _audit.DeniedAsync(AuditAction.RemoveRole, AuditReasonCode.NotFound, userId.Value, targetName,
                     "Role not found.", cancellationToken);
                 return RoleChangeResult.Failed("Role not found.", AuditReasonCode.NotFound,
                     AdminMutationStatus.NotFound);
@@ -88,7 +86,7 @@ public partial class UserDetailsService
                 {
                     string message =
                         "You cannot remove your own SysAdmin role. Ask another administrator to do this if needed.";
-                    await AuditDeniedAsync(AuditAction.RemoveRole, AuditReasonCode.SelfDemotion, userId.Value, targetName,
+                    await _audit.DeniedAsync(AuditAction.RemoveRole, AuditReasonCode.SelfDemotion, userId.Value, targetName,
                         message, cancellationToken);
                     return RoleChangeResult.Failed(message, AuditReasonCode.SelfDemotion);
                 }
@@ -97,25 +95,22 @@ public partial class UserDetailsService
                 {
                     string message =
                         $"'{targetName}' is the last SysAdmin. Assign the role to another user before removing it here.";
-                    await AuditDeniedAsync(AuditAction.RemoveRole, AuditReasonCode.LastAdministrator, userId.Value,
+                    await _audit.DeniedAsync(AuditAction.RemoveRole, AuditReasonCode.LastAdministrator, userId.Value,
                         targetName,
                         message, cancellationToken);
                     return RoleChangeResult.Failed(message, AuditReasonCode.LastAdministrator);
                 }
 
             case RoleRemovalStatus.ValidationFailed:
-                await AuditDeniedAsync(AuditAction.RemoveRole, AuditReasonCode.ValidationFailed, userId.Value,
+                await _audit.DeniedAsync(AuditAction.RemoveRole, AuditReasonCode.ValidationFailed, userId.Value,
                     targetName,
                     outcome.ErrorMessage!, cancellationToken);
                 return RoleChangeResult.Failed(outcome.ErrorMessage!, AuditReasonCode.ValidationFailed,
                     AdminMutationStatus.ValidationFailed);
         }
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-                AuditCategory.User, AuditAction.RemoveRole, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
-                userId.Value, targetName,
-                Details: outcome.RoleWasRemoved ? $"Removed role '{role}'" : $"Role '{role}' was not assigned"),
-            cancellationToken);
+        await _audit.SucceededAsync(AuditAction.RemoveRole, userId.Value, targetName,
+            outcome.RoleWasRemoved ? $"Removed role '{role}'" : $"Role '{role}' was not assigned", cancellationToken);
 
         if (outcome.RoleWasRemoved)
             // This runs after the role transaction commits. Its own durable mutations complete

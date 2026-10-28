@@ -31,11 +31,11 @@ public class BasicsModel(IClientOverviewService clientOverviewService) : PageMod
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(Id))
+        if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
         ClientDetailsModel? client =
-            await _clientOverviewService.GetClientDetailsAsync(ClientId.Create(Id), cancellationToken);
+            await _clientOverviewService.GetClientDetailsAsync(clientId, cancellationToken);
         if (client is null)
             return NotFound();
 
@@ -48,36 +48,31 @@ public class BasicsModel(IClientOverviewService clientOverviewService) : PageMod
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(Id))
+        if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
         if (!ModelState.IsValid)
         {
             ClientDetailsModel? client =
-                await _clientOverviewService.GetClientDetailsAsync(ClientId.Create(Id), cancellationToken);
+                await _clientOverviewService.GetClientDetailsAsync(clientId, cancellationToken);
             if (client is null)
                 return NotFound();
             ClientIdDisplay = client.ClientId;
             return Page();
         }
 
-        AdminMutationResult result = await _clientOverviewService.UpdateClientBasicsAsync(ClientId.Create(Id),
+        AdminMutationResult result = await _clientOverviewService.UpdateClientBasicsAsync(clientId,
             Input.ClientName, Input.Description, cancellationToken);
         if (result.Status == AdminMutationStatus.NotFound)
             return NotFound();
 
         if (!result.Succeeded)
         {
-            MapErrors(result);
+            ModelState.AddErrors(result.Errors);
             ClientIdDisplay = Id;
             return Page();
         }
 
         return RedirectToPage("./Details", new { id = Id });
-    }
-
-    private void MapErrors(AdminMutationResult result)
-    {
-        ModelState.AddErrors(result.Errors);
     }
 }

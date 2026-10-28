@@ -42,7 +42,7 @@ public partial class ClientDetailsService
 
     public Task<AdminMutationResult> UpdateClientTokenSettingsAsync(ClientId clientId,
         ClientTokenSettingsInputModel input, CancellationToken cancellationToken = default) =>
-        ExecuteAuditedAsync(
+        _audit.RunAsync(
             AuditAction.UpdateTokenSettings,
             clientId.Value,
             clientId.Value,
@@ -139,10 +139,12 @@ public partial class ClientDetailsService
 
         await _configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
-            AuditCategory.Client, AuditAction.UpdateTokenSettings, AuditOutcome.Succeeded,
-            AuditReasonCode.Succeeded,
-            clientId, client.ClientName ?? clientId,
+        await _audit.SucceededAsync(
+            AuditAction.UpdateTokenSettings,
+            clientId,
+            client.ClientName ?? clientId,
+            "Updated token and consent settings",
+            cancellationToken,
             oldValues,
             new ClientTokenSettingsAuditValue(
                 TokenLifetime.FromSeconds(trackedClient.AccessTokenLifetime),
@@ -156,24 +158,22 @@ public partial class ClientDetailsService
                     AbsoluteLifetime = TokenLifetime.FromSeconds(trackedClient.AbsoluteRefreshTokenLifetime),
                     SlidingLifetime = TokenLifetime.FromSeconds(trackedClient.SlidingRefreshTokenLifetime)
                 }
-            ),
-            "Updated token and consent settings"), cancellationToken);
+            ));
 
         return AdminMutationResult.Success();
-
     }
 
     private async Task<AdminMutationResult> DenyTokenSettingsValidationFailureAsync(
         string clientId, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdateTokenSettings, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await _audit.DeniedAsync(AuditAction.UpdateTokenSettings, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client token settings validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
 
     private async Task<AdminMutationResult> DenyTokenSettingsClientNotFoundAsync(string clientId, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdateTokenSettings, AuditReasonCode.NotFound, clientId, clientId,
+        await _audit.DeniedAsync(AuditAction.UpdateTokenSettings, AuditReasonCode.NotFound, clientId, clientId,
             $"Client '{clientId}' was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }
@@ -181,7 +181,7 @@ public partial class ClientDetailsService
     private async Task<AdminMutationResult> DenyTokenSettingsInvalidConfigurationAsync(
         string clientId, Client client, string validationError, CancellationToken cancellationToken)
     {
-        await AuditDeniedAsync(AuditAction.UpdateTokenSettings, AuditReasonCode.ValidationFailed, clientId,
+        await _audit.DeniedAsync(AuditAction.UpdateTokenSettings, AuditReasonCode.ValidationFailed, clientId,
             client.ClientName ?? clientId, "Client token settings validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure("Input.AccessTokenLifetime", validationError);
     }
