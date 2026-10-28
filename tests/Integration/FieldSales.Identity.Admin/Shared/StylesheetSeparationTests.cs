@@ -10,24 +10,24 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///     Each surface loads the shared stylesheet plus its own, and neither loads the other's.
 ///     shared.css must come first: the public and admin sheets build on its tokens and reset.
 /// </summary>
-public class StylesheetSeparationTests
+public class StylesheetSeparationTests(AdminWebFactory factory) : IClassFixture<AdminWebFactory>
 {
-    private static async Task<string[]> StylesheetsAsync(string url, string? identity = null)
+    private async Task<string[]> StylesheetsAsync(string url, string? identity = null)
     {
-        using var factory = new AdminWebFactory();
-        HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false
+            AllowAutoRedirect = false,
+            HandleCookies = false
         });
 
         if (identity is not null) client.DefaultRequestHeaders.Add("X-Test-Auth", identity);
 
-        HttpResponseMessage response = await client.GetAsync(url);
+        using HttpResponseMessage response = await client.GetAsync(url);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        IBrowsingContext context = BrowsingContext.New(AngleSharp.Configuration.Default);
-        IDocument document = await context.OpenAsync(
-            request => request.Content(response.Content.ReadAsStringAsync().Result));
+        using IBrowsingContext context = BrowsingContext.New(AngleSharp.Configuration.Default);
+        string html = await response.Content.ReadAsStringAsync();
+        using IDocument document = await context.OpenAsync(request => request.Content(html));
 
         return document.QuerySelectorAll("link[rel=stylesheet]")
             .Select(link => link.GetAttribute("href")!.Split('?')[0])
