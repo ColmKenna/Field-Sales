@@ -397,10 +397,12 @@ Testcontainers to cover migration adoption, concurrency, and cross-instance beha
 in-memory provider cannot represent. Without a container runtime those tests fail to connect
 rather than skipping.
 
-Front-end component tests for the admin console pages are run separately with Node:
+Front-end component tests for the admin console pages live in
+`tests/Unit/FieldSales.Identity.Admin/JavaScript` and run separately with Node.
+Their dependencies and test commands are defined in the Identity host's front-end package:
 
 ```pwsh
-cd FieldSales.Identity/src/FieldSales.Identity
+cd src/FieldSales.Identity/src/FieldSales.Identity
 npm install
 npm run test:admin-ui
 ```

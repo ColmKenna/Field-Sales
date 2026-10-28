@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
 import test from 'node:test';
 import vm from 'node:vm';
-import {JSDOM} from 'jsdom';
+
+const projectRoot = new URL('../../../../src/FieldSales.Identity/src/FieldSales.Identity/', import.meta.url);
+// Use the dependencies declared by the Identity host's front-end package.
+const {JSDOM} = createRequire(new URL('package.json', projectRoot))('jsdom');
 
 async function loadClientUriRowsScript() {
     const containers = new Map();
@@ -30,7 +34,7 @@ async function loadClientUriRowsScript() {
         document, window: {}, navigator: {}, setTimeout() {
         }
     };
-    const script = await readFile(new URL('../wwwroot/js/client-uri-rows.js', import.meta.url), 'utf8');
+    const script = await readFile(new URL('wwwroot/js/client-uri-rows.js', projectRoot), 'utf8');
     vm.runInNewContext(script, context);
 
     return {containers, context};
@@ -85,7 +89,7 @@ test('removeUriRow removes the closest URI row when one exists', async () => {
 });
 
 test('selectPreset reads available presets from application/json script element', async () => {
-    const script = await readFile(new URL('../wwwroot/js/client-presets.js', import.meta.url), 'utf8');
+    const script = await readFile(new URL('wwwroot/js/client-presets.js', projectRoot), 'utf8');
     const dom = new JSDOM(`<!doctype html><html><body>
         <script id="available-presets-data" type="application/json">
             [{"id":"m2m","requirePkce":false,"requireClientSecret":true,"grantTypes":["client_credentials"]}]

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
 import test from 'node:test';
-import {JSDOM} from 'jsdom';
 
-const projectRoot = new URL('../', import.meta.url);
+const projectRoot = new URL('../../../../src/FieldSales.Identity/src/FieldSales.Identity/', import.meta.url);
+// Use the dependencies declared by the Identity host's front-end package.
+const {JSDOM} = createRequire(new URL('package.json', projectRoot))('jsdom');
 
 async function readProjectFile(relativePath) {
     return readFile(new URL(relativePath, projectRoot), 'utf8');

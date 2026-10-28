@@ -5,8 +5,8 @@
   "description": "Front-end package dependencies for the IdentityServer Admin console pages.",
   "scripts": {
     "postinstall": "node ./scripts/copy-ck-responsive-table.js && node ./scripts/copy-ck-tabs.js",
-    "test:client-presets": "node --test tests/client-presets.characterization.test.mjs",
-    "test:admin-ui": "node --test tests/*.test.mjs"
+    "test:client-presets": "node --test ../../../../tests/Unit/FieldSales.Identity.Admin/JavaScript/client-presets.characterization.test.mjs",
+    "test:admin-ui": "node --test ../../../../tests/Unit/FieldSales.Identity.Admin/JavaScript/*.test.mjs"
   },
   "dependencies": {
     "@colmkenna/ck-responsive-table-webcomponent": "^1.0.0",
