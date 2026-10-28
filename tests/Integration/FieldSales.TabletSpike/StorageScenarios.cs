@@ -276,8 +276,13 @@ public sealed class StorageScenarios
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalid.StatusCode);
         using var forbidden = await env.Http.GetAsync(new Uri(endpoint, "snapshot.json"));
         Assert.Equal(System.Net.HttpStatusCode.NotFound, forbidden.StatusCode);
-        using var interrupted = await env.Http.GetAsync(new Uri(endpoint, "payload?stopAfter=100"), HttpCompletionOption.ResponseHeadersRead);
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => interrupted.Content.ReadAsByteArrayAsync());
+        // A TCP reset can surface before headers arrive or while reading the body,
+        // depending on the platform. Both must reject the interrupted transfer.
+        await Assert.ThrowsAnyAsync<HttpRequestException>(async () =>
+        {
+            using var interrupted = await env.Http.GetAsync(new Uri(endpoint, "payload?stopAfter=100"), HttpCompletionOption.ResponseHeadersRead);
+            await interrupted.Content.ReadAsByteArrayAsync();
+        });
     }
 
     [Fact]
