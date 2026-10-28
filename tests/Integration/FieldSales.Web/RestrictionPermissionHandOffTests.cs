@@ -24,6 +24,7 @@ namespace FieldSales.Web.Tests;
 
 // WI-029 increment 4: permissions counted as Restriction Group usage (archive messages and delete
 // protection), and the current-permissions hand-off to the snapshot builder (WI-043).
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

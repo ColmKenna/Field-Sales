@@ -14,6 +14,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class RepTerritoryIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Page = "/Coverage/Territory";

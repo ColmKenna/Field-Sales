@@ -16,6 +16,7 @@ using Supplier = CatalogueApi::FieldSales.Api.Catalogue.Supplier;
 
 namespace FieldSales.Web.Tests;
 
+[Collection(CatalogueSqlServerCollection.Name)]
 public sealed class ProductSearchIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]

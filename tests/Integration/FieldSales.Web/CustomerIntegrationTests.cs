@@ -16,11 +16,12 @@ using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbCon
 
 namespace FieldSales.Web.Tests;
 
-public sealed class CustomerApplication : GeographyApplication
+public sealed class CustomerApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
 {
     protected override bool UseTestLocationUsage => false;
 }
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class CustomerIntegrationTests(CustomerApplication app) : IClassFixture<CustomerApplication>
 {
     private const string Customers = "/directory/customers";

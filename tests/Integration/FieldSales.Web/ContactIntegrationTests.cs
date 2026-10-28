@@ -17,7 +17,7 @@ using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbCon
 
 namespace FieldSales.Web.Tests;
 
-public sealed class ContactApplication : GeographyApplication
+public sealed class ContactApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
 {
     private string? _catalogueConnectionString;
     protected override bool UseTestLocationUsage => false;
@@ -54,6 +54,7 @@ public sealed class ContactApplication : GeographyApplication
     }
 }
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class ContactIntegrationTests(ContactApplication app) : IClassFixture<ContactApplication>
 {
     private const string Contacts = "/directory/contacts";

@@ -14,6 +14,7 @@ using DryRun = CatalogueApi::FieldSales.Api.Coverage.AssignmentImpactPreview;
 
 namespace FieldSales.Web.Tests;
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class AssignmentImpactIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Root = "/coverage/assignments";

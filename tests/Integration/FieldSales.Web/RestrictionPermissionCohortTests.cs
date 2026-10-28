@@ -7,6 +7,7 @@ using static FieldSales.Web.Tests.RestrictionPermissionHost;
 namespace FieldSales.Web.Tests;
 
 // WI-030: one action must either grant every selected rep or record nothing.
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class RestrictionPermissionCohortTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

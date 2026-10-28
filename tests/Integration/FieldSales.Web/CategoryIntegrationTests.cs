@@ -23,7 +23,8 @@ using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbCon
 
 namespace FieldSales.Web.Tests;
 
-public sealed class CategoryIntegrationTests
+[Collection(CatalogueSqlServerCollection.Name)]
+public sealed class CategoryIntegrationTests(CatalogueSqlServerFixture sql)
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(
@@ -32,7 +33,7 @@ public sealed class CategoryIntegrationTests
     [Fact]
     public async Task Should_PersistSixLevelTreeCreatedThroughWebsite_When_ApplicationRestarts()
     {
-        string connectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Category");
+        string connectionString = sql.CreateConnectionString("Category");
         string token = CreateToken();
         string sixthUrl;
 

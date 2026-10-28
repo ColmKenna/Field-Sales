@@ -18,6 +18,7 @@ using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbCon
 
 namespace FieldSales.Web.Tests;
 
+[Collection(CatalogueSqlServerCollection.Name)]
 public sealed class ProductAttributeIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]

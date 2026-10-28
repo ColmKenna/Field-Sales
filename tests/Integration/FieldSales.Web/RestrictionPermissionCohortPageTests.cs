@@ -6,6 +6,7 @@ using static FieldSales.Web.Tests.RestrictionPermissionCohortTests;
 namespace FieldSales.Web.Tests;
 
 // WI-030: the real Razor form, BFF, permission API and SQL record together.
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

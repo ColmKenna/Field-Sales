@@ -29,6 +29,7 @@ using LocationTownUsageSource = CatalogueApi::FieldSales.Api.Directory.LocationT
 
 namespace FieldSales.Web.Tests;
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class GeographyIntegrationTests(GeographyApplication app) : IClassFixture<GeographyApplication>
 {
     private const string PageUrl = "/HeadOffice/Geography";
@@ -360,7 +361,7 @@ public sealed class GeographyIntegrationTests(GeographyApplication app) : IClass
     }
 }
 
-public class GeographyApplication : IAsyncLifetime
+public class GeographyApplication(DirectorySqlServerFixture sql) : IAsyncLifetime
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey Key = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
@@ -373,7 +374,7 @@ public class GeographyApplication : IAsyncLifetime
 
     public Task InitializeAsync() => FixtureCleanup.OnFailureAsync(async () =>
     {
-        ConnectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Geography");
+        ConnectionString = sql.CreateConnectionString("Geography");
         Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
         _api = NewApi();
         await using var scope = Api.Services.CreateAsyncScope();

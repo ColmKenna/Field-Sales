@@ -17,6 +17,7 @@ using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbCon
 
 namespace FieldSales.Web.Tests;
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class TownCoordinatesIntegrationTests(GeographyApplication app) : IClassFixture<GeographyApplication>
 {
     private const string Root = "/directory/geography";

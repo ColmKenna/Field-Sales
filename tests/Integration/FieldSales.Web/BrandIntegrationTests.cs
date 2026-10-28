@@ -21,6 +21,7 @@ using ProductBrandUsageSource = CatalogueApi::FieldSales.Api.Catalogue.ProductBr
 
 namespace FieldSales.Web.Tests;
 
+[Collection(CatalogueSqlServerCollection.Name)]
 public sealed class BrandIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string Page = "/HeadOffice/ReferenceData";

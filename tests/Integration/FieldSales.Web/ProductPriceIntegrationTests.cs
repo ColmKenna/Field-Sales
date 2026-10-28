@@ -10,6 +10,7 @@ using Product = CatalogueApi::FieldSales.Api.Catalogue.Product;
 
 namespace FieldSales.Web.Tests;
 
+[Collection(CatalogueSqlServerCollection.Name)]
 public sealed class ProductPriceIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]

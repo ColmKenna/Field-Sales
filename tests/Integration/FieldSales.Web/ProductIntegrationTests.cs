@@ -30,6 +30,7 @@ using Category = CatalogueApi::FieldSales.Api.Catalogue.Category;
 
 namespace FieldSales.Web.Tests;
 
+[Collection(CatalogueSqlServerCollection.Name)]
 public sealed class ProductIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string CreateUrl = "/HeadOffice/Products/Create";
@@ -315,7 +316,7 @@ public sealed class ProductIntegrationTests(ProductApplication app) : IClassFixt
     }
 }
 
-public sealed class ProductApplication : IAsyncLifetime
+public sealed class ProductApplication(CatalogueSqlServerFixture sql) : IAsyncLifetime
 {
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
@@ -326,7 +327,7 @@ public sealed class ProductApplication : IAsyncLifetime
 
     public Task InitializeAsync() => FixtureCleanup.OnFailureAsync(async () =>
     {
-        ConnectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Product");
+        ConnectionString = sql.CreateConnectionString("Product");
         _api = NewApi();
         await using var scope = Api.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();

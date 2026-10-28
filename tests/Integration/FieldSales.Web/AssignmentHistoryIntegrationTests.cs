@@ -10,6 +10,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class AssignmentHistoryIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Fact]

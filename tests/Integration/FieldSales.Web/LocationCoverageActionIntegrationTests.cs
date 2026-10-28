@@ -12,6 +12,7 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed partial class LocationCoverageActionIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Theory]

@@ -36,8 +36,8 @@ public sealed class FixtureCleanupTests
     [Fact]
     public async Task ApplicationsCanBeDisposedRepeatedlyBeforeInitialization()
     {
-        var product = new ProductApplication();
-        var geography = new GeographyApplication();
+        var product = new ProductApplication(new CatalogueSqlServerFixture());
+        var geography = new GeographyApplication(new DirectorySqlServerFixture());
         await product.DisposeAsync();
         await product.DisposeAsync();
         await geography.DisposeAsync();

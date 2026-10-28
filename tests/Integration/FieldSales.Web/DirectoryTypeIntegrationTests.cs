@@ -18,7 +18,7 @@ using ContactTypeUsageSource = CatalogueApi::FieldSales.Api.Directory.ContactTyp
 
 namespace FieldSales.Web.Tests;
 
-public sealed class DirectoryTypeApplication : GeographyApplication
+public sealed class DirectoryTypeApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
 {
     protected override bool UseTestLocationUsage => false;
     public DirectoryTypeTestContacts Contacts { get; } = new();
@@ -42,6 +42,7 @@ public sealed class DirectoryTypeApplication : GeographyApplication
     }
 }
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class DirectoryTypeIntegrationTests(DirectoryTypeApplication app) : IClassFixture<DirectoryTypeApplication>
 {
     private const string LocationTypes = "location-types";

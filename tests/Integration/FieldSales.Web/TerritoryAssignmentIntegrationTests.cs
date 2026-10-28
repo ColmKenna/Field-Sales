@@ -19,7 +19,7 @@ using AssignmentHistory = CatalogueApi::FieldSales.Api.Coverage.AssignmentHistor
 
 namespace FieldSales.Web.Tests;
 
-public sealed class CoverageReadApplication : GeographyApplication
+public sealed class CoverageReadApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
 {
     protected override bool UseTestLocationUsage => false;
     public ReadProbe Reads { get; } = new();
@@ -124,6 +124,7 @@ public sealed class CoverageReadApplication : GeographyApplication
 
 // Real SQL, real API JWT/current-role boundary; assignment writes are setup only.
 // Production add/remove/history operations belong to later approved increments.
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class TerritoryAssignmentIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Fact]

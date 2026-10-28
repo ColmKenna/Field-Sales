@@ -3,36 +3,43 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.Web.Tests;
 
-public static class WebSqlServerFixture
+public abstract class WebSqlServerFixture : IAsyncLifetime
 {
-    private static readonly SemaphoreSlim Lock = new(1, 1);
-    private static MsSqlContainer? _container;
+    private MsSqlContainer? _container;
 
-    public static async Task<string> CreateConnectionStringAsync(string? prefix = null)
+    public Task InitializeAsync() => FixtureCleanup.OnFailureAsync(async () =>
     {
-        if (_container == null)
-        {
-            await Lock.WaitAsync();
-            try
-            {
-                if (_container == null)
-                {
-                    var container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-                    await container.StartAsync();
-                    _container = container;
-                }
-            }
-            finally
-            {
-                Lock.Release();
-            }
-        }
+        _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
+        await _container.StartAsync();
+    }, DisposeAsync);
 
-        var catalog = $"WebTest_{(prefix != null ? prefix + "_" : "")}{Guid.NewGuid():N}";
-        var builder = new SqlConnectionStringBuilder(_container.GetConnectionString())
+    public string CreateConnectionString(string prefix)
+    {
+        var container = _container ?? throw new InvalidOperationException("The SQL fixture is not initialized.");
+        return new SqlConnectionStringBuilder(container.GetConnectionString())
         {
-            InitialCatalog = catalog
-        };
-        return builder.ConnectionString;
+            InitialCatalog = $"WebTest_{prefix}_{Guid.NewGuid():N}"
+        }.ConnectionString;
     }
+
+    public async Task DisposeAsync()
+    {
+        var container = Interlocked.Exchange(ref _container, null);
+        if (container is not null) await container.DisposeAsync();
+    }
+}
+
+public sealed class CatalogueSqlServerFixture : WebSqlServerFixture { }
+public sealed class DirectorySqlServerFixture : WebSqlServerFixture { }
+
+[CollectionDefinition(Name)]
+public sealed class CatalogueSqlServerCollection : ICollectionFixture<CatalogueSqlServerFixture>
+{
+    public const string Name = "Web Catalogue SQL Server";
+}
+
+[CollectionDefinition(Name)]
+public sealed class DirectorySqlServerCollection : ICollectionFixture<DirectorySqlServerFixture>
+{
+    public const string Name = "Web Directory SQL Server";
 }

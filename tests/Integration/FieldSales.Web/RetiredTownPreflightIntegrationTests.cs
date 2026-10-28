@@ -14,6 +14,7 @@ namespace FieldSales.Web.Tests;
 
 // Exercise the exact preflight gap found by CI, without timing sleeps or
 // weakening the existing concurrent-retirement assertions.
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class RetiredTownPreflightIntegrationTests(RetiredTownPreflightApplication app)
     : IClassFixture<RetiredTownPreflightApplication>
 {
@@ -58,7 +59,7 @@ public sealed class RetiredTownPreflightIntegrationTests(RetiredTownPreflightApp
     }
 }
 
-public sealed class RetiredTownPreflightApplication : GeographyApplication
+public sealed class RetiredTownPreflightApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
 {
     protected override bool UseTestLocationUsage => false;
     public RetirementBeforePositionRead Retirement { get; } = new();

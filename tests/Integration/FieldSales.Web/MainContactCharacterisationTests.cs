@@ -5,6 +5,7 @@ using FieldSales.Directory.Contracts;
 namespace FieldSales.Web.Tests;
 
 // Pins WI-018's rules before WI-020 changes the explicit retirement workflow.
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class MainContactCharacterisationTests(ContactApplication app) : IClassFixture<ContactApplication>
 {
     [Fact]

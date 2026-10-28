@@ -15,6 +15,7 @@ using ProductBasePrice = CatalogueApi::FieldSales.Api.Catalogue.ProductBasePrice
 
 namespace FieldSales.Web.Tests;
 
+[Collection(CatalogueSqlServerCollection.Name)]
 public sealed class CategoryBrowseIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]

@@ -12,6 +12,7 @@ using static FieldSales.Web.Tests.RestrictionPermissionHost;
 namespace FieldSales.Web.Tests;
 
 // Approved WI-031 single-rep increment. Real Razor/cookie/antiforgery, BFF, API and SQL record.
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

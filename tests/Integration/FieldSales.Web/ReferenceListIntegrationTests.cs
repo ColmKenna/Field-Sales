@@ -20,6 +20,7 @@ using RestrictionPermissionUsageSource = CatalogueApi::FieldSales.Api.Coverage.R
 
 namespace FieldSales.Web.Tests;
 
+[Collection(CatalogueSqlServerCollection.Name)]
 public sealed class ReferenceListIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string Page = "/HeadOffice/ReferenceData";

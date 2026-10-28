@@ -17,7 +17,7 @@ using Coordinates = CatalogueApi::FieldSales.Api.Directory.Coordinates;
 
 namespace FieldSales.Web.Tests;
 
-public sealed class LocationCoordinateApplication : GeographyApplication
+public sealed class LocationCoordinateApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
 {
     protected override bool UseTestLocationUsage => false;
     public LookupProbe Probe { get; } = new();
@@ -61,6 +61,7 @@ public sealed class LocationCoordinateApplication : GeographyApplication
     }
 }
 
+[Collection(DirectorySqlServerCollection.Name)]
 public sealed class LocationCoordinateIntegrationTests(LocationCoordinateApplication app) : IClassFixture<LocationCoordinateApplication>
 {
     [Theory]
