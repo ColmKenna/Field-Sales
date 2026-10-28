@@ -4,6 +4,7 @@ namespace FieldSales.Tablet.Core.Tests;
 
 // WI-032 startup: a cold start passes the entry check's result to the next screen so the 24-hour rule runs once.
 // Anything stale, repeated or missing means the screen checks for itself, so the rule is never skipped.
+[Trait("Category", "Unit")]
 public sealed class EntryHandOffTests
 {
     private static readonly TimeSpan Window = TimeSpan.FromSeconds(5);
