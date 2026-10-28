@@ -1,6 +1,7 @@
 # WI-034 — offline Location search checkpoint
 
-Measured 28 October 2026. **STOP: awaiting `Continue T-4.2.1`.**
+Measured 28 October 2026. The developer approved this checkpoint with `Continue T-4.2.1`.
+Final verification and completion are recorded in [the delivery report](tablet-location-search-delivery.md).
 
 ## Delivered before this stop
 
@@ -88,7 +89,7 @@ original enabled-in-airplane-mode state (`wifi_on=2`); the original empty revers
 and 120,000 ms screen timeout are restored. The owned demo AppHost was stopped. Docker Desktop
 remains running; no volumes, application data or unrelated files were removed.
 
-WI-034 remains `active`. After `Continue T-4.2.1`: finish the remaining agreed guard/stale-input
-verification, run the complete application suite and build, reconcile acceptance criteria,
-mark done, commit and push. Stop before integration. No WI-035 implementation beyond the
-explicitly approved minimal destination, and no next work item is started.
+At the checkpoint WI-034 remained `active`. The subsequent approved continuation completed
+guard/stale-input verification and the complete application suite: see the delivery report.
+WI-034 is now `done`. Stop before integration. No WI-035 implementation beyond the explicitly
+approved minimal destination, and no next work item is started.

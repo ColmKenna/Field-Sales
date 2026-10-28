@@ -7,12 +7,12 @@ public sealed class LocationSearchTests : IDisposable
     private readonly TestTablet tablet = new();
     public void Dispose() => tablet.Dispose();
 
-    private async Task<LocationSearchIndex> IndexAsync()
+    private async Task<LocationSearchIndex> IndexAsync(bool curlyStoreApostrophe = true)
     {
         var snapshot = Snapshots.Build("colm", 312, 0);
         var locations = snapshot.Locations.ToArray();
         locations[0] = locations[0] with { Name = "Murphy's Pharmacy", Town = locations[0].Town with { Name = "Rathdrum" } };
-        locations[1] = locations[1] with { Name = "Murphy’s Stores", Town = locations[1].Town with { Name = "Aughrim" } };
+        locations[1] = locations[1] with { Name = curlyStoreApostrophe ? "Murphy’s Stores" : "Murphy's Stores", Town = locations[1].Town with { Name = "Aughrim" } };
         locations[2] = locations[2] with { Name = "Café de Santé" };
         locations[3] = locations[3] with { Name = "100%_Shop" };
         await tablet.SyncAsync(snapshot with { Locations = locations });
@@ -23,10 +23,10 @@ public sealed class LocationSearchTests : IDisposable
     [Fact]
     public async Task Should_ShowBothMurphyShops_When_Searching312AssignedLocationsOffline()
     {
-        var index = await IndexAsync();
+        var index = await IndexAsync(curlyStoreApostrophe: false);
         Assert.Equal(312, index.Count);
         var matches = index.Search("Murphy");
-        Assert.Equal(["Murphy's Pharmacy", "Murphy’s Stores"], matches.Select(row => row.Name));
+        Assert.Equal(["Murphy's Pharmacy", "Murphy's Stores"], matches.Select(row => row.Name));
         Assert.Equal(["Rathdrum", "Aughrim"], matches.Select(row => row.TownName));
         Assert.Equal(matches[0], index.Find(matches[0].Id));
         Assert.Null(index.Find(Guid.NewGuid()));
