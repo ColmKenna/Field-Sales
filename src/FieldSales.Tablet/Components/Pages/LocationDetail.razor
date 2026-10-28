@@ -1,0 +1,20 @@
+@page "/locations/{Id:guid}"
+@inherits OfflineCataloguePage
+
+<section class="shop-detail">
+    <a href="/locations/search">Back to search</a>
+    @if (!Ready) { <h1>Opening shop…</h1> }
+    else if (location is null) { <h1>Shop unavailable</h1><p>This shop is not in your downloaded day.</p> }
+    else { <h1>@location.Name</h1><p>@location.TownName</p> }
+</section>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private HomeLocation? location;
+    protected override void Clear() => location = null;
+    protected override async Task ReadAsync(string rep, Func<bool> isCurrent)
+    {
+        HomeLocation? read = await Task.Run(() => Tablet.ReadLocationIndex(rep).Find(Id));
+        if (isCurrent()) location = read;
+    }
+}

@@ -1,0 +1,85 @@
+@page "/locations/search"
+@inherits OfflineCataloguePage
+@using System.Diagnostics
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<section class="shop-search">
+    <a href="/home">Back to Home</a>
+    <h1>Search shops</h1>
+    <div class="search-field">
+        <label for="shop-query">Shop name</label>
+        <input id="shop-query" type="search" value="@query" @oninput="SearchAsync" disabled="@(!Ready)" autocomplete="off" />
+        <button class="secondary" @onclick="ClearQuery" disabled="@(!Ready || query.Length == 0)">Clear</button>
+    </div>
+    @if (!Ready) { <p role="status">Opening shops…</p> }
+    else if (!string.IsNullOrWhiteSpace(query))
+    {
+        <div role="status" aria-live="polite">
+            @if (searching) { <p>Searching…</p> }
+            else if (results.Count == 0)
+            {
+                <p>No assigned locations match '@query.Trim()'</p>
+                <p>Only locations assigned to you can be searched on the tablet.</p>
+            }
+            else { <p>@results.Count matching shops</p> }
+        </div>
+        <div class="search-results" role="list" @key="revision">
+            <Virtualize TItem="HomeLocation" Items="results" ItemSize="80" OverscanCount="4">
+                <ItemContent Context="location">
+                    <div role="listitem"><a class="shop-result" href="@($"/locations/{location.Id}")"><strong>@location.Name</strong><span>@location.TownName</span></a></div>
+                </ItemContent>
+            </Virtualize>
+        </div>
+    }
+</section>
+
+@code {
+    private string query = "";
+    private LocationSearchIndex? index;
+    private List<HomeLocation> results = [];
+    private int revision;
+    private long? pending;
+    private bool searching;
+
+    protected override void Clear() { index = null; ClearQuery(); }
+    private void ClearQuery() { ++revision; query = ""; results = []; pending = null; searching = false; }
+
+    protected override async Task ReadAsync(string rep, Func<bool> isCurrent)
+    {
+        long started = Stopwatch.GetTimestamp();
+        LocationSearchIndex read = await Task.Run(() => Tablet.ReadLocationIndex(rep));
+        if (!isCurrent()) return;
+        index = read;
+        TabletTiming.SearchIndexBuilt(read.Count, Stopwatch.GetElapsedTime(started));
+    }
+
+    private async Task SearchAsync(ChangeEventArgs args)
+    {
+        long started = Stopwatch.GetTimestamp();
+        int current = ++revision;
+        query = args.Value?.ToString() ?? "";
+        results = [];
+        pending = null;
+        searching = false;
+        if (!Ready || index is null || string.IsNullOrWhiteSpace(query)) return;
+        searching = true;
+        LocationSearchIndex captured = index;
+        string text = query;
+        List<HomeLocation> matches = await Task.Run(() => captured.Search(text));
+        if (current != revision) return;
+        searching = false;
+        results = matches;
+        pending = started;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (pending is not long started) return;
+        pending = null;
+        int current = revision;
+        double visibleMs = await JS.InvokeAsync<double>("fieldSalesSearchAfterPaint", results.Count);
+        if (current == revision) TabletTiming.SearchShown(results.Count, TimeSpan.FromMilliseconds(visibleMs), Stopwatch.GetElapsedTime(started));
+    }
+}
