@@ -54,5 +54,5 @@ jobs:
       # already running, which Testcontainers needs. A silent skip would mean CI stops
       # proving the thing most likely to break: real schema migrations against real SQL Server.
       - name: Run integration test suite
-        run: dotnet test FieldSales.slnx --filter "Category!=Unit" --no-build -m:1 --settings sqlserver.runsettings --verbosity normal
+        run: dotnet test FieldSales.slnx --filter "Category!=Unit" --no-build -m:1 --settings sqlserver.runsettings --blame-hang-timeout 2m --verbosity normal
 

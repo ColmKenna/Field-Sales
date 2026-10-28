@@ -24,12 +24,12 @@ public sealed class ConfigurationConcurrencyTests
     public async Task ConcurrentApiResourceCreation_ReturnsOneSuccessAndOneStableConflict()
     {
         string name = $"task05-api-race-{Guid.NewGuid():N}";
-        using var start = new Barrier(3);
-        Task<SaveApiResourceBasicsResult>[] attempts = Enumerable.Range(0, 2).Select(index => Task.Run(async () =>
+        using var start = new ConcurrentTestStart(2);
+        Task<SaveApiResourceBasicsResult>[] attempts = Enumerable.Range(0, 2).Select(index => start.Run(async () =>
         {
             await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
             IApiResourceEditorService service = scope.ServiceProvider.GetRequiredService<IApiResourceEditorService>();
-            start.SignalAndWait();
+            await start.ReadyAsync();
             return await service.SaveBasicsAsync(new SaveApiResourceBasicsCommand(
                 null,
                 ScopeName.Create(name),
@@ -37,7 +37,7 @@ public sealed class ConfigurationConcurrencyTests
                 null));
         })).ToArray();
 
-        start.SignalAndWait();
+        await start.CompleteAsync(attempts);
         SaveApiResourceBasicsResult[] results = await Task.WhenAll(attempts);
 
         Assert.Single(results, result => result.Status == AdminMutationStatus.Succeeded);
@@ -58,12 +58,12 @@ public sealed class ConfigurationConcurrencyTests
                 await db.SaveChangesAsync();
             }
         });
-        using var start = new Barrier(3);
-        Task<ClientCreateResult>[] attempts = Enumerable.Range(0, 2).Select(index => Task.Run(async () =>
+        using var start = new ConcurrentTestStart(2);
+        Task<ClientCreateResult>[] attempts = Enumerable.Range(0, 2).Select(index => start.Run(async () =>
         {
             await using AsyncServiceScope scope = _factory.Services.CreateAsyncScope();
             IClientCreateService service = scope.ServiceProvider.GetRequiredService<IClientCreateService>();
-            start.SignalAndWait();
+            await start.ReadyAsync();
             return await service.CreateClientAsync(new ClientCreateInputModel
             {
                 ClientId = clientId,
@@ -76,7 +76,7 @@ public sealed class ConfigurationConcurrencyTests
             });
         })).ToArray();
 
-        start.SignalAndWait();
+        await start.CompleteAsync(attempts);
         ClientCreateResult[] results = await Task.WhenAll(attempts);
 
         Assert.Single(results, result => result.Status == AdminMutationStatus.Succeeded);
