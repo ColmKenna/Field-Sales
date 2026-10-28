@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace FieldSales.Tablet.Components.Pages;
 
-/// <summary>Catalogue reads use the current rep and the same 24-hour guard as Home, including after resume.</summary>
+/// <summary>Offline reads use the current rep and the same 24-hour guard as Home, including after resume.</summary>
 public abstract class OfflineCataloguePage : ComponentBase, IDisposable
 {
     [Inject] protected TabletApp Tablet { get; set; } = null!;

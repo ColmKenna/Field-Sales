@@ -52,6 +52,12 @@ public static class TabletTiming
 
     public static void CleanedUp(TimeSpan elapsed) => Write($"cleanup ms={(long)elapsed.TotalMilliseconds}");
 
+    public static void SearchIndexBuilt(int locations, TimeSpan elapsed) =>
+        Write($"search-index locations={locations} ms={elapsed.TotalMilliseconds:F3}");
+
+    public static void SearchShown(int matches, TimeSpan visible, TimeSpan handler) =>
+        Write($"search-visible matches={matches} ms={visible.TotalMilliseconds:F3} handler-ms={handler.TotalMilliseconds:F3}");
+
     private static void Write(string message)
     {
 #if ANDROID
