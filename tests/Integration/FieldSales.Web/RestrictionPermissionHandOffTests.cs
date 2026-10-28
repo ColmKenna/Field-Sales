@@ -33,7 +33,7 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
     private const string Pharmacy = "Pharmacy-only medicines";
     private const string HighValue = "High-value equipment";
     private const string Training = "Completed training 15 Sep 2026";
-    private RestrictionPermissionHost _host = null!;
+    private RestrictionPermissionHost? _host;
 
     public Task InitializeAsync()
     {
@@ -41,13 +41,17 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
         return Task.CompletedTask;
     }
 
-    public async Task DisposeAsync() => await _host.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        var host = Interlocked.Exchange(ref _host, null);
+        if (host is not null) await host.DisposeAsync();
+    }
 
     [Fact]
     public async Task Should_CountCurrentGrantsInArchiveAndUnarchiveNotes_When_RepsHoldTheGroupsPermission()
     {
-        var group = (await _host.ResetAsync(HighValue))[0];
-        using (var headOffice = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser))
+        var group = (await _host!.ResetAsync(HighValue))[0];
+        using (var headOffice = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser))
         {
             foreach (string rep in new[] { "colm", "aoife", "ciara" })
                 await SavedAsync(ChangeAsync(headOffice, rep, group, Granted, Training));
@@ -55,7 +59,7 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
             var brian = await SavedAsync(ChangeAsync(headOffice, "brian", group, Granted, Training));
             await SavedAsync(ChangeAsync(headOffice, "brian", group, Removed, "Left the team", brian.Id));
         }
-        await using var website = _host.CreateWebsite();
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser);
 
@@ -71,17 +75,17 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
         Assert.Contains("<p>3 permissions will take effect again</p>", restore);
         using (var restored = await RetireAsync(browser, restore, group, ReferenceAction.Unarchive))
             Assert.Equal(HttpStatusCode.Redirect, restored.StatusCode);
-        Assert.Equal((5, 3), await _host.CountsAsync()); // archiving kept every permission
+        Assert.Equal((5, 3), await _host!.CountsAsync()); // archiving kept every permission
     }
 
     [Fact]
     public async Task Should_OfferArchiveOrDelete_When_TheGroupIsHeldOrOnlyHasRemovedPermissions()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        await using var website = _host.CreateWebsite();
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser);
-        using var headOffice = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        using var headOffice = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
 
         // A delete confirmed before Colm was granted the group is refused once he holds it.
         string staleDelete = await ReferenceHtmlAsync(browser, group);
@@ -105,7 +109,7 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
         using (var deleted = await RetireAsync(browser, await ReferenceHtmlAsync(browser, group), group, ReferenceAction.Delete))
             Assert.Equal(HttpStatusCode.Redirect, deleted.StatusCode);
 
-        await using var scope = _host.Api.Services.CreateAsyncScope();
+        await using var scope = _host!.Api.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
         Assert.False(await db.RestrictionGroups.AnyAsync());
         Assert.Equal([Pharmacy, Pharmacy], await db.RestrictionPermissionChanges.OrderBy(row => row.Sequence)
@@ -115,11 +119,11 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
     [Fact]
     public async Task Should_ReturnColmsHeldGroups_When_TheSnapshotBuilderAsksForCurrentPermissions()
     {
-        var groups = await _host.ResetAsync(Pharmacy, HighValue);
+        var groups = await _host!.ResetAsync(Pharmacy, HighValue);
         Guid pharmacyProduct = await ProductAsync("Hay fever tablets", groups[0]);
         Guid highValueProduct = await ProductAsync("Blood pressure monitor", groups[1]);
         Guid everyday = await ProductAsync("Sun lotion", null);
-        using var headOffice = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        using var headOffice = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         var granted = await SavedAsync(ChangeAsync(headOffice, "colm", groups[0], Granted, Training));
 
         Assert.Equal([groups[0]], await CurrentAsync("colm"));
@@ -129,10 +133,10 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
         Assert.DoesNotContain(highValueProduct, await VisibleAsync("colm"));
 
         // While the group is archived Colm still holds the permission, but its products are hidden (MI-45).
-        await _host.ArchiveAsync(groups[0]);
+        await _host!.ArchiveAsync(groups[0]);
         Assert.Equal([groups[0]], await CurrentAsync("colm"));
         Assert.Equal([everyday], await VisibleAsync("colm"));
-        await _host.ArchiveAsync(groups[0], archived: false);
+        await _host!.ArchiveAsync(groups[0], archived: false);
         Assert.Equal(new[] { pharmacyProduct, everyday }.Order(), await VisibleAsync("colm"));
 
         // Once removed, his next snapshot leaves the group's products out.
@@ -144,8 +148,8 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
     [Fact]
     public async Task Should_FailClosed_When_ThePermissionSourceIsNotRegistered()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        await using (var scope = _host.Api.Services.CreateAsyncScope())
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        await using (var scope = _host!.Api.Services.CreateAsyncScope())
         {
             var registry = scope.ServiceProvider.GetRequiredService<ReferenceCatalogueRegistry>();
             registry.ValidateRegistrations();
@@ -155,7 +159,7 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
         }
 
         // Without the source, Restriction Groups can be neither listed nor retired: a missing count is not zero.
-        await using var missing = _host.Api.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        await using var missing = _host!.Api.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             foreach (var real in services.Where(service => service.ServiceType == typeof(IReferenceUsageSource)
                 && service.ImplementationType == typeof(RestrictionPermissionUsageSource)).ToArray())
@@ -168,13 +172,13 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
         using (var retire = await api.PostAsJsonAsync($"/catalogue/reference-data/{ReferenceListKeys.RestrictionGroups}/{group}/retire",
             new { Action = ReferenceAction.Delete }))
             Assert.Equal(HttpStatusCode.ServiceUnavailable, retire.StatusCode);
-        await using var check = _host.Api.Services.CreateAsyncScope();
+        await using var check = _host!.Api.Services.CreateAsyncScope();
         Assert.True(await check.ServiceProvider.GetRequiredService<CatalogueDbContext>().RestrictionGroups.AnyAsync(row => row.Id == group));
     }
 
     private async Task SignInAsync(HttpClient browser)
     {
-        _host.SetRoles("niamh", BusinessRoles.HeadOfficeUser);
+        _host!.SetRoles("niamh", BusinessRoles.HeadOfficeUser);
         using var response = await browser.GetAsync("/__test/sign-in?subject=niamh&roles=" + Uri.EscapeDataString(BusinessRoles.HeadOfficeUser));
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
@@ -209,7 +213,7 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
 
     private async Task<Guid> ProductAsync(string name, Guid? group)
     {
-        await using var scope = _host.Api.Services.CreateAsyncScope();
+        await using var scope = _host!.Api.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
         var category = new CategoryTree([]).Add(Guid.NewGuid().ToString("N"));
         var product = Product.Create(Guid.NewGuid().ToString("N"), name, category.Id, 4.80m, new DateOnly(2026, 10, 1));
@@ -222,14 +226,14 @@ public sealed class RestrictionPermissionHandOffTests(CoverageReadApplication ap
 
     private async Task<Guid[]> CurrentAsync(string rep)
     {
-        await using var scope = _host.Api.Services.CreateAsyncScope();
+        await using var scope = _host!.Api.Services.CreateAsyncScope();
         return (await scope.ServiceProvider.GetRequiredService<RestrictionPermissionReader>().CurrentGroupIdsAsync(rep, default)).ToArray();
     }
 
     // What the snapshot builder will do: the rep's current permissions through the one visibility rule.
     private async Task<Guid[]> VisibleAsync(string rep)
     {
-        await using var scope = _host.Api.Services.CreateAsyncScope();
+        await using var scope = _host!.Api.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
         var permitted = await scope.ServiceProvider.GetRequiredService<RestrictionPermissionReader>().CurrentGroupIdsAsync(rep, default);
         // Sorted here: SQL Server orders uniqueidentifier values differently from .NET.

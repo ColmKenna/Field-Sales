@@ -121,7 +121,9 @@ public sealed class RestrictionPermissionHost : IAsyncDisposable
     public static async Task<RepPermissionsPage> PageAsync(HttpClient api, string rep) =>
         (await api.GetFromJsonAsync<RepPermissionsPage>($"/coverage/reps/{Uri.EscapeDataString(rep)}/permissions"))!;
 
-    public ValueTask DisposeAsync() => Api.DisposeAsync();
+    private int _disposed;
+    public ValueTask DisposeAsync() => Interlocked.Exchange(ref _disposed, 1) == 0
+        ? Api.DisposeAsync() : ValueTask.CompletedTask;
 }
 
 // Pauses the next catalogue commit until released, so a test can act while a permission write holds its locks.

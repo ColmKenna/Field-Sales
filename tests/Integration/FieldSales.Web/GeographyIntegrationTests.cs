@@ -367,21 +367,26 @@ public class GeographyApplication : IAsyncLifetime
     public TestStaffRoleLookup Roles { get; } = new();
     public TestLocationUsageSource Locations { get; } = new();
     protected virtual bool UseTestLocationUsage => true;
-    public WebApplicationFactory<DirectoryDbContext> Api { get; private set; } = null!;
+    private WebApplicationFactory<DirectoryDbContext>? _api;
+    public WebApplicationFactory<DirectoryDbContext> Api => _api ?? throw new InvalidOperationException("The test application is not initialized.");
     public string ConnectionString { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync() => FixtureCleanup.OnFailureAsync(async () =>
     {
         ConnectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Geography");
         Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
-        Api = NewApi();
+        _api = NewApi();
         await using var scope = Api.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
         await InitializeAdditionalAsync();
-    }
+    }, DisposeAsync);
     protected virtual Task InitializeAdditionalAsync() => Task.CompletedTask;
     protected virtual void ConfigureAdditionalServices(IServiceCollection services, string connectionString) { }
-    public async Task DisposeAsync() { await Api.DisposeAsync(); }
+    public async Task DisposeAsync()
+    {
+        var api = Interlocked.Exchange(ref _api, null);
+        if (api is not null) await api.DisposeAsync();
+    }
     private WebApplicationFactory<DirectoryDbContext> NewApi() => new WebApplicationFactory<DirectoryDbContext>().WithWebHostBuilder(builder =>
     {
         builder.UseEnvironment("Testing");
@@ -434,7 +439,16 @@ public class GeographyApplication : IAsyncLifetime
         var db = scope.ServiceProvider.GetRequiredService<DirectoryDbContext>();
         return (await db.Regions.CountAsync(), await db.Counties.CountAsync(), await db.Towns.CountAsync());
     }
-    public async Task RestartAsync() { await Api.DisposeAsync(); Api = NewApi(); _ = Api.Server; }
+    public async Task RestartAsync()
+    {
+        await DisposeAsync();
+        await FixtureCleanup.OnFailureAsync(() =>
+        {
+            _api = NewApi();
+            _ = Api.Server;
+            return Task.CompletedTask;
+        }, DisposeAsync);
+    }
     public string Token(string role = StaffRoles.HeadOfficeUser, string scope = "fieldsales.api", string subject = "niamh")
     {
         var token = new JwtSecurityToken(Issuer, "fieldsales-api",

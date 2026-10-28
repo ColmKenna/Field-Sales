@@ -12,16 +12,20 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
     private const string Page = "/Coverage/GroupPermissions";
     private const string Pharmacy = "Pharmacy-only medicines";
     private const string Training = "Completed training 15 Sep 2026";
-    private RestrictionPermissionHost _host = null!;
+    private RestrictionPermissionHost? _host;
     public Task InitializeAsync() { _host = new(app); return Task.CompletedTask; }
-    public async Task DisposeAsync() => await _host.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        var host = Interlocked.Exchange(ref _host, null);
+        if (host is not null) await host.DisposeAsync();
+    }
 
     [Fact]
     public async Task Should_LockOutsideTeamRows_When_TheViewerIsOnlyASalesManager()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        _host.SetRoles("niamh", BusinessRoles.SalesManager);
-        await using var website = _host.CreateWebsite();
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        _host!.SetRoles("niamh", BusinessRoles.SalesManager);
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", BusinessRoles.SalesManager);
         string chooser = await HtmlAsync(browser, Page);
@@ -43,24 +47,24 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
             Assert.Contains("View only", Row(html, rep));
             Assert.DoesNotContain("type=\"checkbox\"", Row(html, rep));
         }
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
 
         // The browser's locked row is no substitute for server authorization.
         var forged = Form(html);
         Select(forged.Fields, "aoife", "ciara");
         using var denied = await browser.PostAsync(forged.Action, new FormUrlEncodedContent(forged.Fields));
         Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_ShowTheSameRecord_When_OpeningEachGrantedRepsPage()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        _host.SetRoles("niamh", BusinessRoles.SalesManager, BusinessRoles.FieldSalesperson);
-        _host.SetRoles("orla", BusinessRoles.HeadOfficeUser);
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        _host!.SetRoles("niamh", BusinessRoles.SalesManager, BusinessRoles.FieldSalesperson);
+        _host!.SetRoles("orla", BusinessRoles.HeadOfficeUser);
         app.ClockOverride = new(2026, 9, 15, 14, 2, 30, TimeSpan.Zero);
-        await using var website = new StaffWebsiteFactory(_host.Api.Server.CreateHandler(), app.Token(BusinessRoles.HeadOfficeUser, subject: "orla"));
+        await using var website = new StaffWebsiteFactory(_host!.Api.Server.CreateHandler(), app.Token(BusinessRoles.HeadOfficeUser, subject: "orla"));
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, "orla", BusinessRoles.HeadOfficeUser);
         Assert.Contains($"href=\"{Page}?groupId={group}\"", await HtmlAsync(browser, "/HeadOffice/ReferenceData?ListKey=restriction-groups"));
@@ -86,7 +90,7 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
             Assert.Contains(record, Text(perRep));
             Assert.Contains(">Granted", perRep);
         }
-        Assert.Equal((5, 5), await _host.CountsAsync());
+        Assert.Equal((5, 5), await _host!.CountsAsync());
 
         // The original browser form cannot duplicate the five records.
         using var stale = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
@@ -94,15 +98,15 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
         string staleHtml = await stale.Content.ReadAsStringAsync();
         SavePreview("group-stale", staleHtml);
         Assert.Contains("This permission changed. Reload before saving.", staleHtml);
-        Assert.Equal((5, 5), await _host.CountsAsync());
+        Assert.Equal((5, 5), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_RejectUnauthorizedRequests_When_UsingTheWebsiteOrApi()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        _host.SetRoles("niamh", BusinessRoles.SalesManager);
-        await using var website = _host.CreateWebsite();
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        _host!.SetRoles("niamh", BusinessRoles.SalesManager);
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", BusinessRoles.SalesManager);
         var form = Form(await HtmlAsync(browser, Page + "?groupId=" + group));
@@ -110,10 +114,10 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
         Assert.True(form.Fields.Remove("__RequestVerificationToken"));
         using var noCsrf = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
         Assert.Equal(HttpStatusCode.BadRequest, noCsrf.StatusCode);
-        using var rep = _host.ApiAs("colm", BusinessRoles.FieldSalesperson);
+        using var rep = _host!.ApiAs("colm", BusinessRoles.FieldSalesperson);
         using (var read = await rep.GetAsync(Path(group))) Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
         using (var grant = await GrantAsync(rep, group, ["aoife"])) Assert.Equal(HttpStatusCode.Forbidden, grant.StatusCode);
-        using var noScope = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        using var noScope = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         noScope.DefaultRequestHeaders.Authorization = new("Bearer", app.Token(BusinessRoles.HeadOfficeUser, scope: "", subject: "orla"));
         using (var read = await noScope.GetAsync(Path(group))) Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
         using (var grant = await GrantAsync(noScope, group, ["aoife"])) Assert.Equal(HttpStatusCode.Forbidden, grant.StatusCode);
@@ -123,15 +127,15 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
         Assert.Equal(HttpStatusCode.Redirect, repRead.StatusCode);
         Assert.Equal("/AccessDenied", repRead.Headers.Location?.AbsolutePath);
         Assert.DoesNotContain("Grant to selected reps", await repRead.Content.ReadAsStringAsync());
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_RecordNothing_When_SelectionIsEmptyDuplicateOrMalformed()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        _host.SetRoles("niamh", BusinessRoles.SalesManager);
-        await using var website = _host.CreateWebsite();
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        _host!.SetRoles("niamh", BusinessRoles.SalesManager);
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", BusinessRoles.SalesManager);
         var form = Form(await HtmlAsync(browser, Page + "?groupId=" + group));
@@ -143,20 +147,20 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
         form.Fields[subjectKey.Replace("RepSubject", "ExpectedLastChangeId")] = "not-a-guid";
         using var malformed = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
         Assert.Equal(HttpStatusCode.OK, malformed.StatusCode);
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_RecordNothing_When_TheGroupIsArchivedOrMissing()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        _host.SetRoles("niamh", BusinessRoles.SalesManager);
-        await using var website = _host.CreateWebsite();
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        _host!.SetRoles("niamh", BusinessRoles.SalesManager);
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, "niamh", BusinessRoles.SalesManager);
         var form = Form(await HtmlAsync(browser, Page + "?groupId=" + group));
         Select(form.Fields, "colm");
-        await _host.ArchiveAsync(group);
+        await _host!.ArchiveAsync(group);
         string html = await HtmlAsync(browser, Page + "?groupId=" + group);
         SavePreview("group-archived", html);
         Assert.Contains("No new permissions can be granted.", html);
@@ -170,7 +174,7 @@ public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication
         Assert.Contains("No active Restriction Groups exist yet.", chooser);
         using var missing = await browser.GetAsync(Page + "?groupId=" + Guid.NewGuid());
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
     }
 
     private static async Task SignInAsync(HttpClient browser, string subject, string role)

@@ -320,21 +320,22 @@ public sealed class ProductApplication : IAsyncLifetime
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
     public TestStaffRoleLookup Roles { get; } = new();
-    public WebApplicationFactory<CatalogueDbContext> Api { get; private set; } = null!;
+    private WebApplicationFactory<CatalogueDbContext>? _api;
+    public WebApplicationFactory<CatalogueDbContext> Api => _api ?? throw new InvalidOperationException("The test application is not initialized.");
     public string ConnectionString { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public Task InitializeAsync() => FixtureCleanup.OnFailureAsync(async () =>
     {
         ConnectionString = await WebSqlServerFixture.CreateConnectionStringAsync("Product");
-        Api = NewApi();
-        _ = Api.Server;
-        await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
+        _api = NewApi();
+        await using var scope = Api.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
-    }
+    }, DisposeAsync);
 
     public async Task DisposeAsync()
     {
-        await Api.DisposeAsync();
+        var api = Interlocked.Exchange(ref _api, null);
+        if (api is not null) await api.DisposeAsync();
     }
 
     public WebApplicationFactory<CatalogueDbContext> NewApi() =>
@@ -370,9 +371,13 @@ public sealed class ProductApplication : IAsyncLifetime
 
     public async Task RestartAsync()
     {
-        await Api.DisposeAsync();
-        Api = NewApi();
-        _ = Api.Server;
+        await DisposeAsync();
+        await FixtureCleanup.OnFailureAsync(() =>
+        {
+            _api = NewApi();
+            _ = Api.Server;
+            return Task.CompletedTask;
+        }, DisposeAsync);
     }
 
     public HttpClient CreateApiClient()

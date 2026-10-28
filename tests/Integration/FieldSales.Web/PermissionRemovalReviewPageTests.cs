@@ -20,16 +20,20 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
     private const string Pharmacy = "Pharmacy-only medicines";
     private const string RemovalReason = "Training expired";
     private const string Consequence = "Colm will lose Pharmacy-only medicines at their next Sync. Any lines already on unsent orders will still send.";
-    private RestrictionPermissionHost _host = null!;
+    private RestrictionPermissionHost? _host;
     private readonly ReviewClock _clock = new();
     public Task InitializeAsync() { _host = new(app); return Task.CompletedTask; }
-    public async Task DisposeAsync() => await _host.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        var host = Interlocked.Exchange(ref _host, null);
+        if (host is not null) await host.DisposeAsync();
+    }
 
     [Fact]
     public async Task Should_ShowConsequenceWithoutSaving_When_ReviewingASingleRemoval()
     {
         await SeedAsync();
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         string review = await ReviewAsync(browser, "  " + RemovalReason + "  ");
         SavePreview("single-review", review);
@@ -38,14 +42,14 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
         Assert.Contains(">Confirm removal</button>", review);
         Assert.Contains($"href=\"{RepPage}\"", review);
         Assert.DoesNotContain("lines already on In Progress", Text(review));
-        Assert.Equal((1, 1), await _host.CountsAsync());
+        Assert.Equal((1, 1), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_KeepPermissionAndRecord_When_CancellingRemoval()
     {
         await SeedAsync();
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         string review = await ReviewAsync(browser);
         string cancel = WebUtility.HtmlDecode(Regex.Match(review, "<a href=\"([^\"]+)\" class=\"button secondary\">Cancel</a>").Groups[1].Value);
@@ -53,14 +57,14 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
         string returned = await HtmlAsync(browser, cancel);
         Assert.DoesNotContain("Review removal", returned);
         Assert.Contains("Granted", Text(returned));
-        Assert.Equal((1, 1), await _host.CountsAsync());
+        Assert.Equal((1, 1), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_RecordOneRemoval_When_ConfirmingASingleReview()
     {
         var group = await SeedAsync();
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         var form = ConfirmationForm(await ReviewAsync(browser, "  " + RemovalReason + "  "));
         // Extra posted fields cannot replace the command protected in the review.
@@ -73,16 +77,16 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
         string html = await HtmlAsync(browser, RepPage);
         SavePreview("single-removed", html);
         Assert.Contains("Pharmacy-only medicines removed from Colm.", Text(html));
-        using var api = _host.ApiAs("niamh", BusinessRoles.SalesManager);
+        using var api = _host!.ApiAs("niamh", BusinessRoles.SalesManager);
         var row = Assert.Single((await PageAsync(api, "colm")).Groups);
         Assert.Equal(group, row.RestrictionGroupId); Assert.False(row.Granted);
         Assert.Equal((RestrictionPermissionChangeKind.Removed, "niamh", RemovalReason, app.ClockOverride),
             (row.LastChange!.Change, row.LastChange.Actor.Subject, row.LastChange.Reason, (DateTimeOffset?)row.LastChange.ChangedAt));
-        Assert.Equal((2, 0), await _host.CountsAsync());
+        Assert.Equal((2, 0), await _host!.CountsAsync());
         using var replay = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
         Assert.Contains("This permission changed.", await replay.Content.ReadAsStringAsync());
-        Assert.Equal((2, 0), await _host.CountsAsync());
+        Assert.Equal((2, 0), await _host!.CountsAsync());
     }
 
     [Theory]
@@ -91,7 +95,7 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
     public async Task Should_RejectConfirmation_When_ReviewIsMissingAlteredExpiredOrForAnotherActor(string kind)
     {
         await SeedAsync();
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         var form = ConfirmationForm(await ReviewAsync(browser));
         switch (kind)
@@ -114,17 +118,17 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
         using var refused = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Contains("This removal review is invalid or expired.", await refused.Content.ReadAsStringAsync());
-        Assert.Equal((1, 1), await _host.CountsAsync());
+        Assert.Equal((1, 1), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_RequireFreshReview_When_ThePermissionChangesBeforeConfirmation()
     {
         var group = await SeedAsync();
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         var form = ConfirmationForm(await ReviewAsync(browser));
-        using (var api = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser))
+        using (var api = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser))
         {
             var old = Assert.Single((await PageAsync(api, "colm")).Groups).LastChange!;
             var removed = await SavedAsync(ChangeAsync(api, "colm", group, RestrictionPermissionChangeKind.Removed, "Another manager", old.Id));
@@ -136,11 +140,11 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
         SavePreview("single-stale-review", html);
         Assert.Contains("This permission changed.", html);
         Assert.DoesNotContain("permission-removal-title", html);
-        Assert.Equal((3, 1), await _host.CountsAsync());
+        Assert.Equal((3, 1), await _host!.CountsAsync());
         var fresh = ConfirmationForm(await ReviewAsync(browser));
         using var confirmed = await browser.PostAsync(fresh.Action, new FormUrlEncodedContent(fresh.Fields));
         Assert.Equal(HttpStatusCode.Redirect, confirmed.StatusCode);
-        Assert.Equal((4, 0), await _host.CountsAsync());
+        Assert.Equal((4, 0), await _host!.CountsAsync());
     }
 
     [Theory]
@@ -148,21 +152,21 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
     public async Task Should_DenyRemoval_When_AuthorityChangesAfterReview(bool roleChanged)
     {
         await SeedAsync();
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         var form = ConfirmationForm(await ReviewAsync(browser));
-        if (roleChanged) _host.SetRoles("niamh", BusinessRoles.FieldSalesperson);
+        if (roleChanged) _host!.SetRoles("niamh", BusinessRoles.FieldSalesperson);
         else
         {
-            using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
-            string version = await _host.ReportingVersionAsync("colm");
+            using var office = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+            string version = await _host!.ReportingVersionAsync("colm");
             using var moved = await office.PutAsJsonAsync("/coverage/reporting-lines/colm", new SetRepReportingLineRequest("another-manager", version));
             Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
         }
         // The BFF still holds the original bearer/session: the API must enforce current authority.
         using var refused = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Equal((1, 1), await _host.CountsAsync());
+        Assert.Equal((1, 1), await _host!.CountsAsync());
     }
 
     [Theory]
@@ -171,9 +175,9 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
     {
         var group = await SeedAsync();
         bool archived = kind is "archived" or "both";
-        if (archived) await _host.ArchiveAsync(group);
+        if (archived) await _host!.ArchiveAsync(group);
         if (kind is "inactive" or "both") app.Staff.Entries["colm"] = app.Staff.Entries["colm"] with { Available = false };
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         string review = await ReviewAsync(browser);
         if (archived)
@@ -187,7 +191,7 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
         var form = ConfirmationForm(review);
         using var confirmed = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
         Assert.Equal(HttpStatusCode.Redirect, confirmed.StatusCode);
-        Assert.Equal((2, 0), await _host.CountsAsync());
+        Assert.Equal((2, 0), await _host!.CountsAsync());
     }
 
     [Theory]
@@ -196,7 +200,7 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
     public async Task Should_RecordNothing_When_IdentityFailsOrRequestsAreUnauthorized(string kind)
     {
         await SeedAsync();
-        await using var parent = _host.CreateWebsite(); await using var website = WithClock(parent);
+        await using var parent = _host!.CreateWebsite(); await using var website = WithClock(parent);
         using var browser = Browser(website); await SignInAsync(browser);
         var removal = RemovalForm(await HtmlAsync(browser, RepPage));
         FormData form = kind.EndsWith("at-confirm") ? ConfirmationForm(await ReviewAsync(browser)) : removal;
@@ -204,15 +208,15 @@ public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app
         else form.Fields.Remove("__RequestVerificationToken");
         using var refused = await browser.PostAsync(form.Action, new FormUrlEncodedContent(form.Fields));
         Assert.Equal(kind.StartsWith("identity") ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.BadRequest, refused.StatusCode);
-        Assert.Equal((1, 1), await _host.CountsAsync());
+        Assert.Equal((1, 1), await _host!.CountsAsync());
     }
 
     private async Task<Guid> SeedAsync()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        using var office = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         await SavedAsync(ChangeAsync(office, "colm", group, RestrictionPermissionChangeKind.Granted, "Completed training"));
-        _host.SetRoles("niamh", BusinessRoles.SalesManager);
+        _host!.SetRoles("niamh", BusinessRoles.SalesManager);
         return group;
     }
     private WebApplicationFactory<Program> WithClock(StaffWebsiteFactory parent) => parent.WithWebHostBuilder(builder =>

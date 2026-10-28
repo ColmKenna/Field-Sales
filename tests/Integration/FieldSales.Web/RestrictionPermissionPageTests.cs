@@ -19,7 +19,7 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
     private const string Veterinary = "Veterinary medicines";
     private const string Training = "Completed training 15 Sep 2026";
     private static readonly DateTimeOffset TrainingDay = new(2026, 9, 15, 14, 2, 30, TimeSpan.Zero);
-    private RestrictionPermissionHost _host = null!;
+    private RestrictionPermissionHost? _host;
 
     public Task InitializeAsync()
     {
@@ -27,13 +27,17 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
         return Task.CompletedTask;
     }
 
-    public async Task DisposeAsync() => await _host.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        var host = Interlocked.Exchange(ref _host, null);
+        if (host is not null) await host.DisposeAsync();
+    }
 
     [Fact]
     public async Task Should_ISeeEachGroupWithGrantedNotGrantedAndTheLastChangeEntry_When_IOpenColmSPermissions()
     {
-        var groups = await _host.ResetAsync(Pharmacy, HighValue, Veterinary);
-        using (var headOffice = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser))
+        var groups = await _host!.ResetAsync(Pharmacy, HighValue, Veterinary);
+        using (var headOffice = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser))
         {
             app.ClockOverride = TrainingDay;
             await SavedAsync(ChangeAsync(headOffice, "colm", groups[0], Granted, Training));
@@ -41,7 +45,7 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
             app.ClockOverride = new DateTimeOffset(2026, 10, 2, 9, 30, 0, TimeSpan.Zero);
             await SavedAsync(ChangeAsync(headOffice, "colm", groups[1], Removed, "Moved to the hardware team", highValue.Id));
         }
-        await using var website = _host.CreateWebsite();
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, BusinessRoles.SalesManager); // Colm's own manager
 
@@ -57,17 +61,17 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
         ];
         Assert.Equal(expected, Rows(html).Select(row => row[..3]).ToArray());
         Assert.Equal(["Grant " + HighValue, "Remove " + Pharmacy, "Grant " + Veterinary], Buttons(html));
-        Assert.Equal((3, 1), await _host.CountsAsync()); // opening the page records nothing
+        Assert.Equal((3, 1), await _host!.CountsAsync()); // opening the page records nothing
     }
 
     [Fact]
     public async Task Should_ICanViewButNotChangeThem_When_IAmASalesManagerWhoDoesNotManageCiaraAndNotA()
     {
-        var groups = await _host.ResetAsync(Pharmacy, HighValue);
+        var groups = await _host!.ResetAsync(Pharmacy, HighValue);
         app.ClockOverride = TrainingDay;
-        using (var headOffice = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser))
+        using (var headOffice = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser))
             await SavedAsync(ChangeAsync(headOffice, "ciara", groups[0], Granted, Training));
-        await using var website = _host.CreateWebsite();
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, BusinessRoles.SalesManager); // manages Colm and Aoife, not Ciara
 
@@ -98,15 +102,15 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
         };
         using var refused = await browser.PostAsync(Page + "?handler=Change", new FormUrlEncodedContent(forged));
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Equal((1, 1), await _host.CountsAsync());
+        Assert.Equal((1, 1), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_ShowTheNewStateAndLastChange_When_IGrantOrRemoveFromThePage()
     {
-        await _host.ResetAsync(Pharmacy);
+        await _host!.ResetAsync(Pharmacy);
         app.ClockOverride = TrainingDay;
-        await using var website = _host.CreateWebsite();
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, BusinessRoles.SalesManager);
         // The page is reached from the manager's home page and from the rep's territory page.
@@ -128,7 +132,7 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
             Assert.Equal(HttpStatusCode.OK, review.StatusCode);
             html = await review.Content.ReadAsStringAsync();
             Assert.Contains("Review removal", html);
-            Assert.Equal((1, 1), await _host.CountsAsync());
+            Assert.Equal((1, 1), await _host!.CountsAsync());
         }
         var confirmation = PermissionRemovalReviewPageTests.ConfirmationForm(html);
         html = await FollowAsync(browser, await browser.PostAsync(confirmation.Action, new FormUrlEncodedContent(confirmation.Fields)));
@@ -142,14 +146,14 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
         SavePreview("stale-change", html);
         Assert.Contains("This permission changed. Reload before saving.", WebUtility.HtmlDecode(html));
         Assert.Equal("Grant " + Pharmacy, Assert.Single(Buttons(html)));
-        Assert.Equal((2, 0), await _host.CountsAsync());
+        Assert.Equal((2, 0), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_RejectThePostAndRecordNothing_When_TheAntiforgeryTokenIsMissing()
     {
-        await _host.ResetAsync(Pharmacy);
-        await using var website = _host.CreateWebsite();
+        await _host!.ResetAsync(Pharmacy);
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, BusinessRoles.HeadOfficeUser);
 
@@ -158,14 +162,14 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
         using var response = await browser.PostAsync(grant.Action, new FormUrlEncodedContent(grant.Fields));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_ShowArchivedHeldGroupsWithRemoveOnlyOrAnEmptyState_When_GroupsAreArchivedOrAbsent()
     {
-        await _host.ResetAsync();
-        await using var website = _host.CreateWebsite();
+        await _host!.ResetAsync();
+        await using var website = _host!.CreateWebsite();
         using var browser = website.CreateBrowser();
         await SignInAsync(browser, BusinessRoles.SalesManager);
         string html = await HtmlAsync(browser, Page + "?repSubject=colm");
@@ -173,11 +177,11 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
         Assert.Contains("No Restriction Groups exist yet.", html);
         Assert.Empty(Rows(html));
 
-        var groups = await _host.ResetAsync(Pharmacy, HighValue);
+        var groups = await _host!.ResetAsync(Pharmacy, HighValue);
         app.ClockOverride = TrainingDay;
-        using (var headOffice = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser))
+        using (var headOffice = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser))
             await SavedAsync(ChangeAsync(headOffice, "colm", groups[0], Granted, Training));
-        await _host.ArchiveAsync(groups[0]);
+        await _host!.ArchiveAsync(groups[0]);
         await SignInAsync(browser, BusinessRoles.SalesManager);
 
         html = await HtmlAsync(browser, Page + "?repSubject=colm");
@@ -195,7 +199,7 @@ public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
 
     private async Task SignInAsync(HttpClient browser, string role)
     {
-        _host.SetRoles("niamh", role);
+        _host!.SetRoles("niamh", role);
         using var response = await browser.GetAsync("/__test/sign-in?subject=niamh&roles=" + Uri.EscapeDataString(role));
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }

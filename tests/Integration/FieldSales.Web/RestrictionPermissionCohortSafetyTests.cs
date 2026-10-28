@@ -18,68 +18,72 @@ public sealed class RestrictionPermissionCohortSafetyTests(CoverageReadApplicati
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {
     private const string Pharmacy = "Pharmacy-only medicines";
-    private RestrictionPermissionHost _host = null!;
+    private RestrictionPermissionHost? _host;
     private readonly CohortSaveFailure _failure = new();
     public Task InitializeAsync() { _host = new(app, _failure); return Task.CompletedTask; }
-    public async Task DisposeAsync() => await _host.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        var host = Interlocked.Exchange(ref _host, null);
+        if (host is not null) await host.DisposeAsync();
+    }
 
     [Theory]
     [InlineData(1)] [InlineData(2)]
     public async Task Should_SaveNoPartialGrants_When_AWriteFailsPartWay(int failAfter)
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        using var api = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        using var api = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         _failure.FailAfter = failAfter;
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => GrantAsync(api, group, ["aoife", "brian", "colm"]));
         Assert.Equal("Injected failure after saving part of a cohort.", error.Message);
         // Both tables really contained the writes inside the transaction before the injected failure.
         Assert.Equal((failAfter, failAfter), _failure.WrittenBeforeFailure);
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
         using var retry = await GrantAsync(api, group, ["aoife", "brian", "colm"]);
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
-        Assert.Equal((3, 3), await _host.CountsAsync());
+        Assert.Equal((3, 3), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_UseCurrentAuthority_When_TeamOrActorRolesChange()
     {
-        var groups = await _host.ResetAsync(Pharmacy, "High-value equipment");
-        using var manager = _host.ApiAs("niamh", BusinessRoles.SalesManager);
-        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        var groups = await _host!.ResetAsync(Pharmacy, "High-value equipment");
+        using var manager = _host!.ApiAs("niamh", BusinessRoles.SalesManager);
+        using var office = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         Assert.All((await GroupAsync(manager, groups[0])).Reps.Where(row => row.Rep.Subject is "aoife" or "colm"), row => Assert.True(row.CanGrant));
 
         // A page loaded before a team change is no authority to save afterwards.
         await MoveAsync(office, "colm", "another-manager");
         using (var staleAuthority = await GrantAsync(manager, groups[0], ["aoife", "colm"]))
             Assert.Equal(HttpStatusCode.Forbidden, staleAuthority.StatusCode);
-        Assert.Equal((0, 0), await _host.CountsAsync());
+        Assert.Equal((0, 0), await _host!.CountsAsync());
         await MoveAsync(office, "colm", "niamh");
 
         // A team change during an authorized cohort must wait until every grant commits.
-        string version = await _host.ReportingVersionAsync("colm");
-        _host.Gate.Armed = true;
+        string version = await _host!.ReportingVersionAsync("colm");
+        _host!.Gate.Armed = true;
         var grant = GrantAsync(manager, groups[0], ["aoife", "colm"]);
         Task<HttpResponseMessage>? move = null;
         try
         {
-            await _host.Gate.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await _host!.Gate.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
             move = office.PutAsJsonAsync("/coverage/reporting-lines/colm", new SetRepReportingLineRequest("another-manager", version));
             await WaitUntilARequestIsBlockedAsync();
             Assert.False(move.IsCompleted);
         }
-        finally { _host.Gate.Release.TrySetResult(); }
+        finally { _host!.Gate.Release.TrySetResult(); }
         using (var saved = await grant) Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         using (var moved = await move!) Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
-        Assert.Equal((2, 2), await _host.CountsAsync());
+        Assert.Equal((2, 2), await _host!.CountsAsync());
 
         Assert.False(Assert.Single((await GroupAsync(manager, groups[1])).Reps, row => row.Rep.Subject == "colm").CanGrant);
         using (var newTeam = await GrantAsync(manager, groups[1], ["aoife", "colm"]))
             Assert.Equal(HttpStatusCode.Forbidden, newTeam.StatusCode);
         // The already-issued bearer token also loses its old manager authority on the next request.
-        _host.SetRoles("niamh", BusinessRoles.FieldSalesperson);
+        _host!.SetRoles("niamh", BusinessRoles.FieldSalesperson);
         using (var removedRole = await GrantAsync(manager, groups[1], ["aoife"]))
             Assert.Equal(HttpStatusCode.Forbidden, removedRole.StatusCode);
-        Assert.Equal((2, 2), await _host.CountsAsync());
+        Assert.Equal((2, 2), await _host!.CountsAsync());
         Assert.False(app.Staff.SawTransaction);
     }
 
@@ -87,8 +91,8 @@ public sealed class RestrictionPermissionCohortSafetyTests(CoverageReadApplicati
     [InlineData(1)] [InlineData(2)]
     public async Task Should_RollBackAllRemovals_When_APersistenceFailureOccursPartWay(int failAfter)
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        using var office = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         using var seed = await GrantAsync(office, group, ["aoife", "brian", "colm"]);
         Assert.Equal(HttpStatusCode.OK, seed.StatusCode);
         var held = (await seed.Content.ReadFromJsonAsync<CohortPermissionGrantResult>())!.Changes;
@@ -97,49 +101,49 @@ public sealed class RestrictionPermissionCohortSafetyTests(CoverageReadApplicati
         Assert.Equal("Injected failure after saving part of a cohort.", error.Message);
         // Read inside the failed transaction, then from a fresh scope after rollback.
         Assert.Equal((3 + failAfter, 3 - failAfter), _failure.WrittenBeforeFailure);
-        Assert.Equal((3, 3), await _host.CountsAsync());
+        Assert.Equal((3, 3), await _host!.CountsAsync());
         foreach (var old in held)
             Assert.Equal(old, Assert.Single((await RestrictionPermissionHost.PageAsync(office, old.Rep.Subject)).Groups).LastChange);
         using var retry = await RemoveAsync(office, group, held);
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
-        Assert.Equal((6, 0), await _host.CountsAsync());
+        Assert.Equal((6, 0), await _host!.CountsAsync());
     }
 
     [Fact]
     public async Task Should_KeepReportingLinesLocked_When_RemovalRacesWithATeamChange()
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        using var office = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         using var seed = await GrantAsync(office, group, ["aoife", "colm"]);
         Assert.Equal(HttpStatusCode.OK, seed.StatusCode);
         var held = (await seed.Content.ReadFromJsonAsync<CohortPermissionGrantResult>())!.Changes;
-        using var manager = _host.ApiAs("niamh", BusinessRoles.SalesManager);
+        using var manager = _host!.ApiAs("niamh", BusinessRoles.SalesManager);
         // Authority is checked before any write, including when an old review crosses a team change.
         await MoveAsync(office, "colm", "another-manager");
         using (var denied = await RemoveAsync(manager, group, held)) Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
-        Assert.Equal((2, 2), await _host.CountsAsync());
+        Assert.Equal((2, 2), await _host!.CountsAsync());
         await MoveAsync(office, "colm", "niamh");
-        string version = await _host.ReportingVersionAsync("colm");
-        _host.Gate.Armed = true;
+        string version = await _host!.ReportingVersionAsync("colm");
+        _host!.Gate.Armed = true;
         var removal = RemoveAsync(manager, group, held);
         Task<HttpResponseMessage>? move = null;
         try
         {
-            await _host.Gate.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await _host!.Gate.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
             move = office.PutAsJsonAsync("/coverage/reporting-lines/colm", new SetRepReportingLineRequest("another-manager", version));
             await WaitUntilARequestIsBlockedAsync();
             Assert.False(move.IsCompleted);
         }
-        finally { _host.Gate.Release.TrySetResult(); }
+        finally { _host!.Gate.Release.TrySetResult(); }
         using (var saved = await removal) Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         using (var moved = await move!) Assert.Equal(HttpStatusCode.OK, moved.StatusCode);
-        Assert.Equal((4, 0), await _host.CountsAsync());
+        Assert.Equal((4, 0), await _host!.CountsAsync());
         Assert.False(app.Staff.SawTransaction);
     }
 
     private async Task MoveAsync(HttpClient api, string rep, string manager)
     {
-        string version = await _host.ReportingVersionAsync(rep);
+        string version = await _host!.ReportingVersionAsync(rep);
         using var response = await api.PutAsJsonAsync("/coverage/reporting-lines/" + rep, new SetRepReportingLineRequest(manager, version));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

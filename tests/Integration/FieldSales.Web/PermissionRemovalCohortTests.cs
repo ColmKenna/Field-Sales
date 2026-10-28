@@ -12,15 +12,19 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {
     private const string Pharmacy = "Pharmacy-only medicines";
-    private RestrictionPermissionHost _host = null!;
+    private RestrictionPermissionHost? _host;
     public Task InitializeAsync() { _host = new(app); return Task.CompletedTask; }
-    public async Task DisposeAsync() => await _host.DisposeAsync();
+    public async Task DisposeAsync()
+    {
+        var host = Interlocked.Exchange(ref _host, null);
+        if (host is not null) await host.DisposeAsync();
+    }
 
     [Fact]
     public async Task Should_RemoveAllSelectedAndKeepUnselected_When_ConfirmingACohort()
     {
         var (group, held) = await SeedAsync("colm", "aoife", "ciara");
-        using var manager = _host.ApiAs("niamh", BusinessRoles.SalesManager);
+        using var manager = _host!.ApiAs("niamh", BusinessRoles.SalesManager);
         var page = await GroupAsync(manager, group);
         Assert.All(page.Reps.Where(row => row.Rep.Subject is "colm" or "aoife"), row => Assert.True(row.CanRemove));
         Assert.False(Assert.Single(page.Reps, row => row.Rep.Subject == "ciara").CanRemove);
@@ -37,7 +41,7 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
             Assert.Equal((RestrictionPermissionChangeKind.Removed, "niamh", "Niamh Byrne", "Training expired", app.ClockOverride),
                 (change.Change, change.Actor.Subject, change.Actor.DisplayName, change.Reason, (DateTimeOffset?)change.ChangedAt));
         });
-        Assert.Equal((5, 1), await _host.CountsAsync());
+        Assert.Equal((5, 1), await _host!.CountsAsync());
         var after = await GroupAsync(manager, group);
         foreach (var change in saved.Changes)
         {
@@ -51,7 +55,7 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
         Assert.True(unselected.Granted); Assert.Equal(held["ciara"], unselected.LastChange);
         using var replay = await RemoveAsync(manager, group, [held["colm"], held["aoife"]]);
         Assert.Equal(HttpStatusCode.Conflict, replay.StatusCode);
-        Assert.Equal((5, 1), await _host.CountsAsync());
+        Assert.Equal((5, 1), await _host!.CountsAsync());
         Assert.False(app.Staff.SawTransaction);
     }
 
@@ -61,7 +65,7 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
     public async Task Should_RejectTheWholeRemoval_When_SelectionIsEmptyDuplicateStaleOrNotHeld(string kind)
     {
         var (group, held) = await SeedAsync("aoife", "colm");
-        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        using var office = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         var aoife = new CohortPermissionSelection("aoife", held["aoife"].Id);
         IReadOnlyList<CohortPermissionSelection> selection = kind switch
         {
@@ -73,7 +77,7 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
         };
         using var response = await office.PostAsJsonAsync(Path(group) + "/removals", new RemoveCohortPermissionRequest(selection, null));
         Assert.Equal(kind is "stale" or "not-held" ? HttpStatusCode.Conflict : HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal((2, 2), await _host.CountsAsync());
+        Assert.Equal((2, 2), await _host!.CountsAsync());
         foreach (string rep in new[] { "aoife", "colm" })
         {
             var row = Assert.Single((await PageAsync(office, rep)).Groups);
@@ -85,20 +89,20 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
     [InlineData("outside-team")] [InlineData("manager-self")] [InlineData("office-self")]
     public async Task Should_RejectTheWholeRemoval_When_SelectionIncludesAnOutsideTeamRepOrTheActor(string kind)
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        _host.SetRoles("niamh", BusinessRoles.SalesManager, BusinessRoles.FieldSalesperson);
-        _host.SetRoles("orla", BusinessRoles.HeadOfficeUser, BusinessRoles.FieldSalesperson);
-        using var seeder = _host.ApiAs("another-manager", BusinessRoles.HeadOfficeUser);
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        _host!.SetRoles("niamh", BusinessRoles.SalesManager, BusinessRoles.FieldSalesperson);
+        _host!.SetRoles("orla", BusinessRoles.HeadOfficeUser, BusinessRoles.FieldSalesperson);
+        using var seeder = _host!.ApiAs("another-manager", BusinessRoles.HeadOfficeUser);
         string forbidden = kind switch { "outside-team" => "ciara", "manager-self" => "niamh", _ => "orla" };
         using var seeded = await GrantAsync(seeder, group, ["aoife", forbidden]);
         Assert.Equal(HttpStatusCode.OK, seeded.StatusCode);
         var held = (await seeded.Content.ReadFromJsonAsync<CohortPermissionGrantResult>())!.Changes;
-        using var actor = kind == "office-self" ? _host.ApiAs("orla", BusinessRoles.HeadOfficeUser, BusinessRoles.FieldSalesperson)
-            : _host.ApiAs("niamh", BusinessRoles.SalesManager, BusinessRoles.FieldSalesperson);
+        using var actor = kind == "office-self" ? _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser, BusinessRoles.FieldSalesperson)
+            : _host!.ApiAs("niamh", BusinessRoles.SalesManager, BusinessRoles.FieldSalesperson);
         Assert.False(Assert.Single((await GroupAsync(actor, group)).Reps, row => row.Rep.Subject == forbidden).CanRemove);
         using var denied = await RemoveAsync(actor, group, held);
         Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
-        Assert.Equal((2, 2), await _host.CountsAsync());
+        Assert.Equal((2, 2), await _host!.CountsAsync());
     }
 
     [Theory]
@@ -106,9 +110,9 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
     public async Task Should_AllowRemovalWithAccurateConsequence_When_GroupIsArchivedOrHolderInactive(string kind)
     {
         var (group, held) = await SeedAsync("aoife", "colm");
-        using var manager = _host.ApiAs("niamh", BusinessRoles.SalesManager);
+        using var manager = _host!.ApiAs("niamh", BusinessRoles.SalesManager);
         bool archived = kind is "archived" or "both";
-        if (archived) await _host.ArchiveAsync(group);
+        if (archived) await _host!.ArchiveAsync(group);
         if (kind is "inactive" or "both") app.Staff.Entries["colm"] = app.Staff.Entries["colm"] with { Available = false };
         if (kind == "former-rep") app.Staff.Entries["colm"] = app.Staff.Entries["colm"] with { Roles = [] };
         var page = await GroupAsync(manager, group);
@@ -121,7 +125,7 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
         }
         using var removed = await RemoveAsync(manager, group, held.Values.ToArray());
         Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
-        Assert.Equal((4, 0), await _host.CountsAsync());
+        Assert.Equal((4, 0), await _host!.CountsAsync());
         if (archived)
             Assert.Empty((await manager.GetFromJsonAsync<PermissionGroupChoice[]>("/coverage/permissions/groups?includeArchived=true"))!);
     }
@@ -132,7 +136,7 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
     public async Task Should_RecordNothing_When_IdentityFailsOrRequestsAreUnauthorized(string kind)
     {
         var (group, held) = await SeedAsync("aoife", "colm");
-        using var actor = _host.ApiAs(kind == "rep-role" ? "brian" : "niamh",
+        using var actor = _host!.ApiAs(kind == "rep-role" ? "brian" : "niamh",
             kind == "rep-role" ? BusinessRoles.FieldSalesperson : BusinessRoles.SalesManager);
         if (kind == "identity") app.Staff.Unavailable = true;
         if (kind == "unknown") app.Staff.Entries.Remove("colm");
@@ -141,7 +145,7 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
         using var denied = await RemoveAsync(actor, group, held.Values.ToArray());
         Assert.Equal(kind is "identity" or "unknown" ? HttpStatusCode.ServiceUnavailable : kind == "anonymous" ? HttpStatusCode.Unauthorized : HttpStatusCode.Forbidden,
             denied.StatusCode);
-        Assert.Equal((2, 2), await _host.CountsAsync());
+        Assert.Equal((2, 2), await _host!.CountsAsync());
         Assert.False(app.Staff.SawTransaction);
     }
 
@@ -151,11 +155,11 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
     public async Task Should_PreserveReasonRules_When_ReviewingAndConfirmingRemoval(string? reason, bool accepted)
     {
         var (group, held) = await SeedAsync("aoife", "colm");
-        using var manager = _host.ApiAs("niamh", BusinessRoles.SalesManager);
+        using var manager = _host!.ApiAs("niamh", BusinessRoles.SalesManager);
         reason = reason switch { "limit" => new string('r', 1000), "over-limit" => new string('r', 1001), _ => reason };
         using var response = await RemoveAsync(manager, group, held.Values.ToArray(), reason);
         Assert.Equal(accepted ? HttpStatusCode.OK : HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal(accepted ? (4, 0) : (2, 2), await _host.CountsAsync());
+        Assert.Equal(accepted ? (4, 0) : (2, 2), await _host!.CountsAsync());
         if (accepted)
             Assert.All((await response.Content.ReadFromJsonAsync<CohortPermissionRemovalResult>())!.Changes,
                 change => Assert.Equal(string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(), change.Reason));
@@ -163,8 +167,8 @@ public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
 
     private async Task<(Guid Group, Dictionary<string, RestrictionPermissionChangeDetails> Held)> SeedAsync(params string[] reps)
     {
-        var group = (await _host.ResetAsync(Pharmacy))[0];
-        using var office = _host.ApiAs("orla", BusinessRoles.HeadOfficeUser);
+        var group = (await _host!.ResetAsync(Pharmacy))[0];
+        using var office = _host!.ApiAs("orla", BusinessRoles.HeadOfficeUser);
         using var seeded = await GrantAsync(office, group, reps);
         Assert.Equal(HttpStatusCode.OK, seeded.StatusCode);
         return (group, (await seeded.Content.ReadFromJsonAsync<CohortPermissionGrantResult>())!.Changes.ToDictionary(change => change.Rep.Subject));
