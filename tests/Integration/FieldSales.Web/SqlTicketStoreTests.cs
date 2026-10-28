@@ -12,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Web.Tests;
 
-[Trait("Category", "Unit")]
+[Trait("Category", "Integration")]
 
 public sealed class SqlTicketStoreTests
 {

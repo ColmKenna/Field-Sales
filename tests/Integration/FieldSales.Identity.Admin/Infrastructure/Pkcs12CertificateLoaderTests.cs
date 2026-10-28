@@ -12,7 +12,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     setting the operator got wrong. These load a real PKCS#12 file rather than asserting
 ///     which flag was chosen — the flag is only interesting insofar as the load works.
 /// </summary>
-[Trait("Category", "Unit")]
+[Trait("Category", "Integration")]
 public sealed class Pkcs12CertificateLoaderTests : IDisposable
 {
     private const string Password = "pkcs12-certificate-loader-tests";
