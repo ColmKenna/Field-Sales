@@ -7,10 +7,12 @@ namespace FieldSales.Tablet.Core;
 
 public enum UnsentKind { Call, Order, ScheduleChange }
 
-/// <summary>A piece of the rep's captured work, waiting for Sync. Capture screens (E5) define its JSON body.</summary>
+/// <summary>A piece of the rep's captured work, waiting for Sync. Location work uses a GUID string
+/// named locationId; capture screens (E5) define the remaining JSON body. Legacy bodies are preserved.</summary>
 public sealed record UnsentItem(Guid Id, UnsentKind Kind, DateTimeOffset SavedUtc, string Json);
 
-/// <summary>The rep's Unsent work, in its own database. Downloading a snapshot never opens it.</summary>
+/// <summary>The rep's Unsent work, in its own database. Snapshot replacement may read Location
+/// references to retain shop details, but never rewrites this database.</summary>
 public sealed class UnsentStore(RepWorkspace workspace)
 {
     private const int SchemaVersion = 1;
@@ -30,6 +32,20 @@ public sealed class UnsentStore(RepWorkspace workspace)
     {
         using (JsonDocument body = JsonDocument.Parse(item.Json))
             if (body.RootElement.ValueKind != JsonValueKind.Object) throw new ArgumentException("Saved work must be a JSON object.", nameof(item));
+        // Serialize capture and snapshot activation so a shop's context is kept before either
+        // the saved work commits or a newer snapshot removes that shop.
+        SemaphoreSlim gate = SnapshotStore.GateFor(workspace);
+        gate.Wait();
+        try
+        {
+            LocationRetention.BeforeSave(workspace, item);
+            SaveCore(item);
+        }
+        finally { gate.Release(); }
+    }
+
+    private void SaveCore(UnsentItem item)
+    {
         using SqliteConnection connection = Open();
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """

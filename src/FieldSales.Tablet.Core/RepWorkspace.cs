@@ -22,6 +22,7 @@ public sealed class RepWorkspace
     public string SnapshotPath => Path.Combine(DirectoryPath, "snapshot.db");
     public string UnsentPath => Path.Combine(DirectoryPath, "unsent.db");
     public string TransferPath => Path.Combine(DirectoryPath, "download.gz");
+    public string RetainedLocationsPath => Path.Combine(DirectoryPath, "retained-locations.json");
 
     /// <summary>The snapshot database with its WAL and shared-memory files, as stored now.</summary>
     public long SnapshotBytes() => new[] { SnapshotPath, SnapshotPath + "-wal", SnapshotPath + "-shm" }
