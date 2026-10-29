@@ -6,6 +6,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
@@ -13,6 +14,8 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../../../src/FieldSales.Tablet/TabletApp.cs" Link="TabletApp.cs" />
+    <Compile Include="../../../src/FieldSales.Tablet/TabletTiming.cs" Link="TabletTiming.cs" />
     <ProjectReference Include="..\..\..\src\FieldSales.Tablet.Core\FieldSales.Tablet.Core.csproj" />
     <ProjectReference Include="..\FieldSales.Tablet.Core.CrashHost\FieldSales.Tablet.Core.CrashHost.csproj" />
   </ItemGroup>

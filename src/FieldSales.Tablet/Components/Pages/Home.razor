@@ -32,6 +32,8 @@
     private const float RowHeight = 64;
     private HomeView? home;
     private List<HomeLocation> shops = [];
+    private int load;
+    private bool disposed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -42,11 +44,18 @@
 
     private async Task GuardAsync(Func<Task<TabletEntry>> enter)
     {
+        int current = ++load;
+        long version = Tablet.SessionVersion;
+        home = null; shops = [];
+        StateHasChanged();
         long started = Stopwatch.GetTimestamp();
         TabletEntry entry = await enter();
+        if (disposed || current != load || version != Tablet.SessionVersion) return;
         if (entry.Screen != EntryScreen.Home) { home = null; Navigation.NavigateTo("/"); return; }
         TimeSpan entered = Stopwatch.GetElapsedTime(started);
-        home = Tablet.ReadHome(entry.RepSubject!);
+        HomeView read = Tablet.ReadHome(entry.RepSubject!);
+        if (version != Tablet.SessionVersion) return;
+        home = read;
         shops = [.. home.Locations];
         TabletTiming.HomePrepared(entered, Stopwatch.GetElapsedTime(started) - entered);
         Tablet.ResumeCleanup(entry.RepSubject!);
@@ -59,5 +68,5 @@
 
     private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
 
-    public void Dispose() => Tablet.Resumed -= OnResumed;
+    public void Dispose() { disposed = true; ++load; home = null; shops = []; Tablet.Resumed -= OnResumed; }
 }

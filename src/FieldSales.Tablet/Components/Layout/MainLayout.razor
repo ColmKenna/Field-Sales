@@ -1,4 +1,62 @@
 @inherits LayoutComponentBase
+@namespace FieldSales.Tablet.Components.Layout
+@implements IDisposable
+@inject TabletApp Tablet
+@inject NavigationManager Navigation
 
-<div class="app-bar">Field Sales</div>
-<main>@Body</main>
+<div class="app-bar">
+    <span>Field Sales</span>
+    @if (entry?.RepSubject is not null)
+    {
+        <SignOutControl @key="entry.SessionVersion" ReadUnsentKinds="ReadUnsentAsync" SignOutRequested="SignOutAsync" />
+    }
+</div>
+@if (entry is not null && (entry.RepSubject is not null || IsEntry))
+{
+    <main @key="entry.SessionVersion">@Body</main>
+}
+
+@code {
+    private TabletEntry? entry;
+    private int load;
+    private bool disposed;
+    private bool IsEntry => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/') == "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tablet.SessionChanged += Changed;
+        Tablet.Resumed += Changed;
+        Navigation.LocationChanged += LocationChanged;
+        await GuardAsync();
+    }
+
+    private async Task GuardAsync()
+    {
+        if (disposed) return;
+        int current = ++load;
+        entry = null;
+        StateHasChanged();
+        TabletEntry next = await Tablet.EnterAsync();
+        if (disposed || current != load || next.SessionVersion != Tablet.SessionVersion) return;
+        entry = next;
+        if (entry.RepSubject is null && !IsEntry) Navigation.NavigateTo("/", replace: true);
+    }
+
+    private Task<IReadOnlyList<UnsentKind>> ReadUnsentAsync() => entry is { } observed
+        ? Tablet.ReadUnsentKindsAsync(observed.SessionVersion) : throw new OperationCanceledException("The session changed.");
+    private async Task SignOutAsync()
+    {
+        if (entry is { } observed && await Tablet.SignOutAsync(observed.SessionVersion))
+            Navigation.NavigateTo("/", replace: true);
+    }
+    private void Changed() => _ = InvokeAsync(async () => { await GuardAsync(); StateHasChanged(); });
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => Changed();
+    public void Dispose()
+    {
+        disposed = true;
+        ++load;
+        Tablet.SessionChanged -= Changed;
+        Tablet.Resumed -= Changed;
+        Navigation.LocationChanged -= LocationChanged;
+    }
+}

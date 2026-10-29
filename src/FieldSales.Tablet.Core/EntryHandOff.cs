@@ -16,6 +16,8 @@ public sealed class EntryHandOff(TimeProvider clock, TimeSpan window)
         lock (gate) { offered = entry; offeredAt = clock.GetTimestamp(); }
     }
 
+    public void Clear() { lock (gate) offered = null; }
+
     /// <summary>The offered entry if it is still fresh, otherwise null. Either way it cannot be taken again.</summary>
     public TabletEntry? Take()
     {

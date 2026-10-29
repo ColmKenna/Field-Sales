@@ -181,6 +181,26 @@ public sealed class LocationDetailComponentTests
         Assert.Empty(screen.Renderer.Buttons(screen.Id));
     }
 
+    [Fact]
+    public async Task Should_NotPublishTheOldShop_When_TheSessionChangesDuringAWorkerRead()
+    {
+        using ManualResetEventSlim release = new();
+        TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var screen = new Screen((_, _) =>
+        {
+            started.SetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("Read was not released.");
+            return Shop();
+        });
+        Task opening = screen.Open(ShopId);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Tablet.SessionVersion++);
+        release.Set();
+        await opening;
+        Assert.DoesNotContain("Doyle", screen.Renderer.Text(screen.Id));
+        Assert.Empty(screen.Renderer.Buttons(screen.Id));
+    }
+
     private sealed class Screen : IAsyncDisposable
     {
         private readonly ServiceProvider services;

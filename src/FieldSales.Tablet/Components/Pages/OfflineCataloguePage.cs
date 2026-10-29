@@ -17,14 +17,15 @@ public abstract class OfflineCataloguePage : ComponentBase, IDisposable
     protected async Task RefreshAsync()
     {
         int current = ++load;
+        long version = Tablet.SessionVersion;
         Ready = false;
         Clear();
         StateHasChanged();
         TabletEntry entry = await Tablet.EnterAsync();
-        if (current != load) return;
+        if (current != load || version != Tablet.SessionVersion) return;
         if (entry.Screen != EntryScreen.Home) { Navigation.NavigateTo("/"); return; }
-        await ReadAsync(entry.RepSubject!, () => current == load);
-        if (current == load) Ready = true;
+        await ReadAsync(entry.RepSubject!, () => current == load && version == Tablet.SessionVersion);
+        if (current == load && version == Tablet.SessionVersion) Ready = true;
     }
 
     protected abstract void Clear();

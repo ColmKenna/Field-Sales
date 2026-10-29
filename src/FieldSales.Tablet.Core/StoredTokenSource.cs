@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using FieldSales.Snapshot.Contracts;
@@ -11,18 +10,27 @@ namespace FieldSales.Tablet.Core;
 /// A network failure is left to Sync, which reports no connection. Refreshes for one rep never overlap, because
 /// each refresh token can be used only once.
 /// </remarks>
-internal sealed class StoredTokenSource(ISecureStore secure, string subject, HttpClient identity, TimeProvider clock) : IAccessTokenSource
+internal sealed class StoredTokenSource(ISecureStore secure, string subject, HttpClient identity, TimeProvider clock, long version) : IAccessTokenSource
 {
     private static readonly TimeSpan Skew = TimeSpan.FromMinutes(1);
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
+    private readonly TabletSessionState session = TabletSessionState.For(secure);
+
+    // Called under the session gate, both before the request and before accepting its result.
+    private async Task<bool> IsCurrentAsync() => !session.Blocked && session.Version == version
+        && await secure.GetAsync(TabletDevice.CurrentRepKey) == subject
+        && LocalAccessRules.Evaluate(await secure.GetAsync(TabletDevice.SessionKey(subject)) is { } stamp
+            ? DateTimeOffset.Parse(stamp, System.Globalization.CultureInfo.InvariantCulture) : null,
+            clock.GetUtcNow()) == LocalAccess.Allowed;
 
     public async Task<string?> GetAccessTokenAsync(CancellationToken ct)
     {
-        SemaphoreSlim gate = Gates.GetOrAdd(subject, _ => new(1, 1));
+        SemaphoreSlim gate = session.RefreshGates.GetOrAdd(subject, _ => new(1, 1));
         await gate.WaitAsync(ct);
         try
         {
-            if (await TokenStore.ReadAsync(secure, subject) is not { } tokens) return null;
+            StoredTokens? tokens = await session.RunAsync(async () =>
+                await IsCurrentAsync() ? await TokenStore.ReadAsync(secure, subject) : null);
+            if (tokens is null) return null;
             if (tokens.AccessTokenExpiresUtc - Skew > clock.GetUtcNow()) return tokens.AccessToken;
             using HttpRequestMessage request = new(HttpMethod.Post, TabletClientContract.TokenPath)
             {
@@ -36,7 +44,11 @@ internal sealed class StoredTokenSource(ISecureStore secure, string subject, Htt
             using HttpResponseMessage response = await identity.SendAsync(request, ct);
             if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
             {
-                TokenStore.Clear(secure, subject);
+                await session.RunAsync(async () =>
+                {
+                    if (await IsCurrentAsync()) TokenStore.Clear(secure, subject);
+                    return true;
+                });
                 return null;
             }
             response.EnsureSuccessStatusCode();
@@ -45,8 +57,12 @@ internal sealed class StoredTokenSource(ISecureStore secure, string subject, Htt
             StoredTokens refreshed = new(root.GetProperty("access_token").GetString()!,
                 clock.GetUtcNow().AddSeconds(root.GetProperty("expires_in").GetInt32()),
                 root.TryGetProperty("refresh_token", out JsonElement next) ? next.GetString()! : tokens.RefreshToken);
-            await TokenStore.SaveAsync(secure, subject, refreshed);
-            return refreshed.AccessToken;
+            return await session.RunAsync(async () =>
+            {
+                if (!await IsCurrentAsync()) return null;
+                await TokenStore.SaveAsync(secure, subject, refreshed);
+                return refreshed.AccessToken;
+            });
         }
         finally { gate.Release(); }
     }

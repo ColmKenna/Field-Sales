@@ -8,7 +8,11 @@ T-4.7.1 / IAM-US-005, from `main` at `e383667` on
 The developer approved the plan and full scenario matrix with **Approved Apply**
 on 29 October 2026. They explicitly authorized session implementation under
 checkpoint review, extending the source package's named agent slivers.
-Human Tight-Loop remains in force: stop after every increment.
+The initial approval retained a stop after every increment. After reviewing
+increment 2, the developer explicitly instructed: "continue, keep continueing
+unless you need extra information from me". That authorizes completing the
+remaining agreed increments without further approval stops. No product values
+remain unresolved for this slice.
 
 The approved session contract ends tablet access, clears local session
 credentials, preserves each rep's existing private workspace, and prevents stale
@@ -22,7 +26,7 @@ system-browser sign-in already uses `prompt=login`.
 2. Add I-04's warning only when Unsent work exists, with Stay signed in,
    Sign out, and Open Sync & unsent. Stop for review.
 3. Implement the approved session boundary and asynchronous-operation guards.
-   Stop for review.
+   Continue under the developer's later instruction above.
 4. Verify restoration and isolation, run the full suite and Android build, and
    finish on a committed, pushed feature branch. Do not integrate it.
 
@@ -132,3 +136,81 @@ Browser check code/results and portrait/landscape screenshots are under
 `.artifacts/wi037/increment-2-*`. This was desktop browser execution, not an
 Android device test. Stopped for increment 2 review before session changes;
 the console remains `active`.
+
+## Increment 3 — Local access and session boundary
+
+The app bar now exposes the completed warning to signed-in reps. The layout
+checks entry, hides private content while checking, and removes both the content
+and dialog when the session changes. Protected routes cannot open signed-out
+workspaces. Home, Sync, entry and offline catalogue guards ignore stale results;
+disposed Sync screens cancel their work.
+
+`TabletDevice` serializes credential changes through the secure store's shared
+session boundary. Manual logout, 24-hour expiry and clock rollback invalidate
+the session version and remove the current-rep pointer, sign-in timestamp and
+tokens. The only additional persisted marker is an identity-free boolean that
+the tablet has previously been signed in, so offline entry can accurately say
+to reconnect rather than claiming the tablet has never downloaded a day.
+Rep workspaces, snapshots, retained Location details and Unsent databases are
+not deleted or reassigned. A credential-removal failure is reported and leaves
+access blocked in the current process; it is not reported as successful logout.
+
+Refresh requests do not hold the session gate across network I/O. They accept
+responses only for their original live session version. A late success cannot
+restore ended credentials, and a late refusal cannot delete a newer session's
+tokens. Sign-in completion and warning confirmation likewise carry the observed
+version, so an old operation cannot replace or end a newer session.
+
+`TabletApp` invalidates handoffs, cancels pending session work and serializes
+Syncs across cancellation. A handoff also rechecks the local window before use.
+The foreground monitor checks rollback at most one second apart and schedules
+the expiry check at the remaining window boundary. It pauses on the Android
+window's Stopped event and checks again on resume. No new idle or network policy
+has been introduced; refused refresh still permits locally valid offline work.
+
+Verification before the final suite:
+
+- Tablet Core: **124 integration cases passed**, including 13 new session
+  cases and four tests linking the production tablet facade. Native platform
+  services alone are adapted for desktop execution.
+- Layout/Sync component cases verify hidden private content, stale entry
+  results, the version passed to app-bar sign-out, ignored late Sync results,
+  and cancellation when the screen is disposed.
+- A worker-read case verifies that a session change alone prevents old shop
+  details from being published, without relying on a new navigation.
+- Handoff unit tests now include explicit invalidation.
+- Release solution build: **zero warnings and zero errors**.
+
+## Increment 4 — Acceptance verification
+
+The production layout, Home, Sync, entry, warning and tablet facade were run
+in a desktop interactive host against real local SQLite data. Test-only tools
+provide connected sign-in results and an adjustable clock; this does not claim
+an Android system-browser sign-in or physical-device run. All **15 journey
+assertions passed**, including the following source criteria:
+
+> With 3 Unsent items, deliberate Sign out warns with the count and offers Stay signed in or Sign out (US-005 S1).
+
+The app-bar warning names exactly two Calls and one Order. Staying restores
+focus without leaving Home; Open Sync closes the warning and opens the existing
+Sync screen. The increment 2 browser checks separately verify offline wording,
+keyboard containment, Escape and touch targets.
+
+> Continuing Sign out ends access but keeps those items for the same rep's next sign-in on the tablet (S2).
+
+The production browser journey confirms that manual sign-out hides the shop,
+removes the action and blocks direct Home navigation after a reload. Aoife sees
+no Colm shop or Unsent work, and zero work bypasses the warning. Signing Colm
+back in restores Home and all three items. Integration tests compare every
+record's ID, kind, saved timestamp and raw JSON, not just the count.
+
+> Automatic logout keeps the same items and states for the rep's next sign-in (S3).
+
+The foreground monitor locks the production UI after clock advancement without
+a decision dialog. Colm's next sign-in restores the three-item warning. Timer
+and return-path integration cases cover exact expiry, rollback and stopped/
+resumed monitoring; record equality verifies unchanged saved states.
+
+Final browser check code/results and portrait/landscape screenshots are under
+`.artifacts/wi037/final-*`. Full-solution and Android results are recorded below
+once those runs finish. The developer's unrelated review files remain untouched.

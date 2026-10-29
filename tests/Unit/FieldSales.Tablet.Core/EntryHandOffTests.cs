@@ -63,6 +63,15 @@ public sealed class EntryHandOffTests
     }
 
     [Fact]
+    public void Should_DiscardTheOffer_When_TheSessionEnds()
+    {
+        EntryHandOff handOff = new(_clock, Window);
+        handOff.Offer(Home);
+        handOff.Clear();
+        Assert.Null(handOff.Take());
+    }
+
+    [Fact]
     public void Should_GiveNothing_When_NothingWasOffered()
     {
         Assert.Null(new EntryHandOff(_clock, Window).Take());

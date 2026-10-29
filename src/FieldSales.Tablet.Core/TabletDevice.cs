@@ -36,9 +36,12 @@ public enum EntryScreen { SignIn, ConnectionNeeded, ConnectToSignInAgain, Sync, 
 
 /// <summary>Where the app opens. Only <see cref="EntryScreen.Sync"/> and <see cref="EntryScreen.Home"/> name a rep;
 /// the locked screens never show another rep's name, Locations or work.</summary>
-public sealed record TabletEntry(EntryScreen Screen, string? RepSubject, string Message);
+public sealed record TabletEntry(EntryScreen Screen, string? RepSubject, string Message)
+{
+    public long SessionVersion { get; init; }
+}
 
-public enum SignInStatus { Started, NotPermitted }
+public enum SignInStatus { Started, NotPermitted, Superseded }
 
 public sealed record SignInOutcome(SignInStatus Status, string Message, RepWorkspace? Workspace);
 
@@ -56,34 +59,96 @@ public static class EntryMessages
 /// never opens them, and nothing here deletes saved work.</remarks>
 public sealed class TabletDevice(string root, ISecureStore secure, TimeProvider? clock = null)
 {
-    private const string CurrentRepKey = "fieldsales.current-rep";
+    internal const string CurrentRepKey = "fieldsales.current-rep";
+    private const string PreviouslySignedInKey = "fieldsales.previously-signed-in";
     private readonly TimeProvider clock = clock ?? TimeProvider.System;
+    private readonly TabletSessionState session = TabletSessionState.For(secure);
+
+    public long SessionVersion => session.Version;
+    public event Action? SessionChanged { add => session.Changed += value; remove => session.Changed -= value; }
 
     internal static string SessionKey(string subject) => $"fieldsales.session.{subject}";
 
-    public async Task<TabletEntry> EnterAsync(bool connected)
+    public Task<TabletEntry> EnterAsync(bool connected) => session.RunAsync(async () =>
     {
-        string? rep = await secure.GetAsync(CurrentRepKey);
-        if (rep is null)
-            return connected ? new(EntryScreen.SignIn, null, EntryMessages.SignInToStart)
+        var active = await ReadSessionAsync();
+        TabletEntry entry;
+        if (active is null)
+        {
+            bool returning = await secure.GetAsync(PreviouslySignedInKey) is not null;
+            entry = connected ? new(EntryScreen.SignIn, null, EntryMessages.SignInToStart)
+                : returning ? new(EntryScreen.ConnectToSignInAgain, null, EntryMessages.ConnectToSignInAgain)
                 : new(EntryScreen.ConnectionNeeded, null, EntryMessages.FirstUseNeedsConnection);
-        if (LocalAccessRules.Evaluate(await LastConnectedSignInAsync(rep), clock.GetUtcNow()) != LocalAccess.Allowed)
-            return connected ? new(EntryScreen.SignIn, null, EntryMessages.SignInToStart)
-                : new(EntryScreen.ConnectToSignInAgain, null, EntryMessages.ConnectToSignInAgain);
-        bool downloaded = new SnapshotStore(Workspace(rep), clock).ReadActive() is not null;
-        return downloaded ? new(EntryScreen.Home, rep, "")
-            : new(EntryScreen.Sync, rep, connected ? EntryMessages.SyncFirst : SyncMessages.NoConnection);
+        }
+        else
+        {
+            string rep = active.Value.Rep;
+            bool downloaded = new SnapshotStore(Workspace(rep), clock).ReadActive() is not null;
+            entry = downloaded ? new(EntryScreen.Home, rep, "")
+                : new(EntryScreen.Sync, rep, connected ? EntryMessages.SyncFirst : SyncMessages.NoConnection);
+        }
+        return entry with { SessionVersion = SessionVersion };
+    });
+
+    /// <summary>Check local access without opening the snapshot. Expiry/rollback clears credentials, never work.</summary>
+    public Task<DateTimeOffset?> CheckSessionAsync() => session.RunAsync(async () =>
+        (await ReadSessionAsync())?.SignedIn);
+
+    private async Task<(string Rep, DateTimeOffset SignedIn)?> ReadSessionAsync()
+    {
+        if (session.Blocked) return null;
+        string? rep = await secure.GetAsync(CurrentRepKey);
+        if (rep is null) return null;
+        DateTimeOffset? signedIn = await LastConnectedSignInAsync(rep);
+        if (LocalAccessRules.Evaluate(signedIn, clock.GetUtcNow()) == LocalAccess.Allowed)
+            return (rep, signedIn!.Value);
+        session.Invalidate();
+        await ClearCredentialsAsync(rep);
+        return null;
+    }
+
+    /// <summary>Ends only the session the caller observed; a late confirmation cannot sign a new rep out.</summary>
+    public Task<bool> EndSessionAsync(long? expectedVersion = null) => session.RunAsync(async () =>
+    {
+        if (expectedVersion is { } expected && expected != SessionVersion) return false;
+        session.Invalidate(); // Fail closed even if platform credential removal throws.
+        string? rep = await secure.GetAsync(CurrentRepKey);
+        await ClearCredentialsAsync(rep);
+        return true;
+    });
+
+    private async Task ClearCredentialsAsync(string? rep)
+    {
+        if (rep is not null) await secure.SetAsync(PreviouslySignedInKey, "true");
+        secure.Remove(CurrentRepKey);
+        if (rep is not null)
+        {
+            TokenStore.Clear(secure, rep);
+            secure.Remove(SessionKey(rep));
+        }
+        if (await secure.GetAsync(CurrentRepKey) is not null || rep is not null &&
+            (await secure.GetAsync(SessionKey(rep)) is not null || await TokenStore.ReadAsync(secure, rep) is not null))
+            throw new IOException("Local session credentials could not be removed.");
     }
 
     /// <summary>Starts the tablet day after a connected sign-in. Only a Field Salesperson may; otherwise nothing is kept.</summary>
-    public async Task<SignInOutcome> CompleteSignInAsync(StaffSignIn signIn)
+    public Task<SignInOutcome> CompleteSignInAsync(StaffSignIn signIn, long? expectedVersion = null)
     {
         if (!signIn.Roles.Contains(TabletClientContract.RequiredRole, StringComparer.Ordinal))
-            return new(SignInStatus.NotPermitted, SyncMessages.NotPermitted, null);
-        await TokenStore.SaveAsync(secure, signIn.Subject, new(signIn.AccessToken, signIn.AccessTokenExpiresUtc, signIn.RefreshToken));
-        await secure.SetAsync(SessionKey(signIn.Subject), clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture));
-        await secure.SetAsync(CurrentRepKey, signIn.Subject);
-        return new(SignInStatus.Started, "", Workspace(signIn.Subject));
+            return Task.FromResult(new SignInOutcome(SignInStatus.NotPermitted, SyncMessages.NotPermitted, null));
+        return session.RunAsync(async () =>
+        {
+            if (expectedVersion is { } expected && expected != SessionVersion)
+                return new SignInOutcome(SignInStatus.Superseded, "Sign-in didn't finish. Try again.", null);
+            session.Invalidate();
+            await ClearCredentialsAsync(await secure.GetAsync(CurrentRepKey));
+            await TokenStore.SaveAsync(secure, signIn.Subject, new(signIn.AccessToken, signIn.AccessTokenExpiresUtc, signIn.RefreshToken));
+            await secure.SetAsync(SessionKey(signIn.Subject), clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture));
+            await secure.SetAsync(PreviouslySignedInKey, "true");
+            await secure.SetAsync(CurrentRepKey, signIn.Subject);
+            session.Blocked = false;
+            return new SignInOutcome(SignInStatus.Started, "", Workspace(signIn.Subject));
+        });
     }
 
     public async Task<DateTimeOffset?> LastConnectedSignInAsync(string subject) =>
@@ -93,7 +158,7 @@ public sealed class TabletDevice(string root, ISecureStore secure, TimeProvider?
     public RepWorkspace Workspace(string subject) => new(root, subject);
 
     /// <summary>The signed-in rep's tokens for Sync; refreshing them never changes the local window.</summary>
-    public IAccessTokenSource Tokens(string subject, HttpClient identity) => new StoredTokenSource(secure, subject, identity, clock);
+    public IAccessTokenSource Tokens(string subject, HttpClient identity) => new StoredTokenSource(secure, subject, identity, clock, SessionVersion);
 }
 
 internal sealed record StoredTokens(string AccessToken, DateTimeOffset AccessTokenExpiresUtc, string RefreshToken);
