@@ -119,10 +119,92 @@ public sealed class TabletSnapshotApiTests(TabletSnapshotFixture fixture) : ICla
         Assert.Equal(new SnapshotTown(places.Arklow.Id, "Arklow", "Wicklow"), hickey.Town);
         Assert.Equal("Y14 X2F9", hickey.Eircode);
         Assert.Equal(new SnapshotContact(mary, "Mary Hickey", "Owner", "+353 402 31234", "mary@hickeys.example"), hickey.MainContact);
-        // A retired Main Contact is not sent; the shop itself still is.
+        // A retired contact is not sent as the active Main; the shop itself still is.
         SnapshotLocation byrne = snapshot.Locations.Single(location => location.Id == byrnes);
         Assert.Null(byrne.MainContact);
         Assert.Null(byrne.Eircode);
+    }
+
+    [Fact]
+    public async Task Should_IncludeInactiveMainContactReplacement_When_RepSyncsAfterRetirement()
+    {
+        Geography places = await _app.SeedGeographyAsync();
+        Guid rathdrum = await _app.CustomerAsync("Rathdrum", places.Rathdrum.Id);
+        Guid arklow = await _app.CustomerAsync("Arklow", places.Arklow.Id);
+        Guid other = await _app.CustomerAsync("Other shop", places.Arklow.Id);
+        Guid owner = await _app.ContactTypeAsync("Owner");
+        Guid mary = await _app.ContactAsync("Mary Walsh", owner, rathdrum);
+        Guid sean = await _app.ContactAsync("Sean Byrne", owner, other);
+        using HttpClient office = _app.ClientAs("orla", [BusinessRoles.HeadOfficeUser]);
+        foreach (Guid location in new[] { arklow, other })
+        {
+            LocationContactsPage page = (await office.GetFromJsonAsync<LocationContactsPage>($"/directory/locations/{location}/contacts"))!;
+            using HttpResponseMessage linked = await office.PostAsJsonAsync($"/directory/locations/{location}/contacts", new LinkContactRequest(mary, page.LocationVersion));
+            Assert.Equal(HttpStatusCode.OK, linked.StatusCode);
+        }
+        await _app.AssignAsync("colm", TerritoryLevel.County, places.Wicklow.Id);
+        TabletSnapshot before = await _app.SyncAsync("colm");
+        Assert.Equal(mary, before.Locations.Single(location => location.Id == rathdrum).MainContact!.Id);
+        Assert.All(before.Locations, location => Assert.Null(location.MainContactReplacement));
+
+        await _app.RetireContactAsync(mary);
+        TabletSnapshot after = await _app.SyncAsync("colm");
+        Assert.Equal("1.2", after.Manifest.Version);
+        foreach (Guid location in new[] { rathdrum, arklow })
+        {
+            SnapshotLocation shop = after.Locations.Single(shop => shop.Id == location);
+            Assert.Null(shop.MainContact); // The active-only field remains safe for old apps.
+            Assert.Equal(new(mary, "Mary Walsh", true), shop.MainContactReplacement);
+        }
+        SnapshotLocation ordinary = after.Locations.Single(shop => shop.Id == other);
+        Assert.Equal(sean, ordinary.MainContact!.Id);
+        Assert.Null(ordinary.MainContactReplacement); // An ordinary inactive link is not a Main gap.
+        Assert.Empty((await _app.SyncAsync("aoife")).Locations);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Should_KeepOtherReplacementGaps_When_OneLocationGetsAnExplicitMain(bool reactivateOutgoing)
+    {
+        Geography places = await _app.SeedGeographyAsync();
+        Guid rathdrum = await _app.CustomerAsync("Rathdrum", places.Rathdrum.Id);
+        Guid arklow = await _app.CustomerAsync("Arklow", places.Arklow.Id);
+        Guid owner = await _app.ContactTypeAsync("Owner");
+        Guid mary = await _app.ContactAsync("Mary Walsh", owner, rathdrum);
+        using HttpClient office = _app.ClientAs("orla", [BusinessRoles.HeadOfficeUser]);
+        LocationContactsPage page = (await office.GetFromJsonAsync<LocationContactsPage>($"/directory/locations/{arklow}/contacts"))!;
+        using (HttpResponseMessage linked = await office.PostAsJsonAsync($"/directory/locations/{arklow}/contacts", new LinkContactRequest(mary, page.LocationVersion)))
+            Assert.Equal(HttpStatusCode.OK, linked.StatusCode);
+        await _app.AssignAsync("colm", TerritoryLevel.County, places.Wicklow.Id);
+        await _app.RetireContactAsync(mary);
+        if (reactivateOutgoing)
+        {
+            ContactDetails details = (await office.GetFromJsonAsync<ContactDetails>($"/directory/contacts/{mary}"))!;
+            using HttpResponseMessage reactivated = await office.PutAsJsonAsync($"/directory/contacts/{mary}",
+                new EditContactRequest(details.Name, details.Type.Id, details.Phone, details.Email, ContactStatus.Active, details.Version));
+            Assert.Equal(HttpStatusCode.OK, reactivated.StatusCode);
+        }
+        TabletSnapshot gap = await _app.SyncAsync("colm");
+        Assert.All(gap.Locations, shop =>
+        {
+            Assert.Null(shop.MainContact);
+            Assert.Equal(new(mary, "Mary Walsh", !reactivateOutgoing), shop.MainContactReplacement);
+        });
+
+        Guid sean = await _app.ContactAsync("Sean Byrne", owner, rathdrum);
+        page = (await office.GetFromJsonAsync<LocationContactsPage>($"/directory/locations/{rathdrum}/contacts"))!;
+        Assert.Null(page.MainContact); // Linking/reactivation cannot silently fill the stored gap.
+        using (HttpResponseMessage replaced = await office.PostAsJsonAsync($"/directory/locations/{rathdrum}/main-contact",
+                   new SetMainContactRequest(sean, page.LocationVersion, ExpectedMainContactId: null)))
+            Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
+        TabletSnapshot next = await _app.SyncAsync("colm");
+        SnapshotLocation resolved = next.Locations.Single(shop => shop.Id == rathdrum);
+        Assert.Equal(sean, resolved.MainContact!.Id);
+        Assert.Null(resolved.MainContactReplacement);
+        Assert.Equal(new(mary, "Mary Walsh", !reactivateOutgoing), next.Locations.Single(shop => shop.Id == arklow).MainContactReplacement);
+        ContactDetails finalMary = (await office.GetFromJsonAsync<ContactDetails>($"/directory/contacts/{mary}"))!;
+        Assert.Equal(reactivateOutgoing ? ContactStatus.Active : ContactStatus.Inactive, finalMary.Status);
     }
 
     [Fact]
@@ -251,7 +333,7 @@ public sealed class TabletSnapshotApiTests(TabletSnapshotFixture fixture) : ICla
         using HttpResponseMessage response = await TabletSnapshotApplication.RequestAsync(client, SnapshotContract.Path, majors);
         Assert.Equal(expected, response.StatusCode);
         if (expected == HttpStatusCode.OK)
-            Assert.Equal("1.1", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
+            Assert.Equal("1.2", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
         if (expected == HttpStatusCode.NotAcceptable)
             Assert.Equal(SnapshotContract.UpdateRequiredTitle, (await response.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
     }

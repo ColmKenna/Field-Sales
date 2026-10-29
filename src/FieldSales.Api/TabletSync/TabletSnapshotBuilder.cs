@@ -45,18 +45,26 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
                               {
                                   location.Id, location.Name, location.CustomerId, CustomerName = customer.Name,
                                   Town = new SnapshotTown(town.Id, town.Name, county.Name), location.Eircode,
-                                  location.MainContactId
+                                  location.MainContactId, location.RetiredMainContactId
                               }).ToArrayAsync(ct);
             Guid[] mainIds = rows.Where(row => row.MainContactId != null).Select(row => row.MainContactId!.Value)
                 .Distinct().ToArray();
-            // A retired Main Contact leaves MainContactId empty; an inactive contact is never shown.
+            // Preserve the active-only MainContact field for older apps. The optional 1.2 field
+            // carries the outgoing identity/status without presenting that person as an active Main.
             var contacts = await (from contact in directory.Contacts.AsNoTracking()
                                   where mainIds.Contains(contact.Id) && contact.Status == ContactStatus.Active
                                   join type in directory.ContactTypes on contact.ContactTypeId equals type.Id
                                   select new SnapshotContact(contact.Id, contact.Name, type.Name, contact.Phone, contact.Email))
                 .ToDictionaryAsync(contact => contact.Id, ct);
+            Guid[] retiredIds = rows.Where(row => row.RetiredMainContactId != null)
+                .Select(row => row.RetiredMainContactId!.Value).Distinct().ToArray();
+            var replacements = await directory.Contacts.AsNoTracking()
+                .Where(contact => retiredIds.Contains(contact.Id))
+                .Select(contact => new SnapshotMainContactReplacement(contact.Id, contact.Name, contact.Status == ContactStatus.Inactive))
+                .ToDictionaryAsync(contact => contact.ContactId, ct);
             return rows.Select(row => new SnapshotLocation(row.Id, row.Name, row.CustomerId, row.CustomerName, row.Town,
-                    row.Eircode, row.MainContactId is Guid main ? contacts.GetValueOrDefault(main) : null))
+                    row.Eircode, row.MainContactId is Guid main ? contacts.GetValueOrDefault(main) : null,
+                    row.RetiredMainContactId is Guid retired ? replacements[retired] : null))
                 .OrderBy(location => location.Name, StringComparer.OrdinalIgnoreCase).ThenBy(location => location.Id)
                 .ToArray();
         }, ct);

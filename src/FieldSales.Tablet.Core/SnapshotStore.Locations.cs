@@ -32,14 +32,16 @@ public sealed partial class SnapshotStore
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT l.name, l.customer_id, l.customer_name, l.town_id, l.town_name,
-                   l.county_name, l.eircode, l.main_contact
-            FROM locations l JOIN active a ON a.generation=l.generation WHERE l.id=$id
+                   l.county_name, l.eircode, l.main_contact, g.manifest
+            FROM locations l JOIN active a ON a.generation=l.generation
+            JOIN generations g ON g.id=l.generation WHERE l.id=$id
             """;
         command.Parameters.AddWithValue("$id", id.ToString());
         using SqliteDataReader reader = command.ExecuteReader();
         return reader.Read() ? new(id, reader.GetString(0), Guid.Parse(reader.GetString(1)), reader.GetString(2),
             new(Guid.Parse(reader.GetString(3)), reader.GetString(4), reader.GetString(5)),
             reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null :
-                JsonSerializer.Deserialize<SnapshotContact>(reader.GetString(7), SnapshotContract.JsonOptions)) : null;
+                JsonSerializer.Deserialize<SnapshotContact>(reader.GetString(7), SnapshotContract.JsonOptions),
+            ReadContactReplacement(reader.GetString(8), id)) : null;
     }
 }

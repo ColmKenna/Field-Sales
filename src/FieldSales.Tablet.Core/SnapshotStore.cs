@@ -149,6 +149,7 @@ public sealed partial class SnapshotStore
         using SqliteConnection connection = Open();
         string generation = Guid.NewGuid().ToString("N");
         SnapshotManifest? manifest = null;
+        Dictionary<Guid, SnapshotMainContactReplacement> contactReplacements = [];
         Dictionary<string, int> counts = SnapshotDocumentReader.Families.ToDictionary(family => family, _ => 0);
         SqliteTransaction? batch = null;
         int rows = 0;
@@ -173,7 +174,7 @@ public sealed partial class SnapshotStore
                     {
                         ct.ThrowIfCancellationRequested();
                         batch ??= connection.BeginTransaction();
-                        Insert(connection, batch, generation, family, entity);
+                        Insert(connection, batch, generation, family, entity, contactReplacements);
                         counts[family]++;
                         if (++rows % BatchRows == 0)
                         {
@@ -200,6 +201,7 @@ public sealed partial class SnapshotStore
                 if ((long)references.ExecuteScalar()! != 0)
                     throw new InvalidDataException("An attribute refers to a product outside this snapshot.");
             }
+            WriteContactReplacements(connection, generation, manifest, contactReplacements);
             // Keep only the old active copy's referenced shop identities before it can be retired.
             // The separate Unsent database is read, never rewritten, by a snapshot replacement.
             LocationRetention.BeforeActivation(workspace, connection);
@@ -260,7 +262,7 @@ public sealed partial class SnapshotStore
     }
 
     private static void Insert(SqliteConnection connection, SqliteTransaction transaction, string generation, string family,
-        JsonElement entity)
+        JsonElement entity, Dictionary<Guid, SnapshotMainContactReplacement> contactReplacements)
     {
         using SqliteCommand insert = connection.CreateCommand();
         insert.Transaction = transaction;
@@ -271,6 +273,17 @@ public sealed partial class SnapshotStore
         {
             case "locations":
                 SnapshotLocation location = Entity<SnapshotLocation>(entity);
+                if (location.MainContactReplacement is { } replacement)
+                {
+                    if (!entity.TryGetProperty("mainContactReplacement", out JsonElement replacementJson)
+                        || replacementJson.ValueKind != JsonValueKind.Object
+                        || !replacementJson.TryGetProperty("isInactive", out JsonElement status)
+                        || status.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+                        || location.MainContact is not null || replacement.ContactId == Guid.Empty || string.IsNullOrWhiteSpace(replacement.Name))
+                        throw new InvalidDataException("A main-contact replacement must identify an outgoing contact and no active Main.");
+                    if (!contactReplacements.TryAdd(location.Id, replacement))
+                        throw new InvalidDataException("A main-contact replacement Location is repeated.");
+                }
                 insert.CommandText = """
                     INSERT INTO locations(generation, id, name, customer_id, customer_name, town_id, town_name, county_name, eircode, main_contact)
                     VALUES($g, $id, $name, $customer, $customerName, $town, $townName, $county, $eircode, $contact)

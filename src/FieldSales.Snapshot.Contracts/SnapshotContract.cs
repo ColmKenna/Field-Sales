@@ -13,7 +13,7 @@ public static class SnapshotContract
 {
     public const string Schema = "field-sales-snapshot";
     public const int CurrentMajor = 1;
-    public const int CurrentMinor = 1;
+    public const int CurrentMinor = 2;
     public static string CurrentVersion => $"{CurrentMajor}.{CurrentMinor}";
 
     /// <summary>The majors this server can build, newest first.</summary>
@@ -71,7 +71,13 @@ public sealed record TabletSnapshot(SnapshotManifest Manifest, IReadOnlyList<Sna
 
 /// <summary>An assigned Location. Locations hold no address lines yet, so its address is Town and Eircode.</summary>
 public sealed record SnapshotLocation(Guid Id, string Name, Guid CustomerId, string CustomerName, SnapshotTown Town,
-    string? Eircode, SnapshotContact? MainContact);
+    string? Eircode, SnapshotContact? MainContact,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    SnapshotMainContactReplacement? MainContactReplacement = null);
+
+/// <summary>The outgoing contact for a stored replacement gap, added in 1.2. This is never an
+/// active Main. Reactivating the person does not clear the gap or select them as Main.</summary>
+public sealed record SnapshotMainContactReplacement(Guid ContactId, string Name, bool IsInactive);
 
 public sealed record SnapshotTown(Guid Id, string Name, string CountyName);
 
