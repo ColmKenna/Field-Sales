@@ -28,11 +28,70 @@ public sealed class LocationDetailComponentTests
         Assert.Contains("Wicklow", text);
         Assert.Contains("Y14 X2F9", text);
         Assert.Contains("Mary Hickey", text);
+        Assert.Contains("Main contact: Mary Hickey", text);
         Assert.Contains("+353 402 31234", text);
         Assert.Contains("mary@example.test", text);
         Assert.Equal(new[] { "Record Call", "New Order" }, screen.Renderer.Buttons(screen.Id));
         Assert.Equal(2, screen.Renderer.AttributeValues(screen.Id, "class").Count(value => value == "primary"));
         Assert.Contains("shop-actions", screen.Renderer.AttributeValues(screen.Id, "class"));
+    }
+
+    [Fact]
+    public async Task Should_ShowInactiveMainContactInIdentityBlock_When_SnapshotContainsReplacementGap()
+    {
+        OfflineLocationDetail shop = Shop();
+        shop = shop with { Location = shop.Location with { MainContact = null,
+            MainContactReplacement = new(Guid.NewGuid(), "Mary Walsh", true) } };
+        await using var screen = new Screen((_, _) => shop);
+        await screen.Open(ShopId);
+        Assert.Contains("Main contact: Mary Walsh (inactive) — replacement needed", screen.Renderer.TextWithinClass(screen.Id, "shop-identity"));
+        Assert.DoesNotContain("No main contact in your downloaded data.", screen.Renderer.Text(screen.Id));
+        Assert.Equal(new[] { "Record Call", "New Order" }, screen.Renderer.Buttons(screen.Id));
+    }
+
+    [Fact]
+    public async Task Should_KeepReplacementStateWithNoActions_When_AnUnsentOrderRetainsTheShop()
+    {
+        OfflineLocationDetail shop = Shop(assigned: false);
+        shop = shop with { Location = shop.Location with { MainContact = null,
+            MainContactReplacement = new(Guid.NewGuid(), "Mary Walsh", true) } };
+        await using var screen = new Screen((_, _) => shop);
+        await screen.Open(ShopId);
+        Assert.Contains("Main contact: Mary Walsh (inactive) — replacement needed", screen.Renderer.TextWithinClass(screen.Id, "shop-identity"));
+        Assert.Contains("No longer assigned to you — your existing order will still be sent", screen.Renderer.Text(screen.Id));
+        Assert.Empty(screen.Renderer.Buttons(screen.Id));
+    }
+
+    [Fact]
+    public async Task Should_KeepGapWithoutInactiveWording_When_OutgoingContactWasReactivated()
+    {
+        OfflineLocationDetail shop = Shop();
+        shop = shop with { Location = shop.Location with { MainContact = null,
+            MainContactReplacement = new(Guid.NewGuid(), "Mary Walsh", false) } };
+        await using var screen = new Screen((_, _) => shop);
+        await screen.Open(ShopId);
+        string identity = screen.Renderer.TextWithinClass(screen.Id, "shop-identity");
+        Assert.Contains("Main contact replacement needed", identity);
+        Assert.Contains("Mary Walsh", identity);
+        Assert.DoesNotContain("(inactive)", identity);
+        Assert.DoesNotContain("Main contact: Mary Walsh", identity);
+    }
+
+    [Fact]
+    public async Task Should_ClearReplacementWording_When_RefreshedSnapshotSelectsActiveMain()
+    {
+        OfflineLocationDetail shop = Shop();
+        shop = shop with { Location = shop.Location with { MainContact = null,
+            MainContactReplacement = new(Guid.NewGuid(), "Mary Walsh", true) } };
+        await using var screen = new Screen((_, _) => shop);
+        await screen.Open(ShopId);
+        Assert.Contains("replacement needed", screen.Renderer.Text(screen.Id));
+        shop = Shop();
+        await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Tablet.Resume());
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Main contact: Mary Hickey"));
+        Assert.DoesNotContain("replacement needed", screen.Renderer.Text(screen.Id));
+        Assert.DoesNotContain("Mary Walsh", screen.Renderer.Text(screen.Id));
+        Assert.Equal(2, screen.Renderer.Buttons(screen.Id).Count);
     }
 
     [Fact]
@@ -177,6 +236,21 @@ public sealed class LocationDetailComponentTests
         public string Text(int id) => System.Net.WebUtility.HtmlDecode(string.Concat(Frames(id)
             .Where(frame => frame.FrameType is RenderTreeFrameType.Text or RenderTreeFrameType.Markup)
             .Select(frame => frame.FrameType == RenderTreeFrameType.Text ? frame.TextContent : frame.MarkupContent)));
+        public string TextWithinClass(int id, string name)
+        {
+            RenderTreeFrame[] frames = Frames(id);
+            for (int index = 0; index < frames.Length; index++)
+            {
+                if (frames[index].FrameType != RenderTreeFrameType.Element) continue;
+                RenderTreeFrame[] children = frames.Skip(index + 1).Take(frames[index].ElementSubtreeLength - 1).ToArray();
+                if (!children.TakeWhile(frame => frame.FrameType == RenderTreeFrameType.Attribute)
+                    .Any(frame => frame.AttributeName == "class" && frame.AttributeValue?.ToString() == name)) continue;
+                return System.Net.WebUtility.HtmlDecode(string.Concat(children
+                    .Where(frame => frame.FrameType is RenderTreeFrameType.Text or RenderTreeFrameType.Markup)
+                    .Select(frame => frame.FrameType == RenderTreeFrameType.Text ? frame.TextContent : frame.MarkupContent)));
+            }
+            throw new InvalidOperationException($"Rendered element .{name} was not found.");
+        }
         public IReadOnlyList<string> AttributeValues(int id, string name) => Frames(id)
             .Where(frame => frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == name)
             .Select(frame => frame.AttributeValue?.ToString() ?? "").ToArray();

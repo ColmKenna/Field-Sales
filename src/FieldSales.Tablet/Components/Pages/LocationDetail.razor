@@ -13,10 +13,18 @@
             <address>@detail.Location.Town.Name, Co. @detail.Location.Town.CountyName
                 @if (detail.Location.Eircode is { } eircode) { <span class="eircode">@eircode</span> }
             </address>
-            <h2>Main Contact</h2>
-            @if (detail.Location.MainContact is { } contact)
+            @if (detail.Location.MainContactReplacement is { } replacement)
             {
-                <p class="contact-name"><strong>@contact.Name</strong><span> · @contact.Type</span></p>
+                <p class="contact-name">
+                    @if (replacement.IsInactive)
+                    { <strong>Main contact: @replacement.Name (inactive) — replacement needed</strong> }
+                    else
+                    { <strong>Main contact replacement needed</strong><span> · @replacement.Name</span> }
+                </p>
+            }
+            else if (detail.Location.MainContact is { } contact)
+            {
+                <p class="contact-name"><strong>Main contact: @contact.Name</strong><span> · @contact.Type</span></p>
                 @if (!string.IsNullOrWhiteSpace(contact.Phone)) { <p class="contact-detail">Phone: @contact.Phone</p> }
                 @if (!string.IsNullOrWhiteSpace(contact.Email)) { <p class="contact-detail">Email: @contact.Email</p> }
             }
