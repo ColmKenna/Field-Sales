@@ -26,7 +26,7 @@
 
 @code {
     // The caller supplies kinds for the current rep only. No payloads, session mutation
-    // or storage policy belong to this warning. Increment 3 connects the real logout.
+    // or storage policy belong to this warning; the layout supplies the session handler.
     [Parameter, EditorRequired] public Func<Task<IReadOnlyList<UnsentKind>>> ReadUnsentKinds { get; set; } = default!;
     [Parameter, EditorRequired] public EventCallback SignOutRequested { get; set; }
 

@@ -46,10 +46,10 @@ public sealed class TabletApp : IDisposable
 
     public Task<TabletEntry> EnterAsync() => device.EnterAsync(Connected);
 
-    /// <summary>Entry checked the 24-hour rule and is about to open the next screen; that screen can skip repeating the check.</summary>
+    /// <summary>Pass entry's snapshot result to the next screen; arrival still revalidates local session access.</summary>
     public void HandOff(TabletEntry entry) { if (entry.SessionVersion == SessionVersion) handOff.Offer(entry); }
 
-    /// <summary>A screen reached straight from entry: the entry just checked, or a fresh check if it was not handed over in time.</summary>
+    /// <summary>Reuse a fresh snapshot result only while its session and local access window are still valid.</summary>
     public async Task<TabletEntry> EnterOnArrivalAsync()
     {
         if (handOff.Take() is { } entry && entry.SessionVersion == SessionVersion

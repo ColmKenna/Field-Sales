@@ -1,9 +1,8 @@
 namespace FieldSales.Tablet.Core;
 
 /// <summary>
-/// The result of the entry check, passed to the screen the app opens next, so a cold start checks the 24-hour rule once
-/// instead of twice. It is taken once and only for a moment: a screen reached any other way (the app resumed, back, a
-/// later navigation) does its own check, and a stale or missing hand-off always means "check again".
+/// The result of entry's snapshot read, offered briefly to the next screen. The caller must still validate its
+/// session and local access window. It is taken once; a stale, cleared or missing handoff requires a fresh entry read.
 /// </summary>
 public sealed class EntryHandOff(TimeProvider clock, TimeSpan window)
 {

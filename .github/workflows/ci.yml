@@ -51,6 +51,9 @@ jobs:
       - name: Run Web JavaScript tests
         run: node --test tests/Unit/FieldSales.Web/product-unit-form.test.mjs
 
+      - name: Run tablet sign-out JavaScript tests
+        run: node --test tests/Unit/FieldSales.Tablet.Core/tablet-sign-out.test.mjs
+
       - name: Run demo reset script tests (mocked Docker)
         run: python3 tests/demo-data-script.test.py
 

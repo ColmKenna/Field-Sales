@@ -212,5 +212,61 @@ and return-path integration cases cover exact expiry, rollback and stopped/
 resumed monitoring; record equality verifies unchanged saved states.
 
 Final browser check code/results and portrait/landscape screenshots are under
-`.artifacts/wi037/final-*`. Full-solution and Android results are recorded below
-once those runs finish. The developer's unrelated review files remain untouched.
+`.artifacts/wi037/final-*`. The developer's unrelated review files remain untouched.
+
+## Final verification
+
+The complete Release solution suite passed on its first final run: **2,703
+passed, zero failures, zero skips**, across all 12 test projects.
+
+| Project | Passed |
+| --- | ---: |
+| API integration | 143 |
+| Demo data integration | 4 |
+| Identity/admin integration | 804 |
+| Snapshot spike integration | 22 |
+| Tablet components integration | 28 |
+| Tablet Core integration | 124 |
+| Tablet spike integration | 41 |
+| Web integration | 873 |
+| API unit | 182 |
+| Identity/admin unit | 256 |
+| Tablet Core unit | 7 |
+| Web unit | 219 |
+
+Commands and artifacts:
+
+- `dotnet build FieldSales.slnx -c Release -m:1`: zero warnings/errors.
+- `dotnet test FieldSales.slnx -c Release --no-build -m:1 --settings sqlserver.runsettings --blame-hang-timeout 2m --logger trx --results-directory .artifacts/wi037/full-suite-results`:
+  all projects passed. Log: `.artifacts/wi037/full-suite.log`; parsed counters:
+  `.artifacts/wi037/full-suite-summary.json`.
+- All admin/Web/tablet JavaScript and console status tests: **38 passed**,
+  zero failures/skips. Log: `.artifacts/wi037/javascript-tests.log`.
+- Demo script tests: **5 passed** in the cached offline Python container, using
+  LF-normalized temporary copies and mocked Docker operations.
+- Browser checks: **18 warning/accessibility/layout assertions** plus **15
+  production journey assertions**, all passed. Final browser console contained
+  no warnings or errors.
+- `scripts/tablet-app.ps1 -Action Build -Configuration Release`: signed Android
+  publish succeeded without warnings/errors. Both existing Android runtime
+  targets were compiled. Log: `.artifacts/wi037/android-build.log`.
+- The APK's `tablet-sign-out.js`, `app.css` and `index.html` match the current
+  source bytes. Artifact: `.artifacts/wi037/android/com.fieldsales.tablet-Signed.apk`.
+  SHA-256: `43df24133978d555e10a4cfef1e199e5e30f3858bd14b60cf2b220927b9d67ab`.
+- `git diff --check` passed. Parsed comparison against the integration base
+  confirms that only WI-037's status changed inside the delivery console.
+
+Final review also made queued dialog calls tolerate a removed/null element
+after automatic logout. Four JavaScript regression tests cover this race,
+open/close focus, Escape and keyboard wrapping, and run in the existing CI fast
+checks job. Startup/handoff comments were clarified to describe the required
+session revalidation; no additional C# behavior changed after the full suite.
+
+No physical tablet installation or execution was performed. Native packaging,
+desktop production-component execution and the agreed integration scenarios
+provide the verification recorded here.
+
+Missing information: none for this item. Repository, native source paths and
+`main` integration base are resolved from the approved predecessor. MI-62 and
+device administration remain explicitly outside the slice. WI-037 is `done`;
+the next item is informational only and has not been started.

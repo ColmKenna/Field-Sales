@@ -2,7 +2,7 @@
     const prepared = new WeakSet();
     window.tabletSignOut = {
         open(dialog) {
-            if (!dialog.isConnected) return;
+            if (!dialog?.isConnected) return;
             if (!prepared.has(dialog)) {
                 dialog.addEventListener("cancel", event => {
                     event.preventDefault();
@@ -28,8 +28,8 @@
             dialog.querySelector("[data-stay-signed-in]").focus();
         },
         close(dialog, trigger) {
-            if (dialog.open) dialog.close();
-            if (trigger.isConnected) trigger.focus({ preventScroll: true });
+            if (dialog?.open) dialog.close();
+            if (trigger?.isConnected) trigger.focus({ preventScroll: true });
         }
     };
 })();
