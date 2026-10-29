@@ -73,6 +73,7 @@ jobs:
               tests/Integration/FieldSales.DemoData/FieldSales.DemoData.IntegrationTests.csproj
               tests/Integration/FieldSales.SnapshotSpike/FieldSales.SnapshotSpike.IntegrationTests.csproj
               tests/Integration/FieldSales.Tablet.Core/FieldSales.Tablet.Core.IntegrationTests.csproj
+              tests/Integration/FieldSales.Tablet.Components/FieldSales.Tablet.Components.IntegrationTests.csproj
               tests/Integration/FieldSales.TabletSpike/FieldSales.TabletSpike.IntegrationTests.csproj
     steps:
       - name: Checkout repository

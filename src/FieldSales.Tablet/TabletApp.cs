@@ -82,5 +82,7 @@ public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IS
 
     public LocationSearchIndex ReadLocationIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadLocationIndex();
 
+    public OfflineLocationDetail? ReadLocation(string rep, Guid id) => new SnapshotStore(device.Workspace(rep), clock).ReadLocation(id);
+
     private TabletSync Sync(string rep) => new(device.Workspace(rep), endpoints.Api, device.Tokens(rep, endpoints.Identity), space, clock);
 }

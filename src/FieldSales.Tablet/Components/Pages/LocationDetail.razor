@@ -2,19 +2,66 @@
 @inherits OfflineCataloguePage
 
 <section class="shop-detail">
-    <a href="/locations/search">Back to search</a>
-    @if (!Ready) { <h1>Opening shop…</h1> }
-    else if (location is null) { <h1>Shop unavailable</h1><p>This shop is not in your downloaded day.</p> }
-    else { <h1>@location.Name</h1><p>@location.TownName</p> }
+    <nav class="shop-back" aria-label="Shop navigation"><a href="/home">Home</a><a href="/locations/search">Back to search</a></nav>
+    @if (!Ready) { <h1>Shop</h1><p role="status">Opening shop…</p> }
+    else if (problem is not null) { <h1>Shop unavailable</h1><p role="alert">@problem</p> }
+    else if (detail is null) { <h1>Shop unavailable</h1><p>This shop is not in your downloaded day.</p> }
+    else
+    {
+        <header class="shop-identity">
+            <h1>@detail.Location.Name</h1>
+            <address>@detail.Location.Town.Name, Co. @detail.Location.Town.CountyName
+                @if (detail.Location.Eircode is { } eircode) { <span class="eircode">@eircode</span> }
+            </address>
+            <h2>Main Contact</h2>
+            @if (detail.Location.MainContact is { } contact)
+            {
+                <p class="contact-name"><strong>@contact.Name</strong><span> · @contact.Type</span></p>
+                @if (!string.IsNullOrWhiteSpace(contact.Phone)) { <p class="contact-detail">Phone: @contact.Phone</p> }
+                @if (!string.IsNullOrWhiteSpace(contact.Email)) { <p class="contact-detail">Email: @contact.Email</p> }
+            }
+            else { <p>No main contact in your downloaded data.</p> }
+        </header>
+        @if (detail.IsAssigned)
+        {
+            <div class="shop-actions" aria-label="Start work at this shop">
+                <button class="primary" @onclick='() => ExplainAction("Record Call")'>Record Call</button>
+                <button class="primary" @onclick='() => ExplainAction("New Order")'>New Order</button>
+            </div>
+            @if (actionMessage is not null) { <p class="action-message" role="status">@actionMessage</p> }
+        }
+        else
+        {
+            <p class="assignment-notice" role="status">@(detail.HasUnsentOrder
+                ? "No longer assigned to you — your existing order will still be sent"
+                : "No longer assigned to you")</p>
+        }
+        <section class="shop-recent" aria-labelledby="recent-heading">
+            <h2 id="recent-heading">Recent</h2>
+            <h3>Calls</h3><p>Recent calls aren't available on this tablet yet.</p>
+            <h3>Orders</h3><p>Recent orders aren't available on this tablet yet.</p>
+        </section>
+    }
 </section>
 
 @code {
     [Parameter] public Guid Id { get; set; }
-    private HomeLocation? location;
-    protected override void Clear() => location = null;
+    private OfflineLocationDetail? detail;
+    private string? actionMessage;
+    private string? problem;
+    protected override void Clear() { detail = null; actionMessage = null; problem = null; }
+    private void ExplainAction(string action) => actionMessage = $"{action} isn't available on this tablet yet.";
     protected override async Task ReadAsync(string rep, Func<bool> isCurrent)
     {
-        HomeLocation? read = await Task.Run(() => Tablet.ReadLocationIndex(rep).Find(Id));
-        if (isCurrent()) location = read;
+        Guid id = Id;
+        try
+        {
+            OfflineLocationDetail? read = await Task.Run(() => Tablet.ReadLocation(rep, id));
+            if (isCurrent()) detail = read;
+        }
+        catch (Exception error) when (error is IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (isCurrent()) problem = "Shop details couldn't be opened. Your saved work is still on this tablet.";
+        }
     }
 }

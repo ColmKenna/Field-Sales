@@ -62,3 +62,20 @@ a:focus-visible, button:focus-visible { outline: 3px solid #c77f09; outline-offs
 .shop-result { height: 80px; padding: 12px 16px; display: flex; flex-direction: column; justify-content: center; gap: 4px; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
 .shop-result strong, .shop-result span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .shop-result span { color: var(--muted); font-size: .9rem; }
+
+.shop-back { display: flex; gap: 24px; }
+.shop-identity { margin: 24px 0; background: var(--surface); padding: 24px; border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+.shop-identity h1 { margin-top: 0; }
+.shop-identity address { font-style: normal; color: var(--muted); }
+.shop-identity .eircode { display: inline-block; margin-left: 12px; white-space: nowrap; }
+.shop-identity h2 { margin-top: 20px; }
+.contact-name { margin: 8px 0; }
+.contact-detail { margin: 4px 0; }
+.shop-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.shop-actions button { min-height: 64px; padding: 12px; font-weight: 600; }
+.action-message { padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.assignment-notice { padding: 20px; border-left: 6px solid var(--alert); background: #fff0e9; color: var(--alert); font-weight: 600; }
+.shop-recent { margin-top: 24px; padding: 20px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.shop-recent h2 { margin-top: 0; }
+.shop-recent h3 { font-size: 1rem; margin: 16px 0 4px; }
+.shop-recent p { color: var(--muted); margin: 4px 0 16px; }
