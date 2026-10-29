@@ -169,6 +169,11 @@ public sealed class TabletApp : IDisposable
 
     public TabletOrder? ReadOrder(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Find(orderId);
 
+    public OrderResult MarkOrderReady(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).MarkReadyToSend(orderId);
+
+    /// <summary>The rep's Unsent count: every saved item, and how many orders are in progress or ready to send.</summary>
+    public UnsentSummary ReadUnsentSummary(string rep) => new UnsentStore(device.Workspace(rep)).Summarise();
+
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
 
     private TabletSync Sync(string rep) => new(device.Workspace(rep), endpoints.Api, device.Tokens(rep, endpoints.Identity), space, clock);

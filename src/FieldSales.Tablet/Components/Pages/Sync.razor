@@ -9,6 +9,10 @@
     @if (home is not null)
     {
         <p class="last-sync">@home.LastSynced</p>
+        @if (unsent is { Total: > 0 })
+        {
+            <p class="unsent-summary" role="status">@UnsentText</p>
+        }
         <div class="sync-region">
             @if (busy)
             {
@@ -33,6 +37,7 @@
 @code {
     private string? rep;
     private HomeView? home;
+    private UnsentSummary? unsent;
     private string? message;
     private bool busy;
     private int load;
@@ -49,7 +54,7 @@
     {
         int current = ++load;
         long version = Tablet.SessionVersion;
-        home = null; rep = null; message = null;
+        home = null; rep = null; message = null; unsent = null;
         StateHasChanged();
         TabletEntry entry = await enter();
         if (disposed || current != load || version != Tablet.SessionVersion) return;
@@ -58,7 +63,26 @@
         HomeView read = Tablet.ReadHome(rep);
         if (version != Tablet.SessionVersion) { rep = null; return; }
         home = read;
+        unsent = ReadUnsent(rep);
         if (!Tablet.Connected) message = SyncMessages.NoConnection;
+    }
+
+    // The count is a courtesy: a saved item that cannot be counted must never stop the rep syncing.
+    private UnsentSummary? ReadUnsent(string repSubject)
+    {
+        try { return Tablet.ReadUnsentSummary(repSubject); }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException or System.Text.Json.JsonException) { return null; }
+    }
+
+    private string UnsentText
+    {
+        get
+        {
+            List<string> parts = [$"Unsent: {unsent!.Total}"];
+            if (unsent.ReadyToSend > 0) parts.Add($"{unsent.ReadyToSend} ready to send");
+            if (unsent.InProgress > 0) parts.Add($"{unsent.InProgress} in progress");
+            return string.Join(" · ", parts);
+        }
     }
 
     private async Task SyncAsync()
@@ -73,6 +97,7 @@
         if (outcome.Completed) { Navigation.NavigateTo("/home"); return; }
         message = outcome.Message;
         home = Tablet.ReadHome(capturedRep);
+        unsent = ReadUnsent(capturedRep);
     }
 
     private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });

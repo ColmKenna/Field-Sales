@@ -27,6 +27,10 @@ public sealed class TabletApp
     public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddWork { get; set; } =
         (_, _, _, _, _) => new OrderResult(null, "Order entry isn't set up in this test.");
     public Func<string, Guid, TabletOrder?> FindOrder { get; set; } = (_, _) => null;
+    public Func<string, Guid, OrderResult> MarkWork { get; set; } = (_, _) => new OrderResult(null, "Order entry isn't set up in this test.");
+    public Func<string, UnsentSummary> ReadSummary { get; set; } = _ => new UnsentSummary(0, 0, 0);
+    public OrderResult MarkOrderReady(string rep, Guid orderId) => MarkWork(rep, orderId);
+    public UnsentSummary ReadUnsentSummary(string rep) => ReadSummary(rep);
     public ProductSearchIndex ReadProductIndex(string rep) => ReadIndex(rep);
     public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
         AddWork(rep, orderId, locationId, productId, quantity);

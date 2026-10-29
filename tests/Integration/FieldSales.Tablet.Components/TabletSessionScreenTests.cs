@@ -77,6 +77,33 @@ public sealed class TabletSessionScreenTests
     }
 
     [Fact]
+    public async Task Should_ShowTheUnsentCountWithWhatIsReady_When_WorkIsWaitingOnTheSyncScreen()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.ReadSummary = rep => rep == "colm" ? new UnsentSummary(4, 1, 2) : new UnsentSummary(0, 0, 0);
+        await screen.Open(new());
+        Assert.Contains("Unsent: 4 · 2 ready to send · 1 in progress", screen.Renderer.Text(screen.Id));
+    }
+
+    [Fact]
+    public async Task Should_SayNothingAboutUnsentWork_When_NothingIsWaitingOnTheSyncScreen()
+    {
+        await using Screen screen = new(typeof(Sync));
+        await screen.Open(new());
+        Assert.DoesNotContain("Unsent", screen.Renderer.Text(screen.Id));
+    }
+
+    [Fact]
+    public async Task Should_KeepSyncUsable_When_TheUnsentCountCannotBeRead()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.ReadSummary = _ => throw new IOException("The saved work could not be read.");
+        await screen.Open(new());
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
+        Assert.DoesNotContain("Unsent", screen.Renderer.Text(screen.Id));
+    }
+
+    [Fact]
     public async Task Should_CancelPageWork_When_TheSyncScreenIsDisposed()
     {
         TaskCompletionSource<SyncOutcome> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -27,6 +27,7 @@ public sealed class OrderStore
     public const string NoPrice = "No price yet — this product can't be ordered.";
     public const string NotChangeable = "This order can't be changed here.";
     public const string AlreadyReady = "This order is ready to send.";
+    public const string EmptyOrder = "Add at least one product";
 
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly RepWorkspace workspace;
@@ -94,6 +95,28 @@ public sealed class OrderStore
                 : existing with { Lines = lines };
             Save(unsent, order);
             return new(order, null);
+        }
+        finally { Gate.Release(); }
+    }
+
+    /// <summary>Moves an In Progress order to Ready to Send, so it uploads at the next Sync. An order with no
+    /// lines cannot be ready. This is the only transition: reopening, editing and deleting arrive with WI-046.
+    /// It needs no connection and no current assignment, because an order is judged against the snapshot it was
+    /// built from.</summary>
+    public OrderResult MarkReadyToSend(Guid orderId)
+    {
+        Gate.Wait();
+        try
+        {
+            UnsentStore unsent = new(workspace);
+            UnsentItem? item = unsent.Find(orderId);
+            TabletOrder? order = Parse(item);
+            if (item is not null && order is null) return OrderResult.Failure(NotChangeable);
+            if (order is null || order.Lines.Count == 0) return OrderResult.Failure(EmptyOrder);
+            if (order.State != OrderState.InProgress) return OrderResult.Failure(AlreadyReady);
+            TabletOrder ready = order with { State = OrderState.ReadyToSend };
+            Save(unsent, ready);
+            return new(ready, null);
         }
         finally { Gate.Release(); }
     }

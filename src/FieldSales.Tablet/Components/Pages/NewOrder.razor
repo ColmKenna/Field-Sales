@@ -15,11 +15,18 @@
             <h1>New order</h1>
             <p class="order-shop">@detail.Location.Name</p>
         </header>
-        <div class="search-field">
-            <label for="product-search">Find a product</label>
-            <input id="product-search" type="search" value="@query" @oninput="SearchAsync" autocomplete="off" />
-        </div>
-        @if (!string.IsNullOrWhiteSpace(query))
+        @if (IsReady)
+        {
+            <p class="ready-notice" role="status">Ready to Send. It goes to head office at your next Sync.</p>
+        }
+        else
+        {
+            <div class="search-field">
+                <label for="product-search">Find a product</label>
+                <input id="product-search" type="search" value="@query" @oninput="SearchAsync" autocomplete="off" />
+            </div>
+        }
+        @if (!IsReady && !string.IsNullOrWhiteSpace(query))
         {
             <div role="status" aria-live="polite">
                 @if (results.Total == 0) { <p>No products match '@query.Trim()'</p> }
@@ -39,7 +46,7 @@
                 }
             </ul>
         }
-        @if (selected is { } chosen)
+        @if (!IsReady && selected is { } chosen)
         {
             <section class="add-line" aria-labelledby="add-line-heading">
                 <h2 id="add-line-heading">@chosen.Name</h2>
@@ -74,8 +81,10 @@
         </section>
         <footer class="order-footer">
             <p class="order-summary" role="status">@Summary</p>
+            @if (readyError is not null) { <p class="problem" role="alert">@readyError</p> }
             <div class="order-actions">
-                <button type="button" class="secondary" @onclick="SaveAndClose">Save and close</button>
+                <button type="button" class="secondary" @onclick="SaveAndClose">@(IsReady ? "Close" : "Save and close")</button>
+                @if (!IsReady) { <button type="button" class="primary" disabled="@busy" @onclick="MarkReadyAsync">Mark Ready to Send</button> }
             </div>
         </footer>
     }
@@ -98,7 +107,10 @@
     private ProductSearchResult? selected;
     private string quantityText = "";
     private string? addError;
+    private string? readyError;
     private bool busy;
+
+    private bool IsReady => order is { State: OrderState.ReadyToSend };
 
     private string Summary
     {
@@ -117,7 +129,7 @@
 
     protected override void Clear() { rep = null; detail = null; index = null; order = null; problem = null; ResetEntry(); }
 
-    private void ResetEntry() { ++revision; query = ""; results = new([], 0); selected = null; quantityText = ""; addError = null; }
+    private void ResetEntry() { ++revision; query = ""; results = new([], 0); selected = null; quantityText = ""; addError = null; readyError = null; }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
     {
@@ -180,6 +192,28 @@
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {
             if (version == Tablet.SessionVersion) addError = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task MarkReadyAsync()
+    {
+        if (busy || rep is null) return;
+        busy = true;
+        readyError = null;
+        string repSubject = rep;
+        Guid shop = LocationId, id = orderId;
+        long version = Tablet.SessionVersion;
+        try
+        {
+            OrderResult result = await Task.Run(() => Tablet.MarkOrderReady(repSubject, id));
+            if (version != Tablet.SessionVersion || orderShop != shop) return;
+            if (result.Succeeded) { order = result.Order; ResetEntry(); }
+            else readyError = result.Error;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version == Tablet.SessionVersion) readyError = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
         }
         finally { busy = false; }
     }

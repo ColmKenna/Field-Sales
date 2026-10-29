@@ -50,6 +50,18 @@ public sealed class NewOrderComponentTests
             return new(Order, null);
         }
 
+        public List<Guid> Marked { get; } = [];
+
+        public OrderResult Mark(string rep, Guid orderId)
+        {
+            Marked.Add(orderId);
+            Started?.TrySetResult();
+            if (Gate is not null && !Gate.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("The save was not released.");
+            if (Order is not { } current || current.Id != orderId || current.Lines.Count == 0) return new(null, OrderStore.EmptyOrder);
+            Order = current with { State = OrderState.ReadyToSend };
+            return new(Order, null);
+        }
+
         public TabletOrder? Find(string rep, Guid orderId) => Order is { } order && order.Id == orderId ? order : null;
     }
 
@@ -197,6 +209,77 @@ public sealed class NewOrderComponentTests
     }
 
     [Fact]
+    public async Task Should_ShowAddAtLeastOneProductAndKeepEditing_When_MarkReadyToSendIsTappedOnAnEmptyOrder()
+    {
+        FakeOrders orders = new();
+        await using Screen screen = Open(orders);
+        await screen.Show();
+
+        await screen.Click("Mark Ready to Send");
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Add at least one product"));
+
+        Assert.Contains("alert", screen.Renderer.AttributeValues(screen.Id, "role"));
+        Assert.Contains("product-search", screen.Renderer.AttributeValues(screen.Id, "id"));
+        Assert.Contains("Mark Ready to Send", screen.Renderer.Buttons(screen.Id));
+        Assert.DoesNotContain("Ready to Send. It goes", screen.Renderer.Text(screen.Id));
+        Assert.Single(orders.Marked);
+    }
+
+    [Fact]
+    public async Task Should_ShowReadyToSendAndStopEditing_When_MarkReadyToSendIsTappedOnAnOrderWithLines()
+    {
+        FakeOrders orders = new();
+        await using Screen screen = Open(orders);
+        await screen.Show();
+        await screen.Type("product-search", "vitamin d");
+        await screen.Pick("Vitamin D 1000IU 90s");
+        await screen.Type("line-quantity", "12");
+        await screen.Click("Add to order");
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("1 line · €150.00"));
+
+        await screen.Click("Mark Ready to Send");
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Ready to Send. It goes to head office at your next Sync."));
+
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Contains("Vitamin D 1000IU 90s", text);
+        Assert.Contains("1 line · €150.00", text);
+        Assert.DoesNotContain("product-search", screen.Renderer.AttributeValues(screen.Id, "id"));
+        Assert.Equal(["Close"], screen.Renderer.Buttons(screen.Id));
+        Assert.Equal(orders.Calls[0].Order, Assert.Single(orders.Marked)); // The same order the lines went to.
+        Assert.Equal(OrderState.ReadyToSend, orders.Order!.State);
+
+        await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Tablet.Resume());
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Ready to Send. It goes to head office"));
+        Assert.Equal(["Close"], screen.Renderer.Buttons(screen.Id));
+        await screen.Click("Close");
+        Assert.Equal([$"/locations/{ShopId}"], screen.Navigation.Destinations);
+    }
+
+    [Fact]
+    public async Task Should_MarkOnce_When_MarkReadyToSendIsTappedTwiceWhileTheFirstIsSaving()
+    {
+        FakeOrders orders = new();
+        await using Screen screen = Open(orders);
+        await screen.Show();
+        await screen.Type("product-search", "vitamin d");
+        await screen.Pick("Vitamin D 1000IU 90s");
+        await screen.Type("line-quantity", "12");
+        await screen.Click("Add to order");
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("1 line"));
+        using ManualResetEventSlim release = new();
+        orders.Gate = release;
+        orders.Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task first = screen.Click("Mark Ready to Send");
+        await orders.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Task second = screen.Click("Mark Ready to Send");
+        release.Set();
+        await Task.WhenAll(first, second);
+
+        Assert.Single(orders.Marked);
+    }
+
+    [Fact]
     public async Task Should_ReturnToTheShop_When_SaveAndCloseIsTapped()
     {
         await using Screen screen = Open(new());
@@ -257,6 +340,7 @@ public sealed class NewOrderComponentTests
                 Read = (_, _) => Shop(assigned),
                 ReadIndex = _ => new ProductSearchIndex("generation", Catalogue),
                 AddWork = orders.Add,
+                MarkWork = orders.Mark,
                 FindOrder = orders.Find
             };
             services = new ServiceCollection().AddLogging().AddSingleton(Tablet).AddSingleton<NavigationManager>(Navigation).BuildServiceProvider();
