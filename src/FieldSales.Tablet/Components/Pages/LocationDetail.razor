@@ -34,7 +34,7 @@
         {
             <div class="shop-actions" aria-label="Start work at this shop">
                 <button class="primary" @onclick='() => ExplainAction("Record Call")'>Record Call</button>
-                <button class="primary" @onclick='() => ExplainAction("New Order")'>New Order</button>
+                <button class="primary" @onclick="NewOrder">New Order</button>
             </div>
             @if (actionMessage is not null) { <p class="action-message" role="status">@actionMessage</p> }
         }
@@ -59,6 +59,7 @@
     private string? problem;
     protected override void Clear() { detail = null; actionMessage = null; problem = null; }
     private void ExplainAction(string action) => actionMessage = $"{action} isn't available on this tablet yet.";
+    private void NewOrder() => Navigation.NavigateTo($"/locations/{Id}/orders/new");
     protected override async Task ReadAsync(string rep, Func<bool> isCurrent)
     {
         Guid id = Id;

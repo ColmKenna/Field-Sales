@@ -1,3 +1,4 @@
+using FieldSales.Ordering.Contracts;
 using FieldSales.Tablet.Core;
 
 namespace FieldSales.Tablet;
@@ -22,6 +23,14 @@ public sealed class TabletApp
     public Task<IReadOnlyList<UnsentKind>> ReadUnsentKindsAsync(long version) => ReadKinds(version);
     public Task<bool> SignOutAsync(long version) => End(version);
     public HomeView ReadHome(string rep) => new("Last synced 07:42", []);
+    public Func<string, ProductSearchIndex> ReadIndex { get; set; } = _ => new ProductSearchIndex(null, []);
+    public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddWork { get; set; } =
+        (_, _, _, _, _) => new OrderResult(null, "Order entry isn't set up in this test.");
+    public Func<string, Guid, TabletOrder?> FindOrder { get; set; } = (_, _) => null;
+    public ProductSearchIndex ReadProductIndex(string rep) => ReadIndex(rep);
+    public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
+        AddWork(rep, orderId, locationId, productId, quantity);
+    public TabletOrder? ReadOrder(string rep, Guid orderId) => FindOrder(rep, orderId);
     public Func<string, CancellationToken, Task<SyncOutcome>> SyncWork { get; set; } = (_, _) =>
         Task.FromResult(new SyncOutcome(SyncStatus.Completed, "Last synced 07:42", null));
     public Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default) => SyncWork(rep, ct);

@@ -30,7 +30,7 @@ public sealed class LocationSearchIndex
 
     public HomeLocation? Find(Guid id) => rows.FirstOrDefault(row => row.Location.Id == id).Location;
 
-    private static string Normalize(string value)
+    internal static string Normalize(string value)
     {
         StringBuilder result = new();
         foreach (Rune rune in value.Normalize(NormalizationForm.FormD).EnumerateRunes())

@@ -1,3 +1,4 @@
+using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
 using FieldSales.Tablet.Core;
 using Microsoft.Extensions.Logging;
@@ -159,6 +160,16 @@ public sealed class TabletApp : IDisposable
     public LocationSearchIndex ReadLocationIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadLocationIndex();
 
     public OfflineLocationDetail? ReadLocation(string rep, Guid id) => new SnapshotStore(device.Workspace(rep), clock).ReadLocation(id);
+
+    // Order entry: products are found offline in the active snapshot, and each added line is saved at once.
+    public ProductSearchIndex ReadProductIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadProductIndex(Today());
+
+    public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
+        new OrderStore(device.Workspace(rep), clock).AddLine(orderId, locationId, productId, quantity);
+
+    public TabletOrder? ReadOrder(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Find(orderId);
+
+    private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
 
     private TabletSync Sync(string rep) => new(device.Workspace(rep), endpoints.Api, device.Tokens(rep, endpoints.Identity), space, clock);
 }
