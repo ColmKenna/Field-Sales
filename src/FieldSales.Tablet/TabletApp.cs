@@ -1,5 +1,6 @@
 using FieldSales.Snapshot.Contracts;
 using FieldSales.Tablet.Core;
+using Microsoft.Extensions.Logging;
 
 namespace FieldSales.Tablet;
 
@@ -7,31 +8,72 @@ namespace FieldSales.Tablet;
 public sealed record HomeView(string LastSynced, IReadOnlyList<HomeLocation> Locations);
 
 /// <summary>The screens' single entry point to the tablet's rules; the rules themselves live in Tablet.Core.</summary>
-public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IStorageSpace space, TimeProvider clock)
+public sealed class TabletApp : IDisposable
 {
+    private readonly TabletDevice device;
+    private readonly TabletEndpoints endpoints;
+    private readonly IStorageSpace space;
+    private readonly TimeProvider clock;
+    private readonly EntryHandOff handOff;
+    private readonly TabletSessionMonitor monitor;
+    private readonly object workGate = new();
+    private CancellationTokenSource sessionWork = new();
+    private readonly SemaphoreSlim syncGate = new(1, 1);
+
+    public TabletApp(TabletDevice device, TabletEndpoints endpoints, IStorageSpace space, TimeProvider clock, ILogger<TabletApp> logger)
+    {
+        this.device = device;
+        this.endpoints = endpoints;
+        this.space = space;
+        this.clock = clock;
+        handOff = new(clock, TimeSpan.FromSeconds(5));
+        device.SessionChanged += OnSessionChanged;
+        monitor = new(device, clock, error => logger.LogError(error, "Could not check the tablet session."));
+        monitor.Start();
+    }
+
     public const string SignInNeedsConnection = "Sign-in needs a connection. Try again when you have signal.";
     public const string SignInDidNotFinish = "Sign-in didn't finish. Try again.";
 
     /// <summary>Raised when the app comes back to the foreground, so the 24-hour rule is checked again.</summary>
     public event Action? Resumed;
-    public void NotifyResumed() => Resumed?.Invoke();
+    public event Action? SessionChanged;
+    public long SessionVersion => device.SessionVersion;
+    public void NotifyResumed() { monitor.Start(); Resumed?.Invoke(); }
+    public void NotifyStopped() => monitor.Stop();
 
     public bool Connected => Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
 
-    private readonly EntryHandOff handOff = new(clock, TimeSpan.FromSeconds(5));
-
     public Task<TabletEntry> EnterAsync() => device.EnterAsync(Connected);
 
-    /// <summary>Entry checked the 24-hour rule and is about to open the next screen; that screen can skip repeating the check.</summary>
-    public void HandOff(TabletEntry entry) => handOff.Offer(entry);
+    /// <summary>Pass entry's snapshot result to the next screen; arrival still revalidates local session access.</summary>
+    public void HandOff(TabletEntry entry) { if (entry.SessionVersion == SessionVersion) handOff.Offer(entry); }
 
-    /// <summary>A screen reached straight from entry: the entry just checked, or a fresh check if it was not handed over in time.</summary>
-    public Task<TabletEntry> EnterOnArrivalAsync() => handOff.Take() is { } entry ? Task.FromResult(entry) : EnterAsync();
+    /// <summary>Reuse a fresh snapshot result only while its session and local access window are still valid.</summary>
+    public async Task<TabletEntry> EnterOnArrivalAsync()
+    {
+        if (handOff.Take() is { } entry && entry.SessionVersion == SessionVersion
+            && await device.CheckSessionAsync() is not null && entry.SessionVersion == SessionVersion) return entry;
+        return await EnterAsync();
+    }
+
+    public Task<bool> SignOutAsync(long expectedVersion) => device.EndSessionAsync(expectedVersion);
+
+    public async Task<IReadOnlyList<UnsentKind>> ReadUnsentKindsAsync(long expectedVersion)
+    {
+        TabletEntry entry = await EnterAsync();
+        if (entry.RepSubject is null || entry.SessionVersion != expectedVersion || SessionVersion != expectedVersion)
+            throw new OperationCanceledException("The tablet session changed.");
+        UnsentKind[] kinds = await Task.Run(() => new UnsentStore(device.Workspace(entry.RepSubject)).Read().Select(item => item.Kind).ToArray());
+        if (SessionVersion != expectedVersion) throw new OperationCanceledException("The tablet session changed.");
+        return kinds;
+    }
 
     /// <summary>The connected sign-in in the system browser. Returns a message to show, or null once the day starts.</summary>
     public async Task<string?> SignInAsync()
     {
         TabletTiming.RepActed();
+        long version = SessionVersion;
         TabletSignInFlow flow = new(endpoints.Identity, endpoints.Api, clock);
         PendingSignIn pending = flow.Start();
         try
@@ -43,7 +85,7 @@ public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IS
             });
             StaffSignIn? signIn = await flow.CompleteAsync(pending, result.Properties);
             if (signIn is null) return SignInDidNotFinish;
-            SignInOutcome outcome = await device.CompleteSignInAsync(signIn);
+            SignInOutcome outcome = await device.CompleteSignInAsync(signIn, version);
             return outcome.Status == SignInStatus.Started ? null : outcome.Message;
         }
         catch (TaskCanceledException) { return null; } // The rep closed the browser; stay on the sign-in screen.
@@ -51,20 +93,54 @@ public sealed class TabletApp(TabletDevice device, TabletEndpoints endpoints, IS
     }
 
     /// <summary>Downloads the rep's day; copies retired by the switch are deleted afterwards in the background (D2-B).</summary>
-    public async Task<SyncOutcome> SyncAsync(string rep)
+    public async Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default)
     {
         TabletTiming.RepActed();
-        TabletSync sync = Sync(rep);
-        long started = clock.GetTimestamp();
-        SyncOutcome outcome = await sync.SyncAsync();
-        TabletTiming.Synced(outcome, clock.GetElapsedTime(started));
-        _ = Task.Run(async () =>
+        TabletEntry entry = await EnterAsync();
+        if (entry.RepSubject != rep) return Cancelled();
+        long version = entry.SessionVersion;
+        CancellationToken cancellation;
+        lock (workGate) cancellation = sessionWork.Token;
+        if (version != SessionVersion) return Cancelled();
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation, ct);
+        try { await syncGate.WaitAsync(linked.Token); }
+        catch (OperationCanceledException) { return Cancelled(); }
+        try
         {
-            long cleanup = clock.GetTimestamp();
-            await sync.CleanupAsync();
-            TabletTiming.CleanedUp(clock.GetElapsedTime(cleanup));
-        });
-        return outcome;
+            if (version != SessionVersion || linked.IsCancellationRequested) return Cancelled();
+            TabletSync sync = Sync(rep);
+            long started = clock.GetTimestamp();
+            SyncOutcome outcome = await sync.SyncAsync(ct: linked.Token);
+            if (version != SessionVersion) return Cancelled();
+            TabletTiming.Synced(outcome, clock.GetElapsedTime(started));
+            _ = Task.Run(async () =>
+            {
+                long cleanup = clock.GetTimestamp();
+                await sync.CleanupAsync();
+                TabletTiming.CleanedUp(clock.GetElapsedTime(cleanup));
+            });
+            return outcome;
+        }
+        finally { syncGate.Release(); }
+    }
+
+    private static SyncOutcome Cancelled() => new(SyncStatus.Cancelled, SyncMessages.Cancelled, null);
+
+    private void OnSessionChanged()
+    {
+        handOff.Clear();
+        CancellationTokenSource previous;
+        lock (workGate) { previous = sessionWork; sessionWork = new(); }
+        previous.Cancel();
+        previous.Dispose();
+        SessionChanged?.Invoke();
+    }
+
+    public void Dispose()
+    {
+        device.SessionChanged -= OnSessionChanged;
+        monitor.Dispose();
+        lock (workGate) { sessionWork.Cancel(); sessionWork.Dispose(); }
     }
 
     /// <summary>Finishes any cleanup an earlier session left, after the day has opened.</summary>

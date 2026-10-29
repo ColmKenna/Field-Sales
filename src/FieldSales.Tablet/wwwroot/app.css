@@ -11,6 +11,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--page); color: var(--ink); font-family: "OpenSansRegular", system-ui, sans-serif; font-size: 18px; }
 .app-bar { background: var(--brand); color: #fff; padding: 14px 24px; font-weight: 600; }
+.app-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 main { max-width: 960px; margin: 0 auto; padding: 24px; }
 h1 { font-size: 1.6rem; margin: 0 0 12px; }
 h2 { font-size: 1.1rem; margin: 24px 0 8px; color: var(--muted); }
@@ -20,6 +21,14 @@ button.primary { background: var(--brand); color: #fff; }
 button.secondary { background: var(--surface); color: var(--brand); }
 button.link { background: none; border: none; color: var(--brand); padding: 0; min-height: 40px; text-decoration: underline; }
 button:disabled { opacity: .45; cursor: default; }
+
+.sign-out-warning { width: min(36rem, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+.sign-out-warning::backdrop { background: rgb(27 36 48 / 60%); }
+.sign-out-warning { font-weight: 400; }
+.sign-out-warning h2 { color: var(--ink); font-size: 1.4rem; margin: 0 0 20px; }
+.sign-out-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; margin-top: 24px; }
+.sign-out-actions button { flex: 1 1 12rem; min-height: 56px; }
+.sign-out-warning .sign-out-sync { margin-top: 12px; min-height: 48px; text-align: left; }
 
 .entry { margin-top: 12vh; text-align: center; }
 .entry .lead { color: var(--muted); max-width: 32rem; margin: 0 auto 24px; }

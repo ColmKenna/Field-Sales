@@ -32,6 +32,8 @@
     private TabletEntry? entry;
     private string? problem;
     private bool busy;
+    private int load;
+    private bool disposed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -42,7 +44,10 @@
 
     private async Task RefreshAsync()
     {
-        entry = await Tablet.EnterAsync();
+        int current = ++load;
+        TabletEntry next = await Tablet.EnterAsync();
+        if (disposed || current != load || next.SessionVersion != Tablet.SessionVersion) return;
+        entry = next;
         TabletTiming.Mark("checked");
         if (entry.Screen is EntryScreen.Home or EntryScreen.Sync)
         {
@@ -56,11 +61,12 @@
     {
         busy = true;
         problem = await Tablet.SignInAsync();
+        if (disposed) return;
         busy = false;
         await RefreshAsync();
     }
 
     private void OnResumed() => _ = InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); });
 
-    public void Dispose() => Tablet.Resumed -= OnResumed;
+    public void Dispose() { disposed = true; ++load; Tablet.Resumed -= OnResumed; }
 }

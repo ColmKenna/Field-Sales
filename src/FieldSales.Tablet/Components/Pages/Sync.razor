@@ -35,6 +35,9 @@
     private HomeView? home;
     private string? message;
     private bool busy;
+    private int load;
+    private bool disposed;
+    private readonly CancellationTokenSource viewWork = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -44,24 +47,40 @@
 
     private async Task GuardAsync(Func<Task<TabletEntry>> enter)
     {
+        int current = ++load;
+        long version = Tablet.SessionVersion;
+        home = null; rep = null; message = null;
+        StateHasChanged();
         TabletEntry entry = await enter();
+        if (disposed || current != load || version != Tablet.SessionVersion) return;
         if (entry.Screen is not (EntryScreen.Sync or EntryScreen.Home)) { Navigation.NavigateTo("/"); return; }
         rep = entry.RepSubject!;
-        home = Tablet.ReadHome(rep);
+        HomeView read = Tablet.ReadHome(rep);
+        if (version != Tablet.SessionVersion) { rep = null; return; }
+        home = read;
         if (!Tablet.Connected) message = SyncMessages.NoConnection;
     }
 
     private async Task SyncAsync()
     {
+        if (busy || disposed || rep is null) return;
+        string capturedRep = rep;
+        long version = Tablet.SessionVersion;
         busy = true; message = null;
-        SyncOutcome outcome = await Tablet.SyncAsync(rep!);
+        SyncOutcome outcome = await Tablet.SyncAsync(capturedRep, viewWork.Token);
+        if (disposed || version != Tablet.SessionVersion) return;
         busy = false;
         if (outcome.Completed) { Navigation.NavigateTo("/home"); return; }
         message = outcome.Message;
-        home = Tablet.ReadHome(rep!);
+        home = Tablet.ReadHome(capturedRep);
     }
 
     private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
 
-    public void Dispose() => Tablet.Resumed -= OnResumed;
+    public void Dispose()
+    {
+        disposed = true; ++load; home = null; rep = null;
+        viewWork.Cancel(); viewWork.Dispose();
+        Tablet.Resumed -= OnResumed;
+    }
 }

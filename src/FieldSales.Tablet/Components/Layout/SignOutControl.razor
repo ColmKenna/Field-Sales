@@ -1,0 +1,124 @@
+@namespace FieldSales.Tablet.Components.Layout
+@using Microsoft.Extensions.Logging
+@using Microsoft.JSInterop
+@implements IDisposable
+@inject Microsoft.JSInterop.IJSRuntime JS
+@inject NavigationManager Navigation
+@inject ILogger<SignOutControl> Logger
+
+<button class="secondary sign-out-trigger" disabled="@busy" @ref="trigger" @onclick="BeginAsync">Sign out</button>
+@if (problem is not null)
+{
+    <p class="problem" role="status">@problem</p>
+}
+<dialog class="sign-out-warning" aria-labelledby="@titleId" aria-describedby="@descriptionId" @ref="dialog">
+    <h2 id="@titleId">Sign out?</h2>
+    <div id="@descriptionId">
+        <p>@summary</p>
+        <p>They will stay on this tablet for you after sign-out.</p>
+    </div>
+    <div class="sign-out-actions">
+        <button class="secondary" data-stay-signed-in autofocus disabled="@busy" @onclick="StayAsync">Stay signed in</button>
+        <button class="primary" disabled="@busy" @onclick="ConfirmAsync">Sign out</button>
+    </div>
+    <button class="link sign-out-sync" disabled="@busy" @onclick="OpenSyncAsync">Open Sync &amp; unsent</button>
+</dialog>
+
+@code {
+    // The caller supplies kinds for the current rep only. No payloads, session mutation
+    // or storage policy belong to this warning; the layout supplies the session handler.
+    [Parameter, EditorRequired] public Func<Task<IReadOnlyList<UnsentKind>>> ReadUnsentKinds { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback SignOutRequested { get; set; }
+
+    private readonly string titleId = $"sign-out-title-{Guid.NewGuid():N}";
+    private readonly string descriptionId = $"sign-out-description-{Guid.NewGuid():N}";
+    private ElementReference trigger;
+    private ElementReference dialog;
+    private string? summary;
+    private string? problem;
+    private bool busy;
+    private bool openAfterRender;
+    private bool disposed;
+
+    private async Task BeginAsync()
+    {
+        if (busy || disposed) return;
+        busy = true;
+        problem = null;
+        try
+        {
+            IReadOnlyList<UnsentKind> items = await ReadUnsentKinds();
+            if (disposed) return;
+            if (items.Count == 0) await SignOutRequested.InvokeAsync();
+            else
+            {
+                List<string> kinds = [];
+                Add(UnsentKind.Call, "Call", "Calls");
+                Add(UnsentKind.Order, "Order", "Orders");
+                Add(UnsentKind.ScheduleChange, "Schedule change", "Schedule changes");
+                string types = kinds.Count == 1 ? kinds[0]
+                    : string.Join(", ", kinds.Take(kinds.Count - 1)) + " and " + kinds[^1];
+                summary = $"{items.Count} {(items.Count == 1 ? "item has" : "items have")} not synced: {types}.";
+                openAfterRender = true;
+
+                void Add(UnsentKind kind, string singular, string plural)
+                {
+                    int count = items.Count(item => item == kind);
+                    if (count > 0) kinds.Add($"{count} {(count == 1 ? singular : plural)}");
+                }
+            }
+        }
+        catch (Exception error)
+        {
+            Logger.LogError(error, "Could not prepare tablet sign-out.");
+            if (!disposed) problem = "Couldn't sign out. Your saved work stays on this tablet. Try again.";
+        }
+        finally { busy = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!openAfterRender || disposed) return;
+        openAfterRender = false;
+        await JS.InvokeVoidAsync("tabletSignOut.open", dialog);
+    }
+
+    private async Task StayAsync()
+    {
+        if (busy || disposed) return;
+        await CloseAsync();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (busy || disposed) return;
+        busy = true;
+        try
+        {
+            await CloseAsync();
+            if (!disposed) await SignOutRequested.InvokeAsync();
+        }
+        catch (Exception error)
+        {
+            Logger.LogError(error, "Could not finish tablet sign-out.");
+            if (!disposed) problem = "Couldn't sign out. Your saved work stays on this tablet. Try again.";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task OpenSyncAsync()
+    {
+        if (busy || disposed) return;
+        await CloseAsync();
+        if (!disposed) Navigation.NavigateTo("/sync");
+    }
+
+    private async Task CloseAsync()
+    {
+        await JS.InvokeVoidAsync("tabletSignOut.close", dialog, trigger);
+        summary = null;
+        openAfterRender = false;
+    }
+
+    public void Dispose() => disposed = true;
+}

@@ -2,8 +2,8 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace FieldSales.Tablet.Core.Tests;
 
-// WI-032 startup: a cold start passes the entry check's result to the next screen so the 24-hour rule runs once.
-// Anything stale, repeated or missing means the screen checks for itself, so the rule is never skipped.
+// Startup passes a recent entry result once. The facade's integration tests also verify
+// that session invalidation or crossing the 24-hour boundary prevents its reuse.
 [Trait("Category", "Unit")]
 public sealed class EntryHandOffTests
 {
@@ -60,6 +60,15 @@ public sealed class EntryHandOffTests
         public override DateTimeOffset GetUtcNow() => WallClock;
         public override long TimestampFrequency => 1000;
         public override long GetTimestamp() => 0;
+    }
+
+    [Fact]
+    public void Should_DiscardTheOffer_When_TheSessionEnds()
+    {
+        EntryHandOff handOff = new(_clock, Window);
+        handOff.Offer(Home);
+        handOff.Clear();
+        Assert.Null(handOff.Take());
     }
 
     [Fact]

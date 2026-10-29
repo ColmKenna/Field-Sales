@@ -17,7 +17,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../../../src/FieldSales.Tablet/Components/Pages/OfflineCataloguePage.cs" Link="OfflineCataloguePage.cs" />
+    <Compile Include="../../../src/FieldSales.Tablet/TabletTiming.cs" Link="TabletTiming.cs" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Layout/MainLayout.razor" Link="MainLayout.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/Sync.razor" Link="Sync.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/LocationDetail.razor" Link="LocationDetail.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Layout/SignOutControl.razor" Link="SignOutControl.razor" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
