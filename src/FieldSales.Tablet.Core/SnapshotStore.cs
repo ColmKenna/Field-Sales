@@ -74,7 +74,8 @@ public sealed partial class SnapshotStore
     }
 
     public SqliteEngine Engine { get; }
-    private SemaphoreSlim Gate => Gates.GetOrAdd(workspace.SnapshotPath, _ => new(1, 1));
+    internal static SemaphoreSlim GateFor(RepWorkspace workspace) => Gates.GetOrAdd(workspace.SnapshotPath, _ => new(1, 1));
+    private SemaphoreSlim Gate => GateFor(workspace);
 
     private SqliteConnection Open()
     {
@@ -199,6 +200,9 @@ public sealed partial class SnapshotStore
                 if ((long)references.ExecuteScalar()! != 0)
                     throw new InvalidDataException("An attribute refers to a product outside this snapshot.");
             }
+            // Keep only the old active copy's referenced shop identities before it can be retired.
+            // The separate Unsent database is read, never rewritten, by a snapshot replacement.
+            LocationRetention.BeforeActivation(workspace, connection);
             hooks.AtBoundary?.Invoke("before-activation");
             ct.ThrowIfCancellationRequested();
             DateTimeOffset completed = clock.GetUtcNow();

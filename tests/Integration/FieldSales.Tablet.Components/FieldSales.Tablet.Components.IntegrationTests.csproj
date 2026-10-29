@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>FieldSales.Tablet.Components.Pages</RootNamespace>
+    <!-- Renderer is used only by this test adapter to dispatch real component events. -->
+    <NoWarn>$(NoWarn);BL0006</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <ProjectReference Include="../../../src/FieldSales.Tablet.Core/FieldSales.Tablet.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../src/FieldSales.Tablet/Components/Pages/OfflineCataloguePage.cs" Link="OfflineCataloguePage.cs" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/LocationDetail.razor" Link="LocationDetail.razor" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

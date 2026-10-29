@@ -28,6 +28,7 @@
         <Project Path="tests/Integration/FieldSales.SnapshotSpike/FieldSales.SnapshotSpike.IntegrationTests.csproj" />
         <Project Path="tests/Integration/FieldSales.TabletSpike/FieldSales.TabletSpike.IntegrationTests.csproj" />
         <Project Path="tests/Integration/FieldSales.Tablet.Core/FieldSales.Tablet.Core.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Tablet.Components/FieldSales.Tablet.Components.IntegrationTests.csproj" />
         <Project Path="tests/Integration/FieldSales.Tablet.Core.CrashHost/FieldSales.Tablet.Core.CrashHost.csproj" />
     </Folder>
     <Folder Name="/tests/E2E/" />
