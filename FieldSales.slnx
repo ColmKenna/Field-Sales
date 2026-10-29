@@ -9,6 +9,7 @@
         <Project Path="src/FieldSales.Catalogue.Contracts/FieldSales.Catalogue.Contracts.csproj" />
         <Project Path="src/FieldSales.Directory.Contracts/FieldSales.Directory.Contracts.csproj" />
         <Project Path="src/FieldSales.Snapshot.Contracts/FieldSales.Snapshot.Contracts.csproj" />
+        <Project Path="src/FieldSales.Ordering.Contracts/FieldSales.Ordering.Contracts.csproj" />
         <Project Path="src/FieldSales.Quantities/FieldSales.Quantities.csproj" />
         <Project Path="src/FieldSales.ReferenceData/FieldSales.ReferenceData.csproj" />
         <Project Path="src/FieldSales.StaffAccess/FieldSales.StaffAccess.csproj" />

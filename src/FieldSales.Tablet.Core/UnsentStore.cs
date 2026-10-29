@@ -66,11 +66,24 @@ public sealed class UnsentStore(RepWorkspace workspace)
         command.CommandText = "SELECT id, kind, saved_utc, json FROM work ORDER BY id";
         using SqliteDataReader reader = command.ExecuteReader();
         List<UnsentItem> items = [];
-        while (reader.Read())
-            items.Add(new(Guid.Parse(reader.GetString(0)), Enum.Parse<UnsentKind>(reader.GetString(1)),
-                DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture), reader.GetString(3)));
+        while (reader.Read()) items.Add(ReadItem(reader));
         return items;
     }
+
+    /// <summary>One saved item by id, or null when none has that id.</summary>
+    public UnsentItem? Find(Guid id)
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT id, kind, saved_utc, json FROM work WHERE id=$id";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadItem(reader) : null;
+    }
+
+    private static UnsentItem ReadItem(SqliteDataReader reader) =>
+        new(Guid.Parse(reader.GetString(0)), Enum.Parse<UnsentKind>(reader.GetString(1)),
+            DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture), reader.GetString(3));
 
     /// <summary>A logical fingerprint of every item (properties in ordinal order), independent of file bytes.</summary>
     public string Fingerprint()

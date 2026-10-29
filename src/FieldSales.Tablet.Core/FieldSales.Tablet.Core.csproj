@@ -12,6 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FieldSales.Snapshot.Contracts\FieldSales.Snapshot.Contracts.csproj" />
+    <ProjectReference Include="..\FieldSales.Ordering.Contracts\FieldSales.Ordering.Contracts.csproj" />
+    <ProjectReference Include="..\FieldSales.Quantities\FieldSales.Quantities.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="FieldSales.Tablet.Core.IntegrationTests" />
