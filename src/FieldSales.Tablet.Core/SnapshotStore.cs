@@ -275,7 +275,9 @@ public sealed partial class SnapshotStore
                 SnapshotLocation location = Entity<SnapshotLocation>(entity);
                 if (location.MainContactReplacement is { } replacement)
                 {
-                    if (!entity.GetProperty("mainContactReplacement").TryGetProperty("isInactive", out JsonElement status)
+                    if (!entity.TryGetProperty("mainContactReplacement", out JsonElement replacementJson)
+                        || replacementJson.ValueKind != JsonValueKind.Object
+                        || !replacementJson.TryGetProperty("isInactive", out JsonElement status)
                         || status.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
                         || location.MainContact is not null || replacement.ContactId == Guid.Empty || string.IsNullOrWhiteSpace(replacement.Name))
                         throw new InvalidDataException("A main-contact replacement must identify an outgoing contact and no active Main.");

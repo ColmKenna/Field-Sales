@@ -112,6 +112,7 @@ public sealed class LocationContactStatusTests : IDisposable
 
     [Theory]
     [InlineData("invalid-status")]
+    [InlineData("invalid-property-case")]
     [InlineData("bad-hash")]
     [InlineData("wrong-version")]
     [InlineData("conflicting-active-main")]
@@ -129,10 +130,18 @@ public sealed class LocationContactStatusTests : IDisposable
         if (fault == "conflicting-active-main")
             next = next with { Locations = [next.Locations[0] with { MainContact = original.Locations[0].MainContact }] };
         EncodedSnapshot encoded;
-        if (fault == "invalid-status")
+        if (fault is "invalid-status" or "invalid-property-case")
         {
             JsonObject json = JsonSerializer.SerializeToNode(next, SnapshotContract.JsonOptions)!.AsObject();
-            json["locations"]![0]!["mainContactReplacement"]!.AsObject().Remove("isInactive");
+            if (fault == "invalid-status")
+                json["locations"]![0]!["mainContactReplacement"]!.AsObject().Remove("isInactive");
+            else
+            {
+                JsonObject location = json["locations"]![0]!.AsObject();
+                JsonNode? status = location["mainContactReplacement"];
+                location.Remove("mainContactReplacement");
+                location["MainContactReplacement"] = status;
+            }
             encoded = EncodedSnapshot.FromJson(JsonSerializer.SerializeToUtf8Bytes(json), "1.2");
         }
         else encoded = EncodedSnapshot.From(next);
