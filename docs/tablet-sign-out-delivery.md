@@ -86,3 +86,49 @@ Verification at the increment 1 checkpoint:
 - The full solution suite and Android build remain scheduled for increment 4.
 
 Stopped for the required increment 1 review before implementing the warning.
+
+## Increment 2 — Warning component
+
+The developer approved proceeding with increment 2. `SignOutControl.razor`
+implements I-04's warning with the count and item types, Stay signed in,
+Sign out, and Open Sync & unsent. It requests a fresh list of kinds from its
+caller each time. No saved payloads are passed into the dialog. With no work it
+emits the sign-out request directly. Confirming closes the warning before
+emitting that request; opening Sync closes it and navigates to `/sync` without
+calling Sync. Stay and Escape return focus to the initiating button.
+
+The native modal dialog has an accessible name/description, keyboard focus
+wrapping, a backdrop and touch targets of at least 48px. CSS permits the main
+actions to stack at narrow widths. The JavaScript is loaded by the tablet's
+existing WebView entry page.
+
+Session and storage behavior remain unchanged. The control is ready for the
+real session handler: app-bar wiring in `MainLayout.razor` and enforcement of
+the current-rep/session boundary will be connected together in increment 3.
+There is no visible incomplete sign-out action in the production layout.
+
+Verification at the increment 2 checkpoint:
+
+- Complete component integration suite: **22 passed**, including **11 new**
+  warning cases; no failures or skips. The tests dispatch actual Razor events
+  and cover the count/types, all actions, zero items, singular wording,
+  recounting, separate SQLite workspaces, read failure/retry, and disposal
+  during a pending count.
+- Complete Tablet Core integration suite: **107 passed**, no failures or skips.
+  TRX files: `.artifacts/wi037/increment-2-tests/`.
+- **18 browser assertions passed** against the actual warning component,
+  production JavaScript/CSS and existing Sync component in an isolated desktop
+  host. They cover 800x1280, 1280x800 and 360x640 layouts and touch targets;
+  Tab/Shift+Tab containment; Escape/Stay focus restoration; confirmation and
+  zero-work callbacks; and offline Sync navigation without starting a transfer.
+  The host supplies test counts/session data; this does not verify native
+  logout or real credentials. No browser console errors remained.
+- The browser check exposed a native-dialog Tab transition to the page body.
+  Explicit focus wrapping fixed it; the complete browser check then passed.
+- JavaScript syntax and `git diff --check` passed. Full solution verification
+  and the Android build remain scheduled for increment 4.
+
+Browser check code/results and portrait/landscape screenshots are under
+`.artifacts/wi037/increment-2-*`. This was desktop browser execution, not an
+Android device test. Stopped for increment 2 review before session changes;
+the console remains `active`.

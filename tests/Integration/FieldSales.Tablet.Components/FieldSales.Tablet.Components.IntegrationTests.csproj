@@ -18,6 +18,7 @@
   <ItemGroup>
     <Compile Include="../../../src/FieldSales.Tablet/Components/Pages/OfflineCataloguePage.cs" Link="OfflineCataloguePage.cs" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/LocationDetail.razor" Link="LocationDetail.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Layout/SignOutControl.razor" Link="SignOutControl.razor" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
