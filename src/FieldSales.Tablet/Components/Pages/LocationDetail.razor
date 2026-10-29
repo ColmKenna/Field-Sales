@@ -59,7 +59,7 @@
             OfflineLocationDetail? read = await Task.Run(() => Tablet.ReadLocation(rep, id));
             if (isCurrent()) detail = read;
         }
-        catch (Exception error) when (error is IOException or Microsoft.Data.Sqlite.SqliteException)
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {
             if (isCurrent()) problem = "Shop details couldn't be opened. Your saved work is still on this tablet.";
         }

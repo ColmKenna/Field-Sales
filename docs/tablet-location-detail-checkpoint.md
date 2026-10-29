@@ -1,8 +1,9 @@
 # WI-035 — Location screen checkpoint
 
 Prepared 29 October 2026 for T-4.2.2 / REP-US-004. The developer approved the plan,
-scenario list and Apply. **Checkpoint review is pending.** Resume only with
-`Continue T-4.2.2`. WI-035 remains `active`.
+scenario list and Apply, then approved this rendered checkpoint with
+`Continue T-4.2.2` on 29 October 2026. Final verification and delivery are recorded
+in [the delivery report](tablet-location-detail-delivery.md).
 
 ## Approved scope decisions
 
@@ -91,12 +92,13 @@ on-device execution is claimed.
   SHA-256 `4A1D0424F40030CF6FEC6FEEF3E4D6E3B79F1185B2CD5E715379352324090EE3`.
 - `git diff --check` passed.
 
-## After checkpoint approval
+## Work authorized after checkpoint approval
 
-Run the complete existing application suite and agreed checks, audit criteria 1–4
-against the approved scope decisions, reconcile the final diff/commits, then set
-WI-035 to `done` and push the completed feature branch. Do not integrate it.
-WI-036 is next by console order, informational only.
+The complete existing application suite and agreed checks passed after approval;
+criteria 1–4 were audited against the approved scope decisions. WI-035 is now
+`done`; the final evidence is in [the delivery report](tablet-location-detail-delivery.md).
+Integration remains with the developer. WI-036 is next by console order,
+informational only.
 
 ## Missing information
 
