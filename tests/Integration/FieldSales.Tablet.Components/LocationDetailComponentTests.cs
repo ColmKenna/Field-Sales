@@ -115,16 +115,24 @@ public sealed class LocationDetailComponentTests
         Assert.DoesNotContain("/orders/", string.Join(" ", screen.Renderer.AttributeValues(screen.Id, "href")));
     }
 
-    [Theory]
-    [InlineData("Record Call")]
-    [InlineData("New Order")]
-    public async Task Should_ExplainTemporaryUnavailability_When_EitherActionIsTapped(string action)
+    [Fact]
+    public async Task Should_ExplainTemporaryUnavailability_When_RecordCallIsTapped()
     {
         await using var screen = new Screen((_, _) => Shop());
         await screen.Open(ShopId);
-        await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Renderer.Click(screen.Id, action));
-        Assert.Contains($"{action} isn't available on this tablet yet.", screen.Renderer.Text(screen.Id));
+        await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Renderer.Click(screen.Id, "Record Call"));
+        Assert.Contains("Record Call isn't available on this tablet yet.", screen.Renderer.Text(screen.Id));
         Assert.Empty(screen.Navigation.Destinations);
+    }
+
+    [Fact]
+    public async Task Should_OpenTheNewOrderScreenForTheShop_When_NewOrderIsTapped()
+    {
+        await using var screen = new Screen((_, _) => Shop());
+        await screen.Open(ShopId);
+        await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Renderer.Click(screen.Id, "New Order"));
+        Assert.Equal([$"/locations/{ShopId}/orders/new"], screen.Navigation.Destinations);
+        Assert.DoesNotContain("isn't available", screen.Renderer.Text(screen.Id));
     }
 
     [Fact]

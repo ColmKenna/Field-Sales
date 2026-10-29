@@ -61,11 +61,22 @@ public sealed partial class SnapshotStore
         List<SnapshotProductAttribute> attributes = [];
         using (SqliteDataReader reader = command.ExecuteReader())
             while (reader.Read()) attributes.Add(new(id, reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3)));
+        List<string> breadcrumb = ReadBreadcrumb(connection, transaction, generation, product.CategoryId);
+        transaction.Commit();
+        return new(product, breadcrumb, attributes);
+    }
+
+    /// <summary>A category's path from the root, read from one generation inside the caller's transaction.</summary>
+    private static List<string> ReadBreadcrumb(SqliteConnection connection, SqliteTransaction transaction, string generation, Guid categoryId)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "SELECT parent_id, name FROM categories WHERE generation=$g AND id=$category";
-        command.Parameters.AddWithValue("$category", product.CategoryId.ToString());
+        command.Parameters.AddWithValue("$g", generation);
+        command.Parameters.AddWithValue("$category", categoryId.ToString());
         List<string> breadcrumb = [];
         HashSet<Guid> visited = [];
-        Guid? category = product.CategoryId;
+        Guid? category = categoryId;
         while (category is Guid current && visited.Add(current))
         {
             command.Parameters["$category"].Value = current.ToString();
@@ -74,8 +85,7 @@ public sealed partial class SnapshotStore
             breadcrumb.Insert(0, reader.GetString(1));
             category = reader.IsDBNull(0) ? null : Guid.Parse(reader.GetString(0));
         }
-        transaction.Commit();
-        return new(product, breadcrumb, attributes);
+        return breadcrumb;
     }
 
     private static decimal? Number(SqliteDataReader reader, int column) => reader.IsDBNull(column) ? null

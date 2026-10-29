@@ -1,6 +1,8 @@
 <Solution>
   <!-- The tablet app needs the Android workload, so it builds outside FieldSales.slnx (P6). -->
   <Project Path="src/FieldSales.Snapshot.Contracts/FieldSales.Snapshot.Contracts.csproj" />
+  <Project Path="src/FieldSales.Ordering.Contracts/FieldSales.Ordering.Contracts.csproj" />
+  <Project Path="src/FieldSales.Quantities/FieldSales.Quantities.csproj" />
   <Project Path="src/FieldSales.Tablet.Core/FieldSales.Tablet.Core.csproj" />
   <Project Path="src/FieldSales.Tablet/FieldSales.Tablet.csproj" />
 </Solution>

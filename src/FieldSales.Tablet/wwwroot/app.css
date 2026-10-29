@@ -88,3 +88,28 @@ a:focus-visible, button:focus-visible { outline: 3px solid #c77f09; outline-offs
 .shop-recent h2 { margin-top: 0; }
 .shop-recent h3 { font-size: 1rem; margin: 16px 0 4px; }
 .shop-recent p { color: var(--muted); margin: 4px 0 16px; }
+
+.new-order { padding-bottom: 120px; }
+.new-order h1 { margin-top: 24px; }
+.order-shop { margin: 0 0 16px; color: var(--muted); }
+.product-results { list-style: none; margin: 16px 0 0; padding: 0; background: var(--surface); }
+.product-result { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; width: 100%; min-height: 72px; padding: 12px 16px; border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--ink); text-align: left; }
+.product-result span { color: var(--muted); font-size: .9rem; }
+.product-result .product-price { color: var(--ink); font-weight: 600; }
+.add-line { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 24px; padding: 20px 24px; background: var(--surface); border: 1px solid var(--brand); border-radius: 8px; }
+.add-line h2, .add-line p { margin: 0; }
+.add-line h2 { color: var(--ink); }
+.add-line-detail { color: var(--muted); }
+.add-line input { min-height: 48px; width: min(14rem, 100%); font: inherit; padding: 8px 12px; border: 1px solid var(--muted); border-radius: 6px; }
+.add-line button { margin-top: 8px; min-height: 56px; }
+.order-lines { margin-top: 24px; padding: 4px 24px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.order-lines ul { list-style: none; margin: 0; padding: 0; }
+.order-lines li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 4px 16px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.order-lines li span:nth-child(2) { grid-row: 2; grid-column: 1; color: var(--muted); font-size: .9rem; }
+.order-lines .line-total { font-weight: 600; }
+.order-footer { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px 24px; background: var(--surface); border-top: 1px solid var(--line); }
+.order-summary { margin: 0; font-weight: 600; }
+.ready-notice { margin: 16px 0; padding: 16px 20px; border-left: 6px solid #2f7d4f; background: #e8f3ec; font-weight: 600; }
+.unsent-summary { font-weight: 600; }
+.order-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.order-actions button { min-height: 56px; }

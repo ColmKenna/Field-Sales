@@ -1,11 +1,16 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
+using FieldSales.Ordering.Contracts;
 using Microsoft.Data.Sqlite;
 
 namespace FieldSales.Tablet.Core;
 
 public enum UnsentKind { Call, Order, ScheduleChange }
+
+/// <summary>What the rep's Unsent count shows: every saved item, and how many orders are still being built
+/// or are ready to send. An order whose body has no recognised state is counted in the total only.</summary>
+public sealed record UnsentSummary(int Total, int InProgress, int ReadyToSend);
 
 /// <summary>A piece of the rep's captured work, waiting for Sync. Location work uses a GUID string
 /// named locationId; capture screens (E5) define the remaining JSON body. Legacy bodies are preserved.</summary>
@@ -66,11 +71,41 @@ public sealed class UnsentStore(RepWorkspace workspace)
         command.CommandText = "SELECT id, kind, saved_utc, json FROM work ORDER BY id";
         using SqliteDataReader reader = command.ExecuteReader();
         List<UnsentItem> items = [];
-        while (reader.Read())
-            items.Add(new(Guid.Parse(reader.GetString(0)), Enum.Parse<UnsentKind>(reader.GetString(1)),
-                DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture), reader.GetString(3)));
+        while (reader.Read()) items.Add(ReadItem(reader));
         return items;
     }
+
+    /// <summary>Counts the rep's saved work. Asking never creates the database.</summary>
+    public UnsentSummary Summarise()
+    {
+        if (!File.Exists(workspace.UnsentPath)) return new(0, 0, 0);
+        int total = 0, inProgress = 0, ready = 0;
+        foreach (UnsentItem item in Read())
+        {
+            total++;
+            if (item.Kind != UnsentKind.Order) continue;
+            using JsonDocument body = JsonDocument.Parse(item.Json);
+            if (!body.RootElement.TryGetProperty("state", out JsonElement state) || state.ValueKind != JsonValueKind.String) continue;
+            if (state.ValueEquals(nameof(OrderState.InProgress))) inProgress++;
+            else if (state.ValueEquals(nameof(OrderState.ReadyToSend))) ready++;
+        }
+        return new(total, inProgress, ready);
+    }
+
+    /// <summary>One saved item by id, or null when none has that id.</summary>
+    public UnsentItem? Find(Guid id)
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT id, kind, saved_utc, json FROM work WHERE id=$id";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? ReadItem(reader) : null;
+    }
+
+    private static UnsentItem ReadItem(SqliteDataReader reader) =>
+        new(Guid.Parse(reader.GetString(0)), Enum.Parse<UnsentKind>(reader.GetString(1)),
+            DateTimeOffset.Parse(reader.GetString(2), CultureInfo.InvariantCulture), reader.GetString(3));
 
     /// <summary>A logical fingerprint of every item (properties in ordinal order), independent of file bytes.</summary>
     public string Fingerprint()

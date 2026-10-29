@@ -1,0 +1,227 @@
+@page "/locations/{LocationId:guid}/orders/new"
+@inherits OfflineCataloguePage
+@using System.Globalization
+@using FieldSales.Ordering.Contracts
+
+@* T-07 · Order entry (this slice: a standalone order built from search. The Order Pad, Low tab and Review come later). *@
+<section class="new-order">
+    <nav class="shop-back" aria-label="Order navigation"><a href="@($"/locations/{LocationId}")">Back to shop</a></nav>
+    @if (!Ready) { <h1>New order</h1><p role="status">Opening order…</p> }
+    else if (problem is not null) { <h1>New order unavailable</h1><p role="alert">@problem</p> }
+    else if (detail is not { IsAssigned: true }) { <h1>New order unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
+    else
+    {
+        <header class="order-header">
+            <h1>New order</h1>
+            <p class="order-shop">@detail.Location.Name</p>
+        </header>
+        @if (IsReady)
+        {
+            <p class="ready-notice" role="status">Ready to Send. It goes to head office at your next Sync.</p>
+        }
+        else
+        {
+            <div class="search-field">
+                <label for="product-search">Find a product</label>
+                <input id="product-search" type="search" value="@query" @oninput="SearchAsync" autocomplete="off" />
+            </div>
+        }
+        @if (!IsReady && !string.IsNullOrWhiteSpace(query))
+        {
+            <div role="status" aria-live="polite">
+                @if (results.Total == 0) { <p>No products match '@query.Trim()'</p> }
+                else if (results.Total > results.Results.Count) { <p>Showing @results.Results.Count of @results.Total matching products. Keep typing to narrow the list.</p> }
+                else { <p>@results.Total matching @(results.Total == 1 ? "product" : "products")</p> }
+            </div>
+            <ul class="product-results">
+                @foreach (ProductSearchResult product in results.Results)
+                {
+                    <li @key="product.Id">
+                        <button type="button" class="product-result" @onclick="() => Select(product)">
+                            <strong>@product.Name</strong>
+                            <span>@product.Code · @product.Breadcrumb</span>
+                            <span class="product-price">@(product.Price is decimal price ? Money(price) : "No price yet")</span>
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+        @if (!IsReady && selected is { } chosen)
+        {
+            <section class="add-line" aria-labelledby="add-line-heading">
+                <h2 id="add-line-heading">@chosen.Name</h2>
+                <p class="add-line-detail">@chosen.Code · @chosen.Breadcrumb</p>
+                @if (chosen.Price is decimal unitPrice) { <p class="add-line-price">@Money(unitPrice)@PerUnit(chosen.Unit)</p> }
+                else { <p class="problem" role="status">No price yet — this product can't be ordered.</p> }
+                <label for="line-quantity">Quantity@(chosen.Unit == "Each" ? "" : $" ({chosen.Unit})")</label>
+                <input id="line-quantity" type="text" inputmode="decimal" value="@quantityText" @oninput="QuantityChanged"
+                       disabled="@(chosen.Price is null)" autocomplete="off" />
+                <button type="button" class="primary" disabled="@(busy || chosen.Price is null)" @onclick="AddAsync">Add to order</button>
+                @if (addError is not null) { <p class="problem" role="alert">@addError</p> }
+            </section>
+        }
+        <section class="order-lines" aria-labelledby="order-lines-heading">
+            <h2 id="order-lines-heading">On this order</h2>
+            @if (order is null || order.Lines.Count == 0) { <p>No products yet.</p> }
+            else
+            {
+                <ul>
+                    @foreach (OrderLine line in order.Lines)
+                    {
+                        <li @key="line.Id">
+                            <strong>@line.ProductName</strong>
+                            <span>@line.ProductCode</span>
+                            <span class="line-quantity">@LineQuantity(line)</span>
+                            <span class="line-price">@Money(line.Price.Amount)@PerUnit(line.Unit)</span>
+                            <span class="line-total">@Money(line.Price.Amount * line.Quantity)</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+        <footer class="order-footer">
+            <p class="order-summary" role="status">@Summary</p>
+            @if (readyError is not null) { <p class="problem" role="alert">@readyError</p> }
+            <div class="order-actions">
+                <button type="button" class="secondary" @onclick="SaveAndClose">@(IsReady ? "Close" : "Save and close")</button>
+                @if (!IsReady) { <button type="button" class="primary" disabled="@busy" @onclick="MarkReadyAsync">Mark Ready to Send</button> }
+            </div>
+        </footer>
+    }
+</section>
+
+@code {
+    [Parameter] public Guid LocationId { get; set; }
+
+    // One order for the whole screen: the id is chosen here, so repeating an add can never start a second order.
+    private Guid orderId = Guid.NewGuid();
+    private Guid orderShop;
+    private string? rep;
+    private OfflineLocationDetail? detail;
+    private ProductSearchIndex? index;
+    private TabletOrder? order;
+    private string? problem;
+    private string query = "";
+    private ProductSearchOutcome results = new([], 0);
+    private int revision;
+    private ProductSearchResult? selected;
+    private string quantityText = "";
+    private string? addError;
+    private string? readyError;
+    private bool busy;
+
+    private bool IsReady => order is { State: OrderState.ReadyToSend };
+
+    private string Summary
+    {
+        get
+        {
+            int lines = order?.Lines.Count ?? 0;
+            return $"{lines} {(lines == 1 ? "line" : "lines")} · {Money(order?.Lines.Sum(line => line.Price.Amount * line.Quantity) ?? 0m)}";
+        }
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        if (orderShop != LocationId) { orderShop = LocationId; orderId = Guid.NewGuid(); ResetEntry(); }
+        return base.OnParametersSetAsync();
+    }
+
+    protected override void Clear() { rep = null; detail = null; index = null; order = null; problem = null; ResetEntry(); }
+
+    private void ResetEntry() { ++revision; query = ""; results = new([], 0); selected = null; quantityText = ""; addError = null; readyError = null; }
+
+    protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
+    {
+        Guid shop = LocationId, id = orderId;
+        try
+        {
+            OfflineLocationDetail? readDetail = null;
+            ProductSearchIndex? readIndex = null;
+            TabletOrder? readOrder = null;
+            await Task.Run(() =>
+            {
+                readDetail = Tablet.ReadLocation(repSubject, shop);
+                if (readDetail is not { IsAssigned: true }) return;
+                readIndex = Tablet.ReadProductIndex(repSubject);
+                readOrder = Tablet.ReadOrder(repSubject, id);
+            });
+            if (!isCurrent()) return;
+            rep = repSubject; detail = readDetail; index = readIndex; order = readOrder;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (isCurrent()) problem = "Order entry couldn't be opened. Your saved work is still on this tablet.";
+        }
+    }
+
+    private async Task SearchAsync(ChangeEventArgs args)
+    {
+        int current = ++revision;
+        query = args.Value?.ToString() ?? "";
+        results = new([], 0);
+        if (!Ready || index is null || string.IsNullOrWhiteSpace(query)) return;
+        ProductSearchIndex captured = index;
+        string text = query;
+        ProductSearchOutcome found = await Task.Run(() => captured.Search(text));
+        if (current != revision) return;
+        results = found;
+    }
+
+    private void Select(ProductSearchResult product) { selected = product; quantityText = ""; addError = null; }
+
+    private void QuantityChanged(ChangeEventArgs args) { quantityText = args.Value?.ToString() ?? ""; addError = null; }
+
+    private async Task AddAsync()
+    {
+        if (busy || rep is null || selected is not { Price: not null } product) return;
+        busy = true;
+        addError = null;
+        string repSubject = rep;
+        Guid shop = LocationId, id = orderId;
+        long version = Tablet.SessionVersion;
+        // Only digits and a decimal point count; anything else is "no quantity", and the product's own rule says what to enter.
+        decimal quantity = decimal.TryParse(quantityText.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal parsed) ? parsed : 0m;
+        try
+        {
+            OrderResult result = await Task.Run(() => Tablet.AddOrderLine(repSubject, id, shop, product.Id, quantity));
+            if (version != Tablet.SessionVersion || orderShop != shop) return;
+            if (result.Succeeded) { order = result.Order; ResetEntry(); }
+            else addError = result.Error;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version == Tablet.SessionVersion) addError = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task MarkReadyAsync()
+    {
+        if (busy || rep is null) return;
+        busy = true;
+        readyError = null;
+        string repSubject = rep;
+        Guid shop = LocationId, id = orderId;
+        long version = Tablet.SessionVersion;
+        try
+        {
+            OrderResult result = await Task.Run(() => Tablet.MarkOrderReady(repSubject, id));
+            if (version != Tablet.SessionVersion || orderShop != shop) return;
+            if (result.Succeeded) { order = result.Order; ResetEntry(); }
+            else readyError = result.Error;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version == Tablet.SessionVersion) readyError = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
+        }
+        finally { busy = false; }
+    }
+
+    private void SaveAndClose() => Navigation.NavigateTo($"/locations/{LocationId}");
+
+    private static string Money(decimal amount) => "€" + amount.ToString("N2", CultureInfo.InvariantCulture);
+    private static string PerUnit(string unit) => unit == "Each" ? "" : $" per {unit}";
+    private static string LineQuantity(OrderLine line) =>
+        line.Quantity.ToString("0.######", CultureInfo.InvariantCulture) + (line.Unit == "Each" ? "" : $" {line.Unit}");
+}
