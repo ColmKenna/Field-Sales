@@ -10,6 +10,7 @@ using System.Text.Json;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Coverage;
 using FieldSales.Api.Directory;
+using FieldSales.Api.Ordering;
 using FieldSales.Directory.Contracts;
 using FieldSales.Quantities;
 using FieldSales.ReferenceData;
@@ -456,7 +457,8 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
                 {
                     ["Authentication:Authority"] = Issuer,
                     ["ConnectionStrings:CatalogueDb"] = connectionString,
-                    ["ConnectionStrings:DirectoryDb"] = connectionString
+                    ["ConnectionStrings:DirectoryDb"] = connectionString,
+                    ["ConnectionStrings:OrderingDb"] = connectionString
                 }));
                 builder.ConfigureTestServices(services =>
                 {
@@ -465,6 +467,9 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
                         .UseSqlServer(connectionString).Options));
                     services.RemoveAll<DirectoryDbContext>();
                     services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>()
+                        .UseSqlServer(connectionString).Options));
+                    services.RemoveAll<OrderingDbContext>();
+                    services.AddScoped(_ => new OrderingDbContext(new DbContextOptionsBuilder<OrderingDbContext>()
                         .UseSqlServer(connectionString).Options));
                     services.RemoveAll<IStaffRoleLookup>();
                     services.AddSingleton<IStaffRoleLookup>(Roles);
@@ -481,6 +486,7 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
             await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
             await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
             await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
+            await scope.ServiceProvider.GetRequiredService<OrderingDbContext>().Database.MigrateAsync();
             _reset = new SnapshotDatabaseReset(connectionString);
             await _reset.InitializeAsync();
         }
@@ -627,6 +633,13 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
             .Where(row => row.Id == assignmentId).ExecuteDeleteAsync());
     }
 
+    public async Task ArchiveTownAsync(Guid townId)
+    {
+        await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
+        Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Towns
+            .Where(town => town.Id == townId).ExecuteUpdateAsync(set => set.SetProperty(town => town.IsArchived, true)));
+    }
+
     public async Task<Category> CategoryAsync(string name, Guid? parentId = null)
     {
         await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
@@ -669,6 +682,15 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
         db.Products.Add(product);
         await db.SaveChangesAsync();
         return product.Id;
+    }
+
+    // Moves an existing product into a group, as a later catalogue change would.
+    public async Task RestrictAsync(Guid productId, Guid groupId)
+    {
+        await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
+        CatalogueDbContext db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
+        (await db.Products.SingleAsync(row => row.Id == productId)).SetRestrictionGroup(await db.RestrictionGroups.SingleAsync(row => row.Id == groupId));
+        await db.SaveChangesAsync();
     }
 
     public async Task AddPriceAsync(Guid productId, decimal amount, DateOnly from)
