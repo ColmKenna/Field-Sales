@@ -371,6 +371,35 @@ public sealed class TabletUploadTests : IDisposable
         Assert.Equal([new(1, 3), new(2, 3), new(3, 3), UploadProgress.Finished], reported);
     }
 
+    // The Sync screen shows "Sending 1 of N…" from the tap, before the session check and the token (found on the Samsung).
+    [Fact]
+    public async Task Should_CountWhatTheNextSyncWouldSend_When_TheScreenStartsASync()
+    {
+        Assert.Equal(0, WorkUploader.CountWaiting(tablet.Workspace("colm")));
+        await tablet.SyncAsync(morning);
+        Call(0, 30);
+        Call(1, 20);
+        Order(2, ready: true);
+        Order(0, ready: false);
+        Unsent().Save(new(Guid.NewGuid(), UnsentKind.ScheduleChange, tablet.Clock.GetUtcNow(), "{}"));
+
+        Assert.Equal(3, WorkUploader.CountWaiting(tablet.Workspace("colm")));
+    }
+
+    [Fact]
+    public async Task Should_ReportNothing_When_NothingIsWaitingToSend()
+    {
+        await tablet.SyncAsync(morning);
+        Order(0, ready: false);
+        tablet.Server.Serve(EncodedSnapshot.From(morning));
+        List<UploadProgress> reported = [];
+
+        SyncOutcome outcome = await SyncAsync(new SynchronousProgress(reported.Add));
+
+        Assert.Equal((SyncStatus.Completed, UploadSummary.None), (outcome.Status, outcome.Upload));
+        Assert.Empty(reported);
+    }
+
     private sealed class SynchronousProgress(Action<UploadProgress> report) : IProgress<UploadProgress>
     {
         public void Report(UploadProgress value) => report(value);

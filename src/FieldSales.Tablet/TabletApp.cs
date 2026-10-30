@@ -175,6 +175,8 @@ public sealed class TabletApp : IDisposable
     /// <summary>The rep's Unsent count: every saved item, and how many orders are in progress or ready to send.</summary>
     public UnsentSummary ReadUnsentSummary(string rep) => new UnsentStore(device.Workspace(rep)).Summarise();
 
+    public int CountWaitingToSend(string rep) => WorkUploader.CountWaiting(device.Workspace(rep));
+
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
 
     private TabletSync Sync(string rep) => new(device.Workspace(rep), endpoints.Api, device.Tokens(rep, endpoints.Identity), space, clock);

@@ -42,6 +42,10 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
         .. work.Where(item => item.Kind == UnsentKind.Order && IsReadyToSend(item)).OrderBy(item => item.SavedUtc).ThenBy(item => item.Id)
     ];
 
+    /// <summary>How many items the next Sync would send, so the screen can say "Sending 1 of 3…" before it starts.</summary>
+    public static int CountWaiting(RepWorkspace workspace) =>
+        File.Exists(workspace.UnsentPath) ? Queue(new UnsentStore(workspace).Read()).Count : 0;
+
     public async Task<(UploadSummary Summary, UploadStop Stop)> UploadAsync(string token, SnapshotHooks hooks,
         IProgress<UploadProgress>? progress, CancellationToken ct)
     {

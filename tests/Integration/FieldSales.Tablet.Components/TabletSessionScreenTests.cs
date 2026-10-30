@@ -144,6 +144,26 @@ public sealed class TabletSessionScreenTests
         Assert.Equal(["/home"], screen.Navigation.Destinations);
     }
 
+    // Found on the Samsung: before the first report (session check, token) the screen read "Downloading your day…" first.
+    [Theory]
+    [InlineData(2, "Sending 1 of 2…", "Downloading your day…")]
+    [InlineData(0, "Downloading your day…", "Sending")]
+    public async Task Should_ShowWhatGoesFirst_When_SyncStartsBeforeAnyReport(int waiting, string shown, string notShown)
+    {
+        TaskCompletionSource<SyncOutcome> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.CountWaiting = rep => rep == "colm" ? waiting : 0;
+        screen.Tablet.SyncWork = (_, _) => pending.Task;
+        await screen.Open(new());
+        Task syncing = screen.Click("Sync now");
+
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains(shown));
+        Assert.DoesNotContain(notShown, screen.Renderer.Text(screen.Id));
+
+        pending.SetResult(new(SyncStatus.Completed, "Last synced 07:42", null) { Upload = new(waiting, waiting) });
+        await syncing;
+    }
+
     // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
     [Theory]
     [InlineData(SyncStatus.Completed, 3, 1, "2 items not sent. They'll send next Sync.", null)]

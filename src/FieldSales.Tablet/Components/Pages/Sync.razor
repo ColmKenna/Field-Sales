@@ -86,6 +86,12 @@
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException or System.Text.Json.JsonException) { return null; }
     }
 
+    private int ReadWaiting(string repSubject)
+    {
+        try { return Tablet.CountWaitingToSend(repSubject); }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException or System.Text.Json.JsonException) { return 0; }
+    }
+
     private string UnsentText
     {
         get
@@ -102,7 +108,9 @@
         if (busy || disposed || rep is null) return;
         string capturedRep = rep;
         long version = Tablet.SessionVersion;
-        busy = true; message = null; notSent = null; sending = null;
+        // "Sending 1 of 3…" from the tap: the session check and the sign-in token come before the first report.
+        int waiting = ReadWaiting(capturedRep);
+        busy = true; message = null; notSent = null; sending = waiting > 0 ? new(1, waiting) : null;
         // Reports arrive on this page's context, one per item, then once more when the uploads are over.
         Progress<UploadProgress> progress = new(report =>
         {
