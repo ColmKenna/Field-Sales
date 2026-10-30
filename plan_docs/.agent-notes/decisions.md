@@ -3,6 +3,32 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-039 upload protocol and MI-52 (2026-10-29/30, developer, plan approval)
+
+The developer replied **Approved** to the WI-039 plan (decisions D1–D11, full text in `WI-039.md`), then on 2026-10-30
+accepted the A5/A6 stand-ins, asked for the directory and ordering migration bundles to be added, and asked for a PR at the end.
+
+- **Identity:** the id the tablet gives an item at capture is its identity across retries. The server stores a SHA-256 of
+  the body, but it is not part of identity. One `PUT` per item (`TabletUploadContract` in `FieldSales.Snapshot.Contracts`;
+  the snapshot document and version are unchanged). 201 `Received` / 200 `AlreadyReceived`; the tablet marks Sent on either,
+  immediately after each confirmation. A lost confirmation is recovered by re-sending. That is the whole protocol.
+- **Same id, different body:** the first version is kept, the re-send is counted on the ledger row, and it is confirmed.
+  Today's tablet can't change an item once finished. **WI-046 (edit/reopen) and Call corrections must decide** what happens
+  to an item changed after an upload attempt whose confirmation was lost.
+- **MI-52 is decided — the technical faults** (`UploadFaults` codes in the problem response's `fault` extension):
+  `corrupt`, `unsupported`, `incomplete`, `not-yours` (400), `id-in-use` (409: another rep's item or another kind already
+  has the id), `too-large` (413, over 1 MiB). Nothing else is ever refused: the receiver never reads the catalogue or
+  directory (BR-NEW-006). A duplicate is not a fault. **WI-042** turns these codes into rep sentences (T1.2).
+- **Server store:** `OrderingDb` (API `Ordering` folder): `ReceivedWork` ledger for every kind, body verbatim, and `Orders`
+  with status **Pending** in the same transaction. Order lines stay in the body; **WI-067** decides line tables. Calls live in
+  the ledger only until Sales Operations has a store. **WI-047** defines the Call body, its structure checks and its
+  snapshot reference.
+- **Upload order:** Calls, then Ready to Send Orders, oldest saved first. No server-side link check between a Call and its Order.
+- **Tablet Sent state:** the Unsent database (v2) moves a confirmed item from `work` to a `sent` table in one transaction.
+  Sent items no longer count as unsent and no longer keep their shop's details on the tablet.
+- **Sync sequence:** token, uploads, space check, download. The download runs whatever the upload outcome; a 401/403 stops
+  everything; a dropped connection or 5xx stops the remaining uploads only. **WI-040** owns the cause wording.
+
 ## WI-021 reporting-line source (2026-10-03, developer, planning)
 
 - The developer selected **Store reporting lines in Field Sales business data,

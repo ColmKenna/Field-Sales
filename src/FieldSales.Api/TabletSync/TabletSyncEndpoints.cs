@@ -15,7 +15,10 @@ public static class TabletSyncEndpoints
     public static void MapTabletSyncEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet(SnapshotContract.Path, GetSnapshotAsync).RequireAuthorization(Policy);
-        app.MapPut(TabletUploadContract.OrdersPath + "/{id:guid}", ReceiveOrderAsync).RequireAuthorization(Policy);
+        app.MapPut(TabletUploadContract.OrdersPath + "/{id:guid}", (Guid id, HttpContext http, TabletWorkReceiver receiver, CancellationToken ct) =>
+            ReceiveAsync(id, http, (subject, body) => receiver.ReceiveOrderAsync(id, subject, body, ct), ct)).RequireAuthorization(Policy);
+        app.MapPut(TabletUploadContract.CallsPath + "/{id:guid}", (Guid id, HttpContext http, TabletWorkReceiver receiver, CancellationToken ct) =>
+            ReceiveAsync(id, http, (subject, body) => receiver.ReceiveCallAsync(id, subject, body, ct), ct)).RequireAuthorization(Policy);
     }
 
     // The snapshot is always the caller's own; no request field can name another rep.
@@ -46,12 +49,13 @@ public static class TabletSyncEndpoints
     }
 
     // An uploaded item is always the caller's own: the rep is taken from the token, never from the body.
-    private static async Task<IResult> ReceiveOrderAsync(Guid id, HttpContext http, TabletWorkReceiver receiver, CancellationToken ct)
+    private static async Task<IResult> ReceiveAsync(Guid id, HttpContext http, Func<string, byte[], Task<ReceiveResult>> receive,
+        CancellationToken ct)
     {
         byte[]? body = await ReadBodyAsync(http.Request, ct);
         if (body is null)
-            return Results.Problem(title: "This item is too large to send.", statusCode: StatusCodes.Status413PayloadTooLarge);
-        return Respond(id, await receiver.ReceiveOrderAsync(id, http.User.GetStaffSubject()!, body, ct));
+            return Fault(StatusCodes.Status413PayloadTooLarge, UploadFaults.TooLarge, "This item is larger than the server accepts.");
+        return Respond(id, await receive(http.User.GetStaffSubject()!, body));
     }
 
     private static IResult Respond(Guid id, ReceiveResult result) => result.Outcome switch
@@ -60,9 +64,12 @@ public static class TabletSyncEndpoints
             UploadJsonContext.Default.UploadReceipt, statusCode: StatusCodes.Status201Created),
         ReceiveOutcome.AlreadyReceived => Results.Json(new UploadReceipt(id, UploadReceiptStatus.AlreadyReceived),
             UploadJsonContext.Default.UploadReceipt, statusCode: StatusCodes.Status200OK),
-        ReceiveOutcome.Conflict => Results.Problem(title: "This item's id is already in use.", statusCode: StatusCodes.Status409Conflict),
-        _ => Results.Problem(title: "This item couldn't be received.", detail: result.Fault, statusCode: StatusCodes.Status400BadRequest)
+        ReceiveOutcome.Conflict => Fault(StatusCodes.Status409Conflict, result.Fault!, result.Detail!),
+        _ => Fault(StatusCodes.Status400BadRequest, result.Fault!, result.Detail!)
     };
+
+    private static IResult Fault(int status, string fault, string detail) => Results.Problem(title: "This item couldn't be received.",
+        detail: detail, statusCode: status, extensions: new Dictionary<string, object?> { [UploadFaults.ProblemKey] = fault });
 
     // Reads at most the contract's limit; null means the item is larger.
     private static async Task<byte[]?> ReadBodyAsync(HttpRequest request, CancellationToken ct)

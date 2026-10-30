@@ -26,6 +26,26 @@ public static class TabletUploadContract
     public static JsonSerializerOptions JsonOptions => UploadJsonContext.Default.Options;
 }
 
+/// <summary>Why the server refused an item (MI-52). Each is a technical fault, never a business rule: work is judged
+/// as captured (BR-NEW-006). A refusal is a problem response whose <see cref="ProblemKey"/> extension holds one of these
+/// codes; the tablet leaves the item unsent. A re-send is not a fault: it is confirmed as already received.</summary>
+public static class UploadFaults
+{
+    public const string ProblemKey = "fault";
+    /// <summary>The body isn't a JSON object that can be read (400).</summary>
+    public const string Corrupt = "corrupt";
+    /// <summary>The body is a kind or version of item this server doesn't read (400).</summary>
+    public const string Unsupported = "unsupported";
+    /// <summary>Something the item must carry is missing or doesn't match where it was sent (400).</summary>
+    public const string Incomplete = "incomplete";
+    /// <summary>The item names a different rep from the one signed in (400).</summary>
+    public const string NotYours = "not-yours";
+    /// <summary>Another rep's item, or an item of another kind, already has this id (409).</summary>
+    public const string IdInUse = "id-in-use";
+    /// <summary>The body is larger than <see cref="TabletUploadContract.MaximumBodyBytes"/> (413).</summary>
+    public const string TooLarge = "too-large";
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<UploadReceiptStatus>))]
 public enum UploadReceiptStatus { Received, AlreadyReceived }
 

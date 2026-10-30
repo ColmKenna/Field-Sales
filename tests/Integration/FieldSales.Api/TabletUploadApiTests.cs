@@ -179,6 +179,117 @@ public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClass
         Assert.Empty(await OrdersAsync());
     }
 
+    [Fact]
+    public async Task Should_StoreTheCallAsReceivedAndConfirmOnce_When_ASavedCallIsUploadedTwice()
+    {
+        // Record Call (WI-047) defines a Call's contents; until then the server stores whatever object the tablet saved.
+        Guid id = Guid.NewGuid();
+        string body = $$"""{"id":"{{id}}","locationId":"{{Hickeys}}","channel":"InPerson","pitchNotes":"Autumn range"}""";
+
+        using HttpResponseMessage first = await UploadAsync("colm", id, body, TabletUploadContract.CallPath(id));
+        using HttpResponseMessage again = await UploadAsync("colm", id, body, TabletUploadContract.CallPath(id));
+
+        Assert.Equal((HttpStatusCode.Created, HttpStatusCode.OK), (first.StatusCode, again.StatusCode));
+        Assert.Equal(new UploadReceipt(id, UploadReceiptStatus.Received),
+            await first.Content.ReadFromJsonAsync(UploadJsonContext.Default.UploadReceipt));
+        Assert.Equal(new UploadReceipt(id, UploadReceiptStatus.AlreadyReceived),
+            await again.Content.ReadFromJsonAsync(UploadJsonContext.Default.UploadReceipt));
+        ReceivedWork work = Assert.Single(await WorkAsync());
+        Assert.Equal((ReceivedWorkKind.Call, "colm", body, 0), (work.Kind, work.RepSubject, work.Body, work.ResentWithChangesCount));
+        Assert.Empty(await OrdersAsync());
+    }
+
+    [Theory]
+    [InlineData("order", "not json", UploadFaults.Corrupt)]
+    [InlineData("order", "[]", UploadFaults.Corrupt)]
+    [InlineData("order", "unknown state", UploadFaults.Corrupt)]
+    [InlineData("order", "other schema", UploadFaults.Unsupported)]
+    [InlineData("order", "newer version", UploadFaults.Unsupported)]
+    [InlineData("order", "id mismatch", UploadFaults.Incomplete)]
+    [InlineData("order", "in progress", UploadFaults.Incomplete)]
+    [InlineData("order", "no lines", UploadFaults.Incomplete)]
+    [InlineData("order", "no snapshot", UploadFaults.Incomplete)]
+    [InlineData("order", "zero quantity", UploadFaults.Incomplete)]
+    [InlineData("call", "not json", UploadFaults.Corrupt)]
+    [InlineData("call", "[]", UploadFaults.Corrupt)]
+    [InlineData("call", "id mismatch", UploadFaults.Incomplete)]
+    public async Task Should_RefuseWithoutStoring_When_TheBodyIsCorruptIncompleteOrUnsupported(string kind, string fault, string expected)
+    {
+        Guid id = Guid.NewGuid();
+        TabletOrder order = Order(id, Hickeys, VitaminD);
+        string body = (kind, fault) switch
+        {
+            (_, "not json") => "{\"id\":",
+            (_, "[]") => "[]",
+            ("order", "unknown state") => Json(order).Replace("\"ReadyToSend\"", "\"Shipped\"", StringComparison.Ordinal),
+            ("order", "other schema") => Json(order with { Schema = "field-sales-call" }),
+            ("order", "newer version") => Json(order with { Version = OrderContract.CurrentVersion + 1 }),
+            ("order", "id mismatch") => Json(order with { Id = Guid.NewGuid() }),
+            ("order", "in progress") => Json(order with { State = OrderState.InProgress }),
+            ("order", "no lines") => Json(order with { Lines = [] }),
+            ("order", "no snapshot") => Json(order with { Snapshot = null! }),
+            ("order", "zero quantity") => Json(order with { Lines = [order.Lines[0] with { Quantity = 0m }] }),
+            ("call", "id mismatch") => $$"""{"id":"{{Guid.NewGuid()}}"}""",
+            _ => throw new ArgumentOutOfRangeException(nameof(fault))
+        };
+
+        using HttpResponseMessage response = await UploadAsync("colm", id, body, kind == "order" ? null : TabletUploadContract.CallPath(id));
+
+        Assert.Equal((HttpStatusCode.BadRequest, expected), (response.StatusCode, await FaultAsync(response)));
+        Assert.Empty(await WorkAsync());
+        Assert.Empty(await OrdersAsync());
+    }
+
+    [Fact]
+    public async Task Should_RefuseWithoutStoring_When_TheOrderNamesAnotherCapturingRep()
+    {
+        TabletOrder order = Order(Guid.NewGuid(), Hickeys, VitaminD, rep: "aoife");
+
+        using HttpResponseMessage response = await UploadAsync("colm", order.Id, Json(order));
+
+        Assert.Equal((HttpStatusCode.BadRequest, UploadFaults.NotYours), (response.StatusCode, await FaultAsync(response)));
+        Assert.Empty(await WorkAsync());
+    }
+
+    [Theory]
+    [InlineData("another rep")]
+    [InlineData("another kind")]
+    public async Task Should_RefuseWithoutConfirming_When_AnotherRepAlreadyUsedTheId(string clash)
+    {
+        TabletOrder colms = Order(Guid.NewGuid(), Hickeys, VitaminD);
+        using HttpResponseMessage stored = await UploadAsync("colm", colms.Id, Json(colms));
+        Assert.Equal(HttpStatusCode.Created, stored.StatusCode);
+
+        using HttpResponseMessage response = clash == "another rep"
+            ? await UploadAsync("aoife", colms.Id, Json(colms with { CapturingRep = "aoife" }))
+            : await UploadAsync("colm", colms.Id, $$"""{"id":"{{colms.Id}}"}""", TabletUploadContract.CallPath(colms.Id));
+
+        Assert.Equal((HttpStatusCode.Conflict, UploadFaults.IdInUse), (response.StatusCode, await FaultAsync(response)));
+        ReceivedWork work = Assert.Single(await WorkAsync());
+        Assert.Equal(("colm", ReceivedWorkKind.Order, Json(colms), 0), (work.RepSubject, work.Kind, work.Body, work.ResentWithChangesCount));
+    }
+
+    [Fact]
+    public async Task Should_RefuseWithoutStoring_When_AnItemIsLargerThanTheLimit()
+    {
+        TabletOrder order = Order(Guid.NewGuid(), Hickeys, VitaminD);
+        string json = Json(order);
+        // Valid JSON padded with whitespace to one byte over the limit.
+        string body = json + new string(' ', TabletUploadContract.MaximumBodyBytes - Encoding.UTF8.GetByteCount(json) + 1);
+
+        using HttpResponseMessage response = await UploadAsync("colm", order.Id, body);
+        using HttpResponseMessage atLimit = await UploadAsync("colm", order.Id, body[..^1]);
+
+        Assert.Equal((HttpStatusCode.RequestEntityTooLarge, UploadFaults.TooLarge), (response.StatusCode, await FaultAsync(response)));
+        Assert.Equal(HttpStatusCode.Created, atLimit.StatusCode);
+    }
+
+    private static async Task<string?> FaultAsync(HttpResponseMessage response)
+    {
+        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return problem.RootElement.TryGetProperty(UploadFaults.ProblemKey, out JsonElement fault) ? fault.GetString() : null;
+    }
+
     private static TabletOrder Order(Guid id, Guid locationId, Guid productId, string rep = "colm", OrderSnapshotRef? snapshot = null,
         string code = "VD-1000", string name = "Vitamin D 1000IU 90s", decimal price = 8.95m)
     {
@@ -196,10 +307,10 @@ public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClass
 
     private static string Sha256(string body) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(body)));
 
-    private async Task<HttpResponseMessage> UploadAsync(string rep, Guid id, string body)
+    private async Task<HttpResponseMessage> UploadAsync(string rep, Guid id, string body, string? path = null)
     {
         using HttpClient client = _app.ClientAs(rep, [BusinessRoles.FieldSalesperson]);
-        return await client.PutAsync(TabletUploadContract.OrderPath(id), Content(body));
+        return await client.PutAsync(path ?? TabletUploadContract.OrderPath(id), Content(body));
     }
 
     private async Task<ReceivedWork[]> WorkAsync()
