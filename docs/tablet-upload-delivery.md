@@ -109,9 +109,29 @@ On the final code (30 October 2026, Docker running):
 - One WI-033 test (`ProductAttributeIntegrationTests`) saved a Call to prove a download leaves unsent work alone. Sync now
   sends Calls first, so it saves a schedule change instead, which Sync never sends; its assertions are unchanged.
 
+## Device check (30 October 2026)
+
+On the Samsung tablet (R52T30AZZXZ) against the demo AppHost, with a dev-trust Release APK, signed in as colm:
+
+- Three orders for Swords Shop, each marked Ready to Send and sent by its own Sync. Each Sync showed "Sending 1 of 1…"
+  with the progress bar, then "Downloading your day…", then went to Home. The Sync screen then showed nothing unsent.
+- `FieldSalesDemo_OrderingDb` holds three `ReceivedWork` rows, one per order, each Pending with no re-sends, and the
+  SHA-256 of each stored body equals its `ContentSha256`. The first body was read back in full: 12 × DEMO-002 at €3.20,
+  Swords Shop, capturing rep `fieldsales-demo-colm`.
+- **Fixed during the check.** For about a second after the tap the screen read "Downloading your day…" before
+  "Sending 1 of 1…", because `TabletApp.SyncAsync` checks the session before the first progress report. The screen now
+  asks `WorkUploader.CountWaiting` when the rep taps Sync now and starts at "Sending 1 of N…" when work is waiting.
+  Covered by a Core count test, a nothing-waiting test and a screen theory; confirmed on the tablet. After the fix:
+  Release build 0 warnings; Tablet Core integration 173, Tablet Components 51 and the API upload tests 31 passed.
+- **Sign-in returned to the sign-in screen at first.** The APK carried this PC's certificate but a stale network security
+  configuration from an earlier build without dev trust, so the app's token request failed TLS while the browser page
+  worked. A clean rebuild of the tablet project's Release Android output fixed it; no code changed. Switching between
+  `-DevTrust` and plain builds needs a clean of `obj/Release/net10.0-android`.
+- **Seen, not part of WI-039:** shop rows on Home are not tappable (only search results open a shop, since WI-034), and
+  New Order's fixed footer sits under the Samsung taskbar so Mark Ready to Send is mostly hidden (WI-038).
+
 ## Not verified here
 
-- No device run. "Sending 2 of 3" and the progress bar were not seen on the Samsung; the bar's wrap uses CSS `:has()`.
 - **Migration bundles don't run on this machine.** All seven bundles build, but every one, including the existing
   staff-web and catalogue bundles, fails at run time with "Could not load file or assembly
   Microsoft.EntityFrameworkCore.SqlServer, Version=10.0.10.0". This predates WI-039 and was not fixed here.
