@@ -16,20 +16,29 @@ public sealed record UnsentSummary(int Total, int InProgress, int ReadyToSend);
 /// named locationId; capture screens (E5) define the remaining JSON body. Legacy bodies are preserved.</summary>
 public sealed record UnsentItem(Guid Id, UnsentKind Kind, DateTimeOffset SavedUtc, string Json);
 
+/// <summary>An item the server confirmed at Sync (T-4.1.2), exactly as it was sent. Read-only on the tablet.</summary>
+public sealed record SentItem(UnsentItem Item, DateTimeOffset SentUtc);
+
 /// <summary>The rep's Unsent work, in its own database. Snapshot replacement may read Location
 /// references to retain shop details, but never rewrites this database.</summary>
+/// <remarks>Format 2 (T-4.1.2) adds the items the server has confirmed. Confirming moves an item out of the Unsent
+/// work in one transaction, so it stops counting as unsent and is never offered for upload again.</remarks>
 public sealed class UnsentStore(RepWorkspace workspace)
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
+    private const string SentTable = """
+        CREATE TABLE sent(id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('Call','Order','ScheduleChange')),
+            saved_utc TEXT NOT NULL, sent_utc TEXT NOT NULL, json TEXT NOT NULL);
+        """;
     private const string Schema = """
         CREATE TABLE work(id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('Call','Order','ScheduleChange')),
             saved_utc TEXT NOT NULL, json TEXT NOT NULL);
-        """;
+        """ + SentTable;
 
     private SqliteConnection Open()
     {
         SqliteConnection connection = SqliteEngine.Open(workspace.UnsentPath);
-        SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema);
+        SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema, upgradeFromPrevious: SentTable);
         return connection;
     }
 
@@ -101,6 +110,49 @@ public sealed class UnsentStore(RepWorkspace workspace)
         command.Parameters.AddWithValue("$id", id.ToString());
         using SqliteDataReader reader = command.ExecuteReader();
         return reader.Read() ? ReadItem(reader) : null;
+    }
+
+    /// <summary>Records that the server confirmed this item: it leaves the Unsent work and is kept as Sent, in one
+    /// transaction. False when no unsent item has this id (it was already marked).</summary>
+    public bool MarkSent(Guid id, DateTimeOffset sentUtc)
+    {
+        using SqliteConnection connection = Open();
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO sent(id, kind, saved_utc, sent_utc, json) SELECT id, kind, saved_utc, $sent, json FROM work WHERE id=$id;
+            DELETE FROM work WHERE id=$id;
+            """;
+        command.Parameters.AddWithValue("$id", id.ToString());
+        command.Parameters.AddWithValue("$sent", sentUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+        int changed = command.ExecuteNonQuery();
+        transaction.Commit();
+        return changed > 0;
+    }
+
+    /// <summary>The items the server has confirmed, as they were sent.</summary>
+    public IReadOnlyList<SentItem> ReadSent()
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT id, kind, saved_utc, json, sent_utc FROM sent ORDER BY id";
+        using SqliteDataReader reader = command.ExecuteReader();
+        List<SentItem> items = [];
+        while (reader.Read())
+            items.Add(new(ReadItem(reader), DateTimeOffset.Parse(reader.GetString(4), CultureInfo.InvariantCulture)));
+        return items;
+    }
+
+    /// <summary>Whether the server has confirmed an item with this id. Asking never creates the database.</summary>
+    public bool IsSent(Guid id)
+    {
+        if (!File.Exists(workspace.UnsentPath)) return false;
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM sent WHERE id=$id";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        return command.ExecuteScalar() is not null;
     }
 
     private static UnsentItem ReadItem(SqliteDataReader reader) =>
