@@ -6,7 +6,7 @@ public static class DemoProfile
     public const int SqlPort = 14339;
     public const string VolumeName = "fieldsales-demo-sqlserver-data";
     public static readonly IReadOnlyList<string> Databases =
-        ["IdentityDb", "IdentityConfigDb", "IdentityOperationalDb", "StaffWebDb", "CatalogueDb", "DirectoryDb"];
+        ["IdentityDb", "IdentityConfigDb", "IdentityOperationalDb", "StaffWebDb", "CatalogueDb", "DirectoryDb", "OrderingDb"];
 
     public static string DatabaseName(string resourceName)
     {

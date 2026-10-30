@@ -52,7 +52,9 @@ public sealed class ProductAttributeIntegrationTests(ProductApplication app) : I
         try
         {
             UnsentStore unsent = new(workspace);
-            unsent.Save(new(Guid.NewGuid(), UnsentKind.Call, DateTimeOffset.UtcNow, "{\"outcome\":\"Visited\"}"));
+            // Sync sends Calls and Ready to Send Orders first (WI-039) but never schedule changes (E13), so this saved work
+            // must come through the download untouched.
+            unsent.Save(new(Guid.NewGuid(), UnsentKind.ScheduleChange, DateTimeOffset.UtcNow, "{\"outcome\":\"Visited\"}"));
             string fingerprint = unsent.Fingerprint();
             TabletSync sync = new(workspace, download, new FlowTokens(token), new DriveStorageSpace());
             SyncOutcome outcome = await sync.SyncAsync();

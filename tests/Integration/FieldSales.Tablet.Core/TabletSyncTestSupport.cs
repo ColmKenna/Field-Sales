@@ -49,10 +49,16 @@ public static class Snapshots
 }
 
 /// <summary>Stands in for the Field Sales API, with the faults a real connection can produce.</summary>
+/// <remarks>Uploads (T-4.1.2) have their own responder, so a test that only serves a snapshot still has every upload
+/// refused as unavailable: saved work stays unsent and the download is attempted regardless.</remarks>
 public sealed class FakeSnapshotServer : HttpMessageHandler
 {
+    public const string UploadPathPrefix = "/tablet/uploads/";
+
     public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } = _ => new(HttpStatusCode.ServiceUnavailable);
+    public Func<HttpRequestMessage, HttpResponseMessage> RespondToUpload { get; set; } = _ => new(HttpStatusCode.ServiceUnavailable);
     public List<(string Path, string? Authorization, string? Majors)> Requests { get; } = [];
+    public List<(string Path, string Body)> Uploads { get; } = [];
 
     public void Serve(EncodedSnapshot snapshot, Func<byte[], HttpContent>? content = null, string? gzipHash = null,
         string? plainHash = null) => Respond = _ =>
@@ -67,11 +73,14 @@ public sealed class FakeSnapshotServer : HttpMessageHandler
 
     public HttpClient Client() => new(this) { BaseAddress = new Uri("https://api.test/") };
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        Requests.Add((request.RequestUri!.AbsolutePath, request.Headers.Authorization?.ToString(),
+        string path = request.RequestUri!.AbsolutePath;
+        Requests.Add((path, request.Headers.Authorization?.ToString(),
             request.Headers.TryGetValues(SnapshotContract.AcceptedMajorsHeader, out IEnumerable<string>? majors) ? string.Join(",", majors) : null));
-        return Task.FromResult(Respond(request));
+        if (!path.StartsWith(UploadPathPrefix, StringComparison.Ordinal)) return Respond(request);
+        Uploads.Add((path, request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken)));
+        return RespondToUpload(request);
     }
 }
 

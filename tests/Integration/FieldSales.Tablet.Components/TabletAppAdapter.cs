@@ -31,13 +31,20 @@ public sealed class TabletApp
     public Func<string, UnsentSummary> ReadSummary { get; set; } = _ => new UnsentSummary(0, 0, 0);
     public OrderResult MarkOrderReady(string rep, Guid orderId) => MarkWork(rep, orderId);
     public UnsentSummary ReadUnsentSummary(string rep) => ReadSummary(rep);
+    public Func<string, int> CountWaiting { get; set; } = _ => 0;
+    public int CountWaitingToSend(string rep) => CountWaiting(rep);
     public ProductSearchIndex ReadProductIndex(string rep) => ReadIndex(rep);
     public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
         AddWork(rep, orderId, locationId, productId, quantity);
     public TabletOrder? ReadOrder(string rep, Guid orderId) => FindOrder(rep, orderId);
     public Func<string, CancellationToken, Task<SyncOutcome>> SyncWork { get; set; } = (_, _) =>
         Task.FromResult(new SyncOutcome(SyncStatus.Completed, "Last synced 07:42", null));
-    public Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default) => SyncWork(rep, ct);
+    public IProgress<UploadProgress>? Progress { get; private set; }
+    public Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default, IProgress<UploadProgress>? progress = null)
+    {
+        Progress = progress;
+        return SyncWork(rep, ct);
+    }
 }
 
 public sealed record HomeView(string LastSynced, IReadOnlyList<HomeLocation> Locations);

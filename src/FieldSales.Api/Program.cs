@@ -3,6 +3,7 @@ using FieldSales.StaffAccess;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Directory;
 using FieldSales.Api.Coverage;
+using FieldSales.Api.Ordering;
 using FieldSales.Api.TabletSync;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +13,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddSqlServerDbContext<CatalogueDbContext>("CatalogueDb");
 builder.AddSqlServerDbContext<DirectoryDbContext>("DirectoryDb");
+builder.AddSqlServerDbContext<OrderingDbContext>("OrderingDb");
 builder.Services.AddScoped<GeographyStore>();
 builder.Services.AddScoped<CustomerStore>();
 builder.Services.AddScoped<CoverageReadStore>();
@@ -31,6 +33,7 @@ builder.Services.AddScoped<RestrictionPermissionStore>();
 builder.Services.AddScoped<RestrictionPermissionCohortStore>();
 builder.Services.AddScoped<ReportingLineStore>();
 builder.Services.AddScoped<TabletSnapshotBuilder>();
+builder.Services.AddScoped<TabletWorkReceiver>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddLocationCoordinates(builder.Configuration);
 builder.Services.AddScoped<ContactStore>();
@@ -156,6 +159,8 @@ if (!app.Environment.IsEnvironment("Testing"))
 await DatabaseStartup.EnsureSchemaAsync<CatalogueDbContext>(app.Services, app.Environment, "CatalogueDb",
     context => context.Database.MigrateAsync(), context => context.Database.GetPendingMigrationsAsync());
 await DatabaseStartup.EnsureSchemaAsync<DirectoryDbContext>(app.Services, app.Environment, "DirectoryDb",
+    context => context.Database.MigrateAsync(), context => context.Database.GetPendingMigrationsAsync());
+await DatabaseStartup.EnsureSchemaAsync<OrderingDbContext>(app.Services, app.Environment, "OrderingDb",
     context => context.Database.MigrateAsync(), context => context.Database.GetPendingMigrationsAsync());
 app.UseHttpsRedirection();
 app.UseAuthentication();

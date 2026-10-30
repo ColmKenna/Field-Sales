@@ -56,6 +56,8 @@ public sealed class OrderStore
             UnsentItem? item = unsent.Find(orderId);
             TabletOrder? existing = Parse(item);
             if (item is not null && existing is null) return OrderResult.Failure(NotChangeable);
+            // A Sent order is read-only, and its id must never start a second order the server would treat as a re-send.
+            if (item is null && unsent.IsSent(orderId)) return OrderResult.Failure(NotChangeable);
             if (existing is not null && (existing.LocationId != locationId)) return OrderResult.Failure(NotChangeable);
             if (existing is { State: not OrderState.InProgress }) return OrderResult.Failure(AlreadyReady);
 
@@ -112,6 +114,7 @@ public sealed class OrderStore
             UnsentItem? item = unsent.Find(orderId);
             TabletOrder? order = Parse(item);
             if (item is not null && order is null) return OrderResult.Failure(NotChangeable);
+            if (item is null && unsent.IsSent(orderId)) return OrderResult.Failure(NotChangeable);
             if (order is null || order.Lines.Count == 0) return OrderResult.Failure(EmptyOrder);
             if (order.State != OrderState.InProgress) return OrderResult.Failure(AlreadyReady);
             TabletOrder ready = order with { State = OrderState.ReadyToSend };

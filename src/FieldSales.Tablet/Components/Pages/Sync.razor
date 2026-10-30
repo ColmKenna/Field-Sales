@@ -3,7 +3,8 @@
 @inject TabletApp Tablet
 @inject NavigationManager Navigation
 
-@* T-01 · Sync (this slice: last sync, Sync now, progress and why a Sync did not run). Unsent sections arrive with T-4.3.1. *@
+@* T-01 · Sync (last sync, Sync now, "Sending 2 of 3" then the download, items not sent, and why a Sync did not run).
+   Unsent sections arrive with T-4.3.1; the cause of items not sent with T-4.1.3. *@
 <section class="sync">
     <h1>Sync</h1>
     @if (home is not null)
@@ -14,7 +15,12 @@
             <p class="unsent-summary" role="status">@UnsentText</p>
         }
         <div class="sync-region">
-            @if (busy)
+            @if (busy && sending is { Total: > 0 } progress)
+            {
+                <p role="status">Sending @progress.Sending of @progress.Total…</p>
+                <progress value="@progress.Sending" max="@progress.Total"></progress>
+            }
+            else if (busy)
             {
                 <p role="status">Downloading your day…</p>
             }
@@ -23,6 +29,10 @@
                 <button class="primary" disabled="@(!Tablet.Connected)" @onclick="SyncAsync">Sync now</button>
             }
         </div>
+        @if (notSent is not null)
+        {
+            <p class="problem" role="status">@notSent</p>
+        }
         @if (message is not null)
         {
             <p class="problem" role="status">@message</p>
@@ -39,6 +49,8 @@
     private HomeView? home;
     private UnsentSummary? unsent;
     private string? message;
+    private string? notSent;
+    private UploadProgress? sending;
     private bool busy;
     private int load;
     private bool disposed;
@@ -74,6 +86,12 @@
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException or System.Text.Json.JsonException) { return null; }
     }
 
+    private int ReadWaiting(string repSubject)
+    {
+        try { return Tablet.CountWaitingToSend(repSubject); }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException or System.Text.Json.JsonException) { return 0; }
+    }
+
     private string UnsentText
     {
         get
@@ -90,12 +108,23 @@
         if (busy || disposed || rep is null) return;
         string capturedRep = rep;
         long version = Tablet.SessionVersion;
-        busy = true; message = null;
-        SyncOutcome outcome = await Tablet.SyncAsync(capturedRep, viewWork.Token);
+        // "Sending 1 of 3…" from the tap: the session check and the sign-in token come before the first report.
+        int waiting = ReadWaiting(capturedRep);
+        busy = true; message = null; notSent = null; sending = waiting > 0 ? new(1, waiting) : null;
+        // Reports arrive on this page's context, one per item, then once more when the uploads are over.
+        Progress<UploadProgress> progress = new(report =>
+        {
+            if (disposed || !busy || version != Tablet.SessionVersion) return;
+            sending = report;
+            StateHasChanged();
+        });
+        SyncOutcome outcome = await Tablet.SyncAsync(capturedRep, viewWork.Token, progress);
         if (disposed || version != Tablet.SessionVersion) return;
-        busy = false;
-        if (outcome.Completed) { Navigation.NavigateTo("/home"); return; }
-        message = outcome.Message;
+        busy = false; sending = null;
+        // Home only when everything went; otherwise the rep stays here to see what didn't.
+        if (outcome.Completed && outcome.Upload.NotSent == 0) { Navigation.NavigateTo("/home"); return; }
+        message = outcome.Completed ? null : outcome.Message;
+        if (outcome.Upload.NotSent > 0) notSent = SyncMessages.NotSent(outcome.Upload.NotSent);
         home = Tablet.ReadHome(capturedRep);
         unsent = ReadUnsent(capturedRep);
     }

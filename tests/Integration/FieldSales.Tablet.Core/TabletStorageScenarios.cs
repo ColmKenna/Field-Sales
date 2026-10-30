@@ -197,7 +197,8 @@ public sealed class TabletStorageScenarios : IDisposable
         _tablet.Space.Available = required - 1;
         SyncOutcome refused = await _tablet.Sync().SyncAsync();
         Assert.Equal((SyncStatus.InsufficientSpace, SyncMessages.InsufficientSpace), (refused.Status, refused.Message));
-        Assert.Equal(requests, _tablet.Server.Requests.Count);
+        // WI-039 D8: uploads need no snapshot space and go first; only the download is refused.
+        Assert.DoesNotContain(_tablet.Server.Requests.Skip(requests), request => request.Path == SnapshotContract.Path);
         AssertUnchanged(old, fingerprint);
 
         _tablet.Space.Available = required;

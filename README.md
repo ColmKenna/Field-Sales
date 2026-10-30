@@ -366,9 +366,11 @@ Invoke-MigrationBundle configuration IdentityConfigDb
 Invoke-MigrationBundle operational IdentityOperationalDb
 Invoke-MigrationBundle 'staff-web' StaffWebDb
 Invoke-MigrationBundle catalogue CatalogueDb
+Invoke-MigrationBundle directory DirectoryDb
+Invoke-MigrationBundle ordering OrderingDb
 ```
 
-After all five commands report `Done.`, restart the `identityserver`, `staff-api`, and `staff-web` resources in the Aspire
+After all seven commands report `Done.`, restart the `identityserver`, `staff-api`, and `staff-web` resources in the Aspire
 Dashboard (or restart AppHost). The bundles are idempotent, so it is safe to run them again when
 deploying a new migration.
 

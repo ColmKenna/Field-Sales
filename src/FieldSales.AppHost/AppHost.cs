@@ -37,6 +37,7 @@ IResourceBuilder<SqlServerDatabaseResource> identityOperationalDb = sqlServer.Ad
 IResourceBuilder<SqlServerDatabaseResource> staffWebDb = sqlServer.AddDatabase("StaffWebDb", DatabaseName("StaffWebDb"));
 IResourceBuilder<SqlServerDatabaseResource> catalogueDb = sqlServer.AddDatabase("CatalogueDb", DatabaseName("CatalogueDb"));
 IResourceBuilder<SqlServerDatabaseResource> directoryDb = sqlServer.AddDatabase("DirectoryDb", DatabaseName("DirectoryDb"));
+IResourceBuilder<SqlServerDatabaseResource> orderingDb = sqlServer.AddDatabase("OrderingDb", DatabaseName("OrderingDb"));
 
 IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales_Identity>("identityserver")
     .WithReference(identityDb)
@@ -53,6 +54,7 @@ IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales
 IResourceBuilder<ProjectResource> staffApi = builder.AddProject<FieldSales_Api>("staff-api")
     .WithReference(catalogueDb)
     .WithReference(directoryDb)
+    .WithReference(orderingDb)
     .WithHttpsEndpoint(7204, name: "https")
     .WithEnvironment("Authentication__Authority", "https://localhost:7201")
     .WaitFor(identityServer);
