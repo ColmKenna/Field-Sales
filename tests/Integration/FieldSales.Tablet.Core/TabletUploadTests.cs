@@ -368,7 +368,7 @@ public sealed class TabletUploadTests : IDisposable
 
         await SyncAsync(new SynchronousProgress(reported.Add));
 
-        Assert.Equal([new(1, 3), new(2, 3), new(3, 3)], reported);
+        Assert.Equal([new(1, 3), new(2, 3), new(3, 3), UploadProgress.Finished], reported);
     }
 
     private sealed class SynchronousProgress(Action<UploadProgress> report) : IProgress<UploadProgress>

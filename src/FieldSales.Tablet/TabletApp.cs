@@ -93,8 +93,9 @@ public sealed class TabletApp : IDisposable
         catch (HttpRequestException) { return SignInNeedsConnection; }
     }
 
-    /// <summary>Downloads the rep's day; copies retired by the switch are deleted afterwards in the background (D2-B).</summary>
-    public async Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default)
+    /// <summary>Sends the rep's finished work, then downloads their day; copies retired by the switch are deleted afterwards
+    /// in the background (D2-B). <paramref name="progress"/> hears "Sending 2 of 3" as each item goes.</summary>
+    public async Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default, IProgress<UploadProgress>? progress = null)
     {
         TabletTiming.RepActed();
         TabletEntry entry = await EnterAsync();
@@ -111,7 +112,7 @@ public sealed class TabletApp : IDisposable
             if (version != SessionVersion || linked.IsCancellationRequested) return Cancelled();
             TabletSync sync = Sync(rep);
             long started = clock.GetTimestamp();
-            SyncOutcome outcome = await sync.SyncAsync(ct: linked.Token);
+            SyncOutcome outcome = await sync.SyncAsync(ct: linked.Token, progress: progress);
             if (version != SessionVersion) return Cancelled();
             TabletTiming.Synced(outcome, clock.GetElapsedTime(started));
             _ = Task.Run(async () =>

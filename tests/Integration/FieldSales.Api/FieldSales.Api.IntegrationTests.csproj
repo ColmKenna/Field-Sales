@@ -22,6 +22,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\FieldSales.Api\FieldSales.Api.csproj" />
     <ProjectReference Include="..\..\..\src\FieldSales.Quantities\FieldSales.Quantities.csproj" />
+    <!-- WI-039 end to end: the real tablet store syncs against the real API. -->
+    <ProjectReference Include="..\..\..\src\FieldSales.Tablet.Core\FieldSales.Tablet.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

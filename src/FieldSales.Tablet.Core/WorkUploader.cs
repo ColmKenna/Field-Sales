@@ -7,8 +7,12 @@ using FieldSales.Snapshot.Contracts;
 
 namespace FieldSales.Tablet.Core;
 
-/// <summary>"Sending 2 of 3": the item being sent and how many are going this Sync.</summary>
-public sealed record UploadProgress(int Sending, int Total);
+/// <summary>"Sending 2 of 3": the item being sent and how many are going this Sync. <see cref="Finished"/> is reported
+/// once the uploads are over, before the download.</summary>
+public sealed record UploadProgress(int Sending, int Total)
+{
+    public static UploadProgress Finished { get; } = new(0, 0);
+}
 
 /// <summary>What the upload part of a Sync did: how many items were going, and how many the server confirmed.</summary>
 public sealed record UploadSummary(int Total, int Sent)

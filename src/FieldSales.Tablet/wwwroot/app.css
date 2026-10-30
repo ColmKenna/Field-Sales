@@ -35,6 +35,8 @@ button:disabled { opacity: .45; cursor: default; }
 .problem { color: var(--alert); }
 .last-sync { color: var(--muted); margin: 0 0 16px; }
 .sync-region { min-height: 64px; display: flex; align-items: center; }
+.sync-region:has(progress) { flex-wrap: wrap; gap: 8px 16px; }
+.sync-region progress { flex-basis: 100%; max-width: 24rem; height: 12px; accent-color: var(--brand); }
 
 .home-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .home-header .last-sync { margin: 0; flex: 1; }

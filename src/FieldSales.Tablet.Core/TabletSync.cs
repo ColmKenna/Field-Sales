@@ -73,6 +73,7 @@ public sealed partial class TabletSync(RepWorkspace workspace, HttpClient http, 
             string? token = await tokens.GetAccessTokenAsync(ct);
             if (token is null) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired);
             (upload, UploadStop stop) = await new WorkUploader(workspace, http, time).UploadAsync(token, hooks, progress, ct);
+            if (upload.Total > 0) progress?.Report(UploadProgress.Finished);
             if (stop == UploadStop.SignInRequired) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, upload);
             if (stop == UploadStop.NotPermitted) return Outcome(SyncStatus.NotPermitted, SyncMessages.NotPermitted, upload);
             // Uploads need no room for a snapshot; only the download does.

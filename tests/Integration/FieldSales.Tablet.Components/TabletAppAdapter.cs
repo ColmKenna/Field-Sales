@@ -37,7 +37,12 @@ public sealed class TabletApp
     public TabletOrder? ReadOrder(string rep, Guid orderId) => FindOrder(rep, orderId);
     public Func<string, CancellationToken, Task<SyncOutcome>> SyncWork { get; set; } = (_, _) =>
         Task.FromResult(new SyncOutcome(SyncStatus.Completed, "Last synced 07:42", null));
-    public Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default) => SyncWork(rep, ct);
+    public IProgress<UploadProgress>? Progress { get; private set; }
+    public Task<SyncOutcome> SyncAsync(string rep, CancellationToken ct = default, IProgress<UploadProgress>? progress = null)
+    {
+        Progress = progress;
+        return SyncWork(rep, ct);
+    }
 }
 
 public sealed record HomeView(string LastSynced, IReadOnlyList<HomeLocation> Locations);

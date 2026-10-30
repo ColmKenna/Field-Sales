@@ -518,6 +518,13 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
         return client;
     }
 
+    /// <summary>A bearer token for a caller whose current roles are <paramref name="roles"/>, as the tablet would hold.</summary>
+    public string TokenFor(string subject, string[] roles)
+    {
+        Roles.Set(subject, roles);
+        return Token(subject, roles, withScope: true);
+    }
+
     public HttpClient Anonymous() => Api.CreateClient(new WebApplicationFactoryClientOptions
     { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
 

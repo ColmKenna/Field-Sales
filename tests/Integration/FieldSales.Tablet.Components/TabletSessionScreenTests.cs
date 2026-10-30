@@ -119,6 +119,67 @@ public sealed class TabletSessionScreenTests
         Assert.Empty(screen.Navigation.Destinations);
     }
 
+    // WI-039 C1: "Sending 2 of 3" while items go, then the download.
+    [Fact]
+    public async Task Should_ShowSendingNOfTotal_When_UploadsAreInProgress()
+    {
+        TaskCompletionSource<SyncOutcome> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => pending.Task;
+        await screen.Open(new());
+        Task syncing = screen.Click("Sync now");
+        await screen.Until(() => screen.Tablet.Progress is not null);
+
+        screen.Tablet.Progress!.Report(new(2, 3));
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Sending 2 of 3…"));
+        Assert.DoesNotContain("Downloading your day…", screen.Renderer.Text(screen.Id));
+        Assert.DoesNotContain("Sync now", screen.Renderer.Buttons(screen.Id));
+
+        screen.Tablet.Progress.Report(UploadProgress.Finished);
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Downloading your day…"));
+        Assert.DoesNotContain("Sending", screen.Renderer.Text(screen.Id));
+
+        pending.SetResult(new(SyncStatus.Completed, "Last synced 07:42", null) { Upload = new(3, 3) });
+        await syncing;
+        Assert.Equal(["/home"], screen.Navigation.Destinations);
+    }
+
+    // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
+    [Theory]
+    [InlineData(SyncStatus.Completed, 3, 1, "2 items not sent. They'll send next Sync.", null)]
+    [InlineData(SyncStatus.Completed, 2, 1, "1 item not sent. It'll send next Sync.", null)]
+    [InlineData(SyncStatus.NoConnection, 2, 0, "2 items not sent. They'll send next Sync.", SyncMessages.NoConnection)]
+    public async Task Should_StayOnSyncWithTheNotSentCount_When_SomeItemsWereNotSent(SyncStatus status, int total, int sent,
+        string notSent, string? problem)
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(status, status == SyncStatus.Completed ? "Last synced 07:42" : problem!, null)
+            { Upload = new(total, sent) });
+        await screen.Open(new());
+
+        await screen.Click("Sync now");
+
+        Assert.Empty(screen.Navigation.Destinations);
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Contains(notSent, text);
+        if (problem is null) Assert.DoesNotContain(SyncMessages.NoConnection, text);
+        else Assert.Contains(problem, text);
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
+    [Fact]
+    public async Task Should_GoHome_When_EverythingWasSent()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.Completed, "Last synced 07:42", null) { Upload = new(3, 3) });
+        await screen.Open(new());
+
+        await screen.Click("Sync now");
+
+        Assert.Equal(["/home"], screen.Navigation.Destinations);
+        Assert.DoesNotContain("not sent", screen.Renderer.Text(screen.Id));
+    }
+
     private sealed class Screen : IAsyncDisposable
     {
         private readonly ServiceProvider services;
@@ -135,6 +196,15 @@ public sealed class TabletSessionScreenTests
         }
         public Task Open(Dictionary<string, object?> parameters) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, parameters));
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
+        public async Task Until(Func<bool> predicate)
+        {
+            for (int attempt = 0; attempt < 200; attempt++)
+            {
+                if (await Renderer.Dispatcher.InvokeAsync(predicate)) return;
+                await Task.Delay(10);
+            }
+            Assert.Fail("The screen never reached the expected state.");
+        }
         public async ValueTask DisposeAsync()
         {
             await Renderer.DisposeAsync(); await services.DisposeAsync(); Assert.Empty(Renderer.Errors);
