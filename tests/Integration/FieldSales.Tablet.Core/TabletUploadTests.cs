@@ -215,9 +215,10 @@ public sealed class TabletUploadTests : IDisposable
 
         SyncOutcome outcome = await SyncAsync();
 
-        Assert.Equal((SyncStatus.Completed, new UploadSummary(3, 2)), (outcome.Status, outcome.Upload));
+        Assert.Equal((SyncStatus.Completed, new UploadSummary(3, 2, NeedsAttention: 1)), (outcome.Status, outcome.Upload));
         Assert.Equivalent(new[] { first, ready }, SentIds());
         Assert.Equal([refused], UnsentIds());
+        Assert.Equal(fault, Unsent().Find(refused)!.Rejection!.Fault);
     }
 
     [Fact]
@@ -361,7 +362,7 @@ public sealed class TabletUploadTests : IDisposable
         using SqliteConnection check = SqliteEngine.Open(workspace.UnsentPath);
         using SqliteCommand version = check.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(2L, (long)version.ExecuteScalar()!);
+        Assert.Equal(3L, (long)version.ExecuteScalar()!);
     }
 
     [Fact]

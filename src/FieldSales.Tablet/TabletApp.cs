@@ -178,6 +178,18 @@ public sealed class TabletApp : IDisposable
     /// <summary>The rep's Unsent count: every saved item, and how many orders are in progress or ready to send.</summary>
     public UnsentSummary ReadUnsentSummary(string rep) => new UnsentStore(device.Workspace(rep)).Summarise();
 
+    public IReadOnlyList<UnsentView> ReadUnsentViews(string rep) => new UnsentStore(device.Workspace(rep)).ReadViews();
+
+    // Recheck local access and the observed session immediately before changing captured work.
+    public async Task<bool> ChangeRejectedWorkAsync(string rep, Guid id, long expectedVersion, bool delete, bool confirmed)
+    {
+        TabletEntry entry = await EnterAsync();
+        if (SessionVersion != expectedVersion || entry.RepSubject != rep
+            || entry.Screen is not (EntryScreen.Home or EntryScreen.Sync)) return false;
+        UnsentStore store = new(device.Workspace(rep));
+        return delete ? store.DeleteRejected(id, confirmed) : store.MarkReviewedReady(id);
+    }
+
     public int CountWaitingToSend(string rep) => WorkUploader.CountWaiting(device.Workspace(rep));
 
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);

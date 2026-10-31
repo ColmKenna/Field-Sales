@@ -9,7 +9,7 @@ namespace FieldSales.Tablet.Core;
 public enum SyncStatus { Completed, NoConnection, SignInRequired, NotPermitted, UpdateRequired, InsufficientSpace, Failed, Cancelled }
 
 /// <summary>What a Sync did. <see cref="Upload"/> says how many finished items were going, how many the server confirmed
-/// and why the uploads stopped early, if they did; only confirmed items changed. Every outcome other than
+/// and why the uploads stopped early, if they did. Refused items gain rejection metadata; captured bodies stay intact. Every outcome other than
 /// <see cref="SyncStatus.Completed"/> leaves the snapshot as it was.</summary>
 public sealed record SyncOutcome(SyncStatus Status, string Message, ActiveSnapshot? Active)
 {
@@ -33,8 +33,7 @@ public static class SyncMessages
     public const string Cancelled = "Sync was cancelled. Your data and saved work on this tablet are unchanged.";
     public static string Completed(DateTimeOffset localCompleted) => $"Last synced {localCompleted:HH:mm}";
 
-    /// <summary>Said when some finished items didn't go and no cause below applies: items refused as technical faults (until
-    /// WI-042 gives them Needs Attention), or a permission refused part way.</summary>
+    /// <summary>Said when finished items still await upload, excluding technical faults needing review.</summary>
     public static string NotSent(int count) => count == 1
         ? "1 item not sent. It'll send next Sync."
         : $"{count} items not sent. They'll send next Sync.";
@@ -61,22 +60,25 @@ public static class SyncMessages
         UploadSummary upload = outcome.Upload;
         // Nothing more goes, and the day doesn't download, until the rep signs in again: one sentence says so.
         if (outcome.Status == SyncStatus.SignInRequired)
-            return new(upload.NotSent > 0 ? SignInToSend(upload.NotSent) : SignInRequired, null);
+            return new(WithAttention(upload.Waiting > 0 ? SignInToSend(upload.Waiting) : SignInRequired, upload.NeedsAttention), null);
         // The connection failed during the uploads. It was poor if an item was confirmed or the day downloaded afterwards;
         // otherwise nothing got through, and there was no connection.
-        bool connectionLost = upload is { Stop: UploadStop.ConnectionLost, NotSent: > 0 };
+        bool connectionLost = upload is { Stop: UploadStop.ConnectionLost, Waiting: > 0 };
         bool poorConnection = connectionLost && (upload.Sent > 0 || outcome.Completed);
         string? work =
-            connectionLost ? (poorConnection ? PoorConnection(upload.NotSent) : NoConnection)
-            : upload.NotSent > 0 ? (upload.Stop == UploadStop.ServerError ? ServerError(upload.NotSent) : NotSent(upload.NotSent))
+            connectionLost ? (poorConnection ? PoorConnection(upload.Waiting) : NoConnection)
+            : upload.Waiting > 0 ? (upload.Stop == UploadStop.ServerError ? ServerError(upload.Waiting) : NotSent(upload.Waiting))
             : upload.Sent > 0 && !outcome.Completed ? Sent(upload.Sent)
             : null;
         // A new day shows in "Last synced", and one sentence about the connection is enough.
         string? day = outcome.Completed || (connectionLost && outcome.Status == SyncStatus.NoConnection) ? null
             : upload.Sent > 0 ? DayAfterSending(outcome)
             : outcome.Message;
-        return new(work, day);
+        return new(WithAttention(work, upload.NeedsAttention), day);
     }
+
+    private static string? WithAttention(string? work, int count) => count == 0 ? work
+        : (work is null ? "" : work + " ") + (count == 1 ? "1 needs attention." : $"{count} need attention.");
 
     // Once work has gone this Sync, why the day didn't download, and never that saved work is unchanged (WI-040 D6).
     private static string DayAfterSending(SyncOutcome outcome) => outcome.Status switch

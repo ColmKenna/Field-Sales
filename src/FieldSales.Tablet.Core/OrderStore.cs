@@ -54,6 +54,7 @@ public sealed class OrderStore
         {
             UnsentStore unsent = new(workspace);
             UnsentItem? item = unsent.Find(orderId);
+            if (item?.Rejection is not null) return OrderResult.Failure(NotChangeable);
             TabletOrder? existing = Parse(item);
             if (item is not null && existing is null) return OrderResult.Failure(NotChangeable);
             // A Sent order is read-only, and its id must never start a second order the server would treat as a re-send.
@@ -129,7 +130,7 @@ public sealed class OrderStore
     private void Save(UnsentStore unsent, TabletOrder order) => unsent.Save(new(order.Id, UnsentKind.Order, clock.GetUtcNow(),
         JsonSerializer.Serialize(order, OrderJsonContext.Default.TabletOrder)));
 
-    private static TabletOrder? Parse(UnsentItem? item)
+    internal static TabletOrder? Parse(UnsentItem? item)
     {
         if (item is not { Kind: UnsentKind.Order }) return null;
         try
