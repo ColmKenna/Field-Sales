@@ -3,6 +3,29 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-040 sync failure causes (2026-10-30, developer, plan approval)
+
+The developer replied **Approved** to the WI-040 plan (decisions D1–D8, full text in `WI-040.md`).
+
+- **Causes, decided on the tablet only (no API or contract change):** *sign-in expired* (no token, a refused refresh, or a 401)
+  stops everything, so nothing uploads and the day doesn't download; *no connection* means nothing in that Sync got an answer;
+  *poor connection* means the connection failed during uploads after something got through (an item confirmed, or the day
+  downloaded afterwards); *server error* (5xx, unexpected answer, receipt not naming the item) stops the uploads and the download
+  is still tried. Items refused as technical faults keep WI-039's sentence until **WI-042** gives them Needs Attention.
+- **Wording:** "2 items not sent — poor connection. They'll send next Sync." (US-001 S2 wins over the T-01 wireframe's "Try again
+  when you have signal."); "Sign in again to send 3 items" counts the finished work still waiting (saved Calls + Ready to Send
+  Orders), "Sign in again to sync." when nothing waits; server error "2 items not sent — Field Sales didn't respond. They'll send
+  next Sync."; when uploads went but the day didn't download, "3 items sent." plus why the day didn't download. No message may
+  say saved work is unchanged once an item was sent in that Sync.
+- **Sign in on T-01:** a Sign in button replaces Sync now in the expired state and starts the entry screen's connected sign-in.
+  **WI-041** owns the automatic resume, I-03's "After sign-in, this Sync resumes automatically." and Sign in without signal.
+- **Resume point for WI-041:** confirmed items move to Sent immediately and every Sync reads the queue fresh, so a repeated or
+  resumed Sync never re-sends a confirmed item; a lost confirmation is re-sent and answered `AlreadyReceived` (WI-039).
+- **Amendment 2026-10-31 (device check, developer chose "keep it in the app"):** `MainLayout` rebuilds the routed page on every
+  resume, and returning from the sign-in browser is a resume. The Sync screen's notice (report, Sign in state, sign-in answer)
+  therefore lives in `TabletApp.SyncNotices` (Tablet.Core `SyncNotices`), keyed by rep and session version, and the page restores
+  it. **WI-041** should build its interrupted-Sync state on the same store rather than on page fields.
+
 ## WI-039 upload protocol and MI-52 (2026-10-29/30, developer, plan approval)
 
 The developer replied **Approved** to the WI-039 plan (decisions D1–D11, full text in `WI-039.md`), then on 2026-10-30

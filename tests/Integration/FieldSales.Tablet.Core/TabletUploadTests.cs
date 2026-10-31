@@ -24,6 +24,12 @@ public sealed class FakeReceiver(FakeSnapshotServer server)
         return Receipt(id, already);
     }
 
+    /// <summary>Signal goes after the server has answered this many items: every later upload fails before an answer arrives.</summary>
+    public void DropAfter(int answered) => Interfere = (_, arrival) => arrival > answered ? throw Faults.NoSignal() : null;
+
+    /// <summary>The server answers every upload from this arrival on with an error status.</summary>
+    public void FailFrom(int arrival, HttpStatusCode status) => Interfere = (_, at) => at >= arrival ? new HttpResponseMessage(status) : null;
+
     public static HttpResponseMessage Receipt(Guid id, bool already) =>
         new(already ? HttpStatusCode.OK : HttpStatusCode.Created)
         {
@@ -121,7 +127,7 @@ public sealed class TabletUploadTests : IDisposable
 
         SyncOutcome outcome = await SyncAsync();
 
-        Assert.Equal((SyncStatus.NoConnection, new UploadSummary(3, 1)), (outcome.Status, outcome.Upload));
+        Assert.Equal((SyncStatus.NoConnection, new UploadSummary(3, 1, UploadStop.ConnectionLost)), (outcome.Status, outcome.Upload));
         Assert.Equal([first], SentIds());
         Assert.Equivalent(new[] { second, third }, UnsentIds());
         Assert.Equal(remainingBefore, Unsent().Find(second)!.Json + Unsent().Find(third)!.Json);
@@ -144,7 +150,7 @@ public sealed class TabletUploadTests : IDisposable
         tablet.Server.Serve(EncodedSnapshot.From(morning));
 
         SyncOutcome lost = await SyncAsync();
-        Assert.Equal(new UploadSummary(1, 0), lost.Upload);
+        Assert.Equal(new UploadSummary(1, 0, UploadStop.ConnectionLost), lost.Upload);
         Assert.Equal([order], UnsentIds());
 
         SyncOutcome next = await SyncAsync();
@@ -225,15 +231,17 @@ public sealed class TabletUploadTests : IDisposable
 
         SyncOutcome outcome = await SyncAsync();
 
-        Assert.Equal((SyncStatus.SignInRequired, UploadSummary.None), (outcome.Status, outcome.Upload));
+        // WI-040: the summary counts what was waiting, so the rep can be told how many items need the sign-in.
+        Assert.Equal((SyncStatus.SignInRequired, new UploadSummary(2, 0, UploadStop.SignInRequired)), (outcome.Status, outcome.Upload));
         Assert.Empty(tablet.Server.Uploads);
         Assert.Equal(fingerprint, Unsent().Fingerprint());
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.Unauthorized, SyncStatus.SignInRequired)]
-    [InlineData(HttpStatusCode.Forbidden, SyncStatus.NotPermitted)]
-    public async Task Should_StopEverything_When_TheServerRefusesTheSignInOrPermission(HttpStatusCode refusal, SyncStatus expected)
+    [InlineData(HttpStatusCode.Unauthorized, SyncStatus.SignInRequired, UploadStop.SignInRequired)]
+    [InlineData(HttpStatusCode.Forbidden, SyncStatus.NotPermitted, UploadStop.NotPermitted)]
+    public async Task Should_StopEverything_When_TheServerRefusesTheSignInOrPermission(HttpStatusCode refusal, SyncStatus expected,
+        UploadStop stop)
     {
         await tablet.SyncAsync(morning);
         Call(0, 20);
@@ -244,7 +252,7 @@ public sealed class TabletUploadTests : IDisposable
 
         SyncOutcome outcome = await SyncAsync();
 
-        Assert.Equal((expected, new UploadSummary(2, 0)), (outcome.Status, outcome.Upload));
+        Assert.Equal((expected, new UploadSummary(2, 0, stop)), (outcome.Status, outcome.Upload));
         Assert.Single(receiver.Arrivals);
         Assert.Equal(snapshotsBefore, SnapshotRequests());
         Assert.Equal(fingerprint, Unsent().Fingerprint());
@@ -265,7 +273,7 @@ public sealed class TabletUploadTests : IDisposable
 
         SyncOutcome outcome = await SyncAsync();
 
-        Assert.Equal((SyncStatus.Completed, new UploadSummary(3, 0)), (outcome.Status, outcome.Upload));
+        Assert.Equal((SyncStatus.Completed, new UploadSummary(3, 0, UploadStop.ServerError)), (outcome.Status, outcome.Upload));
         Assert.Single(receiver.Arrivals);
         Assert.Equal(fingerprint, Unsent().Fingerprint());
         Assert.Equal(3, outcome.Upload.NotSent);
@@ -398,10 +406,5 @@ public sealed class TabletUploadTests : IDisposable
 
         Assert.Equal((SyncStatus.Completed, UploadSummary.None), (outcome.Status, outcome.Upload));
         Assert.Empty(reported);
-    }
-
-    private sealed class SynchronousProgress(Action<UploadProgress> report) : IProgress<UploadProgress>
-    {
-        public void Report(UploadProgress value) => report(value);
     }
 }

@@ -22,7 +22,11 @@ public sealed class TabletApp
     public Func<long, Task<bool>> End { get; set; } = _ => Task.FromResult(false);
     public Task<IReadOnlyList<UnsentKind>> ReadUnsentKindsAsync(long version) => ReadKinds(version);
     public Task<bool> SignOutAsync(long version) => End(version);
-    public HomeView ReadHome(string rep) => new("Last synced 07:42", []);
+    public SyncNotices SyncNotices { get; } = new();
+    public Func<Task<string?>> SignIn { get; set; } = () => Task.FromResult<string?>(null);
+    public Task<string?> SignInAsync() => SignIn();
+    public HomeView Home { get; set; } = new("Last synced 07:42", []);
+    public HomeView ReadHome(string rep) => Home;
     public Func<string, ProductSearchIndex> ReadIndex { get; set; } = _ => new ProductSearchIndex(null, []);
     public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddWork { get; set; } =
         (_, _, _, _, _) => new OrderResult(null, "Order entry isn't set up in this test.");

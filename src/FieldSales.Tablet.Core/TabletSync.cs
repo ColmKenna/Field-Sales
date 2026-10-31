@@ -8,15 +8,20 @@ namespace FieldSales.Tablet.Core;
 
 public enum SyncStatus { Completed, NoConnection, SignInRequired, NotPermitted, UpdateRequired, InsufficientSpace, Failed, Cancelled }
 
-/// <summary>What a Sync did. <see cref="Upload"/> says how many finished items went and how many the server confirmed;
-/// only confirmed items changed. Every outcome other than <see cref="SyncStatus.Completed"/> leaves the snapshot as it was.</summary>
+/// <summary>What a Sync did. <see cref="Upload"/> says how many finished items were going, how many the server confirmed
+/// and why the uploads stopped early, if they did; only confirmed items changed. Every outcome other than
+/// <see cref="SyncStatus.Completed"/> leaves the snapshot as it was.</summary>
 public sealed record SyncOutcome(SyncStatus Status, string Message, ActiveSnapshot? Active)
 {
     public bool Completed => Status == SyncStatus.Completed;
     public UploadSummary Upload { get; init; } = UploadSummary.None;
 }
 
-/// <summary>Rep-facing Sync text. T-4.1.3 owns the full set of failure causes.</summary>
+/// <summary>What the rep reads after a Sync that didn't simply finish: a sentence about their finished work, then one about
+/// their day. Either may be absent.</summary>
+public sealed record SyncReport(string? Work, string? Day);
+
+/// <summary>Rep-facing Sync text, including why a Sync didn't complete (T-4.1.3).</summary>
 public static class SyncMessages
 {
     public const string NoConnection = "No connection — your work is saved on this tablet";
@@ -28,10 +33,60 @@ public static class SyncMessages
     public const string Cancelled = "Sync was cancelled. Your data and saved work on this tablet are unchanged.";
     public static string Completed(DateTimeOffset localCompleted) => $"Last synced {localCompleted:HH:mm}";
 
-    /// <summary>Said when some finished items didn't go. Why they didn't is T-4.1.3's to say.</summary>
+    /// <summary>Said when some finished items didn't go and no cause below applies: items refused as technical faults (until
+    /// WI-042 gives them Needs Attention), or a permission refused part way.</summary>
     public static string NotSent(int count) => count == 1
         ? "1 item not sent. It'll send next Sync."
         : $"{count} items not sent. They'll send next Sync.";
+
+    /// <summary>US-001 S2: the connection went during the uploads after something got through.</summary>
+    public static string PoorConnection(int count) => count == 1
+        ? "1 item not sent — poor connection. It'll send next Sync."
+        : $"{count} items not sent — poor connection. They'll send next Sync.";
+
+    /// <summary>WI-040 D4: the server answered an upload with an error, so the rest wait for the next Sync.</summary>
+    public static string ServerError(int count) => count == 1
+        ? "1 item not sent — Field Sales didn't respond. It'll send next Sync."
+        : $"{count} items not sent — Field Sales didn't respond. They'll send next Sync.";
+
+    /// <summary>WI-040 D6: what went, said when the day then didn't download.</summary>
+    public static string Sent(int count) => count == 1 ? "1 item sent." : $"{count} items sent.";
+
+    /// <summary>US-001 S3 and Sign-in US-004 S1: nothing more goes until the rep signs in again.</summary>
+    public static string SignInToSend(int count) => count == 1 ? "Sign in again to send 1 item" : $"Sign in again to send {count} items";
+
+    /// <summary>What happened to the rep's finished work and to their day, in the rep's words (WI-040 D1–D6).</summary>
+    public static SyncReport Explain(SyncOutcome outcome)
+    {
+        UploadSummary upload = outcome.Upload;
+        // Nothing more goes, and the day doesn't download, until the rep signs in again: one sentence says so.
+        if (outcome.Status == SyncStatus.SignInRequired)
+            return new(upload.NotSent > 0 ? SignInToSend(upload.NotSent) : SignInRequired, null);
+        // The connection failed during the uploads. It was poor if an item was confirmed or the day downloaded afterwards;
+        // otherwise nothing got through, and there was no connection.
+        bool connectionLost = upload is { Stop: UploadStop.ConnectionLost, NotSent: > 0 };
+        bool poorConnection = connectionLost && (upload.Sent > 0 || outcome.Completed);
+        string? work =
+            connectionLost ? (poorConnection ? PoorConnection(upload.NotSent) : NoConnection)
+            : upload.NotSent > 0 ? (upload.Stop == UploadStop.ServerError ? ServerError(upload.NotSent) : NotSent(upload.NotSent))
+            : upload.Sent > 0 && !outcome.Completed ? Sent(upload.Sent)
+            : null;
+        // A new day shows in "Last synced", and one sentence about the connection is enough.
+        string? day = outcome.Completed || (connectionLost && outcome.Status == SyncStatus.NoConnection) ? null
+            : upload.Sent > 0 ? DayAfterSending(outcome)
+            : outcome.Message;
+        return new(work, day);
+    }
+
+    // Once work has gone this Sync, why the day didn't download, and never that saved work is unchanged (WI-040 D6).
+    private static string DayAfterSending(SyncOutcome outcome) => outcome.Status switch
+    {
+        SyncStatus.NoConnection => "Your day didn't download — no connection.",
+        SyncStatus.Failed => "Your day didn't download. Sync again to try.",
+        SyncStatus.InsufficientSpace => "There isn't enough free space on this tablet to download your day.",
+        SyncStatus.Cancelled => "Sync was cancelled before your day downloaded.",
+        _ => outcome.Message
+    };
 
     /// <summary>Home's "Last synced 07:42"; a sync from an earlier day also shows its date.</summary>
     public static string LastSynced(DateTimeOffset completedUtc, TimeProvider clock)
@@ -71,11 +126,13 @@ public sealed partial class TabletSync(RepWorkspace workspace, HttpClient http, 
         try
         {
             string? token = await tokens.GetAccessTokenAsync(ct);
-            if (token is null) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired);
-            (upload, UploadStop stop) = await new WorkUploader(workspace, http, time).UploadAsync(token, hooks, progress, ct);
+            // Nothing is sent without a sign-in, but the rep is told how many finished items are waiting for one.
+            if (token is null)
+                return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, new(CountWaiting(), 0, UploadStop.SignInRequired));
+            upload = await new WorkUploader(workspace, http, time).UploadAsync(token, hooks, progress, ct);
             if (upload.Total > 0) progress?.Report(UploadProgress.Finished);
-            if (stop == UploadStop.SignInRequired) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, upload);
-            if (stop == UploadStop.NotPermitted) return Outcome(SyncStatus.NotPermitted, SyncMessages.NotPermitted, upload);
+            if (upload.Stop == UploadStop.SignInRequired) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, upload);
+            if (upload.Stop == UploadStop.NotPermitted) return Outcome(SyncStatus.NotPermitted, SyncMessages.NotPermitted, upload);
             // Uploads need no room for a snapshot; only the download does.
             if (space.AvailableBytes(workspace.DirectoryPath) < 2 * workspace.SnapshotBytes() + ReserveBytes)
                 return Outcome(SyncStatus.InsufficientSpace, SyncMessages.InsufficientSpace, upload);
@@ -107,6 +164,13 @@ public sealed partial class TabletSync(RepWorkspace workspace, HttpClient http, 
 
     private SyncOutcome Outcome(SyncStatus status, string message, UploadSummary? upload = null) =>
         new(status, message, Store.ReadActive()) { Upload = upload ?? UploadSummary.None };
+
+    // The count is a courtesy: an Unsent database that can't be read must not hide that a sign-in is needed.
+    private int CountWaiting()
+    {
+        try { return WorkUploader.CountWaiting(workspace); }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or SqliteException) { return 0; }
+    }
 
     private async Task<(SyncOutcome?, ExpectedSnapshot?)> DownloadAsync(string token, SnapshotHooks hooks, CancellationToken ct)
     {

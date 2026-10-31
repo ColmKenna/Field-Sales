@@ -79,5 +79,11 @@ that starts cold finds it there.
   `--window-size=390,…` capture is cropped, not a real 390 px layout. Load the page in a 390 px
   `<iframe>` (with `--allow-file-access-from-files`) instead. `--dump-dom` output only arrived through
   `Start-Process … -RedirectStandardOutput <file> -Wait`, not `& msedge …`. Example: WI-029 notes.
+- **Tablet device checks (seen 2026-10-31, WI-040):** `adb reverse --remove tcp:7204` does not cut a connection the app's
+  HttpClient already holds, so cold-restart the app after cutting the API forward. Signing in needs the API too (`staff/session`),
+  so cut the API only after the sign-in has finished. To expire a tablet sign-in on the demo, delete its row in
+  `FieldSalesDemo_IdentityOperationalDb.dbo.PersistedGrants` (sqlcmd needs `-I` for the delete) once the access token is past its
+  hour. `adb shell svc power stayon usb` keeps the screen on during a check (`stayon false` afterwards). Any resume rebuilds the
+  routed page (`MainLayout`), so page fields don't survive the sign-in browser.
 - **JS admin UI tests without repo noise:** copy the identity host's `package*.json`, `tests/` and
   `wwwroot/js/` to the scratchpad, `npm ci --ignore-scripts` there and run `node --test tests/*.test.mjs`.
