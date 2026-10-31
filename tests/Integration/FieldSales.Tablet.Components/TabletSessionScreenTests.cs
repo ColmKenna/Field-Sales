@@ -540,6 +540,7 @@ public sealed partial class TabletSessionScreenTests
         }
         public Task Open(Dictionary<string, object?> parameters) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, parameters));
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
+        public Task ClickLink(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLink(Id, text));
         public async Task Until(Func<bool> predicate)
         {
             for (int attempt = 0; attempt < 200; attempt++)
@@ -589,15 +590,17 @@ public sealed partial class TabletSessionScreenTests
         }));
         public string[] Buttons(int id) => Events(id).Select(e => e.Text).ToArray();
         public Task Click(int id, string text) => DispatchEventAsync(Events(id).First(e => e.Text == text).Event, null, EventArgs.Empty);
-        private IEnumerable<(string Text, ulong Event)> Events(int id)
+        public Task ClickLink(int id, string text) => DispatchEventAsync(Events(id, "a").First(e => e.Text.Contains(text, StringComparison.Ordinal)).Event, null, EventArgs.Empty);
+        private IEnumerable<(string Text, ulong Event)> Events(int id, string element = "button")
         {
             var frames = Frames(id);
             for (int i = 0; i < frames.Length; i++)
             {
                 if (frames[i].FrameType == RenderTreeFrameType.Component)
-                    foreach (var child in Events(frames[i].ComponentId)) yield return child;
-                if (frames[i].FrameType != RenderTreeFrameType.Element || frames[i].ElementName != "button") continue;
+                    foreach (var child in Events(frames[i].ComponentId, element)) yield return child;
+                if (frames[i].FrameType != RenderTreeFrameType.Element || frames[i].ElementName != element) continue;
                 var children = frames.Skip(i + 1).Take(frames[i].ElementSubtreeLength - 1).ToArray();
+                if (!children.Any(f => f.FrameType == RenderTreeFrameType.Attribute && f.AttributeName == "onclick")) continue;
                 yield return (string.Concat(children.Where(f => f.FrameType == RenderTreeFrameType.Text).Select(f => f.TextContent)),
                     children.Single(f => f.FrameType == RenderTreeFrameType.Attribute && f.AttributeName == "onclick").AttributeEventHandlerId);
             }

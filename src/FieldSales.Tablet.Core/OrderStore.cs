@@ -28,6 +28,7 @@ public sealed class OrderStore
     public const string NotChangeable = "This order can't be changed here.";
     public const string AlreadyReady = "This order is ready to send.";
     public const string EmptyOrder = "Add at least one product";
+    public const string NoLongerAvailable = "No longer available to you";
 
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly RepWorkspace workspace;
@@ -113,6 +114,7 @@ public sealed class OrderStore
         {
             UnsentStore unsent = new(workspace);
             UnsentItem? item = unsent.Find(orderId);
+            if (item?.Rejection is not null) return OrderResult.Failure(NotChangeable);
             TabletOrder? order = Parse(item);
             if (item is not null && order is null) return OrderResult.Failure(NotChangeable);
             if (item is null && unsent.IsSent(orderId)) return OrderResult.Failure(NotChangeable);

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FieldSales.Tablet.Core.Tests;
 
-public sealed class TabletAppSessionScenarios
+public sealed partial class TabletAppSessionScenarios
 {
     [Fact]
     public async Task Should_CountOnlyTheActiveRepsWork_When_PreparingSignOut()

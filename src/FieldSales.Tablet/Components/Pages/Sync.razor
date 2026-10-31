@@ -83,6 +83,8 @@
                         @foreach (var line in order.Lines)
                         {
                             <li><strong>@line.ProductName</strong><span>@line.ProductCode · @line.Quantity.ToString("0.###") @line.Unit</span>
+                                @if (review.MissingProductIds.Contains(line.ProductId))
+                                { <span class="captured-line-notice">@OrderStore.NoLongerAvailable</span> }
                                 <span>€@line.Price.Amount.ToString("0.00") per @line.Unit</span></li>
                         }
                     </ul>

@@ -42,6 +42,8 @@ public sealed class TabletApp
     public Func<string, Guid, long, bool, bool, Task<bool>> ChangeRejected { get; set; } = (_, _, _, _, _) => Task.FromResult(false);
     public Task<bool> ChangeRejectedWorkAsync(string rep, Guid id, long version, bool delete, bool confirmed) =>
         ChangeRejected(rep, id, version, delete, confirmed);
+    public Func<string, Guid, long, Task<bool>> ReviewOrder { get; set; } = (_, _, _) => Task.FromResult(false);
+    public Task<bool> MarkReviewedOrderReadyAsync(string rep, Guid id, long version) => ReviewOrder(rep, id, version);
     public Func<string, int> CountWaiting { get; set; } = _ => 0;
     public int CountWaitingToSend(string rep) => CountWaiting(rep);
     public ProductSearchIndex ReadProductIndex(string rep) => ReadIndex(rep);

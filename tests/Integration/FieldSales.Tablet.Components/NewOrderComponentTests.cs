@@ -325,6 +325,29 @@ public sealed class NewOrderComponentTests
         Assert.Empty(screen.Renderer.Buttons(screen.Id));
     }
 
+    [Fact]
+    public async Task Should_ShowCapturedValuesWithAMissingProductWarning_When_TheActiveCatalogueChanges()
+    {
+        FakeOrders captured = new();
+        Guid id = Guid.NewGuid();
+        captured.Add("colm", id, ShopId, Catalogue[0].Id, 6);
+        captured.Add("colm", id, ShopId, Catalogue[1].Id, 1);
+        await using Screen screen = Open(captured);
+        screen.Tablet.ReadIndex = _ => new ProductSearchIndex("filtered", Catalogue.Where(product => product.Id != Catalogue[0].Id));
+        screen.Tablet.FindOrder = (_, requested) => captured.Order! with { Id = requested };
+
+        await screen.Show();
+
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Equal(1, text.Split("No longer available to you", StringSplitOptions.None).Length - 1);
+        Assert.Contains("Vitamin D 1000IU 90s", text);
+        Assert.Contains("€12.50", text);
+        Assert.Contains("Loose Herbal Tea", text);
+        await screen.Type("product-search", "VITD");
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("No products match"));
+        Assert.DoesNotContain("Add to order", screen.Renderer.Buttons(screen.Id));
+    }
+
     private sealed class Screen : IAsyncDisposable
     {
         private readonly ServiceProvider services;

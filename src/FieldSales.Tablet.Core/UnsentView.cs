@@ -8,6 +8,7 @@ public enum UnsentSection { NeedsAttention, ReadyToSend, InProgress, Other }
 /// <summary>The captured work T-01 can name and review, without exposing its raw JSON or server response.</summary>
 public sealed record UnsentView(UnsentItem Item, string LocationName, TabletOrder? Order, string? CallChannel)
 {
+    public IReadOnlySet<Guid> MissingProductIds { get; init; } = new HashSet<Guid>();
     public string KindLabel => Item.Kind == UnsentKind.ScheduleChange ? "Schedule change" : Item.Kind.ToString();
     public UnsentSection Section
     {
@@ -28,8 +29,8 @@ public sealed record UnsentView(UnsentItem Item, string LocationName, TabletOrde
         }
     }
 
-    public bool CanMarkReady => Item.Rejection is not null && Item.Kind == UnsentKind.Order
-        && Order is { State: OrderState.ReadyToSend, Lines.Count: > 0 };
+    public bool CanMarkReady => Item.Kind == UnsentKind.Order && Order is { Lines.Count: > 0 } order
+        && (Item.Rejection is null ? order.State == OrderState.InProgress : order.State == OrderState.ReadyToSend);
 }
 
 public sealed partial class UnsentStore
@@ -38,6 +39,7 @@ public sealed partial class UnsentStore
     {
         if (!File.Exists(workspace.UnsentPath)) return [];
         SnapshotStore? snapshot = File.Exists(workspace.SnapshotPath) ? new(workspace) : null;
+        IReadOnlySet<Guid> productIds = snapshot?.ReadProductIds() ?? new HashSet<Guid>();
         return Read().OrderBy(item => item.SavedUtc).ThenBy(item => item.Id).Select(item =>
         {
             using JsonDocument body = JsonDocument.Parse(item.Json);
@@ -49,7 +51,11 @@ public sealed partial class UnsentStore
                 && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
             TabletOrder? order = OrderStore.Parse(item);
             if (order is not null && order.Lines.Any(line => line is null || line.Price is null)) order = null;
-            return new UnsentView(item, location, order, channel);
+            return new UnsentView(item, location, order, channel)
+            {
+                MissingProductIds = order?.Lines.Where(line => !productIds.Contains(line.ProductId))
+                    .Select(line => line.ProductId).ToHashSet() ?? []
+            };
         }).ToArray();
     }
 }

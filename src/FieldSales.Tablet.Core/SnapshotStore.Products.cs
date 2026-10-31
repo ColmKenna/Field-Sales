@@ -13,6 +13,18 @@ public sealed partial class SnapshotStore
 {
     public const int ProductPageSize = 50;
 
+    /// <summary>Product identities in one active generation, excluding retained recovery copies.</summary>
+    public IReadOnlySet<Guid> ReadProductIds()
+    {
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT p.id FROM products p JOIN active a ON a.generation=p.generation";
+        using SqliteDataReader reader = command.ExecuteReader();
+        HashSet<Guid> ids = [];
+        while (reader.Read()) ids.Add(Guid.Parse(reader.GetString(0)));
+        return ids;
+    }
+
     /// <summary>A bounded page from the active generation, with no online lookup.</summary>
     public OfflineProductPage ReadProducts(int page)
     {

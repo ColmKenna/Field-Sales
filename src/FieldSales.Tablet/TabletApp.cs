@@ -180,6 +180,15 @@ public sealed class TabletApp : IDisposable
 
     public IReadOnlyList<UnsentView> ReadUnsentViews(string rep) => new UnsentStore(device.Workspace(rep)).ReadViews();
 
+    /// <summary>Marks a reviewed In Progress order ready, without starting Sync or revalidating captured products.</summary>
+    public async Task<bool> MarkReviewedOrderReadyAsync(string rep, Guid id, long expectedVersion)
+    {
+        TabletEntry entry = await EnterAsync();
+        if (SessionVersion != expectedVersion || entry.RepSubject != rep
+            || entry.Screen is not (EntryScreen.Home or EntryScreen.Sync)) return false;
+        return new OrderStore(device.Workspace(rep), clock).MarkReadyToSend(id).Succeeded;
+    }
+
     // Recheck local access and the observed session immediately before changing captured work.
     public async Task<bool> ChangeRejectedWorkAsync(string rep, Guid id, long expectedVersion, bool delete, bool confirmed)
     {
