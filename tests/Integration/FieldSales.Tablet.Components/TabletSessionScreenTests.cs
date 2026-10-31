@@ -417,6 +417,32 @@ public sealed class TabletSessionScreenTests
         Assert.Equal(1, syncs);
     }
 
+    // WI-041 C5 (US-004 S3): without signal, Sign in explains that a connection is needed instead of opening the browser, and the
+    // explanation survives the page being rebuilt. Nothing else changes.
+    [Fact]
+    public async Task Should_ExplainThatSignInNeedsAConnection_When_ITapSignInWithoutSignal()
+    {
+        int signIns = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.ReadSummary = _ => new UnsentSummary(3, 0, 1);
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null)
+            { Upload = new(3, 0, UploadStop.SignInRequired) });
+        screen.Tablet.SignIn = () => { signIns++; return Task.FromResult(new SignInAnswer(null, null)); };
+        await screen.Open(new());
+        await screen.Click("Sync now");
+        screen.Tablet.Connected = false;
+
+        await screen.Click("Sign in");
+        await screen.Rebuild();
+
+        Assert.Equal(0, signIns);
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Contains("Sign-in needs a connection. Try again when you have signal.", text);
+        Assert.Contains("Sign in again to send 3 items", text);
+        Assert.Contains("Unsent: 3", text);
+        Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
+    }
+
     // WI-041 C6 (I-03): the rep is told that signing in carries on with this Sync.
     [Fact]
     public async Task Should_SayThisSyncResumesAfterSignIn_When_SyncNeedsSignInAgain()

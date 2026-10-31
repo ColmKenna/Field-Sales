@@ -183,6 +183,14 @@
         if (signingIn || busy || disposed || rep is null) return;
         string signingRep = rep;
         long version = Tablet.SessionVersion;
+        // US-004 S3: without signal the browser would only show an error, so say what is needed instead; nothing else changes.
+        if (!Tablet.Connected)
+        {
+            signInProblem = TabletApp.SignInNeedsConnection;
+            if (Tablet.SyncNotices.Read(signingRep, version) is { } kept)
+                Tablet.SyncNotices.Keep(signingRep, version, kept with { SignInProblem = signInProblem });
+            return;
+        }
         signingIn = true; signInProblem = null;
         SignInAnswer answer = await Tablet.SignInAsync();
         // Returning from the browser has usually rebuilt this page by now, so what happened goes through the app. A sign-in as the
