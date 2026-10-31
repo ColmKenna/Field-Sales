@@ -22,6 +22,8 @@ public sealed class TabletApp
     public Func<long, Task<bool>> End { get; set; } = _ => Task.FromResult(false);
     public Task<IReadOnlyList<UnsentKind>> ReadUnsentKindsAsync(long version) => ReadKinds(version);
     public Task<bool> SignOutAsync(long version) => End(version);
+    public Func<Task<string?>> SignIn { get; set; } = () => Task.FromResult<string?>(null);
+    public Task<string?> SignInAsync() => SignIn();
     public HomeView ReadHome(string rep) => new("Last synced 07:42", []);
     public Func<string, ProductSearchIndex> ReadIndex { get; set; } = _ => new ProductSearchIndex(null, []);
     public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddWork { get; set; } =

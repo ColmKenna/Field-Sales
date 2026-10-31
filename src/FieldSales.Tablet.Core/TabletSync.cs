@@ -43,10 +43,16 @@ public static class SyncMessages
         ? "1 item not sent — poor connection. It'll send next Sync."
         : $"{count} items not sent — poor connection. They'll send next Sync.";
 
+    /// <summary>US-001 S3 and Sign-in US-004 S1: nothing more goes until the rep signs in again.</summary>
+    public static string SignInToSend(int count) => count == 1 ? "Sign in again to send 1 item" : $"Sign in again to send {count} items";
+
     /// <summary>What happened to the rep's finished work and to their day, in the rep's words (WI-040 D1–D6).</summary>
     public static SyncReport Explain(SyncOutcome outcome)
     {
         UploadSummary upload = outcome.Upload;
+        // Nothing more goes, and the day doesn't download, until the rep signs in again: one sentence says so.
+        if (outcome.Status == SyncStatus.SignInRequired)
+            return new(upload.NotSent > 0 ? SignInToSend(upload.NotSent) : SignInRequired, null);
         // The connection failed during the uploads, but an item was confirmed or the day downloaded afterwards.
         bool poorConnection = upload is { Stop: UploadStop.ConnectionLost, NotSent: > 0 } && (upload.Sent > 0 || outcome.Completed);
         string? work = upload.NotSent == 0 ? null : poorConnection ? PoorConnection(upload.NotSent) : NotSent(upload.NotSent);

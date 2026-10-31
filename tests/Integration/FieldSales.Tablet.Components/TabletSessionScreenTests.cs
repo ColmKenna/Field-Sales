@@ -184,6 +184,53 @@ public sealed class TabletSessionScreenTests
         Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
     }
 
+    // WI-040 C2: an expired sign-in offers Sign in in place of Sync now, and says how many items are waiting for it.
+    [Fact]
+    public async Task Should_ShowSignInInsteadOfSyncNow_When_SyncNeedsSignInAgain()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null)
+            { Upload = new(3, 0, UploadStop.SignInRequired) });
+        await screen.Open(new());
+
+        await screen.Click("Sync now");
+
+        Assert.Empty(screen.Navigation.Destinations);
+        Assert.Contains("Sign in again to send 3 items", screen.Renderer.Text(screen.Id));
+        Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
+        Assert.DoesNotContain("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
+    // WI-040 C3: Sign in starts the connected sign-in once and shows what it says. Signing in doesn't start a Sync (WI-041 resumes it).
+    [Fact]
+    public async Task Should_StartTheConnectedSignInAndShowItsAnswer_When_ITapSignIn()
+    {
+        TaskCompletionSource<string?> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int syncs = 0, signIns = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) =>
+        {
+            syncs++;
+            return Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null) { Upload = new(3, 0, UploadStop.SignInRequired) });
+        };
+        screen.Tablet.SignIn = () => { signIns++; return answer.Task; };
+        await screen.Open(new());
+        await screen.Click("Sync now");
+
+        Task signingIn = screen.Click("Sign in");
+        Task again = screen.Click("Sign in"); // A second tap while the browser is open starts nothing more.
+        screen.Tablet.Resume(); // Coming back from the browser resumes the app, which reloads the page.
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Last synced 07:42"));
+        answer.SetResult("Sign-in needs a connection. Try again when you have signal.");
+        await Task.WhenAll(signingIn, again);
+
+        Assert.Equal((1, 1), (signIns, syncs));
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Contains("Sign-in needs a connection. Try again when you have signal.", text);
+        Assert.Contains("Sign in again to send 3 items", text);
+        Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
+    }
+
     // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
     [Theory]
     [InlineData(SyncStatus.Completed, 3, 1, "2 items not sent. They'll send next Sync.", null)]

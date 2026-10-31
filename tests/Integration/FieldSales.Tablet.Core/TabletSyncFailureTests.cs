@@ -166,8 +166,10 @@ public sealed class TabletSyncFailureTests : IDisposable
         Assert.Equal(new SyncReport("3 items not sent — poor connection. They'll send next Sync.", null), SyncMessages.Explain(outcome));
     }
 
+    // I3: US-001 S3 and Sign-in US-004 S1, the sign-in has expired.
+
     [Fact]
-    public async Task Should_CountWhatWasWaitingAndSendNothing_When_TheSignInHasExpired()
+    public async Task Should_UploadNothingAndAskToSignInToSend3Items_When_MySignInHasExpired()
     {
         using SessionTablet session = new();
         await session.Device.CompleteSignInAsync(SessionTablet.SignIn("colm"));
@@ -185,5 +187,47 @@ public sealed class TabletSyncFailureTests : IDisposable
         Assert.Equal((SyncStatus.SignInRequired, new UploadSummary(3, 0, UploadStop.SignInRequired)), (outcome.Status, outcome.Upload));
         Assert.Equal(requests, session.Server.Requests.Count); // No upload and no download.
         Assert.Equal(fingerprint, new UnsentStore(workspace).Fingerprint());
+        Assert.Equal(new SyncReport("Sign in again to send 3 items", null), SyncMessages.Explain(outcome));
+    }
+
+    [Fact]
+    public async Task Should_AskToSignInToSendTheRest_When_TheServerRefusesTheSignInPartWay()
+    {
+        Guid[] items = await ThreeItemsAsync();
+        receiver.FailFrom(2, HttpStatusCode.Unauthorized);
+        int snapshotsBefore = SnapshotRequests();
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal((SyncStatus.SignInRequired, new UploadSummary(3, 1, UploadStop.SignInRequired)), (outcome.Status, outcome.Upload));
+        Assert.Equal([items[0]], SentIds());
+        Assert.Equal(snapshotsBefore, SnapshotRequests()); // No download without a sign-in.
+        Assert.Equal(new SyncReport("Sign in again to send 2 items", null), SyncMessages.Explain(outcome));
+    }
+
+    [Fact]
+    public async Task Should_SaySignInAgainToSync_When_TheSignInHasExpiredAndNothingIsWaiting()
+    {
+        await tablet.SyncAsync(morning);
+        // An order still being built isn't finished work, so it isn't waiting to send.
+        Assert.True(new OrderStore(tablet.Workspace(), tablet.Clock).AddLine(Guid.NewGuid(), morning.Locations[0].Id, morning.Products[0].Id, 2m).Succeeded);
+        tablet.Tokens.Token = null;
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal(new SyncReport("Sign in again to sync.", null), SyncMessages.Explain(outcome));
+    }
+
+    [Fact]
+    public async Task Should_UseOneItemWording_When_OneItemIsLeftAfterTheSignInExpires()
+    {
+        await tablet.SyncAsync(morning);
+        Guid call = Guid.NewGuid();
+        Unsent().Save(new(call, UnsentKind.Call, tablet.Clock.GetUtcNow(), $$"""{"id":"{{call}}","locationId":"{{morning.Locations[0].Id}}"}"""));
+        tablet.Tokens.Token = null;
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal("Sign in again to send 1 item", SyncMessages.Explain(outcome).Work);
     }
 }

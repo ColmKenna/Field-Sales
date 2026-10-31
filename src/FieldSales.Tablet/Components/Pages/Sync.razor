@@ -24,6 +24,10 @@
             {
                 <p role="status">Downloading your day…</p>
             }
+            else if (signInNeeded)
+            {
+                <button class="primary" disabled="@signingIn" @onclick="SignInAsync">Sign in</button>
+            }
             else
             {
                 <button class="primary" disabled="@(!Tablet.Connected)" @onclick="SyncAsync">Sync now</button>
@@ -36,6 +40,10 @@
         @if (message is not null)
         {
             <p class="problem" role="status">@message</p>
+        }
+        @if (signInProblem is not null)
+        {
+            <p class="problem" role="alert">@signInProblem</p>
         }
         @if (home.Locations.Count > 0)
         {
@@ -52,6 +60,9 @@
     private string? work;
     private UploadProgress? sending;
     private bool busy;
+    private bool signInNeeded;
+    private bool signingIn;
+    private string? signInProblem;
     private int load;
     private bool disposed;
     private readonly CancellationTokenSource viewWork = new();
@@ -110,7 +121,7 @@
         long version = Tablet.SessionVersion;
         // "Sending 1 of 3…" from the tap: the session check and the sign-in token come before the first report.
         int waiting = ReadWaiting(capturedRep);
-        busy = true; message = null; work = null; sending = waiting > 0 ? new(1, waiting) : null;
+        busy = true; message = null; work = null; signInNeeded = false; signInProblem = null; sending = waiting > 0 ? new(1, waiting) : null;
         // Reports arrive on this page's context, one per item, then once more when the uploads are over.
         Progress<UploadProgress> progress = new(report =>
         {
@@ -124,8 +135,23 @@
         // Home only when everything went; otherwise the rep stays here to read what didn't, and why.
         if (outcome.Completed && outcome.Upload.NotSent == 0) { Navigation.NavigateTo("/home"); return; }
         (work, message) = SyncMessages.Explain(outcome);
+        // US-001 S3: nothing more goes until the rep signs in again, so Sign in takes Sync now's place. The sentence is the work
+        // line, which a resume (such as returning from the sign-in browser) leaves in place.
+        signInNeeded = outcome.Status == SyncStatus.SignInRequired;
         home = Tablet.ReadHome(capturedRep);
         unsent = ReadUnsent(capturedRep);
+    }
+
+    // The entry screen's connected sign-in. Success changes the session, so this page reopens for the signed-in rep with
+    // Sync now; resuming the Sync automatically is WI-041's.
+    private async Task SignInAsync()
+    {
+        if (signingIn || busy || disposed) return;
+        signingIn = true; signInProblem = null;
+        string? problem = await Tablet.SignInAsync();
+        if (disposed) return;
+        signingIn = false;
+        signInProblem = problem;
     }
 
     private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
