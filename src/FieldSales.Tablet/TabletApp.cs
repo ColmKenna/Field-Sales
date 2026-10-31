@@ -45,6 +45,9 @@ public sealed class TabletApp : IDisposable
 
     public bool Connected => Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
 
+    /// <summary>What the Sync screen last told the rep, kept for the session so a rebuilt page shows the same.</summary>
+    public SyncNotices SyncNotices { get; } = new();
+
     public Task<TabletEntry> EnterAsync() => device.EnterAsync(Connected);
 
     /// <summary>Pass entry's snapshot result to the next screen; arrival still revalidates local session access.</summary>

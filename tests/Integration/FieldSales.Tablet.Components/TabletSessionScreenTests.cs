@@ -249,6 +249,65 @@ public sealed class TabletSessionScreenTests
         Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
     }
 
+    // WI-040, found on the Samsung: returning from the sign-in browser rebuilds the page. The new page shows the same sentence and
+    // Sign in, and the answer of the sign-in the old page started.
+    [Fact]
+    public async Task Should_KeepTheSignInStateAndShowTheAnswer_When_ThePageIsRebuiltDuringSignIn()
+    {
+        TaskCompletionSource<string?> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null)
+            { Upload = new(2, 0, UploadStop.SignInRequired) });
+        screen.Tablet.SignIn = () => answer.Task;
+        await screen.Open(new());
+        await screen.Click("Sync now");
+        Task signingIn = screen.Click("Sign in");
+
+        await screen.Rebuild();
+
+        Assert.Contains("Sign in again to send 2 items", screen.Renderer.Text(screen.Id));
+        Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
+        answer.SetResult("Sign-in needs a connection. Try again when you have signal.");
+        await signingIn;
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Sign-in needs a connection. Try again when you have signal."));
+        Assert.DoesNotContain("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
+    // A sign-in that succeeds starts a new session, and the page it reopens says nothing about the old one.
+    [Fact]
+    public async Task Should_StartWithSyncNow_When_TheSessionChangedSinceTheNotice()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null)
+            { Upload = new(2, 0, UploadStop.SignInRequired) });
+        await screen.Open(new());
+        await screen.Click("Sync now");
+
+        screen.Tablet.ChangeSession();
+        await screen.Rebuild();
+
+        Assert.DoesNotContain("Sign in again", screen.Renderer.Text(screen.Id));
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
+    [Fact]
+    public async Task Should_ForgetTheNotice_When_IGoBackToHome()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.Home = new("Last synced 07:42", [new(Guid.NewGuid(), "Swords Shop", "Swords", "Swords Pharmacy")]);
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.Completed, "Last synced 17:05", null)
+            { Upload = new(3, 1, UploadStop.ConnectionLost) });
+        await screen.Open(new());
+        await screen.Click("Sync now");
+        await screen.Rebuild();
+        Assert.Contains("2 items not sent — poor connection.", screen.Renderer.Text(screen.Id)); // Kept across a rebuild.
+
+        await screen.Click("Back to Home");
+        await screen.Rebuild();
+
+        Assert.DoesNotContain("not sent", screen.Renderer.Text(screen.Id));
+    }
+
     // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
     [Theory]
     [InlineData(SyncStatus.Completed, 3, 1, "2 items not sent. They'll send next Sync.", null)]
@@ -291,13 +350,22 @@ public sealed class TabletSessionScreenTests
         public TabletApp Tablet { get; } = new();
         public TestNavigation Navigation { get; } = new();
         public ScreenRenderer Renderer { get; }
-        public int Id { get; }
+        public int Id { get; private set; }
+        private readonly Type component;
         public Screen(Type component)
         {
+            this.component = component;
             services = new ServiceCollection().AddLogging().AddSingleton(Tablet)
                 .AddSingleton<NavigationManager>(Navigation).AddSingleton<IJSRuntime>(new NoopJS()).BuildServiceProvider();
             Renderer = new(services, services.GetRequiredService<ILoggerFactory>());
             Id = Renderer.Attach(component);
+        }
+        /// <summary>What the layout does on every resume: the page is removed and a new one opens in its place.</summary>
+        public async Task Rebuild()
+        {
+            await Renderer.Dispatcher.InvokeAsync(() => Renderer.Remove(Id));
+            Id = Renderer.Attach(component);
+            await Open(new());
         }
         public Task Open(Dictionary<string, object?> parameters) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, parameters));
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));

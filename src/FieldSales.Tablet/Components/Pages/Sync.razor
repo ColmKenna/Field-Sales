@@ -47,7 +47,7 @@
         }
         @if (home.Locations.Count > 0)
         {
-            <button class="link" @onclick='() => Navigation.NavigateTo("/home")'>Back to Home</button>
+            <button class="link" @onclick="BackToHome">Back to Home</button>
         }
     }
 </section>
@@ -70,6 +70,7 @@
     protected override async Task OnInitializedAsync()
     {
         Tablet.Resumed += OnResumed;
+        Tablet.SyncNotices.Changed += OnNoticeChanged;
         await GuardAsync(Tablet.EnterOnArrivalAsync);
     }
 
@@ -87,8 +88,28 @@
         if (version != Tablet.SessionVersion) { rep = null; return; }
         home = read;
         unsent = ReadUnsent(rep);
-        if (!Tablet.Connected) message = SyncMessages.NoConnection;
+        ShowNotice();
     }
+
+    // What this screen last told the rep in this session. Returning from the sign-in browser resumes the app, which rebuilds this
+    // page, so the app keeps it and the new page shows the same.
+    private void ShowNotice()
+    {
+        SyncNotice? notice = rep is null ? null : Tablet.SyncNotices.Read(rep, Tablet.SessionVersion);
+        (work, message) = notice?.Report ?? new SyncReport(null, null);
+        signInNeeded = notice?.SignInNeeded ?? false;
+        signInProblem = notice?.SignInProblem;
+        // Without signal, say so, unless the work line already does.
+        if (!Tablet.Connected && work != SyncMessages.NoConnection) message ??= SyncMessages.NoConnection;
+    }
+
+    // A sign-in answer can arrive after this page was rebuilt; the page that shows the notice then shows it.
+    private void OnNoticeChanged() => _ = InvokeAsync(() =>
+    {
+        if (disposed || busy || rep is null) return;
+        ShowNotice();
+        StateHasChanged();
+    });
 
     // The count is a courtesy: a saved item that cannot be counted must never stop the rep syncing.
     private UnsentSummary? ReadUnsent(string repSubject)
@@ -122,6 +143,7 @@
         // "Sending 1 of 3…" from the tap: the session check and the sign-in token come before the first report.
         int waiting = ReadWaiting(capturedRep);
         busy = true; message = null; work = null; signInNeeded = false; signInProblem = null; sending = waiting > 0 ? new(1, waiting) : null;
+        Tablet.SyncNotices.Keep(capturedRep, version, null);
         // Reports arrive on this page's context, one per item, then once more when the uploads are over.
         Progress<UploadProgress> progress = new(report =>
         {
@@ -134,10 +156,9 @@
         busy = false; sending = null;
         // Home only when everything went; otherwise the rep stays here to read what didn't, and why.
         if (outcome.Completed && outcome.Upload.NotSent == 0) { Navigation.NavigateTo("/home"); return; }
-        (work, message) = SyncMessages.Explain(outcome);
-        // US-001 S3: nothing more goes until the rep signs in again, so Sign in takes Sync now's place. The sentence is the work
-        // line, which a resume (such as returning from the sign-in browser) leaves in place.
-        signInNeeded = outcome.Status == SyncStatus.SignInRequired;
+        // US-001 S3: nothing more goes until the rep signs in again, so Sign in takes Sync now's place.
+        Tablet.SyncNotices.Keep(capturedRep, version, new(SyncMessages.Explain(outcome), outcome.Status == SyncStatus.SignInRequired));
+        ShowNotice();
         home = Tablet.ReadHome(capturedRep);
         unsent = ReadUnsent(capturedRep);
     }
@@ -146,12 +167,24 @@
     // Sync now; resuming the Sync automatically is WI-041's.
     private async Task SignInAsync()
     {
-        if (signingIn || busy || disposed) return;
+        if (signingIn || busy || disposed || rep is null) return;
+        string signingRep = rep;
+        long version = Tablet.SessionVersion;
         signingIn = true; signInProblem = null;
         string? problem = await Tablet.SignInAsync();
+        // Returning from the browser has usually rebuilt this page by now, so the answer goes with the notice. A sign-in that
+        // succeeded started a new session, which begins without one.
+        if (version == Tablet.SessionVersion && Tablet.SyncNotices.Read(signingRep, version) is { } shown)
+            Tablet.SyncNotices.Keep(signingRep, version, shown with { SignInProblem = problem });
         if (disposed) return;
         signingIn = false;
         signInProblem = problem;
+    }
+
+    private void BackToHome()
+    {
+        if (rep is not null) Tablet.SyncNotices.Keep(rep, Tablet.SessionVersion, null);
+        Navigation.NavigateTo("/home");
     }
 
     private void OnResumed() => _ = InvokeAsync(async () => { await GuardAsync(Tablet.EnterAsync); StateHasChanged(); });
@@ -161,5 +194,6 @@
         disposed = true; ++load; home = null; rep = null;
         viewWork.Cancel(); viewWork.Dispose();
         Tablet.Resumed -= OnResumed;
+        Tablet.SyncNotices.Changed -= OnNoticeChanged;
     }
 }
