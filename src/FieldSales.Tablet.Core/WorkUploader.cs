@@ -14,15 +14,27 @@ public sealed record UploadProgress(int Sending, int Total)
     public static UploadProgress Finished { get; } = new(0, 0);
 }
 
-/// <summary>What the upload part of a Sync did: how many items were going, and how many the server confirmed.</summary>
-public sealed record UploadSummary(int Total, int Sent)
+/// <summary>What the upload part of a Sync did: how many items were going, how many the server confirmed, and why it
+/// stopped before the end of the queue, if it did.</summary>
+public sealed record UploadSummary(int Total, int Sent, UploadStop Stop = UploadStop.None)
 {
     public static UploadSummary None { get; } = new(0, 0);
     public int NotSent => Total - Sent;
 }
 
-/// <summary>Why the upload stopped before the queue was finished, if it did.</summary>
-public enum UploadStop { None, SignInRequired, NotPermitted, Unavailable }
+/// <summary>Why the upload stopped before the queue was finished, if it did (T-4.1.3 tells the rep).</summary>
+public enum UploadStop
+{
+    None,
+    /// <summary>No usable sign-in: the tablet has no token, or the server refused it (401). Nothing more is sent.</summary>
+    SignInRequired,
+    /// <summary>The server refused the rep's permission (403). Nothing more is sent.</summary>
+    NotPermitted,
+    /// <summary>No answer came back: no route, a refused or dropped connection, or a timeout.</summary>
+    ConnectionLost,
+    /// <summary>The server answered with an error, or with a confirmation that doesn't name the item.</summary>
+    ServerError
+}
 
 /// <summary>Sends the rep's finished work, one item at a time, before the snapshot downloads (T-4.1.2).</summary>
 /// <remarks>
@@ -30,8 +42,8 @@ public enum UploadStop { None, SignInRequired, NotPermitted, Unavailable }
 /// saved item that can't be read as finished work stay on the tablet untouched. An item is marked Sent only when the
 /// server confirms it, and straight away, before the next item goes; if the confirmation is lost, the next Sync sends
 /// the same item again and the server answers that it already has it. A refused item stays unsent and the next item
-/// goes; a refused sign-in or permission stops everything; a lost connection or an unavailable server stops the
-/// remaining uploads but leaves the download to be tried.
+/// goes; a refused sign-in or permission stops everything; a lost connection or a server error stops the remaining
+/// uploads but leaves the download to be tried.
 /// </remarks>
 public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimeProvider clock)
 {
@@ -46,11 +58,11 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
     public static int CountWaiting(RepWorkspace workspace) =>
         File.Exists(workspace.UnsentPath) ? Queue(new UnsentStore(workspace).Read()).Count : 0;
 
-    public async Task<(UploadSummary Summary, UploadStop Stop)> UploadAsync(string token, SnapshotHooks hooks,
-        IProgress<UploadProgress>? progress, CancellationToken ct)
+    public async Task<UploadSummary> UploadAsync(string token, SnapshotHooks hooks, IProgress<UploadProgress>? progress,
+        CancellationToken ct)
     {
         UnsentStore unsent = new(workspace);
-        if (!File.Exists(workspace.UnsentPath)) return (UploadSummary.None, UploadStop.None);
+        if (!File.Exists(workspace.UnsentPath)) return UploadSummary.None;
         IReadOnlyList<UnsentItem> queue = Queue(unsent.Read());
         int sent = 0;
         for (int index = 0; index < queue.Count; index++)
@@ -58,13 +70,13 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
             UnsentItem item = queue[index];
             progress?.Report(new(index + 1, queue.Count));
             (bool confirmed, UploadStop stop) = await SendAsync(item, token, ct);
-            if (stop != UploadStop.None) return (new(queue.Count, sent), stop);
+            if (stop != UploadStop.None) return new(queue.Count, sent, stop);
             if (!confirmed) continue;
             hooks.AtBoundary?.Invoke("upload-confirmed");
             unsent.MarkSent(item.Id, clock.GetUtcNow());
             sent++;
         }
-        return (new(queue.Count, sent), UploadStop.None);
+        return new(queue.Count, sent);
     }
 
     private async Task<(bool Confirmed, UploadStop Stop)> SendAsync(UnsentItem item, string token, CancellationToken ct)
@@ -82,20 +94,20 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
         catch (Exception exception) when (!ct.IsCancellationRequested
             && exception is HttpRequestException { StatusCode: null } or TaskCanceledException or IOException)
         {
-            return (false, UploadStop.Unavailable);
+            return (false, UploadStop.ConnectionLost);
         }
         using (response)
         {
             switch (response.StatusCode)
             {
                 case HttpStatusCode.OK or HttpStatusCode.Created:
-                    return await IsReceiptForAsync(response, item.Id, ct) ? (true, UploadStop.None) : (false, UploadStop.Unavailable);
+                    return await IsReceiptForAsync(response, item.Id, ct) ? (true, UploadStop.None) : (false, UploadStop.ServerError);
                 case HttpStatusCode.Unauthorized: return (false, UploadStop.SignInRequired);
                 case HttpStatusCode.Forbidden: return (false, UploadStop.NotPermitted);
                 // A technical fault in this item (MI-52): it stays unsent and the next item goes.
                 case HttpStatusCode.BadRequest or HttpStatusCode.Conflict or HttpStatusCode.RequestEntityTooLarge:
                     return (false, UploadStop.None);
-                default: return (false, UploadStop.Unavailable);
+                default: return (false, UploadStop.ServerError);
             }
         }
     }

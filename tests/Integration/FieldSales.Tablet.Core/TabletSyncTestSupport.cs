@@ -105,6 +105,17 @@ public static class FailingContent
     }
 }
 
+/// <summary>The faults a real connection and sign-in produce, by name, for the Sync failure scenarios (T-4.1.3).</summary>
+public static class Faults
+{
+    /// <summary>No route, a refused or a dropped connection: the request fails before any answer arrives.</summary>
+    public static HttpRequestException NoSignal() => new(HttpRequestError.ConnectionError, "No route to host.");
+
+    /// <summary>What the identity host answers a refresh once the sign-in has expired or been revoked.</summary>
+    public static HttpResponseMessage ExpiredSignIn() =>
+        new(HttpStatusCode.BadRequest) { Content = new StringContent("""{"error":"invalid_grant"}""") };
+}
+
 public sealed class TestTokens(string? token = "rep-token") : IAccessTokenSource
 {
     public string? Token { get; set; } = token;

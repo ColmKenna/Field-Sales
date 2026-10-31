@@ -8,8 +8,9 @@ namespace FieldSales.Tablet.Core;
 
 public enum SyncStatus { Completed, NoConnection, SignInRequired, NotPermitted, UpdateRequired, InsufficientSpace, Failed, Cancelled }
 
-/// <summary>What a Sync did. <see cref="Upload"/> says how many finished items went and how many the server confirmed;
-/// only confirmed items changed. Every outcome other than <see cref="SyncStatus.Completed"/> leaves the snapshot as it was.</summary>
+/// <summary>What a Sync did. <see cref="Upload"/> says how many finished items were going, how many the server confirmed
+/// and why the uploads stopped early, if they did; only confirmed items changed. Every outcome other than
+/// <see cref="SyncStatus.Completed"/> leaves the snapshot as it was.</summary>
 public sealed record SyncOutcome(SyncStatus Status, string Message, ActiveSnapshot? Active)
 {
     public bool Completed => Status == SyncStatus.Completed;
@@ -71,11 +72,13 @@ public sealed partial class TabletSync(RepWorkspace workspace, HttpClient http, 
         try
         {
             string? token = await tokens.GetAccessTokenAsync(ct);
-            if (token is null) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired);
-            (upload, UploadStop stop) = await new WorkUploader(workspace, http, time).UploadAsync(token, hooks, progress, ct);
+            // Nothing is sent without a sign-in, but the rep is told how many finished items are waiting for one.
+            if (token is null)
+                return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, new(CountWaiting(), 0, UploadStop.SignInRequired));
+            upload = await new WorkUploader(workspace, http, time).UploadAsync(token, hooks, progress, ct);
             if (upload.Total > 0) progress?.Report(UploadProgress.Finished);
-            if (stop == UploadStop.SignInRequired) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, upload);
-            if (stop == UploadStop.NotPermitted) return Outcome(SyncStatus.NotPermitted, SyncMessages.NotPermitted, upload);
+            if (upload.Stop == UploadStop.SignInRequired) return Outcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, upload);
+            if (upload.Stop == UploadStop.NotPermitted) return Outcome(SyncStatus.NotPermitted, SyncMessages.NotPermitted, upload);
             // Uploads need no room for a snapshot; only the download does.
             if (space.AvailableBytes(workspace.DirectoryPath) < 2 * workspace.SnapshotBytes() + ReserveBytes)
                 return Outcome(SyncStatus.InsufficientSpace, SyncMessages.InsufficientSpace, upload);
@@ -107,6 +110,13 @@ public sealed partial class TabletSync(RepWorkspace workspace, HttpClient http, 
 
     private SyncOutcome Outcome(SyncStatus status, string message, UploadSummary? upload = null) =>
         new(status, message, Store.ReadActive()) { Upload = upload ?? UploadSummary.None };
+
+    // The count is a courtesy: an Unsent database that can't be read must not hide that a sign-in is needed.
+    private int CountWaiting()
+    {
+        try { return WorkUploader.CountWaiting(workspace); }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or SqliteException) { return 0; }
+    }
 
     private async Task<(SyncOutcome?, ExpectedSnapshot?)> DownloadAsync(string token, SnapshotHooks hooks, CancellationToken ct)
     {
