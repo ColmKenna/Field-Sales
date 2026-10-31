@@ -45,6 +45,10 @@ public enum SignInStatus { Started, NotPermitted, Superseded }
 
 public sealed record SignInOutcome(SignInStatus Status, string Message, RepWorkspace? Workspace);
 
+/// <summary>What a connected sign-in from a screen came to: the rep it started a session for, or what to tell the rep. Both are
+/// null when the rep closed the browser.</summary>
+public sealed record SignInAnswer(string? SignedInRep, string? Problem);
+
 /// <summary>I-03 text.</summary>
 public static class EntryMessages
 {

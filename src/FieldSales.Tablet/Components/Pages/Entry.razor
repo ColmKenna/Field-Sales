@@ -60,7 +60,7 @@
     private async Task SignInAsync()
     {
         busy = true;
-        problem = await Tablet.SignInAsync();
+        problem = (await Tablet.SignInAsync()).Problem;
         if (disposed) return;
         busy = false;
         await RefreshAsync();

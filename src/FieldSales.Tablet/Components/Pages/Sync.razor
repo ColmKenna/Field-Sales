@@ -37,6 +37,10 @@
         {
             <p class="problem" role="status">@work</p>
         }
+        @if (signInNeeded)
+        {
+            <p>After sign-in, this Sync resumes automatically.</p>
+        }
         @if (message is not null)
         {
             <p class="problem" role="status">@message</p>
@@ -72,6 +76,14 @@
         Tablet.Resumed += OnResumed;
         Tablet.SyncNotices.Changed += OnNoticeChanged;
         await GuardAsync(Tablet.EnterOnArrivalAsync);
+        await ResumeIfAskedAsync();
+    }
+
+    // WI-041 (I3.2): the rep already asked to Sync, so once they have signed in again from this screen, the new session's Sync
+    // screen carries on with it. Only that sign-in asks; signal returning or the app resuming never does (T1.3).
+    private async Task ResumeIfAskedAsync()
+    {
+        if (!busy && !disposed && rep is not null && Tablet.SyncNotices.TakeResume(rep, Tablet.SessionVersion)) await SyncAsync();
     }
 
     private async Task GuardAsync(Func<Task<TabletEntry>> enter)
@@ -103,12 +115,13 @@
         if (!Tablet.Connected && work != SyncMessages.NoConnection) message ??= SyncMessages.NoConnection;
     }
 
-    // A sign-in answer can arrive after this page was rebuilt; the page that shows the notice then shows it.
-    private void OnNoticeChanged() => _ = InvokeAsync(() =>
+    // A sign-in answer can arrive after this page was rebuilt; the page that shows the notice then shows it, or resumes the Sync.
+    private void OnNoticeChanged() => _ = InvokeAsync(async () =>
     {
         if (disposed || busy || rep is null) return;
         ShowNotice();
         StateHasChanged();
+        await ResumeIfAskedAsync();
     });
 
     // The count is a courtesy: a saved item that cannot be counted must never stop the rep syncing.
@@ -171,14 +184,16 @@
         string signingRep = rep;
         long version = Tablet.SessionVersion;
         signingIn = true; signInProblem = null;
-        string? problem = await Tablet.SignInAsync();
-        // Returning from the browser has usually rebuilt this page by now, so the answer goes with the notice. A sign-in that
-        // succeeded started a new session, which begins without one.
-        if (version == Tablet.SessionVersion && Tablet.SyncNotices.Read(signingRep, version) is { } shown)
-            Tablet.SyncNotices.Keep(signingRep, version, shown with { SignInProblem = problem });
+        SignInAnswer answer = await Tablet.SignInAsync();
+        // Returning from the browser has usually rebuilt this page by now, so what happened goes through the app. A sign-in as the
+        // same rep started a new session, whose Sync screen resumes the Sync; anything else leaves the notice with the answer.
+        if (answer.SignedInRep == signingRep && version != Tablet.SessionVersion)
+            Tablet.SyncNotices.RequestResume(signingRep, Tablet.SessionVersion);
+        else if (version == Tablet.SessionVersion && Tablet.SyncNotices.Read(signingRep, version) is { } shown)
+            Tablet.SyncNotices.Keep(signingRep, version, shown with { SignInProblem = answer.Problem });
         if (disposed) return;
         signingIn = false;
-        signInProblem = problem;
+        signInProblem = answer.Problem;
     }
 
     private void BackToHome()

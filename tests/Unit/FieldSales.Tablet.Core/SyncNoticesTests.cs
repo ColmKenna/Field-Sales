@@ -51,4 +51,31 @@ public sealed class SyncNoticesTests
         Assert.Equal(2, told);
         Assert.Equal("Sign-in needs a connection. Try again when you have signal.", notices.Read("colm", 4)!.SignInProblem);
     }
+
+    // WI-041: a sign-in from the Sync screen asks the new session's Sync screen to carry on with the Sync, once.
+    [Fact]
+    public void Should_ResumeOnce_When_TheSameRepAsksInTheSessionTheSignInStarted()
+    {
+        SyncNotices notices = new();
+        int told = 0;
+        notices.Changed += () => told++;
+
+        notices.RequestResume("colm", 5);
+
+        Assert.Equal(1, told);
+        Assert.True(notices.TakeResume("colm", 5));
+        Assert.False(notices.TakeResume("colm", 5));
+    }
+
+    [Theory]
+    [InlineData("aoife", 5)]
+    [InlineData("colm", 4)]
+    [InlineData("colm", 6)]
+    public void Should_NotResume_When_AnotherRepOrSessionAsks(string rep, long version)
+    {
+        SyncNotices notices = new();
+        notices.RequestResume("colm", 5);
+
+        Assert.False(notices.TakeResume(rep, version));
+    }
 }
