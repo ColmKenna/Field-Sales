@@ -21,6 +21,10 @@ The developer replied **Approved** to the WI-040 plan (decisions D1–D8, full t
   **WI-041** owns the automatic resume, I-03's "After sign-in, this Sync resumes automatically." and Sign in without signal.
 - **Resume point for WI-041:** confirmed items move to Sent immediately and every Sync reads the queue fresh, so a repeated or
   resumed Sync never re-sends a confirmed item; a lost confirmation is re-sent and answered `AlreadyReceived` (WI-039).
+- **Amendment 2026-10-31 (device check, developer chose "keep it in the app"):** `MainLayout` rebuilds the routed page on every
+  resume, and returning from the sign-in browser is a resume. The Sync screen's notice (report, Sign in state, sign-in answer)
+  therefore lives in `TabletApp.SyncNotices` (Tablet.Core `SyncNotices`), keyed by rep and session version, and the page restores
+  it. **WI-041** should build its interrupted-Sync state on the same store rather than on page fields.
 
 ## WI-039 upload protocol and MI-52 (2026-10-29/30, developer, plan approval)
 

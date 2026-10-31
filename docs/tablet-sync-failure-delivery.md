@@ -34,9 +34,13 @@ and reviewed each increment before the next ("continue").
 **Tablet app (`FieldSales.Tablet`)**
 
 - `Sync.razor` shows the report's two lines. When the sign-in has expired, **Sign in** takes Sync now's place, calls
-  `TabletApp.SignInAsync()` once (a second tap starts nothing) and shows whatever it reports. The sign-in sentence is the work line,
-  which a resume (returning from the sign-in browser) leaves in place. Success changes the session, so the page reopens for the
-  signed-in rep with Sync now.
+  `TabletApp.SignInAsync()` once (a second tap starts nothing) and shows whatever it reports. Success changes the session, so the
+  page reopens for the signed-in rep with Sync now.
+- `SyncNotices` (Tablet.Core, held by `TabletApp`): the Sync screen's last notice (report, Sign in state, sign-in answer) for the
+  rep and session it was said in. Returning from the sign-in browser resumes the app, and `MainLayout` rebuilds the page on every
+  resume; the rebuilt page shows the same notice and hears a sign-in answer that arrives later. A new Sync, Back to Home or a new
+  session (a successful sign-in) starts without one. Added after the device check found the rebuild (developer's choice,
+  31 October 2026).
 
 No server, API or snapshot contract change.
 
@@ -53,7 +57,8 @@ No server, API or snapshot contract change.
    the tablet (S3)."** `Should_UploadNothingAndAskToSignInToSend3Items_When_MySignInHasExpired` uses the real token source with the
    identity host refusing the refresh: no upload and no download request, the Unsent fingerprint is unchanged, and the report is
    "Sign in again to send 3 items". Screen C2 shows **Sign in** in place of Sync now; C3 shows it starts the connected sign-in once
-   and shows its answer, and survives the resume that returning from the browser causes.
+   and shows its answer; `Should_KeepTheSignInStateAndShowTheAnswer_When_ThePageIsRebuiltDuringSignIn` shows the sentence, Sign in
+   and a later answer survive the page rebuild that returning from the browser causes. Confirmed on the Samsung.
 3. **"Progress shows "Sending 2 of 3" (non-functional)."** Delivered by WI-039 (screen C1 there, and "Sending 1 of N…" from the
    tap); `Should_ReportSending2Of3ThenStop_When_TheConnectionDropsOnTheSecondItem` adds the drop: 1 of 3, 2 of 3, then finished.
 
@@ -64,6 +69,7 @@ No server, API or snapshot contract change.
 | Causes (I1) | 8 cases: drop after 0/1/2 confirmations, 500/503/404, a receipt naming another item, a real expired refresh | `tests/Integration/FieldSales.Tablet.Core/TabletSyncFailureTests.cs` |
 | F1–F12 | 19 cases (F10 and F11 four each) plus a 401 at the download after every item went | same file |
 | Screen C1–C4 | 5 cases | `tests/Integration/FieldSales.Tablet.Components/TabletSessionScreenTests.cs` |
+| Kept notice | 3 screen tests (page rebuilt during sign-in keeps the sentence and shows the later answer; a new session starts with Sync now; Back to Home forgets it) and 5 unit tests | same file; `tests/Unit/FieldSales.Tablet.Core/SyncNoticesTests.cs` |
 
 **Existing tests that changed.** Five WI-039 tests (7 cases) compared upload summaries after a stop; they now assert the stop
 too, and "upload nothing without a token" expects the 2 waiting items instead of zero. Run against the new code before the
@@ -81,10 +87,39 @@ to the shared support). Production Sync has no test hooks.
 - Dropping the item count from the sign-in sentence failed 3. Removing the Sign in double-tap guard first made C3 hang (the
   second tap awaited the pending sign-in); C3 was reworked to await both taps after the answer, after which it fails in 49 ms.
 - The no-connection rule, the server-error sentence and the D6 day lines each failed their tests (F7; F9; the four F10 cases).
+- Kept notice: a rebuilt page ignoring it failed two screen tests; not keeping the sign-in answer failed the rebuild test;
+  Back to Home not forgetting it failed its test.
 
 ## Final verification
 
-DEVICE_AND_FINAL_VERIFICATION
+**Device check (Samsung SM-P610, demo AppHost, dev-trust Release APK, 31 October 2026)**
+
+| Check | Tablet | Server |
+|---|---|---|
+| Sign-in expired: refresh grant deleted in `FieldSalesDemo_IdentityOperationalDb`, access token past its hour, two orders Ready | "Sign in again to send 2 items" with **Sign in** in place of Sync now; Unsent 2 | nothing received |
+| Signed in again, then Sync now | both sent, Home | 2 rows, Pending, resent 0, hashes match |
+| No connection: API forward removed **and the app restarted cold** (a live pooled connection otherwise carries the Sync through) | only "No connection — your work is saved on this tablet"; Unsent 1; Last synced unchanged | nothing received |
+| Forward restored, Sync now | sent, day downloaded | 1 row, Pending, hash matches |
+| After the fix: no-connection result, then Home key and back (the layout rebuilds the page) | the sentence is still shown | — |
+
+Found during the check and fixed: returning from the sign-in browser rebuilt the Sync page and lost its sentence, Sign in and the
+sign-in's answer (see `SyncNotices`). Also learned: signing in needs the API as well as the identity host (the app asks
+`staff/session`); with the API cut, the token exchange succeeds but the app answers "Sign-in needs a connection" and keeps nothing.
+A poor connection can't be timed by hand on the device; F1 and F2 cover it. The sign-in answer after a rebuild is covered by the
+screen test, not repeated on the device.
+
+**Automated**
+
+On the final code (31 October 2026, Docker running):
+
+- `dotnet build FieldSales.slnx -c Release -m:1 --no-incremental`: 0 warnings, 0 errors.
+- `dotnet test FieldSales.slnx -c Release --no-build -m:1 --settings sqlserver.runsettings`: **2,849 passed, 0 failed,
+  0 skipped** across 12 projects (baseline 2,809, so 40 new): Tablet Core integration 200, Tablet Components 59, Tablet Core unit 12,
+  API integration 174, API unit 185, Web integration 873, Web unit 219, Identity Admin integration 804 and unit 256, DemoData 4,
+  SnapshotSpike 22, TabletSpike 41.
+- `scripts/tablet-app.ps1 -Action Build -Configuration Release -DevTrust`: the signed Android APK builds and trusts the dev
+  certificate for localhost only.
+- `node --test plan_docs/field-sales-delivery/tests/status-store.test.js`: 11 passed. The only console change is `WI-040` → `done`.
 
 ## Left for later items
 
