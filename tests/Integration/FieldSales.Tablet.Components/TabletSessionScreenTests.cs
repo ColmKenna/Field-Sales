@@ -308,6 +308,34 @@ public sealed class TabletSessionScreenTests
         Assert.DoesNotContain("not sent", screen.Renderer.Text(screen.Id));
     }
 
+    // WI-041 C4 (T1.3): Sync is deliberate. Signal returning, the app resuming, the page being rebuilt or a new session on its own
+    // never starts one.
+    [Fact]
+    public async Task Should_NotStartASync_When_SignalReturnsOrTheAppResumes()
+    {
+        int syncs = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) =>
+        {
+            syncs++;
+            return Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null) { Upload = new(3, 0, UploadStop.SignInRequired) });
+        };
+        await screen.Open(new());
+        await screen.Click("Sync now");
+
+        screen.Tablet.Connected = false;
+        screen.Tablet.Resume();
+        screen.Tablet.Connected = true;
+        screen.Tablet.Resume();
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Last synced 07:42"));
+        await screen.Rebuild();
+        screen.Tablet.ChangeSession();
+        await screen.Rebuild();
+
+        Assert.Equal(1, syncs);
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
     // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
     [Theory]
     [InlineData(SyncStatus.Completed, 3, 1, "2 items not sent. They'll send next Sync.", null)]

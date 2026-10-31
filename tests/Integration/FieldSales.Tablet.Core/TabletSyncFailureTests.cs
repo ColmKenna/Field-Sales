@@ -24,23 +24,10 @@ public sealed class TabletSyncFailureTests : IDisposable
     private IReadOnlyList<Guid> SentIds() => Unsent().ReadSent().Select(sent => sent.Item.Id).ToArray();
     private int SnapshotRequests() => tablet.Server.Requests.Count(request => request.Path == SnapshotContract.Path);
 
-    // Two saved Calls and a Ready to Send Order, in the order they go.
-    private static Guid[] SaveThreeItems(RepWorkspace workspace, TabletSnapshot day, TimeProvider clock)
-    {
-        Guid first = Guid.NewGuid(), second = Guid.NewGuid(), order = Guid.NewGuid();
-        foreach ((Guid id, int minutesAgo) in new[] { (first, 30), (second, 20) })
-            new UnsentStore(workspace).Save(new(id, UnsentKind.Call, clock.GetUtcNow().AddMinutes(-minutesAgo),
-                $$"""{"id":"{{id}}","locationId":"{{day.Locations[0].Id}}","channel":"InPerson"}"""));
-        OrderStore orders = new(workspace, clock);
-        Assert.True(orders.AddLine(order, day.Locations[1].Id, day.Products[0].Id, 6m).Succeeded);
-        Assert.True(orders.MarkReadyToSend(order).Succeeded);
-        return [first, second, order];
-    }
-
     private async Task<Guid[]> ThreeItemsAsync()
     {
         await tablet.SyncAsync(morning);
-        return SaveThreeItems(tablet.Workspace(), morning, tablet.Clock);
+        return FinishedWork.SaveThree(tablet.Workspace(), morning, tablet.Clock);
     }
 
     private Task<SyncOutcome> SyncAsync()
@@ -175,7 +162,7 @@ public sealed class TabletSyncFailureTests : IDisposable
         await session.Device.CompleteSignInAsync(SessionTablet.SignIn("colm"));
         Assert.Equal(SyncStatus.Completed, (await session.SyncAsync("colm")).Status);
         RepWorkspace workspace = session.Device.Workspace("colm");
-        SaveThreeItems(workspace, Snapshots.Build("colm", 3, products: 20, label: "C"), session.Clock); // The day SyncAsync served.
+        FinishedWork.SaveThree(workspace, Snapshots.Build("colm", 3, products: 20, label: "C"), session.Clock); // The day SyncAsync served.
         string fingerprint = new UnsentStore(workspace).Fingerprint();
         // Two hours on, the access token needs a refresh, and the identity host refuses it.
         session.Clock.UtcNow = SessionTablet.Morning.AddHours(2);
