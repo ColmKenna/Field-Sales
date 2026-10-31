@@ -8,14 +8,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Api.TabletSync;
 
-/// <summary>Builds one rep's Morning Snapshot (contract v1) on demand.</summary>
+/// <summary>Builds one rep's Morning Snapshot on demand.</summary>
 /// <remarks>
-/// Locations come from T-3.1.1's resolver, never a copy of its rule. Version 1 carries only products with
-/// no Restriction Group; WI-043 adds permitted restricted products through <see cref="RestrictedProductVisibility"/>.
+/// Locations come from T-3.1.1's resolver, never a copy of its rule. Product visibility uses
+/// <see cref="RestrictedProductVisibility"/> with the rep's current permissions, read in the same
+/// catalogue transaction as the products and their facts.
 /// Each database is read in one serializable transaction. The two families do not reference each other.
 /// </remarks>
 public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, CoverageOwnershipReader ownership,
-    CatalogueDbContext catalogue, TimeProvider clock)
+    CatalogueDbContext catalogue, RestrictionPermissionReader permissions, TimeProvider clock)
 {
     public async Task<TabletSnapshot> BuildAsync(string repSubject, CancellationToken ct)
     {
@@ -24,7 +25,7 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
         DateOnly buildDate = ProductEndpoints.Today(clock);
         SnapshotLocation[] locations = await ReadLocationsAsync(repSubject, ct);
         (SnapshotCategory[] categories, SnapshotProduct[] products, SnapshotBasePrice[] prices, SnapshotProductAttribute[] attributes) =
-            await ReadCatalogueAsync(buildDate, ct);
+            await ReadCatalogueAsync(repSubject, buildDate, ct);
         var manifest = new SnapshotManifest(SnapshotContract.Schema, SnapshotContract.CurrentVersion, repSubject,
             builtUtc, buildDate, new(locations.Length, categories.Length, products.Length, prices.Length, attributes.Length));
         return new(manifest, locations, categories, products, prices, attributes);
@@ -69,11 +70,14 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
                 .ToArray();
         }, ct);
 
-    private Task<(SnapshotCategory[], SnapshotProduct[], SnapshotBasePrice[], SnapshotProductAttribute[])> ReadCatalogueAsync(DateOnly buildDate,
-        CancellationToken ct) =>
+    private Task<(SnapshotCategory[], SnapshotProduct[], SnapshotBasePrice[], SnapshotProductAttribute[])> ReadCatalogueAsync(
+        string repSubject, DateOnly buildDate, CancellationToken ct) =>
         CatalogueTransactions.RunAsync(catalogue, IsolationLevel.Serializable, async () =>
         {
-            var products = await catalogue.Products.AsNoTracking().Where(product => product.RestrictionGroupId == null)
+            IReadOnlyCollection<Guid> permittedGroupIds = await permissions.CurrentGroupIdsAsync(repSubject, ct);
+            IQueryable<Product> visibleProducts = catalogue.Products.AsNoTracking()
+                .VisibleToRep(catalogue.RestrictionGroups, permittedGroupIds);
+            var products = await visibleProducts
                 .Select(product => new
                 {
                     product.Id, product.Code, product.Name, product.CategoryId, product.Unit, product.QuantityStep,
@@ -82,15 +86,13 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
             HashSet<Guid> included = [.. products.Select(product => product.Id)];
             // Use the same inclusion predicate and catalogue transaction as the products themselves.
             SnapshotProductAttribute[] attributes = await (from value in catalogue.ProductAttributeValues.AsNoTracking()
-                join product in catalogue.Products on value.ProductId equals product.Id
+                join product in visibleProducts on value.ProductId equals product.Id
                 join name in catalogue.AttributeNames on value.AttributeNameId equals name.Id
-                where product.RestrictionGroupId == null
                 orderby value.ProductId, value.Position
                 select new SnapshotProductAttribute(value.ProductId, value.Position, name.Name, value.Value, name.IsArchived))
                 .ToArrayAsync(ct);
             var prices = await (from price in catalogue.ProductBasePrices.AsNoTracking()
-                                join product in catalogue.Products on price.ProductId equals product.Id
-                                where product.RestrictionGroupId == null
+                                join product in visibleProducts on price.ProductId equals product.Id
                                 select new { price.ProductId, price.EffectiveFrom, price.Amount }).ToArrayAsync(ct);
             Dictionary<Guid, SnapshotCategory> categories = await catalogue.Categories.AsNoTracking()
                 .Select(category => new SnapshotCategory(category.Id, category.ParentId, category.Name))

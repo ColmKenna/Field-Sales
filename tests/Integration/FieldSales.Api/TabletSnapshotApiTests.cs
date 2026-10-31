@@ -208,28 +208,53 @@ public sealed class TabletSnapshotApiTests(TabletSnapshotFixture fixture) : ICla
         Assert.Equal(reactivateOutgoing ? ContactStatus.Active : ContactStatus.Inactive, finalMary.Status);
     }
 
-    [Fact]
-    public async Task Should_ExcludeEveryRestrictedProduct_When_BuildingContractV1()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Should_IncludeOnlyPermittedProducts_When_ARepHoldsSomeRestrictionGroups(bool pharmacyPermission,
+        bool highValuePermission)
     {
         Category general = await _app.CategoryAsync("Cough and cold");
         Category pharmacy = await _app.CategoryAsync("Pharmacy medicines");
         Guid syrup = await _app.ProductAsync("SYR-100", "Autumn Cough Syrup 100ml", general.Id);
         RestrictionGroup pharmacyOnly = await _app.RestrictionGroupAsync("Pharmacy-only medicines");
+        RestrictionGroup highValue = await _app.RestrictionGroupAsync("High-value products");
         RestrictionGroup retired = await _app.RestrictionGroupAsync("Retired range");
-        Guid permitted = await _app.ProductAsync("PH-1", "Pharmacy-only lozenges", pharmacy.Id, group: pharmacyOnly);
+        Guid medicine = await _app.ProductAsync("PH-1", "Controlled Pain Relief 30s", pharmacy.Id, group: pharmacyOnly);
+        Guid valuable = await _app.ProductAsync("HV-1", "High-value product", general.Id, group: highValue);
         Guid archived = await _app.ProductAsync("RT-1", "Retired tonic", general.Id, group: retired);
         await _app.ArchiveGroupAsync(retired.Id);
-        Guid withheld = await _app.ProductAsync("PH-2", "Pharmacy-only spray", general.Id, group: pharmacyOnly);
-        await _app.GrantAsync("colm", pharmacyOnly.Id);
+        if (pharmacyPermission) await _app.GrantAsync("colm", pharmacyOnly.Id);
+        if (highValuePermission) await _app.GrantAsync("colm", highValue.Id);
         await _app.GrantAsync("colm", retired.Id);
+        // Another rep's grants must never add anything to Colm's snapshot.
+        await _app.GrantAsync("aoife", pharmacyOnly.Id);
+        await _app.GrantAsync("aoife", highValue.Id);
+        await using (var scope = _app.Api.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
+            AttributeName fact = AttributeName.Create("Storage instructions");
+            db.AttributeNames.Add(fact);
+            foreach (Guid id in new[] { medicine, valuable, archived })
+                (await db.Products.SingleAsync(product => product.Id == id)).AddAttribute(fact, id.ToString());
+            await db.SaveChangesAsync();
+        }
 
         TabletSnapshot snapshot = await _app.SyncAsync("colm");
-        // Version 1 carries no restricted product, even one the rep is permitted (WI-043 adds those).
-        Assert.Equal([syrup], snapshot.Products.Select(product => product.Id));
-        Assert.DoesNotContain(snapshot.BasePrices, price => price.ProductId == permitted || price.ProductId == archived
-            || price.ProductId == withheld);
-        // A category holding only restricted products is not sent either.
-        Assert.Equal([general.Id], snapshot.Categories.Select(category => category.Id));
+        List<Guid> expected = [syrup];
+        if (pharmacyPermission) expected.Add(medicine);
+        if (highValuePermission) expected.Add(valuable);
+        Assert.Equal(expected.Order(), snapshot.Products.Select(product => product.Id).Order());
+        Assert.Equal(expected.Order(), snapshot.BasePrices.Select(price => price.ProductId).Distinct().Order());
+        Assert.Equal(expected.Where(id => id != syrup).Order(), snapshot.ProductAttributes!.Select(fact => fact.ProductId).Order());
+        Assert.DoesNotContain(snapshot.Products, product => product.Id == archived);
+        Assert.DoesNotContain(snapshot.BasePrices, price => price.ProductId == archived);
+        Assert.DoesNotContain(snapshot.ProductAttributes!, fact => fact.ProductId == archived);
+        List<Guid> expectedCategories = [general.Id];
+        if (pharmacyPermission) expectedCategories.Add(pharmacy.Id);
+        Assert.Equal(expectedCategories.Order(), snapshot.Categories.Select(category => category.Id).Order());
     }
 
     [Fact]
