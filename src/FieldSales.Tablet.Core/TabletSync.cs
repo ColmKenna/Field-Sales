@@ -17,7 +17,11 @@ public sealed record SyncOutcome(SyncStatus Status, string Message, ActiveSnapsh
     public UploadSummary Upload { get; init; } = UploadSummary.None;
 }
 
-/// <summary>Rep-facing Sync text. T-4.1.3 owns the full set of failure causes.</summary>
+/// <summary>What the rep reads after a Sync that didn't simply finish: a sentence about their finished work, then one about
+/// their day. Either may be absent.</summary>
+public sealed record SyncReport(string? Work, string? Day);
+
+/// <summary>Rep-facing Sync text, including why a Sync didn't complete (T-4.1.3).</summary>
 public static class SyncMessages
 {
     public const string NoConnection = "No connection — your work is saved on this tablet";
@@ -29,10 +33,27 @@ public static class SyncMessages
     public const string Cancelled = "Sync was cancelled. Your data and saved work on this tablet are unchanged.";
     public static string Completed(DateTimeOffset localCompleted) => $"Last synced {localCompleted:HH:mm}";
 
-    /// <summary>Said when some finished items didn't go. Why they didn't is T-4.1.3's to say.</summary>
+    /// <summary>Said when some finished items didn't go and no cause below applies.</summary>
     public static string NotSent(int count) => count == 1
         ? "1 item not sent. It'll send next Sync."
         : $"{count} items not sent. They'll send next Sync.";
+
+    /// <summary>US-001 S2: the connection went during the uploads after something got through.</summary>
+    public static string PoorConnection(int count) => count == 1
+        ? "1 item not sent — poor connection. It'll send next Sync."
+        : $"{count} items not sent — poor connection. They'll send next Sync.";
+
+    /// <summary>What happened to the rep's finished work and to their day, in the rep's words (WI-040 D1–D6).</summary>
+    public static SyncReport Explain(SyncOutcome outcome)
+    {
+        UploadSummary upload = outcome.Upload;
+        // The connection failed during the uploads, but an item was confirmed or the day downloaded afterwards.
+        bool poorConnection = upload is { Stop: UploadStop.ConnectionLost, NotSent: > 0 } && (upload.Sent > 0 || outcome.Completed);
+        string? work = upload.NotSent == 0 ? null : poorConnection ? PoorConnection(upload.NotSent) : NotSent(upload.NotSent);
+        // A new day shows in "Last synced"; and one sentence about the connection is enough.
+        string? day = outcome.Completed || (poorConnection && outcome.Status == SyncStatus.NoConnection) ? null : outcome.Message;
+        return new(work, day);
+    }
 
     /// <summary>Home's "Last synced 07:42"; a sync from an earlier day also shows its date.</summary>
     public static string LastSynced(DateTimeOffset completedUtc, TimeProvider clock)

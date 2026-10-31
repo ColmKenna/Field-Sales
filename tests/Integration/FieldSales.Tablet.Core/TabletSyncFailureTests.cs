@@ -103,6 +103,69 @@ public sealed class TabletSyncFailureTests : IDisposable
         Assert.Single(receiver.Arrivals);
     }
 
+    // I2: US-001 S2, a poor connection.
+
+    [Fact]
+    public async Task Should_MarkTheConfirmedItemSentKeepTheOther2AndSayPoorConnection_When_SignalDropsAfterTheServerConfirms1Of3()
+    {
+        Guid[] items = await ThreeItemsAsync();
+        ActiveSnapshot day = new SnapshotStore(tablet.Workspace(), tablet.Clock).ReadActive()!;
+        string remainingBefore = Unsent().Find(items[1])!.Json + Unsent().Find(items[2])!.Json;
+        receiver.DropAfter(1);
+        tablet.Server.Respond = _ => throw Faults.NoSignal();
+        int snapshotsBefore = SnapshotRequests();
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal([items[0]], SentIds());
+        Assert.Equal(remainingBefore, Unsent().Find(items[1])!.Json + Unsent().Find(items[2])!.Json);
+        Assert.Equal(new SyncReport("2 items not sent — poor connection. They'll send next Sync.", null), SyncMessages.Explain(outcome));
+        Assert.Equal(snapshotsBefore + 1, SnapshotRequests()); // The download was attempted.
+        Assert.Equal(day.Generation, outcome.Active!.Generation); // It didn't arrive, so the morning's day stays.
+    }
+
+    [Fact]
+    public async Task Should_DownloadTheDayAndStillSayPoorConnection_When_SignalAllowsTheDownloadAfterTheDrop()
+    {
+        Guid[] items = await ThreeItemsAsync();
+        receiver.DropAfter(1);
+        TabletSnapshot evening = Snapshots.Build("colm", 3, 3, label: "N");
+        tablet.Server.Serve(EncodedSnapshot.From(evening));
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal((SyncStatus.Completed, evening.Manifest.BuiltUtc), (outcome.Status, outcome.Active!.Manifest.BuiltUtc));
+        Assert.Equal([items[0]], SentIds());
+        Assert.Equal(new SyncReport("2 items not sent — poor connection. They'll send next Sync.", null), SyncMessages.Explain(outcome));
+    }
+
+    [Fact]
+    public async Task Should_UseOneItemWording_When_OneItemIsLeftAfterAPoorConnection()
+    {
+        await ThreeItemsAsync();
+        receiver.DropAfter(2);
+        tablet.Server.Respond = _ => throw Faults.NoSignal();
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal("1 item not sent — poor connection. It'll send next Sync.", SyncMessages.Explain(outcome).Work);
+    }
+
+    [Fact]
+    public async Task Should_SayPoorConnection_When_TheFirstUploadFailsButTheDayDownloads()
+    {
+        await ThreeItemsAsync();
+        string before = Unsent().Fingerprint();
+        receiver.DropAfter(0);
+        tablet.Server.Serve(EncodedSnapshot.From(Snapshots.Build("colm", 3, 3, label: "N")));
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal(SyncStatus.Completed, outcome.Status);
+        Assert.Equal(before, Unsent().Fingerprint());
+        Assert.Equal(new SyncReport("3 items not sent — poor connection. They'll send next Sync.", null), SyncMessages.Explain(outcome));
+    }
+
     [Fact]
     public async Task Should_CountWhatWasWaitingAndSendNothing_When_TheSignInHasExpired()
     {

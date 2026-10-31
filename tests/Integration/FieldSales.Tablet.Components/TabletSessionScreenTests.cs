@@ -164,6 +164,26 @@ public sealed class TabletSessionScreenTests
         await syncing;
     }
 
+    // WI-040 C1: a poor connection is said once, whether or not the day then downloaded, and the rep stays on Sync to read it.
+    [Theory]
+    [InlineData(SyncStatus.NoConnection)]
+    [InlineData(SyncStatus.Completed)]
+    public async Task Should_ShowTheCauseOnce_When_SomeItemsWereNotSent(SyncStatus status)
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(status,
+            status == SyncStatus.Completed ? "Last synced 17:05" : SyncMessages.NoConnection, null) { Upload = new(3, 1, UploadStop.ConnectionLost) });
+        await screen.Open(new());
+
+        await screen.Click("Sync now");
+
+        Assert.Empty(screen.Navigation.Destinations);
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "2 items not sent — poor connection\\. They'll send next Sync\\."));
+        Assert.DoesNotContain(SyncMessages.NoConnection, text);
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
     // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
     [Theory]
     [InlineData(SyncStatus.Completed, 3, 1, "2 items not sent. They'll send next Sync.", null)]
