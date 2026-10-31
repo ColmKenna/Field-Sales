@@ -231,6 +231,24 @@ public sealed class TabletSessionScreenTests
         Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
     }
 
+    // WI-040 C4: when the work went but the day didn't download, the rep reads both, and no claim that saved work is unchanged.
+    [Fact]
+    public async Task Should_ShowWhatWasSent_When_TheDayDidNotDownload()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.NoConnection, SyncMessages.NoConnection, null) { Upload = new(3, 3) });
+        await screen.Open(new());
+
+        await screen.Click("Sync now");
+
+        Assert.Empty(screen.Navigation.Destinations);
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Contains("3 items sent.", text);
+        Assert.Contains("Your day didn't download — no connection.", text);
+        Assert.DoesNotContain(SyncMessages.NoConnection, text);
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
     // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
     [Theory]
     [InlineData(SyncStatus.Completed, 3, 1, "2 items not sent. They'll send next Sync.", null)]

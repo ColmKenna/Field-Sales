@@ -33,7 +33,8 @@ public static class SyncMessages
     public const string Cancelled = "Sync was cancelled. Your data and saved work on this tablet are unchanged.";
     public static string Completed(DateTimeOffset localCompleted) => $"Last synced {localCompleted:HH:mm}";
 
-    /// <summary>Said when some finished items didn't go and no cause below applies.</summary>
+    /// <summary>Said when some finished items didn't go and no cause below applies: items refused as technical faults (until
+    /// WI-042 gives them Needs Attention), or a permission refused part way.</summary>
     public static string NotSent(int count) => count == 1
         ? "1 item not sent. It'll send next Sync."
         : $"{count} items not sent. They'll send next Sync.";
@@ -42,6 +43,14 @@ public static class SyncMessages
     public static string PoorConnection(int count) => count == 1
         ? "1 item not sent — poor connection. It'll send next Sync."
         : $"{count} items not sent — poor connection. They'll send next Sync.";
+
+    /// <summary>WI-040 D4: the server answered an upload with an error, so the rest wait for the next Sync.</summary>
+    public static string ServerError(int count) => count == 1
+        ? "1 item not sent — Field Sales didn't respond. It'll send next Sync."
+        : $"{count} items not sent — Field Sales didn't respond. They'll send next Sync.";
+
+    /// <summary>WI-040 D6: what went, said when the day then didn't download.</summary>
+    public static string Sent(int count) => count == 1 ? "1 item sent." : $"{count} items sent.";
 
     /// <summary>US-001 S3 and Sign-in US-004 S1: nothing more goes until the rep signs in again.</summary>
     public static string SignInToSend(int count) => count == 1 ? "Sign in again to send 1 item" : $"Sign in again to send {count} items";
@@ -53,13 +62,31 @@ public static class SyncMessages
         // Nothing more goes, and the day doesn't download, until the rep signs in again: one sentence says so.
         if (outcome.Status == SyncStatus.SignInRequired)
             return new(upload.NotSent > 0 ? SignInToSend(upload.NotSent) : SignInRequired, null);
-        // The connection failed during the uploads, but an item was confirmed or the day downloaded afterwards.
-        bool poorConnection = upload is { Stop: UploadStop.ConnectionLost, NotSent: > 0 } && (upload.Sent > 0 || outcome.Completed);
-        string? work = upload.NotSent == 0 ? null : poorConnection ? PoorConnection(upload.NotSent) : NotSent(upload.NotSent);
-        // A new day shows in "Last synced"; and one sentence about the connection is enough.
-        string? day = outcome.Completed || (poorConnection && outcome.Status == SyncStatus.NoConnection) ? null : outcome.Message;
+        // The connection failed during the uploads. It was poor if an item was confirmed or the day downloaded afterwards;
+        // otherwise nothing got through, and there was no connection.
+        bool connectionLost = upload is { Stop: UploadStop.ConnectionLost, NotSent: > 0 };
+        bool poorConnection = connectionLost && (upload.Sent > 0 || outcome.Completed);
+        string? work =
+            connectionLost ? (poorConnection ? PoorConnection(upload.NotSent) : NoConnection)
+            : upload.NotSent > 0 ? (upload.Stop == UploadStop.ServerError ? ServerError(upload.NotSent) : NotSent(upload.NotSent))
+            : upload.Sent > 0 && !outcome.Completed ? Sent(upload.Sent)
+            : null;
+        // A new day shows in "Last synced", and one sentence about the connection is enough.
+        string? day = outcome.Completed || (connectionLost && outcome.Status == SyncStatus.NoConnection) ? null
+            : upload.Sent > 0 ? DayAfterSending(outcome)
+            : outcome.Message;
         return new(work, day);
     }
+
+    // Once work has gone this Sync, why the day didn't download, and never that saved work is unchanged (WI-040 D6).
+    private static string DayAfterSending(SyncOutcome outcome) => outcome.Status switch
+    {
+        SyncStatus.NoConnection => "Your day didn't download — no connection.",
+        SyncStatus.Failed => "Your day didn't download. Sync again to try.",
+        SyncStatus.InsufficientSpace => "There isn't enough free space on this tablet to download your day.",
+        SyncStatus.Cancelled => "Sync was cancelled before your day downloaded.",
+        _ => outcome.Message
+    };
 
     /// <summary>Home's "Last synced 07:42"; a sync from an earlier day also shows its date.</summary>
     public static string LastSynced(DateTimeOffset completedUtc, TimeProvider clock)

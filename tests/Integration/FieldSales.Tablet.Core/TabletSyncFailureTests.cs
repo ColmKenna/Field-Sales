@@ -230,4 +230,98 @@ public sealed class TabletSyncFailureTests : IDisposable
 
         Assert.Equal("Sign in again to send 1 item", SyncMessages.Explain(outcome).Work);
     }
+
+    [Fact]
+    public async Task Should_SaySignInAgainToSync_When_TheDownloadNeedsTheSignInAfterEveryItemWent()
+    {
+        await ThreeItemsAsync();
+        tablet.Server.Respond = _ => new HttpResponseMessage(HttpStatusCode.Unauthorized);
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal((SyncStatus.SignInRequired, new UploadSummary(3, 3)), (outcome.Status, outcome.Upload));
+        Assert.Equal(new SyncReport("Sign in again to sync.", null), SyncMessages.Explain(outcome));
+    }
+
+    // I4: no connection at all, a server error, and work that went while the day didn't.
+
+    [Fact]
+    public async Task Should_SayNoConnectionAndKeepEveryItem_When_NothingGetsThrough()
+    {
+        await ThreeItemsAsync();
+        string fingerprint = Unsent().Fingerprint();
+        receiver.DropAfter(0);
+        tablet.Server.Respond = _ => throw Faults.NoSignal();
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal((SyncStatus.NoConnection, new UploadSummary(3, 0, UploadStop.ConnectionLost)), (outcome.Status, outcome.Upload));
+        Assert.Equal(fingerprint, Unsent().Fingerprint());
+        Assert.Equal(new SyncReport("No connection — your work is saved on this tablet", null), SyncMessages.Explain(outcome));
+    }
+
+    [Fact]
+    public async Task Should_StopUploadingSayFieldSalesDidNotRespondAndStillDownload_When_TheServerAnswersWithAnError()
+    {
+        Guid[] items = await ThreeItemsAsync();
+        receiver.FailFrom(2, HttpStatusCode.ServiceUnavailable);
+        TabletSnapshot evening = Snapshots.Build("colm", 3, 3, label: "N");
+        tablet.Server.Serve(EncodedSnapshot.From(evening));
+
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal((SyncStatus.Completed, evening.Manifest.BuiltUtc), (outcome.Status, outcome.Active!.Manifest.BuiltUtc));
+        Assert.Equal([items[0]], SentIds());
+        Assert.Equal(new SyncReport("2 items not sent — Field Sales didn't respond. They'll send next Sync.", null), SyncMessages.Explain(outcome));
+    }
+
+    [Theory]
+    [InlineData("no connection", "Your day didn't download — no connection.")]
+    [InlineData("server failure", "Your day didn't download. Sync again to try.")]
+    [InlineData("no space", "There isn't enough free space on this tablet to download your day.")]
+    [InlineData("cancelled", "Sync was cancelled before your day downloaded.")]
+    public async Task Should_SayWhatWasSentAndWhyTheDayDidNotDownload_When_EveryItemWentButTheDownloadFailed(string failure, string day)
+    {
+        await ThreeItemsAsync();
+        using CancellationTokenSource cancel = new();
+        FailTheDownload(failure, cancel);
+
+        SyncOutcome outcome = await SyncFailingAsync(cancel);
+
+        Assert.Equal(new UploadSummary(3, 3), outcome.Upload);
+        Assert.Equal(new SyncReport("3 items sent.", day), SyncMessages.Explain(outcome));
+    }
+
+    [Theory]
+    [InlineData("no connection", SyncMessages.NoConnection)]
+    [InlineData("server failure", SyncMessages.Failed)]
+    [InlineData("no space", SyncMessages.InsufficientSpace)]
+    [InlineData("cancelled", SyncMessages.Cancelled)]
+    public async Task Should_KeepTodaysMessages_When_NothingWasSentAndTheDayDidNotDownload(string failure, string day)
+    {
+        await tablet.SyncAsync(morning);
+        using CancellationTokenSource cancel = new();
+        FailTheDownload(failure, cancel);
+
+        SyncOutcome outcome = await SyncFailingAsync(cancel);
+
+        Assert.Equal(new SyncReport(null, day), SyncMessages.Explain(outcome));
+    }
+
+    private void FailTheDownload(string failure, CancellationTokenSource cancel)
+    {
+        switch (failure)
+        {
+            case "no connection": tablet.Server.Respond = _ => throw Faults.NoSignal(); break;
+            case "server failure": tablet.Server.Respond = _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable); break;
+            case "no space": tablet.Space.Available = 0; break;
+            case "cancelled": tablet.Server.Respond = _ => { cancel.Cancel(); throw new OperationCanceledException(cancel.Token); }; break;
+        }
+    }
+
+    private Task<SyncOutcome> SyncFailingAsync(CancellationTokenSource cancel)
+    {
+        tablet.Clock.Advance(TimeSpan.FromMinutes(1));
+        return tablet.Sync().SyncAsync(ct: cancel.Token);
+    }
 }
