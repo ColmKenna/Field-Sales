@@ -116,6 +116,12 @@ public static class Faults
         new(HttpStatusCode.BadRequest) { Content = new StringContent("""{"error":"invalid_grant"}""") };
 }
 
+/// <summary>Hears each progress report as it is made, unlike <see cref="Progress{T}"/>, which posts it for later.</summary>
+public sealed class SynchronousProgress(Action<UploadProgress> report) : IProgress<UploadProgress>
+{
+    public void Report(UploadProgress value) => report(value);
+}
+
 public sealed class TestTokens(string? token = "rep-token") : IAccessTokenSource
 {
     public string? Token { get; set; } = token;

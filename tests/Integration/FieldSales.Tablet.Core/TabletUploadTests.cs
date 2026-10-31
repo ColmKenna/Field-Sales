@@ -407,9 +407,4 @@ public sealed class TabletUploadTests : IDisposable
         Assert.Equal((SyncStatus.Completed, UploadSummary.None), (outcome.Status, outcome.Upload));
         Assert.Empty(reported);
     }
-
-    private sealed class SynchronousProgress(Action<UploadProgress> report) : IProgress<UploadProgress>
-    {
-        public void Report(UploadProgress value) => report(value);
-    }
 }

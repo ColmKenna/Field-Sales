@@ -308,6 +308,22 @@ public sealed class TabletSyncFailureTests : IDisposable
         Assert.Equal(new SyncReport(null, day), SyncMessages.Explain(outcome));
     }
 
+    // I5: the non-functional note, "Sending 2 of 3".
+
+    [Fact]
+    public async Task Should_ReportSending2Of3ThenStop_When_TheConnectionDropsOnTheSecondItem()
+    {
+        await ThreeItemsAsync();
+        receiver.DropAfter(1);
+        tablet.Server.Respond = _ => throw Faults.NoSignal();
+        List<UploadProgress> reported = [];
+
+        tablet.Clock.Advance(TimeSpan.FromMinutes(1));
+        await tablet.Sync().SyncAsync(progress: new SynchronousProgress(reported.Add));
+
+        Assert.Equal([new(1, 3), new(2, 3), UploadProgress.Finished], reported);
+    }
+
     private void FailTheDownload(string failure, CancellationTokenSource cancel)
     {
         switch (failure)
