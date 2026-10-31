@@ -16,10 +16,11 @@ public sealed record UploadProgress(int Sending, int Total)
 
 /// <summary>What the upload part of a Sync did: how many items were going, how many the server confirmed, and why it
 /// stopped before the end of the queue, if it did.</summary>
-public sealed record UploadSummary(int Total, int Sent, UploadStop Stop = UploadStop.None)
+public sealed record UploadSummary(int Total, int Sent, UploadStop Stop = UploadStop.None, int NeedsAttention = 0)
 {
     public static UploadSummary None { get; } = new(0, 0);
     public int NotSent => Total - Sent;
+    public int Waiting => NotSent - NeedsAttention;
 }
 
 /// <summary>Why the upload stopped before the queue was finished, if it did (T-4.1.3 tells the rep).</summary>
@@ -50,8 +51,8 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
     /// <summary>The items this Sync would send, in the order they go.</summary>
     public static IReadOnlyList<UnsentItem> Queue(IEnumerable<UnsentItem> work) =>
     [
-        .. work.Where(item => item.Kind == UnsentKind.Call).OrderBy(item => item.SavedUtc).ThenBy(item => item.Id),
-        .. work.Where(item => item.Kind == UnsentKind.Order && IsReadyToSend(item)).OrderBy(item => item.SavedUtc).ThenBy(item => item.Id)
+        .. work.Where(item => item.Rejection is null && item.Kind == UnsentKind.Call).OrderBy(item => item.SavedUtc).ThenBy(item => item.Id),
+        .. work.Where(item => item.Rejection is null && item.Kind == UnsentKind.Order && IsReadyToSend(item)).OrderBy(item => item.SavedUtc).ThenBy(item => item.Id)
     ];
 
     /// <summary>How many items the next Sync would send, so the screen can say "Sending 1 of 3…" before it starts.</summary>
@@ -64,22 +65,22 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
         UnsentStore unsent = new(workspace);
         if (!File.Exists(workspace.UnsentPath)) return UploadSummary.None;
         IReadOnlyList<UnsentItem> queue = Queue(unsent.Read());
-        int sent = 0;
+        int sent = 0, attention = 0;
         for (int index = 0; index < queue.Count; index++)
         {
             UnsentItem item = queue[index];
             progress?.Report(new(index + 1, queue.Count));
-            (bool confirmed, UploadStop stop) = await SendAsync(item, token, ct);
-            if (stop != UploadStop.None) return new(queue.Count, sent, stop);
-            if (!confirmed) continue;
+            (bool confirmed, UploadStop stop) = await SendAsync(item, token, unsent, ct);
+            if (stop != UploadStop.None) return new(queue.Count, sent, stop, attention);
+            if (!confirmed) { attention++; continue; }
             hooks.AtBoundary?.Invoke("upload-confirmed");
             unsent.MarkSent(item.Id, clock.GetUtcNow());
             sent++;
         }
-        return new(queue.Count, sent);
+        return new(queue.Count, sent, NeedsAttention: attention);
     }
 
-    private async Task<(bool Confirmed, UploadStop Stop)> SendAsync(UnsentItem item, string token, CancellationToken ct)
+    private async Task<(bool Confirmed, UploadStop Stop)> SendAsync(UnsentItem item, string token, UnsentStore unsent, CancellationToken ct)
     {
         string path = item.Kind == UnsentKind.Call ? TabletUploadContract.CallPath(item.Id) : TabletUploadContract.OrderPath(item.Id);
         using HttpRequestMessage request = new(HttpMethod.Put, path)
@@ -89,7 +90,7 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
         };
         request.Headers.Authorization = new("Bearer", token);
         HttpResponseMessage response;
-        try { response = await http.SendAsync(request, ct); }
+        try { response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct); }
         // No route, refused or timed out: the connection is gone, so nothing more is sent this Sync.
         catch (Exception exception) when (!ct.IsCancellationRequested
             && exception is HttpRequestException { StatusCode: null } or TaskCanceledException or IOException)
@@ -98,18 +99,58 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
         }
         using (response)
         {
-            switch (response.StatusCode)
+            // ResponseHeadersRead avoids buffering arbitrary fault pages, but moves body reads outside
+            // HttpClient's timeout. Keep those reads bounded in time as well as in size.
+            using CancellationTokenSource bodyTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            bodyTimeout.CancelAfter(http.Timeout);
+            try
             {
-                case HttpStatusCode.OK or HttpStatusCode.Created:
-                    return await IsReceiptForAsync(response, item.Id, ct) ? (true, UploadStop.None) : (false, UploadStop.ServerError);
-                case HttpStatusCode.Unauthorized: return (false, UploadStop.SignInRequired);
-                case HttpStatusCode.Forbidden: return (false, UploadStop.NotPermitted);
-                // A technical fault in this item (MI-52): it stays unsent and the next item goes.
-                case HttpStatusCode.BadRequest or HttpStatusCode.Conflict or HttpStatusCode.RequestEntityTooLarge:
-                    return (false, UploadStop.None);
-                default: return (false, UploadStop.ServerError);
+                switch (response.StatusCode)
+                {
+                    case HttpStatusCode.OK or HttpStatusCode.Created:
+                        return await IsReceiptForAsync(response, item.Id, bodyTimeout.Token) ? (true, UploadStop.None) : (false, UploadStop.ServerError);
+                    case HttpStatusCode.Unauthorized: return (false, UploadStop.SignInRequired);
+                    case HttpStatusCode.Forbidden: return (false, UploadStop.NotPermitted);
+                    // A technical fault in this item (MI-52): it stays unsent and the next item goes.
+                    case HttpStatusCode.BadRequest or HttpStatusCode.Conflict or HttpStatusCode.RequestEntityTooLarge:
+                        UploadRejection rejection = await ReadRejectionAsync(response, bodyTimeout.Token);
+                        unsent.MarkNeedsAttention(item, rejection);
+                        return (false, UploadStop.None);
+                    default: return (false, UploadStop.ServerError);
+                }
             }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return (false, UploadStop.ConnectionLost); }
         }
+    }
+
+    // Bound support data even if a proxy sends an unexpectedly large error page. It never becomes rep-facing text.
+    private async Task<UploadRejection> ReadRejectionAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        const int maximum = 16 * 1024;
+        string raw;
+        try
+        {
+            using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+            byte[] buffer = new byte[maximum + 1];
+            int length = 0, read;
+            while (length < buffer.Length && (read = await stream.ReadAsync(buffer.AsMemory(length), ct)) > 0) length += read;
+            raw = Encoding.UTF8.GetString(buffer, 0, Math.Min(length, maximum));
+            if (length > maximum) raw += "\n[response truncated]";
+        }
+        catch (Exception error) when (error is IOException or HttpRequestException)
+        {
+            raw = "The server refused the item, but its reason could not be read.";
+        }
+        string? fault = null;
+        try
+        {
+            using JsonDocument problem = JsonDocument.Parse(raw);
+            if (problem.RootElement.ValueKind == JsonValueKind.Object
+                && problem.RootElement.TryGetProperty(UploadFaults.ProblemKey, out JsonElement code)
+                && code.ValueKind == JsonValueKind.String) fault = code.GetString();
+        }
+        catch (JsonException) { /* An unreadable reason uses the contact-office sentence; retain the raw response. */ }
+        return new(fault, raw, (int)response.StatusCode, clock.GetUtcNow());
     }
 
     // A confirmation counts only when it names this item; anything else is treated as no confirmation.

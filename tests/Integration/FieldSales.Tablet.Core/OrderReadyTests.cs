@@ -126,7 +126,7 @@ public sealed class OrderReadyTests : IDisposable
 
         UnsentSummary summary = Unsent().Summarise();
 
-        Assert.Equal(new UnsentSummary(Total: 5, InProgress: 1, ReadyToSend: 1), summary);
+        Assert.Equal(new UnsentSummary(Total: 5, InProgress: 1, ReadyToSend: 3), summary); // Saved Calls are Ready to Send on T-01.
         Assert.Equal(2, Unsent().Read().Count(item => item.Kind == UnsentKind.Call));
         Assert.Equal(3, Unsent().Read().Count(item => item.Kind == UnsentKind.Order));
     }
