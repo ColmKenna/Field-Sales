@@ -116,6 +116,22 @@ public static class Faults
         new(HttpStatusCode.BadRequest) { Content = new StringContent("""{"error":"invalid_grant"}""") };
 }
 
+/// <summary>Finished work as a rep saves it: two Calls and a Ready to Send Order, in the order they go.</summary>
+public static class FinishedWork
+{
+    public static Guid[] SaveThree(RepWorkspace workspace, TabletSnapshot day, TimeProvider clock)
+    {
+        Guid first = Guid.NewGuid(), second = Guid.NewGuid(), order = Guid.NewGuid();
+        foreach ((Guid id, int minutesAgo) in new[] { (first, 30), (second, 20) })
+            new UnsentStore(workspace).Save(new(id, UnsentKind.Call, clock.GetUtcNow().AddMinutes(-minutesAgo),
+                $$"""{"id":"{{id}}","locationId":"{{day.Locations[0].Id}}","channel":"InPerson"}"""));
+        OrderStore orders = new(workspace, clock);
+        Assert.True(orders.AddLine(order, day.Locations[1].Id, day.Products[0].Id, 6m).Succeeded);
+        Assert.True(orders.MarkReadyToSend(order).Succeeded);
+        return [first, second, order];
+    }
+}
+
 /// <summary>Hears each progress report as it is made, unlike <see cref="Progress{T}"/>, which posts it for later.</summary>
 public sealed class SynchronousProgress(Action<UploadProgress> report) : IProgress<UploadProgress>
 {

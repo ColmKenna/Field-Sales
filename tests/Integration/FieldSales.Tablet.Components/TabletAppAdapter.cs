@@ -22,9 +22,10 @@ public sealed class TabletApp
     public Func<long, Task<bool>> End { get; set; } = _ => Task.FromResult(false);
     public Task<IReadOnlyList<UnsentKind>> ReadUnsentKindsAsync(long version) => ReadKinds(version);
     public Task<bool> SignOutAsync(long version) => End(version);
+    public const string SignInNeedsConnection = "Sign-in needs a connection. Try again when you have signal.";
     public SyncNotices SyncNotices { get; } = new();
-    public Func<Task<string?>> SignIn { get; set; } = () => Task.FromResult<string?>(null);
-    public Task<string?> SignInAsync() => SignIn();
+    public Func<Task<SignInAnswer>> SignIn { get; set; } = () => Task.FromResult(new SignInAnswer(null, null));
+    public Task<SignInAnswer> SignInAsync() => SignIn();
     public HomeView Home { get; set; } = new("Last synced 07:42", []);
     public HomeView ReadHome(string rep) => Home;
     public Func<string, ProductSearchIndex> ReadIndex { get; set; } = _ => new ProductSearchIndex(null, []);

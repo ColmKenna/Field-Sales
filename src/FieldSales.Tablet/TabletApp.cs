@@ -73,8 +73,8 @@ public sealed class TabletApp : IDisposable
         return kinds;
     }
 
-    /// <summary>The connected sign-in in the system browser. Returns a message to show, or null once the day starts.</summary>
-    public async Task<string?> SignInAsync()
+    /// <summary>The connected sign-in in the system browser: the rep whose day started, or a message to show.</summary>
+    public async Task<SignInAnswer> SignInAsync()
     {
         TabletTiming.RepActed();
         long version = SessionVersion;
@@ -88,12 +88,12 @@ public sealed class TabletApp : IDisposable
                 CallbackUrl = new Uri(TabletClientContract.RedirectUri)
             });
             StaffSignIn? signIn = await flow.CompleteAsync(pending, result.Properties);
-            if (signIn is null) return SignInDidNotFinish;
+            if (signIn is null) return new(null, SignInDidNotFinish);
             SignInOutcome outcome = await device.CompleteSignInAsync(signIn, version);
-            return outcome.Status == SignInStatus.Started ? null : outcome.Message;
+            return outcome.Status == SignInStatus.Started ? new(signIn.Subject, null) : new(null, outcome.Message);
         }
-        catch (TaskCanceledException) { return null; } // The rep closed the browser; stay on the sign-in screen.
-        catch (HttpRequestException) { return SignInNeedsConnection; }
+        catch (TaskCanceledException) { return new(null, null); } // The rep closed the browser; stay where they were.
+        catch (HttpRequestException) { return new(null, SignInNeedsConnection); }
     }
 
     /// <summary>Sends the rep's finished work, then downloads their day; copies retired by the switch are deleted afterwards

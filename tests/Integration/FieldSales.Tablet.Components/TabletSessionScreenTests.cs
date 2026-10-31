@@ -205,7 +205,7 @@ public sealed class TabletSessionScreenTests
     [Fact]
     public async Task Should_StartTheConnectedSignInAndShowItsAnswer_When_ITapSignIn()
     {
-        TaskCompletionSource<string?> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<SignInAnswer> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
         int syncs = 0, signIns = 0;
         await using Screen screen = new(typeof(Sync));
         screen.Tablet.SyncWork = (_, _) =>
@@ -221,7 +221,7 @@ public sealed class TabletSessionScreenTests
         Task again = screen.Click("Sign in"); // A second tap while the browser is open starts nothing more.
         screen.Tablet.Resume(); // Coming back from the browser resumes the app, which reloads the page.
         await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Last synced 07:42"));
-        answer.SetResult("Sign-in needs a connection. Try again when you have signal.");
+        answer.SetResult(new(null, "Sign-in needs a connection. Try again when you have signal."));
         await Task.WhenAll(signingIn, again);
 
         Assert.Equal((1, 1), (signIns, syncs));
@@ -254,7 +254,7 @@ public sealed class TabletSessionScreenTests
     [Fact]
     public async Task Should_KeepTheSignInStateAndShowTheAnswer_When_ThePageIsRebuiltDuringSignIn()
     {
-        TaskCompletionSource<string?> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<SignInAnswer> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
         await using Screen screen = new(typeof(Sync));
         screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null)
             { Upload = new(2, 0, UploadStop.SignInRequired) });
@@ -267,7 +267,7 @@ public sealed class TabletSessionScreenTests
 
         Assert.Contains("Sign in again to send 2 items", screen.Renderer.Text(screen.Id));
         Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
-        answer.SetResult("Sign-in needs a connection. Try again when you have signal.");
+        answer.SetResult(new(null, "Sign-in needs a connection. Try again when you have signal."));
         await signingIn;
         await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Sign-in needs a connection. Try again when you have signal."));
         Assert.DoesNotContain("Sync now", screen.Renderer.Buttons(screen.Id));
@@ -306,6 +306,172 @@ public sealed class TabletSessionScreenTests
         await screen.Rebuild();
 
         Assert.DoesNotContain("not sent", screen.Renderer.Text(screen.Id));
+    }
+
+    // WI-041 C4 (T1.3): Sync is deliberate. Signal returning, the app resuming, the page being rebuilt or a new session on its own
+    // never starts one.
+    [Fact]
+    public async Task Should_NotStartASync_When_SignalReturnsOrTheAppResumes()
+    {
+        int syncs = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) =>
+        {
+            syncs++;
+            return Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null) { Upload = new(3, 0, UploadStop.SignInRequired) });
+        };
+        await screen.Open(new());
+        await screen.Click("Sync now");
+
+        screen.Tablet.Connected = false;
+        screen.Tablet.Resume();
+        screen.Tablet.Connected = true;
+        screen.Tablet.Resume();
+        await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Last synced 07:42"));
+        await screen.Rebuild();
+        screen.Tablet.ChangeSession();
+        await screen.Rebuild();
+
+        Assert.Equal(1, syncs);
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
+    }
+
+    // WI-041 C1 (US-004 S2): a successful sign-in as the same rep resumes the Sync the rep started, once. The answer can reach the
+    // app before the layout rebuilds the page, while no page is open, or after the new page has opened.
+    [Theory]
+    [InlineData("before")]
+    [InlineData("between")]
+    [InlineData("after")]
+    public async Task Should_ResumeTheSyncOnce_When_SignInSucceedsForTheSameRep(string answerArrives)
+    {
+        TaskCompletionSource<SignInAnswer> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int syncs = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(++syncs == 1
+            ? new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null) { Upload = new(3, 0, UploadStop.SignInRequired) }
+            : new SyncOutcome(SyncStatus.Completed, "Last synced 09:15", null) { Upload = new(3, 3) });
+        screen.Tablet.SignIn = () => answer.Task;
+        await screen.Open(new());
+        await screen.Click("Sync now");
+        Task signingIn = screen.Click("Sign in");
+
+        screen.Tablet.ChangeSession(); // The sign-in completed and started a new session for the same rep.
+        if (answerArrives != "before") await screen.Close();
+        if (answerArrives == "after") await screen.Reopen();
+        answer.SetResult(new("colm", null));
+        await signingIn;
+        if (answerArrives == "before") await screen.Rebuild();
+        if (answerArrives == "between") await screen.Reopen();
+
+        await screen.Until(() => screen.Navigation.Destinations.Contains("/home")); // Everything went, so the rep lands on Home.
+        await screen.Rebuild();
+        Assert.Equal(2, syncs); // The tap, then the one resume; a later page doesn't resume again.
+    }
+
+    // WI-041 C2 (US-004 S3): a failed or cancelled sign-in resumes nothing; the sentence, Sign in and the count stay.
+    [Theory]
+    [InlineData("Sign-in needs a connection. Try again when you have signal.")]
+    [InlineData(null)]
+    public async Task Should_NotResume_When_SignInFailsOrIsCancelled(string? problem)
+    {
+        int syncs = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.ReadSummary = _ => new UnsentSummary(3, 0, 1);
+        screen.Tablet.SyncWork = (_, _) =>
+        {
+            syncs++;
+            return Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null) { Upload = new(3, 0, UploadStop.SignInRequired) });
+        };
+        screen.Tablet.SignIn = () => Task.FromResult(new SignInAnswer(null, problem));
+        await screen.Open(new());
+        await screen.Click("Sync now");
+
+        await screen.Click("Sign in");
+        await screen.Rebuild(); // Back from the browser.
+
+        Assert.Equal(1, syncs);
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Contains("Sign in again to send 3 items", text);
+        Assert.Contains("Unsent: 3", text);
+        Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
+    }
+
+    // WI-041 C3: another rep signing in on this tablet doesn't send the first rep's Sync.
+    [Fact]
+    public async Task Should_NotResume_When_AnotherRepSignsIn()
+    {
+        int syncs = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) =>
+        {
+            syncs++;
+            return Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null) { Upload = new(3, 0, UploadStop.SignInRequired) });
+        };
+        screen.Tablet.SignIn = () => { screen.Tablet.ChangeSession(); return Task.FromResult(new SignInAnswer("aoife", null)); };
+        await screen.Open(new());
+        await screen.Click("Sync now");
+
+        await screen.Click("Sign in");
+        await screen.Rebuild();
+
+        Assert.Equal(1, syncs);
+    }
+
+    // WI-041 C5 (US-004 S3): without signal, Sign in explains that a connection is needed instead of opening the browser, and the
+    // explanation survives the page being rebuilt. Nothing else changes.
+    [Fact]
+    public async Task Should_ExplainThatSignInNeedsAConnection_When_ITapSignInWithoutSignal()
+    {
+        int signIns = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.ReadSummary = _ => new UnsentSummary(3, 0, 1);
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null)
+            { Upload = new(3, 0, UploadStop.SignInRequired) });
+        screen.Tablet.SignIn = () => { signIns++; return Task.FromResult(new SignInAnswer(null, null)); };
+        await screen.Open(new());
+        await screen.Click("Sync now");
+        screen.Tablet.Connected = false;
+
+        await screen.Click("Sign in");
+        await screen.Rebuild();
+
+        Assert.Equal(0, signIns);
+        string text = screen.Renderer.Text(screen.Id);
+        Assert.Contains("Sign-in needs a connection. Try again when you have signal.", text);
+        Assert.Contains("Sign in again to send 3 items", text);
+        Assert.Contains("Unsent: 3", text);
+        Assert.Contains("Sign in", screen.Renderer.Buttons(screen.Id));
+    }
+
+    // WI-041 C6 (I-03): the rep is told that signing in carries on with this Sync.
+    [Fact]
+    public async Task Should_SayThisSyncResumesAfterSignIn_When_SyncNeedsSignInAgain()
+    {
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => Task.FromResult(new SyncOutcome(SyncStatus.SignInRequired, SyncMessages.SignInRequired, null)
+            { Upload = new(3, 0, UploadStop.SignInRequired) });
+        await screen.Open(new());
+        Assert.DoesNotContain("resumes automatically", screen.Renderer.Text(screen.Id));
+
+        await screen.Click("Sync now");
+
+        Assert.Contains("After sign-in, this Sync resumes automatically.", screen.Renderer.Text(screen.Id));
+    }
+
+    // WI-041 C7: a resume belongs to the session the sign-in started; a later session (after a sign-out) never picks it up.
+    [Fact]
+    public async Task Should_NotResume_When_TheResumeWasForAnEarlierSession()
+    {
+        int syncs = 0;
+        await using Screen screen = new(typeof(Sync));
+        screen.Tablet.SyncWork = (_, _) => { syncs++; return Task.FromResult(new SyncOutcome(SyncStatus.Completed, "Last synced 09:15", null)); };
+        screen.Tablet.SyncNotices.RequestResume("colm", screen.Tablet.SessionVersion);
+        screen.Tablet.ChangeSession(); // Signed out, then in again.
+
+        await screen.Open(new());
+
+        Assert.Equal(0, syncs);
+        Assert.Contains("Sync now", screen.Renderer.Buttons(screen.Id));
     }
 
     // WI-039 C2: the rep stays on Sync to see what didn't go; Home only when everything went.
@@ -363,9 +529,14 @@ public sealed class TabletSessionScreenTests
         /// <summary>What the layout does on every resume: the page is removed and a new one opens in its place.</summary>
         public async Task Rebuild()
         {
-            await Renderer.Dispatcher.InvokeAsync(() => Renderer.Remove(Id));
+            await Close();
+            await Reopen();
+        }
+        public Task Close() => Renderer.Dispatcher.InvokeAsync(() => Renderer.Remove(Id));
+        public Task Reopen()
+        {
             Id = Renderer.Attach(component);
-            await Open(new());
+            return Open(new());
         }
         public Task Open(Dictionary<string, object?> parameters) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, parameters));
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
