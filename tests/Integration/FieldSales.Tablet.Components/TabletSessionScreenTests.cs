@@ -10,7 +10,7 @@ using Microsoft.JSInterop;
 
 namespace FieldSales.Tablet.Components.Tests;
 
-public sealed class TabletSessionScreenTests
+public sealed partial class TabletSessionScreenTests
 {
     [Fact]
     public async Task Should_HideTheWorkspaceAndSignOutAction_When_TheSessionEnds()

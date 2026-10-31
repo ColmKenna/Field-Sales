@@ -115,3 +115,17 @@ a:focus-visible, button:focus-visible { outline: 3px solid #c77f09; outline-offs
 .unsent-summary { font-weight: 600; }
 .order-actions { display: flex; gap: 16px; flex-wrap: wrap; }
 .order-actions button { min-height: 56px; }
+
+.sync { padding-bottom: 64px; }
+.unsent-section { margin-top: 24px; }
+.unsent-section h2 { font-size: 1.1rem; }
+.unsent-list { list-style: none; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.unsent-list li { padding: 16px; overflow-wrap: anywhere; }
+.unsent-list li + li { border-top: 1px solid var(--line); }
+.needs-attention .unsent-list { border-left: 5px solid var(--alert); }
+.unsent-list a { display: flex; flex-direction: column; gap: 8px; min-height: 48px; justify-content: center; text-decoration: none; }
+.unsent-list a span { color: var(--muted); }
+.unsent-review, .unsent-confirm { margin-top: 24px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow-wrap: anywhere; }
+.unsent-confirm { border-left: 5px solid var(--alert); }
+.review-lines { list-style: none; padding: 0; }
+.review-lines li { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }

@@ -28,6 +28,7 @@ public sealed class TabletApp
     public Task<SignInAnswer> SignInAsync() => SignIn();
     public HomeView Home { get; set; } = new("Last synced 07:42", []);
     public HomeView ReadHome(string rep) => Home;
+    public void ResumeCleanup(string rep) { }
     public Func<string, ProductSearchIndex> ReadIndex { get; set; } = _ => new ProductSearchIndex(null, []);
     public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddWork { get; set; } =
         (_, _, _, _, _) => new OrderResult(null, "Order entry isn't set up in this test.");
@@ -36,6 +37,11 @@ public sealed class TabletApp
     public Func<string, UnsentSummary> ReadSummary { get; set; } = _ => new UnsentSummary(0, 0, 0);
     public OrderResult MarkOrderReady(string rep, Guid orderId) => MarkWork(rep, orderId);
     public UnsentSummary ReadUnsentSummary(string rep) => ReadSummary(rep);
+    public Func<string, IReadOnlyList<UnsentView>> ReadViews { get; set; } = _ => [];
+    public IReadOnlyList<UnsentView> ReadUnsentViews(string rep) => ReadViews(rep);
+    public Func<string, Guid, long, bool, bool, Task<bool>> ChangeRejected { get; set; } = (_, _, _, _, _) => Task.FromResult(false);
+    public Task<bool> ChangeRejectedWorkAsync(string rep, Guid id, long version, bool delete, bool confirmed) =>
+        ChangeRejected(rep, id, version, delete, confirmed);
     public Func<string, int> CountWaiting { get; set; } = _ => 0;
     public int CountWaitingToSend(string rep) => CountWaiting(rep);
     public ProductSearchIndex ReadProductIndex(string rep) => ReadIndex(rep);

@@ -76,6 +76,31 @@ public sealed class TabletAppSessionScenarios
         Assert.Equal(captured, new UnsentStore(tablet.Device.Workspace("colm")).Read());
     }
 
+    [Theory]
+    [InlineData("expired")]
+    [InlineData("signed-out")]
+    [InlineData("another-rep")]
+    public async Task Should_KeepRejectedWork_When_ADeleteUsesAnExpiredOrDifferentSession(string change)
+    {
+        using SessionTablet tablet = new();
+        await tablet.Device.CompleteSignInAsync(SessionTablet.SignIn("colm"));
+        await tablet.SyncAsync("colm");
+        using TabletApp app = Create(tablet);
+        UnsentStore store = new(tablet.Device.Workspace("colm"));
+        UnsentItem captured = TabletSignOutScenarios.SaveWork(tablet.Device).First(item => item.Kind == UnsentKind.Call);
+        Assert.True(store.MarkNeedsAttention(captured, new("incomplete", "missing field", 400, tablet.Clock.GetUtcNow())));
+        long version = app.SessionVersion;
+        if (change == "expired") tablet.Clock.UtcNow = SessionTablet.Morning.AddHours(24);
+        else
+        {
+            await app.SignOutAsync(version);
+            if (change == "another-rep") await tablet.Device.CompleteSignInAsync(SessionTablet.SignIn("aoife"));
+        }
+
+        Assert.False(await app.ChangeRejectedWorkAsync("colm", captured.Id, version, delete: true, confirmed: true));
+        Assert.NotNull(store.Find(captured.Id)!.Rejection);
+    }
+
     private static TabletApp Create(SessionTablet tablet) => new(tablet.Device,
         new(tablet.Server.Client(), tablet.Identity.Client()), new TestSpace(), tablet.Clock, NullLogger<TabletApp>.Instance);
 

@@ -2,9 +2,9 @@
 @implements IDisposable
 @inject TabletApp Tablet
 @inject NavigationManager Navigation
+@using System.Globalization
 
-@* T-01 · Sync (last sync, Sync now, "Sending 2 of 3" then the download, and why a Sync didn't complete: what happened to
-   the rep's finished work, then to their day, T-4.1.3). Unsent sections arrive with T-4.3.1. *@
+@* T-01 · Manual Sync and Unsent work. Technical faults need a rep decision; captured work stays unchanged. *@
 <section class="sync">
     <h1>Sync</h1>
     @if (home is not null)
@@ -30,7 +30,7 @@
             }
             else
             {
-                <button class="primary" disabled="@(!Tablet.Connected)" @onclick="SyncAsync">Sync now</button>
+                <button class="primary" disabled="@(!Tablet.Connected || changing)" @onclick="SyncAsync">Sync now</button>
             }
         </div>
         @if (work is not null)
@@ -48,6 +48,99 @@
         @if (signInProblem is not null)
         {
             <p class="problem" role="alert">@signInProblem</p>
+        }
+        @if (actionMessage is not null)
+        {
+            <p role="status">@actionMessage</p>
+        }
+        @if (listProblem is not null)
+        {
+            <p class="problem" role="alert">@listProblem</p>
+        }
+        @if (deleting is { } removal)
+        {
+            <section class="unsent-confirm" aria-labelledby="delete-heading">
+                <h2 id="delete-heading">Delete this @removal.KindLabel?</h2>
+                <p>@removal.LocationName</p>
+                <p>It hasn't been accepted by head office. Deleting removes it from this tablet.</p>
+                <div class="order-actions">
+                    <button disabled="@(busy || changing)" @onclick="() => ChangeWorkAsync(removal.Item.Id, true)">Delete item</button>
+                    <button disabled="@changing" @onclick="() => deleting = null">Keep item</button>
+                </div>
+            </section>
+        }
+        @if (reviewing is { } review)
+        {
+            <section class="unsent-review" aria-labelledby="review-heading">
+                <h2 id="review-heading">@review.KindLabel review</h2>
+                <p><strong>@review.LocationName</strong></p>
+                <p>Saved @review.Item.SavedUtc.ToLocalTime().ToString("d MMM HH:mm", CultureInfo.CurrentCulture)</p>
+                @if (review.Item.Rejection is { } reason) { <p class="problem">@reason.Sentence</p> }
+                @if (review.Order is { } order)
+                {
+                    <p>Taken @order.TakenOn.ToString("d MMM yyyy") · @order.Lines.Count lines</p>
+                    <ul class="review-lines">
+                        @foreach (var line in order.Lines)
+                        {
+                            <li><strong>@line.ProductName</strong><span>@line.ProductCode · @line.Quantity.ToString("0.###") @line.Unit</span>
+                                <span>€@line.Price.Amount.ToString("0.00") per @line.Unit</span></li>
+                        }
+                    </ul>
+                }
+                else if (review.Item.Kind == UnsentKind.Call)
+                {
+                    <p>Call recorded@(review.CallChannel is null ? "." : $" · {review.CallChannel}")</p>
+                }
+                else
+                {
+                    <p>This saved item can't be reviewed here. Contact the office for help.</p>
+                }
+                <div class="order-actions">
+                    @if (review.CanMarkReady)
+                    {
+                        <button class="primary" disabled="@(busy || changing)" @onclick="() => ChangeWorkAsync(review.Item.Id, false)">Mark ready to send</button>
+                    }
+                    <button disabled="@changing" @onclick="() => reviewing = null">Back to unsent items</button>
+                </div>
+            </section>
+        }
+        else if (items is not null)
+        {
+            @if (items.Count == 0 && listProblem is null)
+            {
+                <p class="unsent-empty">No unsent items.</p>
+            }
+            @foreach (UnsentSection section in Enum.GetValues<UnsentSection>())
+            {
+                var entries = items.Where(view => view.Section == section).ToArray();
+                if (section == UnsentSection.Other && entries.Length == 0) { continue; }
+                <section class="unsent-section @(section == UnsentSection.NeedsAttention ? "needs-attention" : "")" aria-label="@SectionName(section)">
+                    <h2>@SectionName(section) (@entries.Length)</h2>
+                    <ul class="unsent-list">
+                        @foreach (UnsentView view in entries)
+                        {
+                            <li @key="view.Item.Id">
+                                @if (view.Item.Rejection is { } reason)
+                                {
+                                    <strong>@view.KindLabel · @view.LocationName</strong>
+                                    <p>@reason.Sentence</p>
+                                    <div class="order-actions">
+                                        <button disabled="@(busy || changing)" @onclick="() => OpenReview(view)">Open</button>
+                                        <button disabled="@(busy || changing)" @onclick="() => deleting = view">Delete</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <a href="#unsent-review" @onclick="() => OpenReview(view)" @onclick:preventDefault="true">
+                                        <strong>@view.KindLabel · @view.LocationName</strong>
+                                        <span>@view.Item.SavedUtc.ToLocalTime().ToString("d MMM HH:mm") · Open to review</span>
+                                    </a>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
         }
         @if (home.Locations.Count > 0)
         {
@@ -90,7 +183,7 @@
     {
         int current = ++load;
         long version = Tablet.SessionVersion;
-        home = null; rep = null; message = null; unsent = null;
+        home = null; rep = null; message = null; unsent = null; actionMessage = null;
         StateHasChanged();
         TabletEntry entry = await enter();
         if (disposed || current != load || version != Tablet.SessionVersion) return;
@@ -100,6 +193,7 @@
         if (version != Tablet.SessionVersion) { rep = null; return; }
         home = read;
         unsent = ReadUnsent(rep);
+        ReadItems();
         ShowNotice();
     }
 
@@ -142,6 +236,7 @@
         get
         {
             List<string> parts = [$"Unsent: {unsent!.Total}"];
+            if (unsent.NeedsAttention > 0) parts.Add(unsent.AttentionText);
             if (unsent.ReadyToSend > 0) parts.Add($"{unsent.ReadyToSend} ready to send");
             if (unsent.InProgress > 0) parts.Add($"{unsent.InProgress} in progress");
             return string.Join(" · ", parts);
@@ -150,7 +245,7 @@
 
     private async Task SyncAsync()
     {
-        if (busy || disposed || rep is null) return;
+        if (busy || changing || disposed || rep is null) return;
         string capturedRep = rep;
         long version = Tablet.SessionVersion;
         // "Sending 1 of 3…" from the tap: the session check and the sign-in token come before the first report.
@@ -167,8 +262,10 @@
         SyncOutcome outcome = await Tablet.SyncAsync(capturedRep, viewWork.Token, progress);
         if (disposed || version != Tablet.SessionVersion) return;
         busy = false; sending = null;
+        unsent = ReadUnsent(capturedRep);
+        ReadItems();
         // Home only when everything went; otherwise the rep stays here to read what didn't, and why.
-        if (outcome.Completed && outcome.Upload.NotSent == 0) { Navigation.NavigateTo("/home"); return; }
+        if (outcome.Completed && outcome.Upload.NotSent == 0 && unsent is not { NeedsAttention: > 0 }) { Navigation.NavigateTo("/home"); return; }
         // US-001 S3: nothing more goes until the rep signs in again, so Sign in takes Sync now's place.
         Tablet.SyncNotices.Keep(capturedRep, version, new(SyncMessages.Explain(outcome), outcome.Status == SyncStatus.SignInRequired));
         ShowNotice();
