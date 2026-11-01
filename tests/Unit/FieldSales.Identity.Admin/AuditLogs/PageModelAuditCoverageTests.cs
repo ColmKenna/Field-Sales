@@ -14,6 +14,7 @@ namespace FieldSales.Identity.Admin.Tests.AuditLogs;
 ///     forcing the author to confirm the delegated service method is audited (per the per-service
 ///     coverage tests in this project) before adding it to the list.
 /// </summary>
+[Trait("Category", "Unit")]
 public class PageModelAuditCoverageTests
 {
     /// <summary>

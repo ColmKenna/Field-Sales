@@ -442,6 +442,12 @@ the comparisons below are back to back:
 Under these conditions, `-Tier WorkItem` without areas took 79–81 s, and `-Tier SqlServer` took
 983 s (the API 186 s, Admin 142 s, Web 628 s, DemoData 27 s).
 
+**Item 5: done.** The five pure Admin classes (79 tests) moved with `git mv` into
+`Identity.Admin.UnitTests`, in matching folders and namespaces, tagged `Category=Unit`. The Admin
+unit project went from 256 to 335 tests, and the Admin Docker-free integration selection from 772 to
+693. All the moved tests now run in the inner loop and CI's unit job. The Tablet.Core contract
+classes were handled under items 2–4.
+
 ## 10. Not measured, and why
 
 - **CI wall-clock.** No workflow was dispatched; that would be an outward action, and it was not
