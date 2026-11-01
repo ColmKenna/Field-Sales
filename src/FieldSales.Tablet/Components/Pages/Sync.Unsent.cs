@@ -1,4 +1,5 @@
 using FieldSales.Tablet.Core;
+using FieldSales.Ordering.Contracts;
 using Microsoft.Data.Sqlite;
 
 namespace FieldSales.Tablet.Components.Pages;
@@ -44,14 +45,17 @@ public partial class Sync
     private async Task ChangeWorkAsync(Guid id, bool delete)
     {
         if (busy || changing || disposed || rep is null) return;
-        // Buttons carry no authority: the app checks the current rep/session and the store checks the current rejection.
+        // Buttons carry no authority: the app checks the rep/session, and the store checks the current item state.
         string capturedRep = rep;
         long version = unsentVersion;
         if (version != Tablet.SessionVersion) return;
         changing = true; actionMessage = null;
         try
         {
-            bool changed = await Tablet.ChangeRejectedWorkAsync(capturedRep, id, version, delete, confirmed: delete);
+            bool inProgress = !delete && reviewing is { Item.Rejection: null, Order.State: OrderState.InProgress }
+                && reviewing.Item.Id == id;
+            bool changed = inProgress ? await Tablet.MarkReviewedOrderReadyAsync(capturedRep, id, version)
+                : await Tablet.ChangeRejectedWorkAsync(capturedRep, id, version, delete, confirmed: delete);
             if (disposed || version != Tablet.SessionVersion) return;
             ReadItems();
             unsent = ReadUnsent(capturedRep);

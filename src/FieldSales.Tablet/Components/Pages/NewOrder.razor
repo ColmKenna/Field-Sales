@@ -74,6 +74,8 @@
                             <span class="line-quantity">@LineQuantity(line)</span>
                             <span class="line-price">@Money(line.Price.Amount)@PerUnit(line.Unit)</span>
                             <span class="line-total">@Money(line.Price.Amount * line.Quantity)</span>
+                            @if (index is not null && !index.Contains(line.ProductId))
+                            { <span class="captured-line-notice">@OrderStore.NoLongerAvailable</span> }
                         </li>
                     }
                 </ul>

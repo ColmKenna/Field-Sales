@@ -111,6 +111,61 @@ public sealed class TabletUploadEndToEndTests(TabletSnapshotFixture fixture) : I
         Assert.Equal(2, received.Length);
     }
 
+    // WI-043 T6: both removal and archival reach the same captured-work exception, through the real API.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Should_SendCapturedWork_When_AnInProgressOrderIsReviewedAndMarkedReadyAfterRemoval(bool archiveGroup)
+    {
+        Geography places = await _app.SeedGeographyAsync();
+        Guid quinns = await _app.CustomerAsync("Quinn's Centra", places.Arklow.Id);
+        await _app.AssignAsync("colm", TerritoryLevel.Town, places.Arklow.Id);
+        Category category = await _app.CategoryAsync("Medicines");
+        RestrictionGroup group = await _app.RestrictionGroupAsync("Pharmacy-only medicines");
+        Guid controlled = await _app.ProductAsync("CPR-30", "Controlled Pain Relief 30s", category.Id, group: group, price: 8.95m);
+        await _app.GrantAsync("colm", group.Id);
+        Assert.True((await SyncAsync()).Completed);
+        OrderStore orders = new(Workspace, _clock);
+        UnsentStore work = new(Workspace);
+        Guid id = Guid.NewGuid();
+        Assert.True(orders.AddLine(id, quinns, controlled, 6).Succeeded);
+        string captured = work.Find(id)!.Json;
+        if (archiveGroup) await _app.ArchiveGroupAsync(group.Id);
+        else
+        {
+            await using AsyncServiceScope scope = _app.Api.Services.CreateAsyncScope();
+            Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().RestrictionPermissions
+                .Where(grant => grant.RepSubject == "colm" && grant.RestrictionGroupId == group.Id).ExecuteDeleteAsync());
+        }
+
+        SyncOutcome filtered = await SyncAsync();
+
+        Assert.True(filtered.Completed);
+        Assert.Equal(UploadSummary.None, filtered.Upload); // In Progress is deliberately not uploaded.
+        Assert.Equal(captured, work.Find(id)!.Json);
+        Assert.Null(new SnapshotStore(Workspace).ReadProduct(controlled));
+        UnsentView review = Assert.Single(work.ReadViews());
+        Assert.Equal(new[] { controlled }, review.MissingProductIds);
+        Assert.True(review.CanMarkReady);
+        Assert.Equal(("Controlled Pain Relief 30s", 6m, 8.95m),
+            (review.Order!.Lines[0].ProductName, review.Order.Lines[0].Quantity, review.Order.Lines[0].Price.Amount));
+        Assert.Null(review.Item.Rejection);
+        // The reviewed action uses the same existing order operation; component/session tests cover its app boundary.
+        Assert.True(orders.MarkReadyToSend(id).Succeeded);
+        string ready = work.Find(id)!.Json;
+
+        SyncOutcome sent = await SyncAsync();
+
+        Assert.Equal((SyncStatus.Completed, new UploadSummary(1, 1)), (sent.Status, sent.Upload));
+        Assert.Empty(work.Read());
+        Assert.Equal(ready, Assert.Single(work.ReadSent()).Item.Json);
+        await using AsyncServiceScope verify = _app.Api.Services.CreateAsyncScope();
+        OrderingDbContext received = verify.ServiceProvider.GetRequiredService<OrderingDbContext>();
+        ReceivedOrder row = await received.Orders.AsNoTracking().SingleAsync();
+        Assert.Equal((id, OrderLifecycleStatus.Pending), (row.Id, row.Status));
+        Assert.Equal(ready, (await received.ReceivedWork.AsNoTracking().SingleAsync()).Body);
+    }
+
     private sealed class FixedToken(string token) : IAccessTokenSource
     {
         public Task<string?> GetAccessTokenAsync(CancellationToken ct) => Task.FromResult<string?>(token);

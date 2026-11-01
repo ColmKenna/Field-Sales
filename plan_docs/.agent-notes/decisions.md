@@ -3,6 +3,19 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-043 restricted-product retention (2026-10-31, developer)
+
+The developer explicitly selected **A — restrict active reads; keep recovery snapshots**.
+
+- New snapshot payloads and all active tablet catalogue/search/direct product reads exclude products
+  the rep lacks permission to see. Archived groups remain hidden from every rep (MI-45).
+- Preserve the existing two-completed-generation recovery policy. A previously authorized product
+  can remain in an older local recovery generation; WI-043 does not purge those copies on removal.
+- Captured order lines retain their stored name, quantity, price and snapshot reference and remain
+  valid when captured. They are not rewritten by current catalogue visibility or recovery cleanup.
+- The approved T1 test asserts active-read exclusion, not physical erasure of historical snapshots.
+  No additional retention/schema change or storage scope amendment is needed for WI-043.
+
 ## WI-040 sync failure causes (2026-10-30, developer, plan approval)
 
 The developer replied **Approved** to the WI-040 plan (decisions D1–D8, full text in `WI-040.md`).
