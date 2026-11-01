@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="FieldSales.DemoData" />
+    <!-- Domain rules (for example Main Contact changes) are internal to the API; unit tests exercise them directly. -->
+    <InternalsVisibleTo Include="FieldSales.Api.UnitTests" />
     <ProjectReference Include="..\FieldSales.ServiceDefaults\FieldSales.ServiceDefaults.csproj" />
     <ProjectReference Include="..\FieldSales.StaffAccess\FieldSales.StaffAccess.csproj" />
     <ProjectReference Include="..\FieldSales.Quantities\FieldSales.Quantities.csproj" />
