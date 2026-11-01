@@ -19,7 +19,7 @@ using AssignmentHistory = CatalogueApi::FieldSales.Api.Coverage.AssignmentHistor
 
 namespace FieldSales.Web.Tests;
 
-public sealed class CoverageReadApplication(DirectorySqlServerFixture sql) : GeographyApplication(sql)
+public sealed class CoverageReadApplication(CoverageSqlServerFixture sql) : GeographyApplication(sql)
 {
     protected override bool UseTestLocationUsage => false;
     public ReadProbe Reads { get; } = new();

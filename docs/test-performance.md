@@ -13,6 +13,7 @@ existing assertions, migration tests, and the existing required CI check.
 | `1e5e1de` | Class-scoped hosts for read-only admin component/stylesheet checks |
 | `8702bf4` | Snapshot API schema migrated once per class, with transactional data resets between cases |
 | `perf/test-feedback-loop` | The same pattern (`OwnedCatalogReset`) for nine more API classes; API project 186 s → 95–114 s |
+| `perf/test-feedback-loop` | Web Coverage scenarios in their own SQL collection and container (`sqlserver-web.runsettings`, 3 threads), so they no longer wait for Directory |
 
 The API, admin and Web projects each have their own integration runner. DemoData,
 SnapshotSpike, Tablet.Core, Tablet.Components and TabletSpike share a supporting lane and run

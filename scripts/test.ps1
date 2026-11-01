@@ -30,6 +30,8 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $runSettings = Join-Path $repositoryRoot "sqlserver.runsettings"
+# The Web project has three SQL collections (Catalogue, Directory, Coverage) and runs them at once.
+$webRunSettings = Join-Path $repositoryRoot "sqlserver-web.runsettings"
 
 function Get-TestProject([string]$Name) {
     Join-Path $repositoryRoot "tests/Integration/$Name/$Name.IntegrationTests.csproj"
@@ -78,7 +80,10 @@ function Invoke-TestStep {
     if (-not $Build) { $arguments += @("--no-build", "--no-restore") }
     if ($Filter) { $arguments += @("--filter", $Filter) }
     # The thread cap protects SQL Server memory; Docker-free runs use xUnit's default parallelism.
-    if ($SqlServer) { $arguments += @("-m:1", "--settings", $runSettings, "--blame-hang-timeout", "2m") }
+    if ($SqlServer) {
+        $settings = if ($Target -eq $web) { $webRunSettings } else { $runSettings }
+        $arguments += @("-m:1", "--settings", $settings, "--blame-hang-timeout", "2m")
+    }
     if ($ResultsDirectory) {
         $arguments += @("--logger", "trx", "--results-directory", (Join-Path $ResultsDirectory ($Name -replace '[^\w.-]', '-')))
     }

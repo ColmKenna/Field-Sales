@@ -29,8 +29,15 @@ using LocationTownUsageSource = CatalogueApi::FieldSales.Api.Directory.LocationT
 
 namespace FieldSales.Web.Tests;
 
-public class GeographyApplication(DirectorySqlServerFixture sql) : IAsyncLifetime
+public class GeographyApplication : IAsyncLifetime
 {
+    private readonly WebSqlServerFixture sql;
+
+    // xUnit resolves a class fixture's constructor arguments by exact type, so the public constructor
+    // names the Directory collection's fixture. Coverage's fixture uses the protected one.
+    public GeographyApplication(DirectorySqlServerFixture sql) : this((WebSqlServerFixture)sql) { }
+    protected GeographyApplication(WebSqlServerFixture sql) => this.sql = sql;
+
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey Key = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
     public TestStaffRoleLookup Roles { get; } = new();

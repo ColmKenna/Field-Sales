@@ -31,6 +31,7 @@ public abstract class WebSqlServerFixture : IAsyncLifetime
 
 public sealed class CatalogueSqlServerFixture : WebSqlServerFixture { }
 public sealed class DirectorySqlServerFixture : WebSqlServerFixture { }
+public sealed class CoverageSqlServerFixture : WebSqlServerFixture { }
 
 [CollectionDefinition(Name)]
 public sealed class CatalogueSqlServerCollection : ICollectionFixture<CatalogueSqlServerFixture>
@@ -42,4 +43,13 @@ public sealed class CatalogueSqlServerCollection : ICollectionFixture<CatalogueS
 public sealed class DirectorySqlServerCollection : ICollectionFixture<DirectorySqlServerFixture>
 {
     public const string Name = "Web Directory SQL Server";
+}
+
+// Coverage scenarios have their own container so they run alongside the Directory collection; the two
+// were one sequential collection and the Web project's critical path. sqlserver-web.runsettings allows
+// the three SQL collections to run at once.
+[CollectionDefinition(Name)]
+public sealed class CoverageSqlServerCollection : ICollectionFixture<CoverageSqlServerFixture>
+{
+    public const string Name = "Web Coverage SQL Server";
 }

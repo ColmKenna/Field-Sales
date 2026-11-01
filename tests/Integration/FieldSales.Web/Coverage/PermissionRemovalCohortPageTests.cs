@@ -16,7 +16,7 @@ using IOPath = System.IO.Path;
 namespace FieldSales.Web.Tests;
 
 // WI-031 cohort checkpoint: real cookies, Razor, antiforgery, BFF, API and SQL persistence.
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requires", "SqlServer")]
 [Trait("Area", "Coverage")]

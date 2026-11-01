@@ -71,6 +71,8 @@ jobs:
             projects: tests/Integration/FieldSales.Identity.Admin/FieldSales.Identity.Admin.IntegrationTests.csproj
           - id: web
             projects: tests/Integration/FieldSales.Web/FieldSales.Web.IntegrationTests.csproj
+            # Three SQL Server collections (Catalogue, Directory, Coverage) run at once on this runner.
+            settings: sqlserver-web.runsettings
           - id: supporting
             projects: >-
               tests/Integration/FieldSales.DemoData/FieldSales.DemoData.IntegrationTests.csproj
@@ -89,9 +91,10 @@ jobs:
       - name: Build and run integration projects
         env:
           TEST_PROJECTS: ${{ matrix.projects }}
+          RUN_SETTINGS: ${{ matrix.settings || 'sqlserver.runsettings' }}
         run: |
           for project in $TEST_PROJECTS; do
-            dotnet test "$project" --filter "Category!=Unit" -m:1 --settings sqlserver.runsettings --blame-hang-timeout 2m --logger trx --results-directory TestResults/${{ matrix.id }} --verbosity normal
+            dotnet test "$project" --filter "Category!=Unit" -m:1 --settings "$RUN_SETTINGS" --blame-hang-timeout 2m --logger trx --results-directory TestResults/${{ matrix.id }} --verbosity normal
           done
       - name: Upload test results
         if: always()

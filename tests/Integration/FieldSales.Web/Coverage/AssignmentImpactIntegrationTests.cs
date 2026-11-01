@@ -14,7 +14,7 @@ using DryRun = CatalogueApi::FieldSales.Api.Coverage.AssignmentImpactPreview;
 
 namespace FieldSales.Web.Tests;
 
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requires", "SqlServer")]
 [Trait("Area", "Coverage")]

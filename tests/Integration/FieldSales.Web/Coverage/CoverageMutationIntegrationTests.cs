@@ -16,7 +16,7 @@ using ReferenceUsageUnavailableException = CatalogueApi::FieldSales.Api.Catalogu
 
 namespace FieldSales.Web.Tests;
 
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requires", "SqlServer")]
 [Trait("Area", "Coverage")]

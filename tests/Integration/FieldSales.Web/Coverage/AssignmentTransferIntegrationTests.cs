@@ -13,7 +13,7 @@ using RepReportingLine = CatalogueApi::FieldSales.Api.Coverage.RepReportingLine;
 
 namespace FieldSales.Web.Tests;
 
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requires", "SqlServer")]
 [Trait("Area", "Coverage")]

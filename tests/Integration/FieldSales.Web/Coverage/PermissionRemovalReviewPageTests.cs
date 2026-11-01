@@ -12,7 +12,7 @@ using static FieldSales.Web.Tests.RestrictionPermissionHost;
 namespace FieldSales.Web.Tests;
 
 // Approved WI-031 single-rep increment. Real Razor/cookie/antiforgery, BFF, API and SQL record.
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
 [Trait("Category", "Integration")]
 [Trait("Requires", "SqlServer")]
 [Trait("Area", "Coverage")]

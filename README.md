@@ -437,9 +437,10 @@ Testcontainers to cover migration adoption, concurrency, and cross-instance beha
 in-memory provider cannot represent. Without a container runtime those tests fail to connect
 rather than skipping.
 
-The Web integration project has two SQL collections: Catalogue and Directory.
+The Web integration project has three SQL collections: Catalogue, Directory and Coverage.
 Each owns and disposes one SQL Server container; the collections can run concurrently,
-and scenarios within a collection run sequentially. Application fixtures retain separate
+and scenarios within a collection run sequentially. `sqlserver-web.runsettings` gives the
+Web project the third thread this needs (CI's `web` lane and `scripts/test.ps1` use it). Application fixtures retain separate
 database catalogs. HTTP-only tests do not require these collections. Web scenarios are
 grouped under `Catalogue`, `Directory`, `Coverage`, and `Security`, with shared fixtures
 in `Infrastructure`. Pure tablet entry-handoff checks live in the tablet unit project.

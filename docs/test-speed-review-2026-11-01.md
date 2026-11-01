@@ -480,6 +480,36 @@ Back to back, against the previous commit built in a separate worktree:
 In TRX, the nine classes' span fell from 125.1 s to 29.2 s, and their per-test set-up from 82.4 s
 to 6.1 s.
 
+**Item 14: done, with one caveat to settle on a quiet machine and in CI.**
+
+- The 19 Coverage classes moved from `DirectorySqlServerCollection` to a new
+  `CoverageSqlServerCollection`, with its own container (`CoverageSqlServerFixture`).
+  `CoverageReadApplication` takes the new fixture through a protected base constructor;
+  `GeographyApplication` keeps its public Directory constructor, because xUnit matches class-fixture
+  arguments by exact type.
+- `sqlserver-web.runsettings` (3 xUnit threads) lets the three SQL collections run at once. CI's
+  `web` lane and `scripts/test.ps1` use it; the other lanes keep `sqlserver.runsettings`.
+
+Back to back against the previous commit, in the evening, with the machine under heavy unrelated
+load (another IDE):
+
+| Web integration project, 873 tests | Wall (s) | SQL timeouts |
+|---|---:|---:|
+| After, run 1 | 386.7 | 3 |
+| Before, run 1 | 497.9 | 34 |
+| After, run 2 | 415.6 | 1 |
+| Before, run 2 | 509.9 | 3 |
+
+- **The split overlaps as intended.** In TRX, Coverage and Directory now both start 13 s in.
+  Before, Coverage waited until Directory finished (3 min 23 s in).
+- **Memory.** Peak SQL memory with three containers was 6.2 GiB in total (largest 2.9 GiB),
+  against 3.4–4.5 GiB with two.
+- **The timeouts come from the load, not from the split.** Every failure in all four runs was a SQL
+  timeout or update error under load, the old layout had more of them, and no test failed in both
+  "after" runs.
+- **Still to do.** Run the Web project once on a quiet machine before merging, and once in CI to
+  confirm the 16 GB runner holds three containers.
+
 ## 10. Not measured, and why
 
 - **CI wall-clock.** No workflow was dispatched; that would be an outward action, and it was not
