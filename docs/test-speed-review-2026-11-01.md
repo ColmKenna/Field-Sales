@@ -448,6 +448,15 @@ unit project went from 256 to 335 tests, and the Admin Docker-free integration s
 693. All the moved tests now run in the inner loop and CI's unit job. The Tablet.Core contract
 classes were handled under items 2–4.
 
+**Items 6–8: done.** Each new test was also checked against a temporary break of the rule it
+guards: each break failed the matching tests, and the source was then restored from git.
+
+| Item | Tests | Time | Production change |
+|---|---:|---:|---|
+| 6 UT-3 `MainContactRulesTests` (Location and Contact rules) | 18 | 42 ms | `InternalsVisibleTo("FieldSales.Api.UnitTests")` |
+| 7 UT-1 `TabletWorkPayloadTests` (upload structure checks: the 13 integration cases plus 15 more) | 31 | 67 ms | `TabletWorkReceiver.ReadOrder`/`ReadCall` private → internal |
+| 8 UT-5 model drift: Catalogue, Ordering, StaffWeb, Identity, Configuration and Operational stores | 6 | about 0.5 s per project | none |
+
 ## 10. Not measured, and why
 
 - **CI wall-clock.** No workflow was dispatched; that would be an outward action, and it was not
