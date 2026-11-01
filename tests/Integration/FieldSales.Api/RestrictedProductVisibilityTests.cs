@@ -8,21 +8,20 @@ namespace FieldSales.Api.Tests;
 [Trait("Category", "Integration")]
 [Trait("Requires", "SqlServer")]
 [Trait("Area", "Catalogue")]
-public sealed class RestrictedProductVisibilityTests(SqlServerFixture fixture) : IAsyncLifetime
+public sealed class RestrictedProductVisibilityTests(CatalogueTestDatabase catalogue)
+    : IClassFixture<CatalogueTestDatabase>, IAsyncLifetime
 {
-    private string _connectionString = null!;
+    private bool _initialized;
 
-    public CatalogueDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(_connectionString).Options);
+    public CatalogueDbContext CreateContext() => catalogue.Create();
 
     public async Task InitializeAsync()
     {
-        _connectionString = fixture.CreateConnectionString("Visibility");
-        await using var db = CreateContext();
-        await db.Database.MigrateAsync();
+        await catalogue.ResetAsync();
+        _initialized = true;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => _initialized ? catalogue.ResetAsync() : Task.CompletedTask;
 
     [Fact]
     public async Task Should_HideProductFromEveryRep_When_ItsGroupIsArchived()

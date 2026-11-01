@@ -457,6 +457,29 @@ guards: each break failed the matching tests, and the source was then restored f
 | 7 UT-1 `TabletWorkPayloadTests` (upload structure checks: the 13 integration cases plus 15 more) | 31 | 67 ms | `TabletWorkReceiver.ReadOrder`/`ReadCall` private → internal |
 | 8 UT-5 model drift: Catalogue, Ordering, StaffWeb, Identity, Configuration and Operational stores | 6 | about 0.5 s per project | none |
 
+**Item 13: done.** The nine API classes that created a catalog per test now share one migrated
+catalog per class:
+
+- `DirectoryTestDatabase` for TerritoryAssignment, AssignmentHistory and LocationPosition;
+- `CatalogueTestDatabase` for RestrictionPermission and RestrictedProductVisibility;
+- `ProductApiFixture` for the four product API classes, which also share one host per class.
+
+Each case resets before and after it runs. `SnapshotDatabaseReset` became `OwnedCatalogReset`
+with an owner prefix and the same guards: owned catalog only, initially empty migrated tables,
+triggers and constraints re-enabled and trusted, and everything in one transaction. The product
+reset also restores the default caller role and a fresh save barrier. A host a case restarted is
+kept for the next case. The schema-upgrade cases still migrate their own fresh catalogs.
+
+Back to back, against the previous commit built in a separate worktree:
+
+| API integration project, 186 tests | Run 1 (s) | Run 2 (s) | Run 3 (s) |
+|---|---:|---:|---:|
+| Before | 186.3 | 185.8 | – |
+| After | 103.5 | 114.0 | 95.3 |
+
+In TRX, the nine classes' span fell from 125.1 s to 29.2 s, and their per-test set-up from 82.4 s
+to 6.1 s.
+
 ## 10. Not measured, and why
 
 - **CI wall-clock.** No workflow was dispatched; that would be an outward action, and it was not
