@@ -87,7 +87,7 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
     }
 
     // Structure only: the body must be a finished order this server can read, with what the order lifecycle needs.
-    private static TabletOrder? ReadOrder(Guid id, byte[] body, out ReceiveResult? refused)
+    internal static TabletOrder? ReadOrder(Guid id, byte[] body, out ReceiveResult? refused)
     {
         refused = null;
         TabletOrder? order = null;
@@ -118,7 +118,7 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         _ => null
     };
 
-    private static ReceiveResult? ReadCall(Guid id, byte[] body)
+    internal static ReceiveResult? ReadCall(Guid id, byte[] body)
     {
         try
         {
