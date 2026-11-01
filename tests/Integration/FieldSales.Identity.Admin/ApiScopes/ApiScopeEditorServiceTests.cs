@@ -15,6 +15,7 @@ namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 ///     Every test seeds with a unique tag embedded in the scope name so assertions are
 ///     unaffected by data left behind by other tests sharing the same connection.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiScopeEditorServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

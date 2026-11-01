@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 
+[Trait("Category", "Integration")]
 public class IdentityResourceListServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

@@ -14,6 +14,9 @@ namespace FieldSales.Api.Tests;
 
 // WI-039 E1–E2: the real tablet store syncs against the real API, uploads first and then downloads.
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "TabletSync")]
 public sealed class TabletUploadEndToEndTests(TabletSnapshotFixture fixture) : IClassFixture<TabletSnapshotFixture>, IAsyncLifetime
 {
     private readonly TabletSnapshotApplication _app = fixture.Application;

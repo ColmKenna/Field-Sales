@@ -21,6 +21,9 @@ namespace FieldSales.Web.Tests;
 
 
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class TerritoryAssignmentIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Fact]

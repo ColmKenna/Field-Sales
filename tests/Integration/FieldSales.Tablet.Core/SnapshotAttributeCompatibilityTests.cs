@@ -6,6 +6,7 @@ using V10Reader = FieldSales.Tablet.V10.Core.SnapshotDocumentReader;
 
 namespace FieldSales.Tablet.Core.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class SnapshotAttributeCompatibilityTests
 {
     [Fact]

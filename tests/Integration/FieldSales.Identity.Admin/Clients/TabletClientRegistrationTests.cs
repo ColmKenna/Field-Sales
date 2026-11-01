@@ -18,6 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
 // WI-032 increment 3 (P7): the tablet app's identity registration. Each test seeds its own in-memory host.
+[Trait("Category", "Integration")]
 public sealed class TabletClientRegistrationTests
 {
     [Fact]

@@ -12,6 +12,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.AuditLogs;
 
+[Trait("Category", "Integration")]
 public class AuditLogsIndexIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

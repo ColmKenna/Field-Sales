@@ -4,6 +4,7 @@ using AngleSharp.Dom;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
+[Trait("Category", "Integration")]
 public class AdminSmokeTests : IClassFixture<AdminWebFactory>
 {
     private readonly HttpClient _client;

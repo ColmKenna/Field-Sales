@@ -43,9 +43,10 @@ that starts cold finds it there.
 
 ## Environment gotchas (Windows dev machine)
 
-- **Inner loop between increments:** `dotnet test FieldSales.Fast.slnx` (unit projects, tablet components,
-  Tablet.Core storage; no Docker; about 12–24 s with build). Run SQL-backed classes only at the end of
-  an increment, not after every edit.
+- **Test tiers (`scripts/test.ps1`, README § Testing):** between edits `./scripts/test.ps1` (Fast: unit
+  projects, tablet components, Tablet.Core storage; no Docker; 12–24 s with build). At an increment boundary
+  `./scripts/test.ps1 -Tier WorkItem -Area <areas touched>` (Docker-free integration plus that area's SQL
+  classes). New SQL Server test classes need `[Trait("Requires", "SqlServer")]` and usually an `Area` trait.
 - **Docker Desktop must be running** for anything beyond the fast solution. The SQL Server Testcontainers
   suites fail, not skip, without it.
 - Full test run: `dotnet test FieldSales.slnx --no-build --no-restore -m:1 --settings sqlserver.runsettings`

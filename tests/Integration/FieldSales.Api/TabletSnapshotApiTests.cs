@@ -34,6 +34,9 @@ namespace FieldSales.Api.Tests;
 
 // WI-032 increment 1: the server-side Morning Snapshot, contract v1 (scenarios 1–8 and 23's download part).
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "TabletSync")]
 public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture) : IClassFixture<TabletSnapshotFixture>, IAsyncLifetime
 {
     private readonly TabletSnapshotApplication _app = fixture.Application;

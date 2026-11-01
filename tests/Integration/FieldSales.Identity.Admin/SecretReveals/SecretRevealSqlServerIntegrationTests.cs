@@ -13,6 +13,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FieldSales.Identity.Admin.Tests.SecretReveals;
 
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Identity")]
 public sealed class SecretRevealSqlServerIntegrationTests
 {
     private readonly Task02SqlServerFactory _factory;

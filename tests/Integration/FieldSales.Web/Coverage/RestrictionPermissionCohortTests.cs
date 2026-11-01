@@ -8,6 +8,9 @@ namespace FieldSales.Web.Tests;
 
 // WI-030: one action must either grant every selected rep or record nothing.
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class RestrictionPermissionCohortTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

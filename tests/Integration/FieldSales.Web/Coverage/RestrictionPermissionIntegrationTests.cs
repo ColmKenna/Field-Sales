@@ -12,6 +12,9 @@ namespace FieldSales.Web.Tests;
 // WI-029 increment 2: who may grant or remove a rep's Restriction Permission, through the real API and SQL.
 // The people and their teams are described on RestrictionPermissionHost.
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class RestrictionPermissionIntegrationTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

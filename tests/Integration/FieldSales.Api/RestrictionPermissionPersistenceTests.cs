@@ -10,6 +10,9 @@ namespace FieldSales.Api.Tests;
 
 // WI-029 increment 1: the append-only permission record and the current grants it keeps in step.
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class RestrictionPermissionPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
 {
     private const RestrictionPermissionChangeKind Granted = RestrictionPermissionChangeKind.Granted;

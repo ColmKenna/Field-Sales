@@ -3,6 +3,7 @@ using FieldSales.Snapshot.Contracts;
 
 namespace FieldSales.Tablet.Core.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class LocationDetailTests : IDisposable
 {
     private readonly TestTablet tablet = new();

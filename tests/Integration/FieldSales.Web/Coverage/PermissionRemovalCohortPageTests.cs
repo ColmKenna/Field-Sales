@@ -17,6 +17,9 @@ namespace FieldSales.Web.Tests;
 
 // WI-031 cohort checkpoint: real cookies, Razor, antiforgery, BFF, API and SQL persistence.
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class PermissionRemovalCohortPageTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

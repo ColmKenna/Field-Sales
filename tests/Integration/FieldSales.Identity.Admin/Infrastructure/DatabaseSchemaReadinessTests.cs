@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
 public sealed class DatabaseSchemaReadinessTests
 {
     private readonly Task02SqlServerFactory _factory;

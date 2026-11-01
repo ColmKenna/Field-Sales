@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.AuditLogs;
 
+[Trait("Category", "Integration")]
 public class AuditLogListServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

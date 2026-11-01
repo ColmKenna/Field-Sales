@@ -16,6 +16,7 @@ namespace FieldSales.Identity.Admin.Tests.Users;
 ///     <see cref="UserListServiceTests" />, <see cref="UserCreateServiceTests" />, and
 ///     <see cref="UserDetailsServiceTests" /> via the real (SQLite in-memory) DI container.
 /// </summary>
+[Trait("Category", "Integration")]
 public class EfIdentityUserAdministrationStoreTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

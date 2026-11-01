@@ -12,6 +12,9 @@ using Testcontainers.MsSql;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Directory")]
 public sealed class LocationPositionPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
 {
     private readonly string catalogName = $"ApiTest_LocPos_{Guid.NewGuid():N}";

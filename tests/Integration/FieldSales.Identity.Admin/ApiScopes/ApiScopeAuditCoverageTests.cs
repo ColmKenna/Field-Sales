@@ -14,6 +14,7 @@ namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 ///     success-only) and <see cref="ApiScopeListService.DeleteApiScopeAsync" /> (previously had
 ///     no <see cref="IAuditWriter" /> dependency at all - a named plan gap).
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiScopeAuditCoverageTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

@@ -16,6 +16,9 @@ namespace FieldSales.Api.Tests;
 
 // WI-039 (T-4.1.2): the server receives each finished item exactly once and judges it as captured (BR-NEW-006).
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "TabletSync")]
 public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClassFixture<TabletSnapshotFixture>, IAsyncLifetime
 {
     private static readonly OrderSnapshotRef Morning = new("1.2", new DateTimeOffset(2026, 10, 1, 6, 42, 0, TimeSpan.Zero));

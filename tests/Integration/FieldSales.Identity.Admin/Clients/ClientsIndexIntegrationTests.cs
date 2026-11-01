@@ -15,6 +15,7 @@ namespace FieldSales.Identity.Admin.Tests.Clients;
 ///     Each test builds its own factory/client with <see cref="IClientListService" /> replaced by a
 ///     mock so the rendered markup is fully controlled and independent of database state.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ClientsIndexIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

@@ -14,6 +14,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
+[Trait("Category", "Integration")]
 public class ClientsCreatePageModelTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

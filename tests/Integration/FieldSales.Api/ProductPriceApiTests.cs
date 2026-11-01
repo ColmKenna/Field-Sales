@@ -23,6 +23,9 @@ using Testcontainers.MsSql;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class ProductPriceApiTests(SqlServerFixture fixture) : IAsyncLifetime
 {
     private readonly ProductPriceApplication _app = new(fixture.CreateConnectionString("PriceApi"));

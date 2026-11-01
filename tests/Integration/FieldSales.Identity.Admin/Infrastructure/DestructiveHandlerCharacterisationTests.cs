@@ -21,6 +21,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     Locks in current behavior for destructive handlers before refactoring/re-skinning begins (WI-01..WI-07).
 ///     All tests adhere to the Should_ExpectedBehaviour_When_Condition naming convention.
 /// </summary>
+[Trait("Category", "Integration")]
 public class DestructiveHandlerCharacterisationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

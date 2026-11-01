@@ -21,6 +21,9 @@ using RestrictionPermissionUsageSource = CatalogueApi::FieldSales.Api.Coverage.R
 namespace FieldSales.Web.Tests;
 
 [Collection(CatalogueSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class ReferenceListIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string Page = "/HeadOffice/ReferenceData";

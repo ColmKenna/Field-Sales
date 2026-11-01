@@ -7,6 +7,9 @@ namespace FieldSales.Web.Tests;
 
 // WI-030: the real Razor form, BFF, permission API and SQL record together.
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class RestrictionPermissionCohortPageTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

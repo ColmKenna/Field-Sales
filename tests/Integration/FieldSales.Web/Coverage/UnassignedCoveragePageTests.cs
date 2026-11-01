@@ -6,6 +6,7 @@ using FieldSales.StaffAccess;
 
 namespace FieldSales.Web.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class UnassignedCoveragePageTests
 {
     [Theory]

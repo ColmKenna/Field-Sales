@@ -13,6 +13,9 @@ namespace FieldSales.Web.Tests;
 
 // Approved WI-031 single-rep increment. Real Razor/cookie/antiforgery, BFF, API and SQL record.
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class PermissionRemovalReviewPageTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

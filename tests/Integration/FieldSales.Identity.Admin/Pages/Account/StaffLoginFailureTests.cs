@@ -13,6 +13,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Pages.Account;
 
+[Trait("Category", "Integration")]
 public sealed class StaffLoginFailureTests
 {
     [Fact]

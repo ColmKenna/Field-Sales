@@ -11,6 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
 public sealed class MigrationAdoptionSqlServerTests
 {
     private const string ProductVersion = "10.0.10";

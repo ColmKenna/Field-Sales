@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FieldSales.Tablet.Core.Tests;
 
+[Trait("Category", "Integration")]
 public sealed partial class TabletAppSessionScenarios
 {
     [Fact]

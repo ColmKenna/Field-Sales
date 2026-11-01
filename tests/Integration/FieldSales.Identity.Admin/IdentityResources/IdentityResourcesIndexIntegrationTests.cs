@@ -10,6 +10,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 
+[Trait("Category", "Integration")]
 public class IdentityResourcesIndexIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

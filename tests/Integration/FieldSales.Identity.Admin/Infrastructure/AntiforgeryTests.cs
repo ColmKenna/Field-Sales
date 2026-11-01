@@ -12,6 +12,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     supplies a token, which means the suite would pass unchanged if validation were turned
 ///     off. These assert the refusal, so the protection is evidenced rather than assumed.
 /// </summary>
+[Trait("Category", "Integration")]
 public class AntiforgeryTests : IClassFixture<AdminWebFactory>
 {
     private const string CreatePage = "/Admin/Clients/Create";

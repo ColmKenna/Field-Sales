@@ -9,6 +9,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     are covered here: the unattributed page is refused, and each page that has to stay
 ///     anonymous still answers — over-locking the login page is the way this change breaks.
 /// </summary>
+[Trait("Category", "Integration")]
 public class FallbackAuthorizationTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

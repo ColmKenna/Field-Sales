@@ -18,6 +18,9 @@ using Microsoft.IdentityModel.Tokens;
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Identity")]
 public sealed class StaffRoleLookupEndpointTests(Task02SqlServerFactory databases)
 {
     private const string Issuer = "https://staff-issuer.test";

@@ -5,6 +5,7 @@ namespace FieldSales.Tablet.Core.Tests;
 /// <summary>WI-041 (T-4.6.1, Sign-in US-004): a Sync stopped because the online sign-in expired leaves every item as it was, the
 /// rep keeps capturing inside the local window, and once they sign in again each item is sent once. The token handling is real
 /// (the identity host is faked); uploads go to the fake receiver.</summary>
+[Trait("Category", "Integration")]
 public sealed class TabletSyncResumeTests : IDisposable
 {
     private readonly SessionTablet session = new();

@@ -31,6 +31,9 @@ using Category = CatalogueApi::FieldSales.Api.Catalogue.Category;
 namespace FieldSales.Web.Tests;
 
 [Collection(CatalogueSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class ProductIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     private const string CreateUrl = "/HeadOffice/Products/Create";

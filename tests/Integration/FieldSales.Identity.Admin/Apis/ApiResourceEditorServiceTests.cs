@@ -12,6 +12,7 @@ namespace FieldSales.Identity.Admin.Tests.Apis;
 ///     Exercises <see cref="ApiResourceEditorService" /> against a real (SQLite in-memory)
 ///     <see cref="ConfigurationDbContext" /> resolved from the shared <see cref="AdminWebFactory" /> DI container.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiResourceEditorServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

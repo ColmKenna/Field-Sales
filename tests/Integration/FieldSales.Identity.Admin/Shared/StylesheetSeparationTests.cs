@@ -10,6 +10,7 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///     Each surface loads the shared stylesheet plus its own, and neither loads the other's.
 ///     shared.css must come first: the public and admin sheets build on its tokens and reset.
 /// </summary>
+[Trait("Category", "Integration")]
 public class StylesheetSeparationTests(AdminWebFactory factory) : IClassFixture<AdminWebFactory>
 {
     private async Task<string[]> StylesheetsAsync(string url, string? identity = null)

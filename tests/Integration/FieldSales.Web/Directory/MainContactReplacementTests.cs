@@ -16,6 +16,9 @@ using static FieldSales.Web.Tests.MainContactTestData;
 namespace FieldSales.Web.Tests;
 
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Directory")]
 public sealed class MainContactReplacementTests(ContactApplication app) : IClassFixture<ContactApplication>
 {
     [Theory]

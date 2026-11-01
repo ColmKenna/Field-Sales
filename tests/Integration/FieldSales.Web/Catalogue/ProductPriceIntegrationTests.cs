@@ -11,6 +11,9 @@ using Product = CatalogueApi::FieldSales.Api.Catalogue.Product;
 namespace FieldSales.Web.Tests;
 
 [Collection(CatalogueSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class ProductPriceIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]

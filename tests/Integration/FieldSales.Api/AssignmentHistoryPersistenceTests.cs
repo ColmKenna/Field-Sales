@@ -12,6 +12,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class AssignmentHistoryPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
 {
     private readonly CoverageDatabase database = new(fixture);

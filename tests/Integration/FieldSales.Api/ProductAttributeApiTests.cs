@@ -10,6 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class ProductAttributeApiTests(SqlServerFixture fixture) : IAsyncLifetime
 {
     private readonly ProductPriceApplication app = new(fixture.CreateConnectionString("AttributeApi"));

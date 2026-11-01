@@ -8,6 +8,7 @@ using Microsoft.JSInterop;
 
 namespace FieldSales.Tablet.Components.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class SignOutControlTests
 {
     [Fact]

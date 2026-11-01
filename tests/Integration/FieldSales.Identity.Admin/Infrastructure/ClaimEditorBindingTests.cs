@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
+[Trait("Category", "Integration")]
 public class ClaimEditorBindingTests
 {
     [Theory]

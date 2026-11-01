@@ -14,6 +14,7 @@ using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
+[Trait("Category", "Integration")]
 public class ClientsCreateIntegrationTests : IDisposable
 {
     private readonly HttpClient _client;

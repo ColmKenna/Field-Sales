@@ -19,6 +19,8 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     against real SQL Server, using the same migrations production ships.
 /// </summary>
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
 public sealed class DevelopmentMigrationSqlServerTests
 {
     [Fact]

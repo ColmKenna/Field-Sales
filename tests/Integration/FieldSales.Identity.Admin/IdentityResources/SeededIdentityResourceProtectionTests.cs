@@ -17,6 +17,7 @@ namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 ///     Each test gets its own factory (and therefore its own database), because these tests run the
 ///     real seeder and assert on the exact contents of the identity resource table.
 /// </remarks>
+[Trait("Category", "Integration")]
 public class SeededIdentityResourceProtectionTests
 {
     private static async Task SeedAsync(AdminWebFactory factory)

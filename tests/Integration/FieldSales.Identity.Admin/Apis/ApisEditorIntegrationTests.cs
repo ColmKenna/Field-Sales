@@ -20,6 +20,7 @@ namespace FieldSales.Identity.Admin.Tests.Apis;
 ///     delete modal. Uses a real (SQLite in-memory) database via <see cref="AdminWebFactory" />
 ///     so the redirect/TempData/antiforgery pipeline is exercised end to end.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApisEditorIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

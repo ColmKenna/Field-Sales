@@ -15,6 +15,9 @@ namespace FieldSales.Web.Tests;
 // Exercise the exact preflight gap found by CI, without timing sleeps or
 // weakening the existing concurrent-retirement assertions.
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Directory")]
 public sealed class RetiredTownPreflightIntegrationTests(RetiredTownPreflightApplication app)
     : IClassFixture<RetiredTownPreflightApplication>
 {

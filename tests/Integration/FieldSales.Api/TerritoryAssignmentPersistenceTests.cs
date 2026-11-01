@@ -12,6 +12,9 @@ namespace FieldSales.Api.Tests;
 // Increment 1 exercises only the approved duplicate/invalid storage,
 // reporting-line uniqueness and schema upgrade/restart scenario families.
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class TerritoryAssignmentPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
 {
     private readonly CoverageDatabase database = new(fixture);

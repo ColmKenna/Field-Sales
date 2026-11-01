@@ -20,6 +20,9 @@ using Secret = Duende.IdentityServer.Models.Secret;
 namespace FieldSales.Identity.Admin.Tests.Task02;
 
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Identity")]
 public sealed class Task02SqlServerIntegrationTests
 {
     private readonly Task02SqlServerFactory _factory;

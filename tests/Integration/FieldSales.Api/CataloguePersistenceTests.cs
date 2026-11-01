@@ -22,6 +22,9 @@ using Testcontainers.MsSql;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class CataloguePersistenceTests(SqlServerFixture fixture)
 {
     private const string Issuer = "https://staff-issuer.test";

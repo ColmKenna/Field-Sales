@@ -40,6 +40,7 @@ public sealed class FakeReceiver(FakeSnapshotServer server)
 
 /// <summary>WI-039 (T-4.1.2) T1–T12: the tablet sends finished work first, one item at a time, marks each Sent only when the
 /// server confirms it, never sends anything twice as new work, and then downloads the snapshot.</summary>
+[Trait("Category", "Integration")]
 public sealed class TabletUploadTests : IDisposable
 {
     private readonly TestTablet tablet = new();

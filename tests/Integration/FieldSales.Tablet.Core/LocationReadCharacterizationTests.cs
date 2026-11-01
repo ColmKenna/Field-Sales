@@ -1,5 +1,6 @@
 namespace FieldSales.Tablet.Core.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class LocationReadCharacterizationTests : IDisposable
 {
     private readonly TestTablet tablet = new();

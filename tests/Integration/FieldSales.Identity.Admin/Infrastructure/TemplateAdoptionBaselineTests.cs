@@ -14,6 +14,8 @@ using Microsoft.Extensions.Logging;
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
 public sealed class TemplateAdoptionBaselineTests
 {
     [Fact]
@@ -229,6 +231,7 @@ public sealed class TemplateAdoptionBaselineTests
     }
 }
 
+[Trait("Category", "Integration")]
 public sealed class TemplateAdoptionAdminAuthorizationTests(AdminWebFactory adminFactory)
     : IClassFixture<AdminWebFactory>
 {

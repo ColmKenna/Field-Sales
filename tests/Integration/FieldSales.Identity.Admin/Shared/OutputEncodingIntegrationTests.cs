@@ -34,6 +34,7 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///         these tests cover what the view does when it meets one.
 ///     </para>
 /// </remarks>
+[Trait("Category", "Integration")]
 public class OutputEncodingIntegrationTests : IDisposable
 {
     // No "/" in the payload: ASP.NET Core deliberately does not decode %2F inside a path

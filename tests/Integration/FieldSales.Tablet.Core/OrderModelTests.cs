@@ -5,6 +5,7 @@ using FieldSales.Snapshot.Contracts;
 namespace FieldSales.Tablet.Core.Tests;
 
 /// <summary>WI-038 scenarios 1-9: the order and line model, captured values and the rules for adding a line.</summary>
+[Trait("Category", "Integration")]
 public sealed class OrderModelTests : IDisposable
 {
     private readonly TestTablet tablet = new();

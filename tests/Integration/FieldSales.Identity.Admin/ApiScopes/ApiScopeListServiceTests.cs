@@ -11,6 +11,7 @@ namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 ///     Integration tests for <see cref="ApiScopeListService" /> exercised against the
 ///     shared SQLite in-memory database provided by <see cref="AdminWebFactory" />.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiScopeListServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

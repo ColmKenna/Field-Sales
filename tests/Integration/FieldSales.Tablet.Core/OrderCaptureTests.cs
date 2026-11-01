@@ -4,6 +4,7 @@ using FieldSales.Snapshot.Contracts;
 namespace FieldSales.Tablet.Core.Tests;
 
 /// <summary>WI-038 scenarios 12-14: finding products offline in Order entry, and S4, a standalone order.</summary>
+[Trait("Category", "Integration")]
 public sealed class OrderCaptureTests : IDisposable
 {
     private static readonly Guid Health = Guid.Parse("20000000-0000-0000-0000-000000000001");

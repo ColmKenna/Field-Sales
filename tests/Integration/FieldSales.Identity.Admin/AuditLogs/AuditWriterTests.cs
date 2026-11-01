@@ -16,6 +16,7 @@ namespace FieldSales.Identity.Admin.Tests.AuditLogs;
 ///     Unit tests for <see cref="AuditWriter" /> constructed directly (not via <c>AdminWebFactory</c>)
 ///     so actor/time/persistence collaborators can be fully controlled.
 /// </summary>
+[Trait("Category", "Integration")]
 public class AuditWriterTests : IDisposable
 {
     private readonly SqliteConnection _connection;

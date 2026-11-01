@@ -11,6 +11,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     starts cleanly, serves discovery, and issues tokens from a key nobody chose — there
 ///     is no symptom to notice, which is exactly why it needs a test rather than a comment.
 /// </summary>
+[Trait("Category", "Integration")]
 public sealed class SigningCredentialStartupTests : IDisposable
 {
     private const string CertificatePassword = "signing-credential-startup-tests";

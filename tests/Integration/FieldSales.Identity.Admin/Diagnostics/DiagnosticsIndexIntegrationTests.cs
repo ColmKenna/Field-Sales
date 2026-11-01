@@ -11,6 +11,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Diagnostics;
 
+[Trait("Category", "Integration")]
 public class DiagnosticsIndexIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

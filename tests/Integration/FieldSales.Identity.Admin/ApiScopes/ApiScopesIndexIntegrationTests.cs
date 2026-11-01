@@ -16,6 +16,7 @@ namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 ///     Each test builds its own factory/client with <see cref="IApiScopeListService" /> replaced by a
 ///     mock so the rendered markup is fully controlled and independent of database state.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiScopesIndexIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

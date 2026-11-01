@@ -15,6 +15,9 @@ namespace FieldSales.Web.Tests;
 
 // Approved WI-030 scenarios 9 and 10: real SQL failure/rollback and current authority under concurrency.
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class RestrictionPermissionCohortSafetyTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

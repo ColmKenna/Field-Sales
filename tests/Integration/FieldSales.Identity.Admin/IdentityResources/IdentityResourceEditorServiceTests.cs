@@ -20,6 +20,7 @@ namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 ///     suite guards against was precisely that the protection matched a claim literal instead of the
 ///     real resource. A fabricated row named "openid" would have passed the old code too.
 /// </remarks>
+[Trait("Category", "Integration")]
 public class IdentityResourceEditorServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

@@ -411,6 +411,37 @@ that assembly took 8 s in round 1 and 10–14 s in round 2, under about 41% back
 main gain is what the command leaves out. It cannot start a SQL Server container, so the API SQL
 project (98–206 s) and other SQL-backed classes drop out of the edit loop. CI is unchanged.
 
+**Items 2–4: done.**
+
+- Traits now on every integration class: 188 `Category=Integration`, 68 `Requires=SqlServer` and 62
+  `Area` (Catalogue 20, Coverage 22, Directory 11, Identity 6, TabletSync 3).
+- The two Tablet.Core JSON contract classes are tagged `Category=Unit` where they stand, because they
+  compile the V10 sources in their project; CI's unit job now runs them.
+- The five pure Admin classes stay untagged until item 5 moves them.
+- `scripts/test.ps1` runs the Fast, WorkItem (`-Area`), SqlServer and All tiers. Docker-free selections
+  run at default parallelism; SQL selections use CI's settings.
+
+Checks:
+
+| Check | Result |
+|---|---|
+| `-Tier WorkItem` with Docker blocked | Passed, with the same Docker-free counts as section 4.2 (API 3, Admin 772, Web 126), so every SQL class is tagged |
+| `-Tier SqlServer` | Selected exactly the 966 SQL tests; all passed |
+| `-Area TabletSync,Identity` | Added 67 API and 18 Admin SQL tests (92 s) |
+| `-Area` without Docker | Stops in under 1 s with a "Docker is not running" message |
+
+The afternoon runs were about 2.4 times slower per test than the morning runs, on the same build.
+The machine is a laptop with the Balanced power plan, and another IDE was using about 1.3 cores, so
+the comparisons below are back to back:
+
+| Docker-free selection | CI settings (s) | Default parallelism (s) |
+|---|---:|---:|
+| Admin, 772 tests | 138.2 | 55.2 |
+| Tablet.Core, 234 tests | 25.2 | 14.4 |
+
+Under these conditions, `-Tier WorkItem` without areas took 79–81 s, and `-Tier SqlServer` took
+983 s (the API 186 s, Admin 142 s, Web 628 s, DemoData 27 s).
+
 ## 10. Not measured, and why
 
 - **CI wall-clock.** No workflow was dispatched; that would be an outward action, and it was not

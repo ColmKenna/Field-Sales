@@ -17,6 +17,9 @@ using ReferenceUsageUnavailableException = CatalogueApi::FieldSales.Api.Catalogu
 namespace FieldSales.Web.Tests;
 
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class CoverageMutationIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Root = "/coverage";

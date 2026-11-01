@@ -6,6 +6,7 @@ using FieldSales.SnapshotSpike;
 
 namespace FieldSales.SnapshotSpike.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class SnapshotExportTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "FieldSales.SnapshotSpike.Tests", Guid.NewGuid().ToString("N"));
