@@ -386,6 +386,20 @@ Use the provided PowerShell script to build self-contained EF Core migration exe
 
 ## Testing
 
+### Inner loop (between commits)
+
+```pwsh
+dotnet test FieldSales.Fast.slnx
+```
+
+`FieldSales.Fast.slnx` builds and runs the four unit projects, the tablet component tests and the
+Tablet.Core storage tests (about 1,000 tests). It needs no Docker and no run settings, so xUnit uses
+its default parallelism. On the development workstation it takes 12–24 s after an edit, build
+included; Tablet.Core's real SQLite I/O is the slowest and most variable part. It runs no SQL
+Server, host-level Web/Admin/API or migration test. Run the suites below before committing.
+
+### Full suite and CI split
+
 ```pwsh
 # Whole solution
 dotnet test FieldSales.slnx

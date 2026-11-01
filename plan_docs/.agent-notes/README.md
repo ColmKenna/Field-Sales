@@ -43,7 +43,11 @@ that starts cold finds it there.
 
 ## Environment gotchas (Windows dev machine)
 
-- **Docker Desktop must be running.** The SQL Server Testcontainers suites fail, not skip, without it.
+- **Inner loop between increments:** `dotnet test FieldSales.Fast.slnx` (unit projects, tablet components,
+  Tablet.Core storage; no Docker; about 12–24 s with build). Run SQL-backed classes only at the end of
+  an increment, not after every edit.
+- **Docker Desktop must be running** for anything beyond the fast solution. The SQL Server Testcontainers
+  suites fail, not skip, without it.
 - Full test run: `dotnet test FieldSales.slnx --no-build --no-restore -m:1 --settings sqlserver.runsettings`
   after a build. It takes several minutes, so run it in the background. A plain `dotnet test FieldSales.slnx`
   runs the projects in parallel and starts too many SQL Server containers at once. They crash at startup with
