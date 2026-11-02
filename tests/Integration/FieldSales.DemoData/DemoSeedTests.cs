@@ -144,6 +144,39 @@ public sealed class DemoSeedTests(DemoSqlServer server) : IClassFixture<DemoSqlS
         Assert.Equal(15, await directory.AssignmentHistory.CountAsync(entry => entry.Reason == "Scale test coverage"));
     }
 
+    // WI-044: the Order Pad sample is the S1b tree, five levels deep, applied once on top of the sample.
+    [Fact]
+    public async Task Should_AddTheFiveLevelOrderPadCatalogueOnce_When_PadRunsAfterTheSample()
+    {
+        await using var catalogue = server.Catalogue();
+        await catalogue.Database.MigrateAsync();
+        Assert.True(await DemoScenarioSeeder.SeedCatalogueAsync(catalogue));
+        int sampleProducts = await catalogue.Products.CountAsync();
+
+        Assert.True(await DemoPadSeeder.SeedCatalogueAsync(catalogue, new DateOnly(2026, 10, 1)));
+        Assert.False(await DemoPadSeeder.SeedCatalogueAsync(catalogue, new DateOnly(2026, 10, 1)));
+
+        Category[] categories = await catalogue.Categories.AsNoTracking().ToArrayAsync();
+        Product[] products = await catalogue.Products.AsNoTracking().Where(product => product.Code.StartsWith("PAD-")).ToArrayAsync();
+        Assert.Equal(DemoPadSeeder.Products, products.Length);
+        Assert.Equal(sampleProducts + DemoPadSeeder.Products, await catalogue.Products.CountAsync());
+        Category Child(string name, Category? parent) => categories.Single(category => category.Name == name && category.ParentId == parent?.Id);
+        HashSet<Guid> Beneath(Category top)
+        {
+            HashSet<Guid> ids = [top.Id];
+            while (categories.Where(category => category.ParentId is Guid parent && ids.Contains(parent)).Select(category => category.Id)
+                .Aggregate(false, (added, id) => ids.Add(id) || added)) { }
+            return ids;
+        }
+        Category suncare = Child("Suncare", Child("Skincare", Child("Health", null)));
+        Assert.Equal(4, categories.Count(category => category.ParentId == suncare.Id));
+        Assert.Equal(12, products.Count(product => product.CategoryId == suncare.Id));
+        Assert.Equal(180, products.Count(product => Beneath(suncare).Contains(product.CategoryId)));
+        Assert.Equal(2, categories.Count(category => category.Name == "Lotions"));
+        Category spf50 = Child("SPF50", Child("Lotions", suncare));
+        Assert.Contains(products, product => product.CategoryId == spf50.Id); // Five levels: Health > Skincare > Suncare > Lotions > SPF50.
+    }
+
     private static ServiceProvider IdentityServices(string connection)
     {
         var services = new ServiceCollection();

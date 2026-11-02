@@ -12,7 +12,7 @@ namespace FieldSales.Tablet.Components.Tests;
 
 /// <summary>WI-038 scenarios 14-18: New Order on the tablet, from search to a saved In Progress order.</summary>
 [Trait("Category", "Integration")]
-public sealed class NewOrderComponentTests
+public sealed partial class NewOrderComponentTests
 {
     private static readonly Guid ShopId = Guid.Parse("55000000-0000-0000-0000-000000000001");
     private static readonly OrderSnapshotRef Snapshot = new("1.2", new DateTimeOffset(2026, 10, 29, 6, 30, 0, TimeSpan.Zero));
@@ -35,6 +35,7 @@ public sealed class NewOrderComponentTests
         public TabletOrder? Order { get; private set; }
         public string? Refuse { get; set; }
         public ManualResetEventSlim? Gate { get; set; }
+        public IReadOnlyList<ProductSearchResult> Products { get; init; } = Catalogue;
         public TaskCompletionSource? Started { get; set; }
 
         public OrderResult Add(string rep, Guid orderId, Guid shop, Guid product, decimal quantity)
@@ -43,7 +44,7 @@ public sealed class NewOrderComponentTests
             Started?.TrySetResult();
             if (Gate is not null && !Gate.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("The save was not released.");
             if (Refuse is not null) return new(null, Refuse);
-            ProductSearchResult found = Catalogue.Single(candidate => candidate.Id == product);
+            ProductSearchResult found = Products.Single(candidate => candidate.Id == product);
             OrderLine line = new(Guid.NewGuid(), found.Id, found.Code, found.Name, quantity, found.Unit,
                 new(found.Price!.Value, "Base", "Base price", [new("Base", "Base price", found.Price.Value, true)]), Snapshot);
             Order = (Order ?? new TabletOrder(OrderContract.Schema, OrderContract.CurrentVersion, orderId, OrderState.InProgress, shop, shop,
@@ -66,9 +67,9 @@ public sealed class NewOrderComponentTests
         public TabletOrder? Find(string rep, Guid orderId) => Order is { } order && order.Id == orderId ? order : null;
     }
 
-    private static Screen Open(FakeOrders orders, bool assigned = true)
+    private static Screen Open(FakeOrders orders, bool assigned = true, ProductSearchIndex? index = null)
     {
-        Screen screen = new(orders, assigned);
+        Screen screen = new(orders, assigned, index);
         return screen;
     }
 
@@ -357,12 +358,12 @@ public sealed class NewOrderComponentTests
         public ComponentRenderer Renderer { get; }
         public int Id { get; }
 
-        public Screen(FakeOrders orders, bool assigned)
+        public Screen(FakeOrders orders, bool assigned, ProductSearchIndex? index = null)
         {
             Tablet = new()
             {
                 Read = (_, _) => Shop(assigned),
-                ReadIndex = _ => new ProductSearchIndex("generation", Catalogue),
+                ReadIndex = _ => index ?? new ProductSearchIndex("generation", Catalogue),
                 AddWork = orders.Add,
                 MarkWork = orders.Mark,
                 FindOrder = orders.Find
@@ -375,6 +376,7 @@ public sealed class NewOrderComponentTests
         public Task Show() => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, ShopId));
         public Task Type(string inputId, string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Type(Id, inputId, text));
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
+        public Task ClickLabelled(string label) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLabelled(Id, label));
         public async Task Pick(string productName)
         {
             await Until(() => Renderer.Text(Id).Contains(productName));
@@ -430,6 +432,27 @@ public sealed class NewOrderComponentTests
         public Task Click(int id, string text) => DispatchEventAsync(ButtonEvents(id).Single(button => button.Text == text).Event, null, EventArgs.Empty);
         public Task ClickContaining(int id, string text) =>
             DispatchEventAsync(ButtonEvents(id).First(button => button.Text.Contains(text)).Event, null, EventArgs.Empty);
+
+        /// <summary>The button whose aria-label is <paramref name="label"/>: its attributes by name (a false boolean attribute is absent).</summary>
+        public IReadOnlyDictionary<string, string> LabelledButton(int id, string label) =>
+            LabelledButtonFrames(id, label).Where(frame => frame.FrameType == RenderTreeFrameType.Attribute)
+                .ToDictionary(frame => frame.AttributeName, frame => frame.AttributeValue?.ToString() ?? "");
+
+        public Task ClickLabelled(int id, string label) => DispatchEventAsync(LabelledButtonFrames(id, label)
+            .Single(frame => frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onclick").AttributeEventHandlerId, null, EventArgs.Empty);
+
+        private RenderTreeFrame[] LabelledButtonFrames(int id, string label)
+        {
+            RenderTreeFrame[] frames = Frames(id);
+            for (int index = 0; index < frames.Length; index++)
+            {
+                if (frames[index].FrameType != RenderTreeFrameType.Element || frames[index].ElementName != "button") continue;
+                RenderTreeFrame[] button = frames.Skip(index + 1).Take(frames[index].ElementSubtreeLength - 1).ToArray();
+                if (button.Any(frame => frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "aria-label"
+                        && frame.AttributeValue?.ToString() == label)) return button;
+            }
+            throw new InvalidOperationException($"Button labelled {label} was not found.");
+        }
 
         public IReadOnlyList<string> AttributeNamesOnButton(int id, string text)
         {
