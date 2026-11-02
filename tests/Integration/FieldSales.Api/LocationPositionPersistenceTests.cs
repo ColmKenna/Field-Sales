@@ -12,25 +12,25 @@ using Testcontainers.MsSql;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
-public sealed class LocationPositionPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Directory")]
+public sealed class LocationPositionPersistenceTests(DirectoryTestDatabase directory)
+    : IClassFixture<DirectoryTestDatabase>, IAsyncLifetime
 {
-    private readonly string catalogName = $"ApiTest_LocPos_{Guid.NewGuid():N}";
     private static readonly DateTimeOffset First = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
+    private bool _initialized;
 
-    public DbContextOptions<DirectoryDbContext> Options(string? database = null)
-    {
-        var connection = new SqlConnectionStringBuilder(fixture.ConnectionString) { InitialCatalog = database ?? catalogName };
-        return new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(connection.ConnectionString).Options;
-    }
-    public DirectoryDbContext Create() => new(Options());
+    public DbContextOptions<DirectoryDbContext> Options(string? database = null) => directory.Options(database);
+    public DirectoryDbContext Create() => directory.Create();
 
     public async Task InitializeAsync()
     {
-        await using var db = Create();
-        await db.Database.MigrateAsync();
+        await directory.ResetAsync();
+        _initialized = true;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => _initialized ? directory.ResetAsync() : Task.CompletedTask;
 
     [Fact]
     public async Task Should_PreserveDirectoryData_When_CoordinateSchemaIsAddedOrAppRestarts()

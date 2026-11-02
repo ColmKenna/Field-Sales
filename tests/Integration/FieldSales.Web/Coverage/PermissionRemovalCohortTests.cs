@@ -8,7 +8,10 @@ using static FieldSales.Web.Tests.RestrictionPermissionCohortTests;
 namespace FieldSales.Web.Tests;
 
 // WI-031 scenarios 8–14/17: the existing rule/writer must remove a whole cohort or nothing.
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class PermissionRemovalCohortTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

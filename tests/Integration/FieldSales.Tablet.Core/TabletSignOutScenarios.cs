@@ -3,6 +3,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace FieldSales.Tablet.Core.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class TabletSignOutScenarios
 {
     [Fact]

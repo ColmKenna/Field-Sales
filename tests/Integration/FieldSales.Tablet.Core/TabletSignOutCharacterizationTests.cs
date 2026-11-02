@@ -3,6 +3,7 @@ namespace FieldSales.Tablet.Core.Tests;
 // WI-037 increment 1: characterize the persisted work and existing local-access rules
 // before introducing logout. New devices/stores reopen the same on-disk SQLite files;
 // the platform secure store is represented by the existing MemorySecureStore fixture.
+[Trait("Category", "Integration")]
 public sealed class TabletSignOutCharacterizationTests : IDisposable
 {
     private readonly SessionTablet tablet = new();

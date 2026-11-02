@@ -386,9 +386,42 @@ Use the provided PowerShell script to build self-contained EF Core migration exe
 
 ## Testing
 
+`scripts/test.ps1` runs one tier (PowerShell 7):
+
 ```pwsh
-# Whole solution
-dotnet test FieldSales.slnx
+./scripts/test.ps1                                         # Fast: between commits
+./scripts/test.ps1 -Tier WorkItem                          # before committing, no Docker
+./scripts/test.ps1 -Tier WorkItem -Area Coverage,TabletSync  # ... plus SQL tests for the areas touched
+./scripts/test.ps1 -Tier SqlServer                         # every SQL Server test
+./scripts/test.ps1 -Tier All                               # what CI runs
+```
+
+| Tier | Runs | Docker | Time on the development workstation |
+|---|---|---|---|
+| `Fast` | `FieldSales.Fast.slnx`: the four unit projects, tablet components and Tablet.Core storage tests | no | 12–24 s after an edit, build included |
+| `WorkItem` | `Fast`, then every Docker-free integration class in the API, Admin and Web projects | no | 50–80 s |
+| `WorkItem -Area …` | ... plus the SQL Server classes tagged with those areas | yes | + 0.5–3 min per area |
+| `SqlServer` | every class tagged `Requires=SqlServer`, migration and adoption tests included | yes | 7–16 min |
+| `All` | `Fast`, then every integration project with CI's filter and settings | yes | 9–11 min or more |
+
+Times vary by up to 2.5 times with machine load. Docker-free runs use xUnit's default
+parallelism. SQL Server runs keep `sqlserver.runsettings` and run one project at a time; the
+thread cap protects SQL Server memory. The tiers select by trait:
+
+- `Category`: `Unit` or `Integration`. CI's split is `Category=Unit` / `Category!=Unit`.
+- `Requires=SqlServer`: the class starts a SQL Server container through Testcontainers.
+- `Area`: `Catalogue`, `Directory`, `Coverage`, `TabletSync` or `Identity`, on SQL Server
+  behaviour classes. Migration, adoption and demo-seed classes carry no area: only `SqlServer`,
+  `All` and CI run them.
+
+A new SQL Server test class needs `Requires=SqlServer`; without it, `-Tier WorkItem` fails when
+Docker is not running. Give it an `Area` too if it belongs in an area run.
+
+### Individual projects and the CI split
+
+```pwsh
+# Whole solution, one project at a time (a plain `dotnet test FieldSales.slnx` starts too many SQL Server containers)
+dotnet test FieldSales.slnx -m:1 --settings sqlserver.runsettings
 
 # Admin page models and services
 dotnet test tests/Unit/FieldSales.Identity.Admin/FieldSales.Identity.Admin.UnitTests.csproj
@@ -404,9 +437,10 @@ Testcontainers to cover migration adoption, concurrency, and cross-instance beha
 in-memory provider cannot represent. Without a container runtime those tests fail to connect
 rather than skipping.
 
-The Web integration project has two SQL collections: Catalogue and Directory.
+The Web integration project has three SQL collections: Catalogue, Directory and Coverage.
 Each owns and disposes one SQL Server container; the collections can run concurrently,
-and scenarios within a collection run sequentially. Application fixtures retain separate
+and scenarios within a collection run sequentially. `sqlserver-web.runsettings` gives the
+Web project the third thread this needs (CI's `web` lane and `scripts/test.ps1` use it). Application fixtures retain separate
 database catalogs. HTTP-only tests do not require these collections. Web scenarios are
 grouped under `Catalogue`, `Directory`, `Coverage`, and `Security`, with shared fixtures
 in `Infrastructure`. Pure tablet entry-handoff checks live in the tablet unit project.

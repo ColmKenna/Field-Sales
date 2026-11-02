@@ -14,6 +14,7 @@ using IdentityResourceModel = Duende.IdentityServer.Models.IdentityResource;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
+[Trait("Category", "Integration")]
 public class ClientPermissionsServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

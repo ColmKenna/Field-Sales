@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 
+[Trait("Category", "Integration")]
 public class ApiScopesCreateIntegrationTests : IDisposable
 {
     private readonly HttpClient _client;

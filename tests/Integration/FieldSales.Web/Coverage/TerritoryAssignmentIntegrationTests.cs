@@ -20,7 +20,10 @@ using AssignmentHistory = CatalogueApi::FieldSales.Api.Coverage.AssignmentHistor
 namespace FieldSales.Web.Tests;
 
 
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class TerritoryAssignmentIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     [Fact]

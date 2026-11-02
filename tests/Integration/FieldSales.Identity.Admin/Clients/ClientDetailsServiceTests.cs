@@ -11,6 +11,7 @@ using Secret = Duende.IdentityServer.Models.Secret;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
+[Trait("Category", "Integration")]
 public class ClientDetailsServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

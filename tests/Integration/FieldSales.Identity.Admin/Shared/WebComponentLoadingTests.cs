@@ -12,6 +12,7 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///     a page that uses a component without declaring it would silently fail to hydrate.
 ///     These guard that pairing.
 /// </summary>
+[Trait("Category", "Integration")]
 public class WebComponentLoadingTests(AdminWebFactory factory) : IClassFixture<AdminWebFactory>
 {
     private const string TableModule = "ck-responsive-table-webcomponent/index.esm.js";

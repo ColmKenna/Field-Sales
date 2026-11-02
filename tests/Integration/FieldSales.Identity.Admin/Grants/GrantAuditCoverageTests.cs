@@ -13,6 +13,7 @@ namespace FieldSales.Identity.Admin.Tests.Grants;
 ///     Verifies TASK-04 audit coverage for <see cref="GrantListService" />, which previously
 ///     had no <see cref="IAuditWriter" /> dependency at all.
 /// </summary>
+[Trait("Category", "Integration")]
 public class GrantAuditCoverageTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace FieldSales.Identity.Admin.Tests.Apis;
 
+[Trait("Category", "Integration")]
 public class ApiResourceValidationTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

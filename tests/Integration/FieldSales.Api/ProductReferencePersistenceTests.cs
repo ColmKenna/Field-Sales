@@ -10,6 +10,8 @@ using Testcontainers.MsSql;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
 public sealed class ProductReferencePersistenceTests(SqlServerFixture fixture)
 {
     private const string Predecessor = "20261001085456_AddBrandsAndProductReferences";

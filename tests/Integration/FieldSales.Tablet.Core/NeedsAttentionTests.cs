@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 namespace FieldSales.Tablet.Core.Tests;
 
 // WI-042: approved Scenario Review cases. Real rep-bound SQLite storage and uploader; faults at the HTTP boundary.
+[Trait("Category", "Integration")]
 public sealed class NeedsAttentionTests : IDisposable
 {
     private readonly TestTablet tablet = new();

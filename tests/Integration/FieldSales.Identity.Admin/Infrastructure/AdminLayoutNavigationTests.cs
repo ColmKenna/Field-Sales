@@ -8,6 +8,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     matching against Razor Pages route data, rather than page-title string matching or a
 ///     single hardcoded section special case.
 /// </summary>
+[Trait("Category", "Integration")]
 public class AdminLayoutNavigationTests : IClassFixture<AdminWebFactory>
 {
     private readonly HttpClient _client;

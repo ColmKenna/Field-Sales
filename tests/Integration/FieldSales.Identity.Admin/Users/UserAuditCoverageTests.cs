@@ -13,6 +13,7 @@ namespace FieldSales.Identity.Admin.Tests.Users;
 ///     <see cref="IAuditWriter" /> at all), plus the previously success-only
 ///     <see cref="UserDetailsService" /> denial paths.
 /// </summary>
+[Trait("Category", "Integration")]
 public class UserAuditCoverageTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

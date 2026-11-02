@@ -12,12 +12,21 @@ namespace FieldSales.Api.Tests;
 // Increment 1 exercises only the approved duplicate/invalid storage,
 // reporting-line uniqueness and schema upgrade/restart scenario families.
 [Collection(SqlServerCollection.Name)]
-public sealed class TerritoryAssignmentPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
+public sealed class TerritoryAssignmentPersistenceTests(DirectoryTestDatabase database)
+    : IClassFixture<DirectoryTestDatabase>, IAsyncLifetime
 {
-    private readonly CoverageDatabase database = new(fixture);
+    private bool _initialized;
 
-    public Task InitializeAsync() => database.InitializeAsync();
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async Task InitializeAsync()
+    {
+        await database.ResetAsync();
+        _initialized = true;
+    }
+
+    public Task DisposeAsync() => _initialized ? database.ResetAsync() : Task.CompletedTask;
     [Fact]
     public async Task Should_PreserveDirectoryAndCoverageData_When_SchemaIsUpgradedOrRestarted()
     {
@@ -233,25 +242,4 @@ public sealed class TerritoryAssignmentPersistenceTests(SqlServerFixture fixture
         }
         return seed;
     }
-}
-
-public sealed class CoverageDatabase(SqlServerFixture fixture) : IAsyncLifetime
-{
-    private readonly string _catalogName = $"ApiTest_Coverage_{Guid.NewGuid():N}";
-
-    public DbContextOptions<DirectoryDbContext> Options(string? name = null)
-    {
-        var connection = new SqlConnectionStringBuilder(fixture.ConnectionString) { InitialCatalog = name ?? _catalogName };
-        return new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(connection.ConnectionString).Options;
-    }
-
-    public DirectoryDbContext Create() => new(Options());
-
-    public async Task InitializeAsync()
-    {
-        await using var db = Create();
-        await db.Database.MigrateAsync();
-    }
-
-    public Task DisposeAsync() => Task.CompletedTask;
 }

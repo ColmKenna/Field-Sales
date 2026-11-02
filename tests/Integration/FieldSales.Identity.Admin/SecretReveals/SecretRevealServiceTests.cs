@@ -14,6 +14,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace FieldSales.Identity.Admin.Tests.SecretReveals;
 
+[Trait("Category", "Integration")]
 public sealed class SecretRevealServiceTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 13, 12, 0, 0, TimeSpan.Zero);

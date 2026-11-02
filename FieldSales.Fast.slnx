@@ -1,0 +1,14 @@
+<Solution>
+    <!-- Inner-loop tier: no Docker, default xUnit parallelism. See README § Testing. -->
+    <Folder Name="/tests/Unit/">
+        <Project Path="tests/Unit/FieldSales.Api/FieldSales.Api.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Identity.Admin/FieldSales.Identity.Admin.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Web/FieldSales.Web.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Tablet.Core/FieldSales.Tablet.Core.UnitTests.csproj" />
+    </Folder>
+    <Folder Name="/tests/Integration/">
+        <Project Path="tests/Integration/FieldSales.Tablet.Components/FieldSales.Tablet.Components.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Tablet.Core/FieldSales.Tablet.Core.IntegrationTests.csproj" />
+        <Project Path="tests/Integration/FieldSales.Tablet.Core.CrashHost/FieldSales.Tablet.Core.CrashHost.csproj" />
+    </Folder>
+</Solution>

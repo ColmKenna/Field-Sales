@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Users;
 
+[Trait("Category", "Integration")]
 public class UserCreateServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Grants;
 
+[Trait("Category", "Integration")]
 public class GrantListServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

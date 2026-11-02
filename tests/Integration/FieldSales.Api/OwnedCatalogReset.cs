@@ -2,17 +2,18 @@ using Microsoft.Data.SqlClient;
 
 namespace FieldSales.Api.Tests;
 
-// Privileged cleanup for the snapshot fixture's exclusively owned, initially empty catalog.
-// Real migration tests continue to create and migrate their own fresh databases.
-internal sealed class SnapshotDatabaseReset(string connectionString)
+// Privileged cleanup for a class fixture's exclusively owned, initially empty catalog, so one migrated
+// schema serves every case in the class. Real migration tests continue to create and migrate their
+// own fresh databases.
+internal sealed class OwnedCatalogReset(string connectionString, string owner)
 {
     private string[] _tables = [];
 
     public async Task InitializeAsync()
     {
         var settings = new SqlConnectionStringBuilder(connectionString);
-        if (!settings.InitialCatalog.StartsWith("ApiTest_TabletSnapshot_", StringComparison.Ordinal))
-            throw new InvalidOperationException("Snapshot reset requires its exclusively owned test catalog.");
+        if (!settings.InitialCatalog.StartsWith($"ApiTest_{owner}_", StringComparison.Ordinal))
+            throw new InvalidOperationException($"Catalog reset requires the {owner} fixture's exclusively owned test catalog.");
 
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
@@ -21,7 +22,7 @@ internal sealed class SnapshotDatabaseReset(string connectionString)
             IF EXISTS (SELECT 1 FROM sys.triggers WHERE parent_class = 1 AND is_disabled = 1)
                 OR EXISTS (SELECT 1 FROM sys.foreign_keys WHERE is_disabled = 1)
                 OR EXISTS (SELECT 1 FROM sys.check_constraints WHERE is_disabled = 1)
-                THROW 50000, 'Snapshot reset requires enabled triggers and constraints.', 1;
+                THROW 50000, 'Catalog reset requires enabled triggers and constraints.', 1;
             SELECT QUOTENAME(SCHEMA_NAME(schema_id)) + '.' + QUOTENAME(name)
             FROM sys.tables WHERE is_ms_shipped = 0 AND name <> N'__EFMigrationsHistory'
             ORDER BY object_id;
@@ -33,7 +34,7 @@ internal sealed class SnapshotDatabaseReset(string connectionString)
 
         // Do not silently discard reference data if future migrations introduce seed rows.
         command.CommandText = string.Join("\n", _tables.Select(table =>
-            $"IF EXISTS (SELECT 1 FROM {table}) THROW 50000, 'Snapshot reset requires initially empty migrated tables.', 1;"));
+            $"IF EXISTS (SELECT 1 FROM {table}) THROW 50000, 'Catalog reset requires initially empty migrated tables.', 1;"));
         await command.ExecuteNonQueryAsync();
     }
 

@@ -13,6 +13,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Keys;
 
+[Trait("Category", "Integration")]
 public class KeysIndexIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

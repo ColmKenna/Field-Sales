@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
+[Trait("Category", "Integration")]
 public class AdminAuthorizationIntegrationTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

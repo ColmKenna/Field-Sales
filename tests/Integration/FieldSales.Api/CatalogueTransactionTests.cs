@@ -6,6 +6,9 @@ using Testcontainers.MsSql;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public class CatalogueTransactionTests(SqlServerFixture fixture)
 {
     [Fact]

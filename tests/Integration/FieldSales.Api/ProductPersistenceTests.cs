@@ -9,6 +9,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class ProductPersistenceTests(SqlServerFixture fixture)
 {
     [Fact]

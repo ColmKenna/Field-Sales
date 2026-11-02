@@ -34,6 +34,9 @@ namespace FieldSales.Api.Tests;
 
 // WI-032 increment 1: the server-side Morning Snapshot, contract v1 (scenarios 1–8 and 23's download part).
 [Collection(SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "TabletSync")]
 public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture) : IClassFixture<TabletSnapshotFixture>, IAsyncLifetime
 {
     private readonly TabletSnapshotApplication _app = fixture.Application;
@@ -467,7 +470,7 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
     public SnapshotRoleLookup Roles { get; } = new();
     private WebApplicationFactory<Program>? _api;
-    private SnapshotDatabaseReset? _reset;
+    private OwnedCatalogReset? _reset;
     public WebApplicationFactory<Program> Api => _api ?? throw new InvalidOperationException("Snapshot application is not initialized.");
 
     public async Task InitializeAsync()
@@ -512,7 +515,7 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
             await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
             await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
             await scope.ServiceProvider.GetRequiredService<OrderingDbContext>().Database.MigrateAsync();
-            _reset = new SnapshotDatabaseReset(connectionString);
+            _reset = new OwnedCatalogReset(connectionString, "TabletSnapshot");
             await _reset.InitializeAsync();
         }
         catch (Exception setupError)

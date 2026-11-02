@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 namespace FieldSales.Tablet.Components.Tests;
 
 /// <summary>WI-038 scenarios 14-18: New Order on the tablet, from search to a saved In Progress order.</summary>
+[Trait("Category", "Integration")]
 public sealed class NewOrderComponentTests
 {
     private static readonly Guid ShopId = Guid.Parse("55000000-0000-0000-0000-000000000001");

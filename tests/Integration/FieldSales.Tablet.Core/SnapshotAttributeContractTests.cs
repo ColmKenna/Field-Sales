@@ -5,6 +5,7 @@ using LegacyContract = FieldSales.Snapshot.V10.Contracts;
 
 namespace FieldSales.Tablet.Core.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class SnapshotAttributeContractTests
 {
     [Fact]

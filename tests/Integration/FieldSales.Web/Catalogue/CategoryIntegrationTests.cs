@@ -24,6 +24,9 @@ using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbCon
 namespace FieldSales.Web.Tests;
 
 [Collection(CatalogueSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class CategoryIntegrationTests(CatalogueSqlServerFixture sql)
 {
     private const string Issuer = "https://staff-issuer.test";

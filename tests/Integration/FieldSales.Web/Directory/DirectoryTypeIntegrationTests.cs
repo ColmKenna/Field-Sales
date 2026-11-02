@@ -20,6 +20,9 @@ namespace FieldSales.Web.Tests;
 
 
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Directory")]
 public sealed class DirectoryTypeIntegrationTests(DirectoryTypeApplication app) : IClassFixture<DirectoryTypeApplication>
 {
     private const string LocationTypes = "location-types";

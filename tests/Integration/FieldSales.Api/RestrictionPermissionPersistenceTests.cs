@@ -10,7 +10,11 @@ namespace FieldSales.Api.Tests;
 
 // WI-029 increment 1: the append-only permission record and the current grants it keeps in step.
 [Collection(SqlServerCollection.Name)]
-public sealed class RestrictionPermissionPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
+public sealed class RestrictionPermissionPersistenceTests(CatalogueTestDatabase catalogue)
+    : IClassFixture<CatalogueTestDatabase>, IAsyncLifetime
 {
     private const RestrictionPermissionChangeKind Granted = RestrictionPermissionChangeKind.Granted;
     private const RestrictionPermissionChangeKind Removed = RestrictionPermissionChangeKind.Removed;
@@ -18,16 +22,15 @@ public sealed class RestrictionPermissionPersistenceTests(SqlServerFixture fixtu
     private static readonly HistoryStaffSnapshot Staff = new("niamh", [
         new("niamh", "Niamh Byrne", [BusinessRoles.SalesManager, BusinessRoles.HeadOfficeUser], true),
         new("colm", "Colm", [BusinessRoles.FieldSalesperson], true)]);
-    private string _connectionString = null!;
+    private bool _initialized;
 
     public async Task InitializeAsync()
     {
-        _connectionString = fixture.CreateConnectionString("Permissions");
-        await using var db = CreateContext();
-        await db.Database.MigrateAsync();
+        await catalogue.ResetAsync();
+        _initialized = true;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public Task DisposeAsync() => _initialized ? catalogue.ResetAsync() : Task.CompletedTask;
 
     [Fact]
     public async Task Should_StoreUtcTimeActorRepGroupAndReason_When_AGrantIsRecorded()
@@ -171,8 +174,7 @@ public sealed class RestrictionPermissionPersistenceTests(SqlServerFixture fixtu
         Assert.All(entries, row => Assert.Equal((group.Id, "Pharmacy-only medicines"), (row.RestrictionGroupId, row.RestrictionGroupName)));
     }
 
-    private CatalogueDbContext CreateContext() =>
-        new(new DbContextOptionsBuilder<CatalogueDbContext>().UseSqlServer(_connectionString).Options);
+    private CatalogueDbContext CreateContext() => catalogue.Create();
 
     private static async Task<RestrictionPermissionChange> ApplyAsync(CatalogueDbContext db, RestrictionPermissionChangeKind change,
         Guid group, Guid? expectedLastChangeId, string? reason, bool fail = false)

@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FieldSales.Web.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class ProtectedAreasTests
 {
     [Fact]

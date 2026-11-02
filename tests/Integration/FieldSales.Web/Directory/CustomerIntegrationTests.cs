@@ -18,6 +18,9 @@ namespace FieldSales.Web.Tests;
 
 
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Directory")]
 public sealed class CustomerIntegrationTests(CustomerApplication app) : IClassFixture<CustomerApplication>
 {
     private const string Customers = "/directory/customers";

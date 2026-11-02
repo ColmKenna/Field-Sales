@@ -10,6 +10,7 @@ namespace FieldSales.Identity.Admin.Tests.Apis;
 ///     Integration tests for <see cref="ApiResourceListService" /> exercised against the
 ///     shared SQLite in-memory database provided by <see cref="AdminWebFactory" />.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiResourceListServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

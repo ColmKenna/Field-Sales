@@ -10,12 +10,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
-public sealed class ProductClassificationApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
+public sealed class ProductClassificationApiTests(ProductApiFixture fixture) : IClassFixture<ProductApiFixture>, IAsyncLifetime
 {
-    private readonly ProductPriceApplication app = new(fixture.CreateConnectionString("ClassificationApi"));
+    private readonly ProductPriceApplication app = fixture.Application;
+    private bool _initialized;
 
-    public Task InitializeAsync() => app.InitializeAsync();
-    public Task DisposeAsync() => app.DisposeAsync();
+    public async Task InitializeAsync()
+    {
+        await app.ResetAsync();
+        _initialized = true;
+    }
+
+    public Task DisposeAsync() => _initialized ? app.ResetAsync() : Task.CompletedTask;
     [Fact]
     public async Task Should_SaveAllClassificationAndPreserveRecord_When_ApplicationRestarts()
     {

@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 
 namespace FieldSales.TabletSpike.IntegrationTests;
 
+[Trait("Category", "Integration")]
 public sealed class LocalOpenScenarios
 {
     [Fact]

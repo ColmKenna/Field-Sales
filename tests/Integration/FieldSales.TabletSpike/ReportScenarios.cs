@@ -5,6 +5,7 @@ using FieldSales.TabletSpike.Core;
 
 namespace FieldSales.TabletSpike.IntegrationTests;
 
+[Trait("Category", "Integration")]
 public sealed class ReportScenarios
 {
     [Fact]

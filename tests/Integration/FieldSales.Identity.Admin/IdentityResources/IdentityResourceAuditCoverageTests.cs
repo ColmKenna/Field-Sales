@@ -14,6 +14,7 @@ namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 ///     success-only) and <see cref="IdentityResourceListService.DeleteIdentityResourceAsync" />
 ///     (previously had no <see cref="IAuditWriter" /> dependency at all - a named plan gap).
 /// </summary>
+[Trait("Category", "Integration")]
 public class IdentityResourceAuditCoverageTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

@@ -5,6 +5,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Roles;
 
+[Trait("Category", "Unit")]
 public class RoleServiceTests
 {
     private readonly Mock<IAuditWriter> _auditWriterMock = new();

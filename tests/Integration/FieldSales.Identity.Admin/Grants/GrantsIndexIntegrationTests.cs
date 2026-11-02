@@ -12,6 +12,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Grants;
 
+[Trait("Category", "Integration")]
 public class GrantsIndexIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

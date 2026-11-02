@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 
+[Trait("Category", "Integration")]
 public class IdentityResourcesEditIntegrationTests : IDisposable
 {
     private readonly HttpClient _client;

@@ -8,6 +8,7 @@ namespace FieldSales.Tablet.Core.Tests;
 
 // WI-032 increment 4a (P7): the system-browser sign-in. The browser itself is the tablet's; these tests begin
 // with the authorization request it is given and the callback it returns.
+[Trait("Category", "Integration")]
 public sealed class TabletSignInFlowTests : IDisposable
 {
     private readonly SessionTablet _tablet = new();

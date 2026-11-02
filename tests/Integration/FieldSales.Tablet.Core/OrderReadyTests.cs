@@ -5,6 +5,7 @@ using FieldSales.Snapshot.Contracts;
 namespace FieldSales.Tablet.Core.Tests;
 
 /// <summary>WI-038 scenarios 20-25: Mark Ready to Send, the one allowed transition, and the Unsent summary.</summary>
+[Trait("Category", "Integration")]
 public sealed class OrderReadyTests : IDisposable
 {
     private readonly TestTablet tablet = new();

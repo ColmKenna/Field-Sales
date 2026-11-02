@@ -15,6 +15,7 @@ namespace FieldSales.Identity.Admin.Tests.Shared;
 ///     aria-describedby, so an assistive technology can report the error against the field it
 ///     belongs to. These check the rendered markup, because the association only exists there.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ValidationMessageAssociationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

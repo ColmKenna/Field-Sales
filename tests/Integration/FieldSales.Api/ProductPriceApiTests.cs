@@ -23,12 +23,21 @@ using Testcontainers.MsSql;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
-public sealed class ProductPriceApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
+public sealed class ProductPriceApiTests(ProductApiFixture fixture) : IClassFixture<ProductApiFixture>, IAsyncLifetime
 {
-    private readonly ProductPriceApplication _app = new(fixture.CreateConnectionString("PriceApi"));
+    private readonly ProductPriceApplication _app = fixture.Application;
+    private bool _initialized;
 
-    public Task InitializeAsync() => _app.InitializeAsync();
-    public Task DisposeAsync() => _app.DisposeAsync();
+    public async Task InitializeAsync()
+    {
+        await _app.ResetAsync();
+        _initialized = true;
+    }
+
+    public Task DisposeAsync() => _initialized ? _app.ResetAsync() : Task.CompletedTask;
 
     [Fact]
     public async Task Should_PreserveHistory_When_ApplicationRestarts()
@@ -197,25 +206,55 @@ public sealed class ProductPriceApiTests(SqlServerFixture fixture) : IAsyncLifet
     }
 }
 
+/// <summary>One API host and migrated catalog shared by a product test class; each case resets both.</summary>
+public sealed class ProductApiFixture(SqlServerFixture sql) : IAsyncLifetime
+{
+    public ProductPriceApplication Application { get; } = new(sql.CreateConnectionString(ProductPriceApplication.Owner));
+    public Task InitializeAsync() => Application.InitializeAsync();
+    public Task DisposeAsync() => Application.DisposeAsync();
+}
+
 public sealed class ProductPriceApplication(string connectionString) : IAsyncLifetime
 {
+    public const string Owner = "ProductApi";
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
+    private OwnedCatalogReset? _reset;
     public PriceRoleLookup Roles { get; } = new();
-    public PriceSaveBarrier ConcurrentSaves { get; } = new();
+    public PriceSaveBarrier ConcurrentSaves { get; private set; } = new();
     public WebApplicationFactory<Program> Api { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
-        Api = NewApi();
-        _ = Api.Server;
-        await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
+        try
+        {
+            Api = NewApi();
+            _ = Api.Server;
+            await using (AsyncServiceScope scope = Api.Services.CreateAsyncScope())
+                await scope.ServiceProvider.GetRequiredService<CatalogueDbContext>().Database.MigrateAsync();
+            _reset = new OwnedCatalogReset(connectionString, Owner);
+            await _reset.InitializeAsync();
+        }
+        catch (Exception setupError)
+        {
+            try { await DisposeAsync(); }
+            catch (Exception cleanupError) { setupError.Data["FixtureCleanupFailure"] = cleanupError; }
+            throw;
+        }
+    }
+
+    /// <summary>Empties the catalog and restores the default caller role and an unarmed save barrier.
+    /// The host itself is kept, including one a previous case restarted.</summary>
+    public async Task ResetAsync()
+    {
+        await (_reset ?? throw new InvalidOperationException("The product catalog is not initialized.")).ResetAsync();
+        Roles.Current = [BusinessRoles.HeadOfficeUser];
+        ConcurrentSaves = new();
     }
 
     public async Task DisposeAsync()
     {
-        await Api.DisposeAsync();
+        if (Api is not null) await Api.DisposeAsync();
     }
 
     public async Task RestartAsync()

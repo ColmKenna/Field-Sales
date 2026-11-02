@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FieldSales.Tablet.Components.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class LocationDetailComponentTests
 {
     private static readonly Guid ShopId = Guid.Parse("55000000-0000-0000-0000-000000000001");

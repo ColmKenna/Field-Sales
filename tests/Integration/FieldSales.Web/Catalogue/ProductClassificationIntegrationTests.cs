@@ -19,6 +19,9 @@ using NamedReferenceItem = CatalogueApi::FieldSales.Api.Catalogue.NamedReference
 namespace FieldSales.Web.Tests;
 
 [Collection(CatalogueSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
 public sealed class ProductClassificationIntegrationTests(ProductApplication app) : IClassFixture<ProductApplication>
 {
     [Fact]

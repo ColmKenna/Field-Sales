@@ -30,6 +30,9 @@ using LocationTownUsageSource = CatalogueApi::FieldSales.Api.Directory.LocationT
 namespace FieldSales.Web.Tests;
 
 [Collection(DirectorySqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Directory")]
 public sealed class GeographyIntegrationTests(GeographyApplication app) : IClassFixture<GeographyApplication>
 {
     private const string PageUrl = "/HeadOffice/Geography";

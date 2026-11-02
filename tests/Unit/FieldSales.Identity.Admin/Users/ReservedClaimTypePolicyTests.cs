@@ -10,6 +10,7 @@ namespace FieldSales.Identity.Admin.Tests.Users;
 ///     cases that decide whether an administrator can mint a privileged claim, so they are asserted
 ///     exhaustively rather than through the service round-trip.
 /// </summary>
+[Trait("Category", "Unit")]
 public class ReservedClaimTypePolicyTests
 {
     private static ReservedClaimTypePolicy CreatePolicy(IdentityOptions? options = null) =>

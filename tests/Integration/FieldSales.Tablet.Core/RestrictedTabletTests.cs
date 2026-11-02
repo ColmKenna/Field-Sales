@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 namespace FieldSales.Tablet.Core.Tests;
 
 // WI-043 approved T1-T4: active-generation visibility and captured-work preservation, not historical erasure.
+[Trait("Category", "Integration")]
 public sealed class RestrictedTabletTests : IDisposable
 {
     private readonly TestTablet tablet = new();

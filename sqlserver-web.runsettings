@@ -1,0 +1,6 @@
+<RunSettings>
+  <!-- As sqlserver.runsettings, but with a third thread: the Web project's Catalogue, Directory and
+       Coverage SQL collections each own a SQL Server container and can run at the same time. -->
+  <RunConfiguration><MaxCpuCount>1</MaxCpuCount></RunConfiguration>
+  <xUnit><MaxParallelThreads>3</MaxParallelThreads></xUnit>
+</RunSettings>

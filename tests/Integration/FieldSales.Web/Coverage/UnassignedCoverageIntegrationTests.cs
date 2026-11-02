@@ -12,7 +12,10 @@ using TerritoryAssignment = CatalogueApi::FieldSales.Api.Coverage.TerritoryAssig
 
 namespace FieldSales.Web.Tests;
 
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class UnassignedCoverageIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string ListUrl = "/Coverage/Unassigned";

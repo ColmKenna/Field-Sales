@@ -1,5 +1,6 @@
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
+[Trait("Category", "Integration")]
 public sealed class ConcurrentTestStartTests
 {
     [Fact]

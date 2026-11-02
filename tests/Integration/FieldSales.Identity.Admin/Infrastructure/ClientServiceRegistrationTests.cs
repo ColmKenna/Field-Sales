@@ -8,6 +8,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     that they share one instance, and a registration that handed out several would give each its
 ///     own EF ChangeTracker - a page model could then read state a sibling had not yet saved.
 /// </summary>
+[Trait("Category", "Integration")]
 public sealed class ClientServiceRegistrationTests : IDisposable
 {
     private readonly AdminWebFactory _factory = new();

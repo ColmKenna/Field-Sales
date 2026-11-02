@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 
 namespace FieldSales.Tablet.Core.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class ProductAttributeStorageTests : IDisposable
 {
     private readonly TestTablet tablet = new();

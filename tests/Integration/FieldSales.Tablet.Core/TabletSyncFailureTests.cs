@@ -6,6 +6,7 @@ namespace FieldSales.Tablet.Core.Tests;
 /// <summary>WI-040 (T-4.1.3): when a Sync can't finish, the tablet knows why (the signal went, the server answered with an
 /// error, or the sign-in has expired) and what was sent and what wasn't. Faults are injected at the fake server and the fake
 /// identity host; production Sync has no test hooks.</summary>
+[Trait("Category", "Integration")]
 public sealed class TabletSyncFailureTests : IDisposable
 {
     private readonly TestTablet tablet = new();

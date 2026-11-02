@@ -14,6 +14,7 @@ namespace FieldSales.Identity.Admin.Tests.Apis;
 ///     Verifies TASK-04 audit coverage for <see cref="ApiResourceEditorService" />, which
 ///     previously audited every method's success path only.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiResourceAuditCoverageTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

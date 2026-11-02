@@ -13,6 +13,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     through a test scheme, so the real cookie is never issued during a test run and there
 ///     is no Set-Cookie header to inspect instead.
 /// </summary>
+[Trait("Category", "Integration")]
 public class CookieHardeningTests : IClassFixture<AdminWebFactory>
 {
     private readonly CookieAuthenticationOptions _options;

@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
+[Trait("Category", "Integration")]
 public class ClientTokenSettingsServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

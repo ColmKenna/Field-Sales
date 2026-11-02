@@ -9,6 +9,7 @@ namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 ///     callback configured: Program.cs registers a second, bare OperationalStoreOptions for
 ///     the EF design-time tools, and a later singleton registration is what resolves.
 /// </summary>
+[Trait("Category", "Integration")]
 public class TokenCleanupTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

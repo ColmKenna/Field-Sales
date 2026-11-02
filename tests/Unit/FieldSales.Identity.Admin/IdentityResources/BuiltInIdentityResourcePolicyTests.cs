@@ -7,6 +7,7 @@ namespace FieldSales.Identity.Admin.Tests.IdentityResources;
 ///     Unit coverage for the protection rules themselves, independent of any store. The service tests
 ///     prove the rules are applied; these prove the rules are right.
 /// </summary>
+[Trait("Category", "Unit")]
 public class BuiltInIdentityResourcePolicyTests
 {
     [Theory]

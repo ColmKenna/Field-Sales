@@ -11,6 +11,8 @@ using Testcontainers.MsSql;
 
 namespace FieldSales.DemoData.Tests;
 
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
 public sealed class DemoSeedTests(DemoSqlServer server) : IClassFixture<DemoSqlServer>
 {
     [Fact]

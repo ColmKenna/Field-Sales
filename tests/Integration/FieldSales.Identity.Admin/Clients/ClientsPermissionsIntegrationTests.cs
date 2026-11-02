@@ -13,6 +13,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Clients;
 
+[Trait("Category", "Integration")]
 public class ClientsPermissionsIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

@@ -12,10 +12,14 @@ existing assertions, migration tests, and the existing required CI check.
 | `09eb71a` | Unthrottled download for import cancellation; transfer cancellation retains slow-transfer simulation |
 | `1e5e1de` | Class-scoped hosts for read-only admin component/stylesheet checks |
 | `8702bf4` | Snapshot API schema migrated once per class, with transactional data resets between cases |
+| `perf/test-feedback-loop` | The same pattern (`OwnedCatalogReset`) for nine more API classes; API project 186 s → 95–114 s |
+| `perf/test-feedback-loop` | Web Coverage scenarios in their own SQL collection and container (`sqlserver-web.runsettings`, 3 threads), so they no longer wait for Directory |
 
 The API, admin and Web projects each have their own integration runner. DemoData,
-SnapshotSpike, Tablet.Core and TabletSpike share a supporting lane and run
-sequentially within it. All seven projects are assigned exactly once. The existing
+SnapshotSpike, Tablet.Core, Tablet.Components and TabletSpike share a supporting lane and run
+sequentially within it. All eight projects are assigned exactly once. Local test tiers
+(`scripts/test.ps1`) are described in the README and in
+[the 1 November 2026 review](test-speed-review-2026-11-01.md). The existing
 `Build & Test` check now waits for both the build/unit/script job and every matrix
 lane; failures, cancellations and skipped dependencies do not pass the aggregate.
 Each integration lane restores and builds its own selected projects. Test results

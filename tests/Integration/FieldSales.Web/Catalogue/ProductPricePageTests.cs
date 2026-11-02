@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FieldSales.Web.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class ProductPricePageTests
 {
     [Fact]

@@ -15,6 +15,7 @@ namespace FieldSales.Identity.Admin.Tests.Clients;
 ///     <see cref="ClientDetailsService" />: both already audited success, but neither
 ///     audited denial or unexpected-failure outcomes before this task.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ClientAuditCoverageTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

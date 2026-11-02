@@ -11,6 +11,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Users;
 
+[Trait("Category", "Integration")]
 public class UsersDetailsIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

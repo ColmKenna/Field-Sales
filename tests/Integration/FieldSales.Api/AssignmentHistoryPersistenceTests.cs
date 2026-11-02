@@ -12,12 +12,21 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
-public sealed class AssignmentHistoryPersistenceTests(SqlServerFixture fixture) : IAsyncLifetime
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
+public sealed class AssignmentHistoryPersistenceTests(DirectoryTestDatabase database)
+    : IClassFixture<DirectoryTestDatabase>, IAsyncLifetime
 {
-    private readonly CoverageDatabase database = new(fixture);
+    private bool _initialized;
 
-    public Task InitializeAsync() => database.InitializeAsync();
-    public Task DisposeAsync() => Task.CompletedTask;
+    public async Task InitializeAsync()
+    {
+        await database.ResetAsync();
+        _initialized = true;
+    }
+
+    public Task DisposeAsync() => _initialized ? database.ResetAsync() : Task.CompletedTask;
     private static readonly DateTimeOffset At = new(2026, 9, 17, 14, 2, 59, TimeSpan.Zero);
     private static readonly HistoryStaffSnapshot Staff = new("actor", [
         new("actor", "M. Byrne", [BusinessRoles.HeadOfficeUser], true),

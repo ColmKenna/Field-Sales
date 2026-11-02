@@ -13,7 +13,10 @@ using RepReportingLine = CatalogueApi::FieldSales.Api.Coverage.RepReportingLine;
 
 namespace FieldSales.Web.Tests;
 
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class AssignmentTransferIntegrationTests(CoverageReadApplication app) : IClassFixture<CoverageReadApplication>
 {
     private const string Root = "/coverage/transfers";

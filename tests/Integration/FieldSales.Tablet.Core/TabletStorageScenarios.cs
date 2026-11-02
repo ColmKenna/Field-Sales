@@ -10,6 +10,7 @@ namespace FieldSales.Tablet.Core.Tests;
 // WI-032 increment 2: the tablet's local storage, contract v1 (approved scenarios 9-13, and 7 and 14 on the tablet).
 // The spike's verified behaviours each have a counterpart here: whole-generation activation, the separate Unsent
 // store, recovery after a killed process, rejection of bad payloads and the pinned native engine.
+[Trait("Category", "Integration")]
 public sealed class TabletStorageScenarios : IDisposable
 {
     private readonly TestTablet _tablet = new();

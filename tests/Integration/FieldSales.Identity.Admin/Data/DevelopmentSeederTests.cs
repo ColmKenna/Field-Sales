@@ -18,6 +18,7 @@ namespace FieldSales.Identity.Admin.Tests.Data;
 ///     evidence it really didn't. The SQL-Server-backed proof that a fresh, unmigrated database
 ///     reaches a running host lives in <c>DevelopmentMigrationSqlServerTests</c>.
 /// </summary>
+[Trait("Category", "Integration")]
 public class DevelopmentSeederTests
 {
     // Nothing listens on TCP port 1 on loopback, so a real connection attempt fails immediately

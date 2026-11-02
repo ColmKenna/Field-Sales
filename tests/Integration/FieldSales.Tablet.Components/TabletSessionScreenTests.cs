@@ -10,6 +10,7 @@ using Microsoft.JSInterop;
 
 namespace FieldSales.Tablet.Components.Tests;
 
+[Trait("Category", "Integration")]
 public sealed partial class TabletSessionScreenTests
 {
     [Fact]

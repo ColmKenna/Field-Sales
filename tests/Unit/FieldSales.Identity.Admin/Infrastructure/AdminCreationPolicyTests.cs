@@ -8,6 +8,7 @@ using Moq;
 
 namespace FieldSales.Identity.Admin.Tests.Infrastructure;
 
+[Trait("Category", "Unit")]
 public class AdminCreationPolicyTests
 {
     private const string Email = "configured@example.test";

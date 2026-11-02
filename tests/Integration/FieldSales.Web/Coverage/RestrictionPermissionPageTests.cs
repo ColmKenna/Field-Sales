@@ -8,7 +8,10 @@ namespace FieldSales.Web.Tests;
 
 // WI-029 increment 3: the M-14 per-rep permissions page through the real website, API and SQL. Niamh is
 // signed in to the website; the people and their teams are described on RestrictionPermissionHost.
-[Collection(DirectorySqlServerCollection.Name)]
+[Collection(CoverageSqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Coverage")]
 public sealed class RestrictionPermissionPageTests(CoverageReadApplication app)
     : IClassFixture<CoverageReadApplication>, IAsyncLifetime
 {

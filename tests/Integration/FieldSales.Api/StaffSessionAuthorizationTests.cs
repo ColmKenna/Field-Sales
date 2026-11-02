@@ -17,6 +17,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace FieldSales.Api.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class StaffSessionAuthorizationTests
 {
     private const string Issuer = "https://staff-issuer.test";

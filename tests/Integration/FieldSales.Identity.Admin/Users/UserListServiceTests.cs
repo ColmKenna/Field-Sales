@@ -9,6 +9,7 @@ namespace FieldSales.Identity.Admin.Tests.Users;
 ///     Integration tests for <see cref="UserListService" /> exercised against the
 ///     shared SQLite in-memory database provided by <see cref="AdminWebFactory" />.
 /// </summary>
+[Trait("Category", "Integration")]
 public class UserListServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

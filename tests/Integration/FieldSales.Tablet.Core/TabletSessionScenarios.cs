@@ -5,6 +5,7 @@ namespace FieldSales.Tablet.Core.Tests;
 
 // WI-032 increment 3: tablet entry, the 24-hour local window and sign-in (approved scenarios 15-22, tablet side).
 // The interactive system-browser sign-in is verified on the Samsung in increment 4; these tests start from its result.
+[Trait("Category", "Integration")]
 public sealed class TabletSessionScenarios : IDisposable
 {
     private readonly SessionTablet _tablet = new();

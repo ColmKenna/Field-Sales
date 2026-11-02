@@ -15,6 +15,7 @@ namespace FieldSales.Identity.Admin.Tests.Clients;
 ///     once shared (WI-07): no editor page renders the strip, and each one carries a standalone
 ///     back link to the client's Details page instead.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ClientEditorTabsIntegrationTests : IDisposable
 {
     private const string ClientId = "coop.market.razor";

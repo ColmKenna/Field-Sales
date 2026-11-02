@@ -17,6 +17,7 @@ namespace FieldSales.Identity.Admin.Tests.Users;
 ///     Every test uses a unique tag for role/user names so assertions are unaffected by data left
 ///     behind by other tests sharing the same connection (AdminWebFactory is a class fixture).
 /// </summary>
+[Trait("Category", "Integration")]
 public class UserDetailsServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;

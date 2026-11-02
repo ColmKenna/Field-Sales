@@ -10,11 +10,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FieldSales.Api.Tests;
 
 [Collection(SqlServerCollection.Name)]
-public sealed class ProductAttributeApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Catalogue")]
+public sealed class ProductAttributeApiTests(ProductApiFixture fixture) : IClassFixture<ProductApiFixture>, IAsyncLifetime
 {
-    private readonly ProductPriceApplication app = new(fixture.CreateConnectionString("AttributeApi"));
-    public Task InitializeAsync() => app.InitializeAsync();
-    public Task DisposeAsync() => app.DisposeAsync();
+    private readonly ProductPriceApplication app = fixture.Application;
+    private bool _initialized;
+
+    public async Task InitializeAsync()
+    {
+        await app.ResetAsync();
+        _initialized = true;
+    }
+
+    public Task DisposeAsync() => _initialized ? app.ResetAsync() : Task.CompletedTask;
 
     [Fact]
     public async Task Should_PreserveOrderedExactValues_When_AttributesAreAddedAndTheServerRestarts()

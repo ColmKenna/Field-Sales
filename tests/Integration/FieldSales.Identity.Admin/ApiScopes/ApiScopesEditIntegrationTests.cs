@@ -17,6 +17,7 @@ namespace FieldSales.Identity.Admin.Tests.ApiScopes;
 ///     Uses a real (SQLite in-memory) database via <see cref="AdminWebFactory" /> so the
 ///     redirect/model-binding/antiforgery pipeline is exercised end to end.
 /// </summary>
+[Trait("Category", "Integration")]
 public class ApiScopesEditIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();

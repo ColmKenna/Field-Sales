@@ -16,6 +16,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FieldSales.Identity.Admin.Tests.Task02;
 
 [Collection(Task02SqlServerCollection.Name)]
+[Trait("Category", "Integration")]
+[Trait("Requires", "SqlServer")]
+[Trait("Area", "Identity")]
 public class TransactionHelperSqlServerTests(Task02SqlServerFactory factory)
 {
     [Fact]

@@ -14,6 +14,7 @@ namespace FieldSales.Identity.Admin.Tests.Diagnostics;
 ///     failure is exercised at the integration-test level instead (mocked IDiagnosticsService),
 ///     since forcing a connection failure against the shared test fixture isn't practical.
 /// </summary>
+[Trait("Category", "Integration")]
 public class DiagnosticsServiceTests : IClassFixture<AdminWebFactory>
 {
     private readonly AdminWebFactory _factory;
