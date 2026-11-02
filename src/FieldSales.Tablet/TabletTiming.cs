@@ -63,6 +63,10 @@ public static class TabletTiming
     public static void SearchShown(int matches, TimeSpan visible, TimeSpan handler) =>
         Write($"search-visible matches={matches} ms={visible.TotalMilliseconds:F3} handler-ms={handler.TotalMilliseconds:F3}");
 
+    /// <summary>Order entry's product search (WI-044): matches out of the downloaded products, to the painted results.</summary>
+    public static void ProductSearchShown(int products, int matches, TimeSpan visible, TimeSpan handler) =>
+        Write($"product-search products={products} matches={matches} ms={visible.TotalMilliseconds:F3} handler-ms={handler.TotalMilliseconds:F3}");
+
     [System.Diagnostics.Conditional("DEBUG")]
     public static void NetworkRequest(Uri endpoint, int? status, HttpRequestException? error)
     {

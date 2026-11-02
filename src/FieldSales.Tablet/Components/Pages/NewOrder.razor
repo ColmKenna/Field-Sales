@@ -1,9 +1,13 @@
 @page "/locations/{LocationId:guid}/orders/new"
 @inherits OfflineCataloguePage
+@using System.Diagnostics
 @using System.Globalization
 @using FieldSales.Ordering.Contracts
+@using Microsoft.Extensions.DependencyInjection
+@using Microsoft.JSInterop
+@inject IServiceProvider Services
 
-@* T-07 · Order entry (this slice: a standalone order built from search. The Order Pad, Low tab and Review come later). *@
+@* T-07 · Order entry: the Order Pad by category (T7.3) and search. The Low tab and Review come later. *@
 <section class="new-order">
     <nav class="shop-back" aria-label="Order navigation"><a href="@($"/locations/{LocationId}")">Back to shop</a></nav>
     @if (!Ready) { <h1>New order</h1><p role="status">Opening order…</p> }
@@ -45,19 +49,13 @@
                     </li>
                 }
             </ul>
+            @if (selected is not null) { @AddLine }
         }
-        @if (!IsReady && selected is { } chosen)
+        else if (!IsReady && index is not null)
         {
-            <section class="add-line" aria-labelledby="add-line-heading">
-                <h2 id="add-line-heading">@chosen.Name</h2>
-                <p class="add-line-detail">@chosen.Code · @chosen.Breadcrumb</p>
-                @if (chosen.Price is decimal unitPrice) { <p class="add-line-price">@Money(unitPrice)@PerUnit(chosen.Unit)</p> }
-                else { <p class="problem" role="status">No price yet — this product can't be ordered.</p> }
-                <label for="line-quantity">Quantity@(chosen.Unit == "Each" ? "" : $" ({chosen.Unit})")</label>
-                <input id="line-quantity" type="text" inputmode="decimal" value="@quantityText" @oninput="QuantityChanged"
-                       disabled="@(chosen.Price is null)" autocomplete="off" />
-                <button type="button" class="primary" disabled="@(busy || chosen.Price is null)" @onclick="AddAsync">Add to order</button>
-                @if (addError is not null) { <p class="problem" role="alert">@addError</p> }
+            <section class="order-pad" aria-label="Order pad">
+                @if (index.Pad.Categories.Count == 0) { <p>No products in your downloaded day.</p> }
+                @foreach (OrderPadCategory category in index.Pad.Categories) { @PadSection(category) }
             </section>
         }
         <section class="order-lines" aria-labelledby="order-lines-heading">
@@ -111,8 +109,69 @@
     private string? addError;
     private string? readyError;
     private bool busy;
+    // Expanded Order Pad headers (D2: top-level categories start collapsed). Kept through search and adds; reset with the screen.
+    private readonly HashSet<Guid> expanded = [];
+    private long? searchStarted;
 
     private bool IsReady => order is { State: OrderState.ReadyToSend };
+
+    /// <summary>One category header with the full breadcrumb (T7.3). Expanded: its subcategories first, then the products
+    /// directly in it under "In {name} (n)" (the T-1.1.2 ordering).</summary>
+    private RenderFragment PadSection(OrderPadCategory category) => @<section class="pad-category" @key="category.Id">
+        <h2 class="pad-heading">
+            <button type="button" class="pad-header" aria-expanded="@(expanded.Contains(category.Id) ? "true" : "false")"
+                    aria-controls="@($"pad-{category.Id}")" @onclick="() => Toggle(category.Id)">
+                <span class="pad-breadcrumb">@category.Breadcrumb</span>
+                <span class="pad-count">@category.Beneath @(category.Beneath == 1 ? "product" : "products")</span>
+            </button>
+        </h2>
+        @if (expanded.Contains(category.Id))
+        {
+            <div class="pad-body" id="@($"pad-{category.Id}")">
+                @foreach (OrderPadCategory subcategory in category.Subcategories) { @PadSection(subcategory) }
+                @if (category.Here > 0)
+                {
+                    <h3 class="pad-here">In @category.Name (@category.Here)</h3>
+                    <ul class="pad-products">
+                        @foreach (ProductSearchResult product in category.Products) { @PadRow(product) }
+                    </ul>
+                }
+            </div>
+        }
+    </section>;
+
+    /// <summary>A product on the pad: breadcrumb, today's price, what is already on the order, and Add (D3: no − until WI-046).</summary>
+    private RenderFragment PadRow(ProductSearchResult product) => @<li class="pad-product" @key="product.Id">
+        <div class="pad-product-text">
+            <strong>@product.Name</strong>
+            <span>@product.Code · @product.Breadcrumb</span>
+            <span class="product-price">@(product.Price is decimal price ? Money(price) + PerUnit(product.Unit) : "No price yet")</span>
+        </div>
+        <div class="pad-product-quantity">
+            @if (OnOrder(product.Id) is decimal quantity) { <span class="pad-on-order">@Quantity(quantity, product.Unit) on order</span> }
+            <button type="button" class="secondary pad-add" aria-label="@($"Add {product.Name}")" disabled="@(product.Price is null)"
+                    @onclick="() => Select(product)">Add</button>
+        </div>
+        @if (selected?.Id == product.Id) { @AddLine }
+    </li>;
+
+    /// <summary>WI-038's quantity entry for the selected product: under its pad row, or under the search results.</summary>
+    private RenderFragment AddLine => @<text>
+        @if (selected is { } chosen)
+        {
+            <section class="add-line" aria-labelledby="add-line-heading">
+                <h2 id="add-line-heading">@chosen.Name</h2>
+                <p class="add-line-detail">@chosen.Code · @chosen.Breadcrumb</p>
+                @if (chosen.Price is decimal unitPrice) { <p class="add-line-price">@Money(unitPrice)@PerUnit(chosen.Unit)</p> }
+                else { <p class="problem" role="status">No price yet — this product can't be ordered.</p> }
+                <label for="line-quantity">Quantity@(chosen.Unit == "Each" ? "" : $" ({chosen.Unit})")</label>
+                <input id="line-quantity" type="text" inputmode="decimal" value="@quantityText" @oninput="QuantityChanged"
+                       disabled="@(chosen.Price is null)" autocomplete="off" />
+                <button type="button" class="primary" disabled="@(busy || chosen.Price is null)" @onclick="AddAsync">Add to order</button>
+                @if (addError is not null) { <p class="problem" role="alert">@addError</p> }
+            </section>
+        }
+    </text>;
 
     private string Summary
     {
@@ -125,11 +184,16 @@
 
     protected override Task OnParametersSetAsync()
     {
-        if (orderShop != LocationId) { orderShop = LocationId; orderId = Guid.NewGuid(); ResetEntry(); }
+        if (orderShop != LocationId) { orderShop = LocationId; orderId = Guid.NewGuid(); expanded.Clear(); ResetEntry(); }
         return base.OnParametersSetAsync();
     }
 
     protected override void Clear() { rep = null; detail = null; index = null; order = null; problem = null; ResetEntry(); }
+
+    private void Toggle(Guid category) { if (!expanded.Remove(category)) expanded.Add(category); }
+
+    private decimal? OnOrder(Guid product) =>
+        order?.Lines.Where(line => line.ProductId == product).Select(line => line.Quantity).DefaultIfEmpty().Sum() is decimal sum and > 0 ? sum : null;
 
     private void ResetEntry() { ++revision; query = ""; results = new([], 0); selected = null; quantityText = ""; addError = null; readyError = null; }
 
@@ -159,6 +223,7 @@
 
     private async Task SearchAsync(ChangeEventArgs args)
     {
+        long started = Stopwatch.GetTimestamp();
         int current = ++revision;
         query = args.Value?.ToString() ?? "";
         results = new([], 0);
@@ -168,6 +233,23 @@
         ProductSearchOutcome found = await Task.Run(() => captured.Search(text));
         if (current != revision) return;
         results = found;
+        searchStarted = started;
+    }
+
+    // Device evidence for "search within 1 second": the time to the painted results, read in the WebView (no query text is logged).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (searchStarted is not long started) return;
+        searchStarted = null;
+        if (Services.GetService<IJSRuntime>() is not { } js) return;
+        int current = revision, matches = results.Results.Count, total = results.Total;
+        try
+        {
+            double visibleMs = await js.InvokeAsync<double>("fieldSalesSearchAfterPaint", matches, ".product-result");
+            if (current == revision)
+                TabletTiming.ProductSearchShown(index?.Count ?? 0, total, TimeSpan.FromMilliseconds(visibleMs), Stopwatch.GetElapsedTime(started));
+        }
+        catch (JSException) { }
     }
 
     private void Select(ProductSearchResult product) { selected = product; quantityText = ""; addError = null; }
@@ -224,6 +306,7 @@
 
     private static string Money(decimal amount) => "€" + amount.ToString("N2", CultureInfo.InvariantCulture);
     private static string PerUnit(string unit) => unit == "Each" ? "" : $" per {unit}";
-    private static string LineQuantity(OrderLine line) =>
-        line.Quantity.ToString("0.######", CultureInfo.InvariantCulture) + (line.Unit == "Each" ? "" : $" {line.Unit}");
+    private static string LineQuantity(OrderLine line) => Quantity(line.Quantity, line.Unit);
+    private static string Quantity(decimal quantity, string unit) =>
+        quantity.ToString("0.######", CultureInfo.InvariantCulture) + (unit == "Each" ? "" : $" {unit}");
 }
