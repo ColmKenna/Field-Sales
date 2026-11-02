@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
-        <!-- 1C: Android first; the iPad target is added once the deferred iPad check passes (D4). -->
         <TargetFrameworks>net10.0-android</TargetFrameworks>
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">$(TargetFrameworks);net10.0-ios</TargetFrameworks>
         <OutputType>Exe</OutputType>
         <RootNamespace>FieldSales.Tablet</RootNamespace>
         <UseMaui>true</UseMaui>
@@ -14,15 +14,23 @@
 
         <ApplicationTitle>Field Sales</ApplicationTitle>
         <ApplicationId>com.fieldsales.tablet</ApplicationId>
-        <AndroidPackageFormats>apk</AndroidPackageFormats>
-        <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
-        <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
 
         <!-- Where this build signs in and syncs. Development builds use this PC through adb reverse. -->
         <FieldSalesApiBaseUrl Condition="'$(FieldSalesApiBaseUrl)' == ''">https://localhost:7204/</FieldSalesApiBaseUrl>
         <FieldSalesIdentityBaseUrl Condition="'$(FieldSalesIdentityBaseUrl)' == ''">https://localhost:7201/</FieldSalesIdentityBaseUrl>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+        <AndroidPackageFormats>apk</AndroidPackageFormats>
+        <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+        <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+    </PropertyGroup>
+    <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+        <SupportedOSPlatformVersion>16.4</SupportedOSPlatformVersion>
+        <!-- Simulator Keychain access only; physical devices use their development profile. -->
+        <CodesignEntitlements Condition="$(RuntimeIdentifier.StartsWith('iossimulator-'))">Platforms/iOS/Entitlements.Simulator.plist</CodesignEntitlements>
     </PropertyGroup>
 
     <ItemGroup>
@@ -40,11 +48,11 @@
         P8: a build given FieldSalesDevCertificate (this PC's ASP.NET development certificate, public part only,
         exported by scripts/tablet-app.ps1) trusts it for localhost alone. Every other build trusts system CAs only.
     -->
-    <ItemGroup Condition="'$(FieldSalesDevCertificate)' != ''">
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' and '$(FieldSalesDevCertificate)' != ''">
         <AndroidResource Include="$(FieldSalesDevCertificate)" Link="Resources\raw\fieldsales_dev_cert.der" />
         <AndroidResource Include="Platforms\Android\Security\network_security_config.devtrust.xml" Link="Resources\xml\network_security_config.xml" />
     </ItemGroup>
-    <ItemGroup Condition="'$(FieldSalesDevCertificate)' == ''">
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android' and '$(FieldSalesDevCertificate)' == ''">
         <AndroidResource Include="Platforms\Android\Security\network_security_config.xml" Link="Resources\xml\network_security_config.xml" />
     </ItemGroup>
 
@@ -52,6 +60,10 @@
         <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#1F4E79" />
         <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#1F4E79" BaseSize="128,128" />
         <MauiFont Include="Resources\Fonts\*" />
+    </ItemGroup>
+
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+        <BundleResource Include="Platforms/iOS/PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
     </ItemGroup>
 
     <ItemGroup>

@@ -3,33 +3,38 @@ using FieldSales.Tablet.Core;
 namespace FieldSales.Tablet;
 
 /// <summary>
-/// Scenario 25 evidence (D3 budgets): how long opening the day and a Sync take, written to the Android log under
-/// <see cref="Tag"/> for the device session to read with adb logcat. Nothing here changes what the rep sees.
+/// Device diagnostics under <see cref="Tag"/>. Android open timing starts at process launch;
+/// iOS timing starts at the first managed timing mark and excludes native startup. Debug timings are diagnostic only.
 /// </summary>
 public static class TabletTiming
 {
     public const string Tag = "FieldSalesTiming";
     private static bool openPending = true;
     private static readonly List<string> marks = [];
+#if !ANDROID
+    private static readonly System.Diagnostics.Stopwatch managedStartup = System.Diagnostics.Stopwatch.StartNew();
+#endif
 
     /// <summary>A sign-in or Sync in this process means the next Home is not a plain open of the day.</summary>
     public static void RepActed() => openPending = false;
 
-    /// <summary>A step on the way to the first Home, in milliseconds since Android started the process (kept only for a plain open).</summary>
+    /// <summary>A step towards the first Home using the platform's startup clock (kept only for a plain open).</summary>
     public static void Mark(string step)
     {
         if (!openPending) return;
         lock (marks) marks.Add($"{step}={SinceProcessStart()}");
     }
 
-    /// <summary>The first Home of a plain open: milliseconds from Android starting the process to the shops list.</summary>
+    /// <summary>The first Home of a plain open, with iOS's managed-only clock identified in the output.</summary>
     public static void HomeShown(int locations)
     {
         if (!openPending) return;
         openPending = false;
-#if ANDROID
         string steps;
         lock (marks) steps = string.Join(' ', marks);
+#if IOS
+        Write($"open clock=managed-start ms={SinceProcessStart()} locations={locations} steps: {steps}");
+#else
         Write($"open ms={SinceProcessStart()} locations={locations} steps: {steps}");
 #endif
     }
@@ -38,7 +43,7 @@ public static class TabletTiming
 #if ANDROID
         Android.OS.SystemClock.ElapsedRealtime() - Android.OS.Process.StartElapsedRealtime;
 #else
-        0;
+        managedStartup.ElapsedMilliseconds;
 #endif
 
     /// <summary>The two parts of Home's own work before the list draws: the 24-hour check, then reading the shops.</summary>
@@ -58,10 +63,23 @@ public static class TabletTiming
     public static void SearchShown(int matches, TimeSpan visible, TimeSpan handler) =>
         Write($"search-visible matches={matches} ms={visible.TotalMilliseconds:F3} handler-ms={handler.TotalMilliseconds:F3}");
 
+    [System.Diagnostics.Conditional("DEBUG")]
+    public static void NetworkRequest(Uri endpoint, int? status, HttpRequestException? error)
+    {
+        Write($"http host={endpoint.Host} port={endpoint.Port} path={endpoint.AbsolutePath} status={status} " +
+            $"error={error?.HttpRequestError} cause={error?.GetBaseException().GetType().Name} hresult={error?.GetBaseException().HResult}");
+#if IOS
+        if (error?.GetBaseException() is Foundation.NSErrorException native)
+            Write($"http-native domain={native.Error.Domain} code={native.Error.Code}");
+#endif
+    }
+
     private static void Write(string message)
     {
 #if ANDROID
         Android.Util.Log.Info(Tag, message);
+#elif IOS
+        Console.WriteLine($"{Tag}: {message}");
 #endif
     }
 }
