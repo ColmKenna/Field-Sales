@@ -67,6 +67,15 @@ The sample includes:
   and has an explicit Arklow location override. Cobh remains unassigned. Initial
   assignment history entries are included.
 
+Two optional batches go on top of the sample, each applied once:
+
+- `./scripts/demo-data.sh pad` (WI-044) adds a five-level catalogue of 256 products for the
+  tablet's Order Pad: "Suncare" with 4 subcategories and 12 products directly in it, 180
+  beneath; "Lotions" under both Suncare and Body Care; and
+  "Health > Skincare > Suncare > Lotions > SPF50".
+- `./scripts/demo-data.sh scale` (WI-032) adds 25,000 products and 500 shops for Colm, for
+  timing Sync and reopening on a tablet.
+
 All records and email addresses are fictional testing examples. Town coordinates
 are approximate, and no external Eircode lookup is needed.
 

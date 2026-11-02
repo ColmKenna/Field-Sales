@@ -16,9 +16,9 @@ internal static class DemoCommand
 {
     public static async Task<int> Main(string[] args)
     {
-        if (args.Length != 1 || args[0] is not ("seed" or "scale" or "status"))
+        if (args.Length != 1 || args[0] is not ("seed" or "scale" or "pad" or "status"))
         {
-            Console.Error.WriteLine("Usage: dotnet run --project tools/FieldSales.DemoData -- <seed|scale|status>");
+            Console.Error.WriteLine("Usage: dotnet run --project tools/FieldSales.DemoData -- <seed|scale|pad|status>");
             Console.Error.WriteLine("Start and reset the isolated environment with scripts/demo-data.sh.");
             return 2;
         }
@@ -79,6 +79,12 @@ internal static class DemoCommand
                 // WI-032 scenario 25: the tablet's target scale for Colm, on top of the sample seed.
                 Report("Scale catalogue", await DemoScaleSeeder.SeedCatalogueAsync(catalogue));
                 Report("Scale shops", await DemoScaleSeeder.SeedDirectoryAsync(directory));
+            }
+            if (args[0] == "pad")
+            {
+                // WI-044: a five-level catalogue for the tablet's Order Pad, on top of the sample seed.
+                if (!await DemoSeedBatch.IsSeededAsync(catalogue)) throw new InvalidOperationException("Run the sample seed first.");
+                Report("Order Pad catalogue", await DemoPadSeeder.SeedCatalogueAsync(catalogue));
             }
             foreach (var (name, db) in new (string, DbContext)[] { ("Staff", identity), ("Catalogue", catalogue), ("Directory", directory) })
                 Console.WriteLine($"{name}: {(await DemoSeedBatch.IsSeededAsync(db) ? "seeded" : "not seeded")}");

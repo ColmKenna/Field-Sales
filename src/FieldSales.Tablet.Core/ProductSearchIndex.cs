@@ -4,8 +4,9 @@ using Microsoft.Data.Sqlite;
 namespace FieldSales.Tablet.Core;
 
 /// <summary>A downloaded product as Order entry lists it: its breadcrumb and the base price in effect today
-/// (null when none is, so it cannot be ordered).</summary>
-public sealed record ProductSearchResult(Guid Id, string Code, string Name, string Breadcrumb, string Unit, decimal? Price);
+/// (null when none is, so it cannot be ordered). <paramref name="CategoryId"/> places it on the Order Pad.</summary>
+public sealed record ProductSearchResult(Guid Id, string Code, string Name, string Breadcrumb, string Unit, decimal? Price,
+    Guid? CategoryId = null);
 
 /// <summary>The first <see cref="ProductSearchIndex.MaximumResults"/> matches, and how many matched in all.</summary>
 public sealed record ProductSearchOutcome(IReadOnlyList<ProductSearchResult> Results, int Total);
@@ -17,9 +18,12 @@ public sealed class ProductSearchIndex
     public const int MaximumResults = 50;
     private readonly (ProductSearchResult Product, string Name, string Code)[] rows;
     private readonly HashSet<Guid> productIds;
+    private readonly IReadOnlyList<PadCategory> categories;
+    private OrderPad? pad;
 
-    public ProductSearchIndex(string? generation, IEnumerable<ProductSearchResult> products)
+    public ProductSearchIndex(string? generation, IEnumerable<ProductSearchResult> products, IEnumerable<PadCategory>? categories = null)
     {
+        this.categories = categories?.ToArray() ?? [];
         Generation = generation;
         rows = products.Select(product => (Product: product, Name: LocationSearchIndex.Normalize(product.Name),
                 Code: LocationSearchIndex.Normalize(product.Code)))
@@ -33,6 +37,9 @@ public sealed class ProductSearchIndex
     public string? Generation { get; }
     public int Count => rows.Length;
     public bool Contains(Guid productId) => productIds.Contains(productId);
+
+    /// <summary>The same products by category, built on first use. Like the index, it is never changed afterwards.</summary>
+    public OrderPad Pad => pad ??= OrderPad.Build(categories, rows.Select(row => row.Product));
 
     public ProductSearchOutcome Search(string? query)
     {
@@ -67,11 +74,16 @@ public sealed partial class SnapshotStore
         if (generation is not null)
         {
             Dictionary<Guid, (Guid? Parent, string Name)> categories = [];
+            List<PadCategory> padCategories = [];
             command.CommandText = "SELECT id, parent_id, name FROM categories WHERE generation=$g";
             command.Parameters.AddWithValue("$g", generation);
             using (SqliteDataReader reader = command.ExecuteReader())
                 while (reader.Read())
-                    categories[Guid.Parse(reader.GetString(0))] = (reader.IsDBNull(1) ? null : Guid.Parse(reader.GetString(1)), reader.GetString(2));
+                {
+                    PadCategory category = new(Guid.Parse(reader.GetString(0)), reader.IsDBNull(1) ? null : Guid.Parse(reader.GetString(1)), reader.GetString(2));
+                    categories[category.Id] = (category.ParentId, category.Name);
+                    padCategories.Add(category);
+                }
 
             Dictionary<Guid, string> paths = [];
             string Path(Guid category)
@@ -93,8 +105,13 @@ public sealed partial class SnapshotStore
             command.Parameters.AddWithValue("$today", today.ToString("O", CultureInfo.InvariantCulture));
             using SqliteDataReader rows = command.ExecuteReader();
             while (rows.Read())
-                products.Add(new(Guid.Parse(rows.GetString(0)), rows.GetString(1), rows.GetString(2), Path(Guid.Parse(rows.GetString(3))),
-                    rows.GetString(4), Number(rows, 5)));
+            {
+                Guid category = Guid.Parse(rows.GetString(3));
+                products.Add(new(Guid.Parse(rows.GetString(0)), rows.GetString(1), rows.GetString(2), Path(category),
+                    rows.GetString(4), Number(rows, 5), category));
+            }
+            transaction.Commit();
+            return new(generation, products, padCategories);
         }
         transaction.Commit();
         return new(generation, products);

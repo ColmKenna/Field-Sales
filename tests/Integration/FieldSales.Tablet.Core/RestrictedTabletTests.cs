@@ -59,6 +59,31 @@ public sealed class RestrictedTabletTests : IDisposable
         Assert.Equal(1L, (long)check.ExecuteScalar()!);
     }
 
+    // WI-044 agreed scenario 10: the Order Pad and its search read only the active day, which carries neither the product nor
+    // a category holding only restricted products (T7.5: no trace).
+    [Fact]
+    public async Task Should_NeverListRestrictedProductOrPrivateCategory_When_RepLacksPermission()
+    {
+        SnapshotCategory specialist = new(Guid.NewGuid(), day.Categories[0].Id, "Specialist Range");
+        TabletSnapshot permitted = day with
+        {
+            Categories = [.. day.Categories, specialist],
+            Products = day.Products.Select(product => product.Id == Hidden ? product with { CategoryId = specialist.Id } : product).ToArray(),
+            Manifest = day.Manifest with { Counts = day.Manifest.Counts with { Categories = day.Categories.Count + 1 } }
+        };
+        await tablet.SyncAsync(permitted);
+        await tablet.SyncAsync(Filtered()); // The server leaves out the product and its private-only category.
+
+        ProductSearchIndex index = new SnapshotStore(tablet.Workspace(), tablet.Clock).ReadProductIndex(Today);
+
+        OrderPadCategory health = Assert.Single(index.Pad.Categories);
+        OrderPadCategory remedies = Assert.Single(health.Subcategories);
+        Assert.Equal($"Health > {day.Categories[1].Name}", remedies.Breadcrumb);
+        Assert.Equal(Visible, Assert.Single(remedies.Products).Id);
+        Assert.Equal(1, health.Beneath);
+        Assert.Equal(0, index.Search(day.Products[0].Code).Total);
+    }
+
     [Fact]
     public async Task Should_KeepThePreviousDayAndCapturedWork_When_TheReplacementSnapshotFails()
     {
