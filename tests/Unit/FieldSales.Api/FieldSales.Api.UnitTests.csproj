@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../../../src/FieldSales.AppHost/TabletLanProfile.cs" Link="AppHost/TabletLanProfile.cs" />
   </ItemGroup>
 
 </Project>

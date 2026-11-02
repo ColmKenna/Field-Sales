@@ -19,8 +19,9 @@
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.20" />
-    <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.20" />
+    <!-- Xcode 27 scene lifecycle and WebAuthenticator scene callback forwarding. -->
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="10.0.110" />
+    <PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.110" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />

@@ -4,7 +4,7 @@ using FieldSales.Snapshot.Contracts;
 
 namespace FieldSales.Tablet.Core;
 
-/// <summary>Platform secure storage; the tablet app backs it with Android SecureStorage (Keystore).</summary>
+/// <summary>Platform secure storage: Android Keystore or iOS Keychain through MAUI SecureStorage.</summary>
 public interface ISecureStore
 {
     Task<string?> GetAsync(string key);
@@ -64,7 +64,7 @@ public static class EntryMessages
 public sealed class TabletDevice(string root, ISecureStore secure, TimeProvider? clock = null)
 {
     internal const string CurrentRepKey = "fieldsales.current-rep";
-    private const string PreviouslySignedInKey = "fieldsales.previously-signed-in";
+    internal const string PreviouslySignedInKey = "fieldsales.previously-signed-in";
     private readonly TimeProvider clock = clock ?? TimeProvider.System;
     private readonly TabletSessionState session = TabletSessionState.For(secure);
 
@@ -169,7 +169,7 @@ internal sealed record StoredTokens(string AccessToken, DateTimeOffset AccessTok
 
 internal static class TokenStore
 {
-    private static string Key(string subject) => $"fieldsales.tokens.{subject}";
+    internal static string Key(string subject) => $"fieldsales.tokens.{subject}";
 
     public static Task SaveAsync(ISecureStore secure, string subject, StoredTokens tokens) =>
         secure.SetAsync(Key(subject), JsonSerializer.Serialize(tokens, TabletJsonContext.Default.StoredTokens));

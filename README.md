@@ -225,6 +225,10 @@ serving, so a fresh clone needs no migration-bundle step and no manual port disc
 | **Staff API** | `https://localhost:7204` | Protected `/staff/session` endpoint |
 | **Aspire Dashboard** | Dynamic (see console output) | Telemetry, logs, and distributed application management |
 
+For Debug builds on an iPad, see [iPad development setup](docs/tablet-ipad-development.md).
+It includes Personal Team development provisioning, trusted LAN HTTPS, simulator/device commands
+and the physical-device validation checklist. Release distribution and D4 acceptance remain deferred.
+
 ### 4. Development Seed Data
 
 For connected sample business data in separate, disposable databases, use the

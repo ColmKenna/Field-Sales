@@ -9,8 +9,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Projects;
 using FieldSales.DemoData;
+using FieldSales.AppHost;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
+TabletLanProfile? tabletLan = TabletLanProfile.Read(builder.Configuration, builder.Environment.IsDevelopment());
+string identityAuthority = tabletLan?.IdentityUrl ?? "https://localhost:7201";
 
 bool demo = builder.Configuration.GetValue<bool>("Demo:Enabled");
 if (demo && !builder.Environment.IsDevelopment())
@@ -45,7 +48,7 @@ IResourceBuilder<ProjectResource> identityServer = builder.AddProject<FieldSales
     .WithReference(identityOperationalDb)
     .WaitFor(sqlServer)
     .WithHttpsEndpoint(7201, name: "https")
-    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
+    .WithEnvironment("Authentication__Authority", identityAuthority)
     .WithEnvironment("Clients__StaffWebUri", "https://localhost:7203")
     .WithEnvironment("Clients__StaffWebSecret", staffWebClientSecret)
     .WithEnvironment("Seed__SysAdminPassword", sysAdminPassword)
@@ -56,17 +59,37 @@ IResourceBuilder<ProjectResource> staffApi = builder.AddProject<FieldSales_Api>(
     .WithReference(directoryDb)
     .WithReference(orderingDb)
     .WithHttpsEndpoint(7204, name: "https")
-    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
+    .WithEnvironment("Authentication__Authority", identityAuthority)
     .WaitFor(identityServer);
 
 builder.AddProject<FieldSales_Web>("staff-web")
     .WithReference(staffWebDb)
     .WithHttpsEndpoint(7203, name: "https")
-    .WithEnvironment("Authentication__Authority", "https://localhost:7201")
+    .WithEnvironment("Authentication__Authority", identityAuthority)
     .WithEnvironment("Authentication__ClientSecret", staffWebClientSecret)
     .WithEnvironment("StaffApi__BaseUrl", "https://localhost:7204")
     .WaitFor(identityServer)
     .WaitFor(staffApi)
     .WaitFor(sqlServer);
+
+if (tabletLan is not null)
+{
+    IResourceBuilder<ParameterResource> certificatePassword = builder.AddParameter("tablet-lan-certificate-password", secret: true);
+    ConfigureTabletEndpoint(identityServer, 7201);
+    ConfigureTabletEndpoint(staffApi, 7204);
+
+    void ConfigureTabletEndpoint(IResourceBuilder<ProjectResource> resource, int port)
+    {
+        resource.WithEndpoint("https", endpoint =>
+        {
+            endpoint.Port = port;
+            endpoint.TargetPort = port;
+            endpoint.TargetHost = "0.0.0.0";
+            endpoint.IsProxied = false;
+        });
+        resource.WithEnvironment("Kestrel__Certificates__Default__Path", tabletLan.CertificatePath)
+            .WithEnvironment("Kestrel__Certificates__Default__Password", certificatePassword);
+    }
+}
 
 builder.Build().Run();
