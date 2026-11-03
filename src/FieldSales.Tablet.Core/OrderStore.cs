@@ -75,7 +75,8 @@ public sealed class OrderStore
     {
         if (!File.Exists(workspace.UnsentPath)) return null;
         UnsentStore unsent = new(workspace);
-        if (unsent.Find(orderId) is { } item) return Parse(item) is { } order ? new(order, StandingOf(item, order)) : null;
+        if (unsent.Find(orderId) is { } item)
+            return Parse(item) is { } order ? new(order, StandingOf(item, order, unsent.IsClaimed(orderId))) : null;
         return unsent.FindSent(orderId) is { } sent && Parse(sent.Item) is { } sentOrder
             ? new(sentOrder, OrderStanding.Sent, sent.SentUtc) : null;
     }
@@ -86,12 +87,12 @@ public sealed class OrderStore
         item = unsent.Find(orderId);
         order = Parse(item);
         if (item is null) return unsent.IsSent(orderId) ? OrderStanding.Sent : OrderStanding.New;
-        return StandingOf(item, order);
+        return StandingOf(item, order, unsent.IsClaimed(orderId));
     }
 
     // A claim outranks everything: the server may hold that exact body.
-    private static OrderStanding StandingOf(UnsentItem item, TabletOrder? order) =>
-        item.UploadClaimedUtc is not null ? OrderStanding.Sending
+    private static OrderStanding StandingOf(UnsentItem item, TabletOrder? order, bool claimed) =>
+        claimed ? OrderStanding.Sending
         : item.Rejection is not null ? OrderStanding.NeedsAttention
         : order?.State switch
         {

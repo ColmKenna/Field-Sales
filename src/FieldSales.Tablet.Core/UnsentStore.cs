@@ -20,10 +20,6 @@ public sealed record UnsentSummary(int Total, int InProgress, int ReadyToSend, i
 public sealed record UnsentItem(Guid Id, UnsentKind Kind, DateTimeOffset SavedUtc, string Json)
 {
     public UploadRejection? Rejection { get; init; }
-
-    /// <summary>When an upload claimed this item and no answer has settled it yet (T-5.2.1). While set, the server may
-    /// hold this exact body, so the item must not change or be deleted.</summary>
-    public DateTimeOffset? UploadClaimedUtc { get; init; }
 }
 
 /// <summary>The server's technical refusal, separate from the captured work. RawReason is for support only.</summary>
@@ -52,8 +48,8 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
         """ + SentTable + FaultTable + ClaimTable;
 
     private const string SelectWork = """
-        SELECT w.id, w.kind, w.saved_utc, w.json, f.fault, f.raw_reason, f.http_status, f.rejected_utc, c.claimed_utc
-        FROM work w LEFT JOIN work_faults f ON f.id=w.id LEFT JOIN upload_claims c ON c.id=w.id
+        SELECT w.id, w.kind, w.saved_utc, w.json, f.fault, f.raw_reason, f.http_status, f.rejected_utc
+        FROM work w LEFT JOIN work_faults f ON f.id=w.id
         """;
 
     private SqliteConnection Open()
@@ -207,9 +203,7 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
         {
             Rejection = reader.FieldCount >= 8 && !reader.IsDBNull(7)
                 ? new(reader.IsDBNull(4) ? null : reader.GetString(4), reader.GetString(5), reader.GetInt32(6),
-                    DateTimeOffset.Parse(reader.GetString(7), CultureInfo.InvariantCulture)) : null,
-            UploadClaimedUtc = reader.FieldCount >= 9 && !reader.IsDBNull(8)
-                ? DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture) : null
+                    DateTimeOffset.Parse(reader.GetString(7), CultureInfo.InvariantCulture)) : null
         };
 
     /// <summary>A logical fingerprint of every item (properties in ordinal order), independent of file bytes.</summary>

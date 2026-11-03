@@ -18,7 +18,10 @@ The developer replied **Approved** to the WI-046 plan with the recommended D1–
 - **D4 (inferred):** at a shop no longer assigned, reopen/change/remove/delete are allowed; adding a product still needs assignment.
 - **D5 (inferred):** a line whose product is missing from today's snapshot can be removed but its quantity can't change.
 - **D6 (inferred):** a quantity change keeps the captured price (breaks are E6).
-- **WI-055 (Call corrections) should reuse the same claim** before letting a saved Call change.
+- The claim covers **orders only** (Calls can't be changed by the rep yet), and lives in its own table, not on `UnsentItem`, so captured
+  work compares equal whether or not it is claimed. **WI-055 (Call corrections) should extend the claim to Calls** before letting a saved
+  Call change. Consequence: a Sync whose upload of a Ready to Send order fails without a definite answer now writes the claim to the
+  Unsent database (the byte-for-byte "failed Sync leaves the file unchanged" tests use Calls and In Progress orders, which aren't claimed).
 
 ## WI-043 restricted-product retention (2026-10-31, developer)
 
