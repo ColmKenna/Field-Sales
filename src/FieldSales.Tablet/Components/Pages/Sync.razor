@@ -98,6 +98,11 @@
                     <p>This saved item can't be reviewed here. Contact the office for help.</p>
                 }
                 <div class="order-actions">
+                    @* T-5.2.1: change, reopen or delete happen on the order screen; Needs Attention keeps WI-042's review (D2). *@
+                    @if (review.Order is { } opened && review.Item.Rejection is null)
+                    {
+                        <button disabled="@(busy || changing)" @onclick="@(() => Navigation.NavigateTo($"/locations/{opened.LocationId}/orders/{opened.Id}"))">Open order</button>
+                    }
                     @if (review.CanMarkReady)
                     {
                         <button class="primary" disabled="@(busy || changing)" @onclick="() => ChangeWorkAsync(review.Item.Id, false)">Mark ready to send</button>

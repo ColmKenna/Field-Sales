@@ -363,7 +363,7 @@ public sealed class TabletUploadTests : IDisposable
         using SqliteConnection check = SqliteEngine.Open(workspace.UnsentPath);
         using SqliteCommand version = check.CreateCommand();
         version.CommandText = "PRAGMA user_version";
-        Assert.Equal(3L, (long)version.ExecuteScalar()!);
+        Assert.Equal(4L, (long)version.ExecuteScalar()!);
     }
 
     [Fact]

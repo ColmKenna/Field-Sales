@@ -45,6 +45,8 @@ public enum UploadStop
 /// the same item again and the server answers that it already has it. A refused item stays unsent and the next item
 /// goes; a refused sign-in or permission stops everything; a lost connection or a server error stops the remaining
 /// uploads but leaves the download to be tried.
+/// Each order is claimed just before it goes (T-5.2.1), and the claim holds until an answer settles it, so the rep can't
+/// change or delete work the server may already hold; an item changed after the queue was read is left for its new state.
 /// </remarks>
 public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimeProvider clock)
 {
@@ -65,22 +67,44 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
         UnsentStore unsent = new(workspace);
         if (!File.Exists(workspace.UnsentPath)) return UploadSummary.None;
         IReadOnlyList<UnsentItem> queue = Queue(unsent.Read());
-        int sent = 0, attention = 0;
+        int sent = 0, attention = 0, skipped = 0;
         for (int index = 0; index < queue.Count; index++)
         {
             UnsentItem item = queue[index];
-            progress?.Report(new(index + 1, queue.Count));
-            (bool confirmed, UploadStop stop) = await SendAsync(item, token, unsent, ct);
-            if (stop != UploadStop.None) return new(queue.Count, sent, stop, attention);
+            // T-5.2.1: an order is claimed under the gate order changes hold, and only if unchanged since the queue was read. One
+            // the rep reopened, changed or deleted meanwhile isn't sent and isn't counted; a claimed one can no longer change.
+            // Calls can't be changed by the rep yet, so they need no claim (WI-055 adds Call corrections and should claim them).
+            bool claimed = item.Kind == UnsentKind.Order;
+            if (claimed && !await ClaimAsync(unsent, item, ct)) { skipped++; continue; }
+            int total = queue.Count - skipped;
+            progress?.Report(new(index + 1 - skipped, total));
+            (bool confirmed, UploadStop stop) = await SendAsync(item, token, unsent, claimed, ct);
+            if (stop != UploadStop.None) return new(total, sent, stop, attention);
             if (!confirmed) { attention++; continue; }
             hooks.AtBoundary?.Invoke("upload-confirmed");
             unsent.MarkSent(item.Id, clock.GetUtcNow());
             sent++;
         }
-        return new(queue.Count, sent, NeedsAttention: attention);
+        return new(queue.Count - skipped, sent, NeedsAttention: attention);
     }
 
-    private async Task<(bool Confirmed, UploadStop Stop)> SendAsync(UnsentItem item, string token, UnsentStore unsent, CancellationToken ct)
+    private async Task<bool> ClaimAsync(UnsentStore unsent, UnsentItem item, CancellationToken ct)
+    {
+        SemaphoreSlim gate = OrderStore.GateFor(workspace);
+        await gate.WaitAsync(ct);
+        try { return unsent.Claim(item, clock.GetUtcNow()); }
+        finally { gate.Release(); }
+    }
+
+    // The claim stays whenever the server may hold the item: only a refusal that never reached the endpoint, or a
+    // connection that was never made, clears it. A confirmation (Sent) or a technical refusal clears it elsewhere.
+    private static bool NeverReached(Exception exception) => exception is HttpRequestException
+    {
+        HttpRequestError: HttpRequestError.NameResolutionError or HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError
+    };
+
+    private async Task<(bool Confirmed, UploadStop Stop)> SendAsync(UnsentItem item, string token, UnsentStore unsent, bool claimed,
+        CancellationToken ct)
     {
         string path = item.Kind == UnsentKind.Call ? TabletUploadContract.CallPath(item.Id) : TabletUploadContract.OrderPath(item.Id);
         using HttpRequestMessage request = new(HttpMethod.Put, path)
@@ -95,6 +119,7 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
         catch (Exception exception) when (!ct.IsCancellationRequested
             && exception is HttpRequestException { StatusCode: null } or TaskCanceledException or IOException)
         {
+            if (claimed && NeverReached(exception)) unsent.ReleaseClaim(item.Id);
             return (false, UploadStop.ConnectionLost);
         }
         using (response)
@@ -109,8 +134,9 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
                 {
                     case HttpStatusCode.OK or HttpStatusCode.Created:
                         return await IsReceiptForAsync(response, item.Id, bodyTimeout.Token) ? (true, UploadStop.None) : (false, UploadStop.ServerError);
-                    case HttpStatusCode.Unauthorized: return (false, UploadStop.SignInRequired);
-                    case HttpStatusCode.Forbidden: return (false, UploadStop.NotPermitted);
+                    // Refused before the endpoint read it: the server kept nothing.
+                    case HttpStatusCode.Unauthorized: if (claimed) unsent.ReleaseClaim(item.Id); return (false, UploadStop.SignInRequired);
+                    case HttpStatusCode.Forbidden: if (claimed) unsent.ReleaseClaim(item.Id); return (false, UploadStop.NotPermitted);
                     // A technical fault in this item (MI-52): it stays unsent and the next item goes.
                     case HttpStatusCode.BadRequest or HttpStatusCode.Conflict or HttpStatusCode.RequestEntityTooLarge:
                         UploadRejection rejection = await ReadRejectionAsync(response, bodyTimeout.Token);

@@ -5,12 +5,21 @@ using FieldSales.Quantities;
 
 namespace FieldSales.Tablet.Core;
 
-/// <summary>The outcome of an order change: the saved order, or a message the rep can act on.</summary>
+/// <summary>The outcome of an order change: the saved order, or a message the rep can act on. A deletion succeeds with no
+/// order and <see cref="Deleted"/> set. A deletion still waiting for the rep's confirmation is refused with
+/// <see cref="NeedsConfirmation"/> set and the question as the message.</summary>
 public sealed record OrderResult(TabletOrder? Order, string? Error)
 {
     public bool Succeeded => Error is null;
+    public bool Deleted { get; init; }
+    public bool NeedsConfirmation { get; init; }
     internal static OrderResult Failure(string error) => new(null, error);
+    internal static OrderResult Ask(string question) => new(null, question) { NeedsConfirmation = true };
+    internal static OrderResult Gone { get; } = new(null, null) { Deleted = true };
 }
+
+/// <summary>An order as the order screen shows it: its body, where it stands, and when it was sent if it was.</summary>
+public sealed record OrderView(TabletOrder Order, OrderStanding Standing, DateTimeOffset? SentUtc = null);
 
 /// <summary>The rep's orders, kept as Unsent Orders in their own database (T-5.1.1).</summary>
 /// <remarks>
@@ -18,7 +27,10 @@ public sealed record OrderResult(TabletOrder? Order, string? Error)
 /// stopped app loses nothing. A line captures the product's code and name, the quantity with its unit, the base
 /// price in effect today with its source, and the snapshot it came from; none of that changes afterwards.
 /// Adding a product already on the order raises that line's quantity and keeps what the line captured first.
-/// Changes are serialized per rep, because a change reads the saved order and writes it back.
+/// Before Sync the rep can change a line's quantity, remove a line, reopen a Ready to Send order or delete an order
+/// (T-5.2.1); <see cref="OrderTransitions"/> is the whole table of what is allowed from where.
+/// Changes are serialized per rep, because a change reads the saved order and writes it back. The uploader claims an item
+/// under the same gate, so a change either lands before the claim (and the changed order isn't sent) or is refused.
 /// </remarks>
 public sealed class OrderStore
 {
@@ -29,6 +41,15 @@ public sealed class OrderStore
     public const string AlreadyReady = "This order is ready to send.";
     public const string EmptyOrder = "Add at least one product";
     public const string NoLongerAvailable = "No longer available to you";
+    public const string NotFound = "This order isn't on this tablet.";
+    public const string AlreadyInProgress = "This order is already in progress.";
+    public const string SendingUnconfirmed = "Sending this order wasn't confirmed. Sync again before changing it.";
+    public const string LastLinePrompt = "Remove the last line and delete this order?";
+    public const string DeletePrompt = "Delete this order? It hasn't been sent. Deleting removes it from this tablet.";
+    public const string NoSuchLine = "This line isn't on the order any more.";
+    public const string CantChangeMissing = "No longer available to you — you can remove this line but not change it.";
+    public const string UnitChanged = "This product's unit changed since it was added. Start a new order for it.";
+    public const string RulesUnreadable = "This product's ordering rules couldn't be read.";
 
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly RepWorkspace workspace;
@@ -40,10 +61,45 @@ public sealed class OrderStore
         this.clock = clock ?? TimeProvider.System;
     }
 
-    private SemaphoreSlim Gate => Gates.GetOrAdd(workspace.UnsentPath, _ => new(1, 1));
+    private SemaphoreSlim Gate => GateFor(workspace);
+
+    /// <summary>The per-rep gate every order change holds; the uploader holds it to claim an item.</summary>
+    internal static SemaphoreSlim GateFor(RepWorkspace workspace) => Gates.GetOrAdd(workspace.UnsentPath, _ => new(1, 1));
 
     /// <summary>The order with this id, or null when none is saved or the saved item is not a readable order.</summary>
     public TabletOrder? Find(Guid orderId) => Parse(new UnsentStore(workspace).Find(orderId));
+
+    /// <summary>The order with this id wherever it is, unsent or Sent, with its standing; null when there is none or it
+    /// can't be read as an order.</summary>
+    public OrderView? Read(Guid orderId)
+    {
+        if (!File.Exists(workspace.UnsentPath)) return null;
+        UnsentStore unsent = new(workspace);
+        if (unsent.Find(orderId) is { } item)
+            return Parse(item) is { } order ? new(order, StandingOf(item, order, unsent.IsClaimed(orderId))) : null;
+        return unsent.FindSent(orderId) is { } sent && Parse(sent.Item) is { } sentOrder
+            ? new(sentOrder, OrderStanding.Sent, sent.SentUtc) : null;
+    }
+
+    /// <summary>Where the order stands for changing it.</summary>
+    private static OrderStanding Standing(UnsentStore unsent, Guid orderId, out UnsentItem? item, out TabletOrder? order)
+    {
+        item = unsent.Find(orderId);
+        order = Parse(item);
+        if (item is null) return unsent.IsSent(orderId) ? OrderStanding.Sent : OrderStanding.New;
+        return StandingOf(item, order, unsent.IsClaimed(orderId));
+    }
+
+    // A claim outranks everything: the server may hold that exact body.
+    private static OrderStanding StandingOf(UnsentItem item, TabletOrder? order, bool claimed) =>
+        claimed ? OrderStanding.Sending
+        : item.Rejection is not null ? OrderStanding.NeedsAttention
+        : order?.State switch
+        {
+            OrderState.InProgress => OrderStanding.InProgress,
+            OrderState.ReadyToSend => OrderStanding.ReadyToSend,
+            _ => OrderStanding.Unreadable
+        };
 
     /// <summary>Adds <paramref name="quantity"/> of a product to the order, starting the order at
     /// <paramref name="locationId"/> when it has no line yet. The shop must be assigned to the rep on the
@@ -54,14 +110,11 @@ public sealed class OrderStore
         try
         {
             UnsentStore unsent = new(workspace);
-            UnsentItem? item = unsent.Find(orderId);
-            if (item?.Rejection is not null) return OrderResult.Failure(NotChangeable);
-            TabletOrder? existing = Parse(item);
-            if (item is not null && existing is null) return OrderResult.Failure(NotChangeable);
             // A Sent order is read-only, and its id must never start a second order the server would treat as a re-send.
-            if (item is null && unsent.IsSent(orderId)) return OrderResult.Failure(NotChangeable);
+            OrderStanding standing = Standing(unsent, orderId, out _, out TabletOrder? existing);
+            if (OrderTransitions.After(standing, OrderAction.AddLine) is null)
+                return OrderResult.Failure(OrderTransitions.Refusal(standing, OrderAction.AddLine));
             if (existing is not null && (existing.LocationId != locationId)) return OrderResult.Failure(NotChangeable);
-            if (existing is { State: not OrderState.InProgress }) return OrderResult.Failure(AlreadyReady);
 
             SnapshotStore snapshot = new(workspace, clock);
             if (snapshot.ReadLocation(locationId) is not { IsAssigned: true }) return OrderResult.Failure(NotAssigned);
@@ -72,11 +125,10 @@ public sealed class OrderStore
 
             if (!QuantityRules.TryCreate(product.Product.Unit, product.Product.QuantityStep, product.Product.MinimumQuantity,
                     out QuantityRules? rules, out _))
-                return OrderResult.Failure("This product's ordering rules couldn't be read.");
+                return OrderResult.Failure(RulesUnreadable);
             string unit = rules.Unit.ToCode();
             OrderLine? current = existing?.Lines.FirstOrDefault(line => line.ProductId == productId);
-            if (current is not null && current.Unit != unit)
-                return OrderResult.Failure("This product's unit changed since it was added. Start a new order for it.");
+            if (current is not null && current.Unit != unit) return OrderResult.Failure(UnitChanged);
             // A new line must meet the product's minimum and step. Adding to a line only needs whole steps,
             // and the new total is what must meet the rules.
             string? invalid = current is null
@@ -104,28 +156,68 @@ public sealed class OrderStore
     }
 
     /// <summary>Moves an In Progress order to Ready to Send, so it uploads at the next Sync. An order with no
-    /// lines cannot be ready. This is the only transition: reopening, editing and deleting arrive with WI-046.
-    /// It needs no connection and no current assignment, because an order is judged against the snapshot it was
-    /// built from.</summary>
-    public OrderResult MarkReadyToSend(Guid orderId)
+    /// lines cannot be ready. It needs no connection and no current assignment, because an order is judged against the
+    /// snapshot it was built from.</summary>
+    public OrderResult MarkReadyToSend(Guid orderId) => Change(orderId, OrderAction.MarkReady, (_, order) =>
+        order.Lines.Count == 0 ? OrderResult.Failure(EmptyOrder) : Saved(order with { State = OrderState.ReadyToSend }));
+
+    /// <summary>Returns an unsynced Ready to Send order to In Progress so the rep can change it (US-013 S2). Refused once an
+    /// upload has claimed it: it stays locked until a Sync gets the server's answer.</summary>
+    public OrderResult Reopen(Guid orderId) =>
+        Change(orderId, OrderAction.Reopen, (_, order) => Saved(order with { State = OrderState.InProgress }));
+
+    /// <summary>Sets a line of an In Progress order to <paramref name="quantity"/> (US-013 S1). The line keeps the price,
+    /// unit and snapshot it captured (D6); the quantity must follow the product's rules on the current snapshot, so a
+    /// product no longer downloaded can only be removed (D5). The shop needn't still be assigned (D4).</summary>
+    public OrderResult ChangeQuantity(Guid orderId, Guid lineId, decimal quantity) =>
+        Change(orderId, OrderAction.ChangeQuantity, (saved, order) =>
+        {
+            if (order.Lines.FirstOrDefault(line => line.Id == lineId) is not { } line) return OrderResult.Failure(NoSuchLine);
+            OrderableProduct? product = new SnapshotStore(workspace, clock).ReadOrderableProduct(line.ProductId, Today());
+            if (product is null) return OrderResult.Failure(CantChangeMissing);
+            if (!QuantityRules.TryCreate(product.Product.Unit, product.Product.QuantityStep, product.Product.MinimumQuantity,
+                    out QuantityRules? rules, out _)) return OrderResult.Failure(RulesUnreadable);
+            if (rules.Unit.ToCode() != line.Unit) return OrderResult.Failure(UnitChanged);
+            QuantityValidationResult valid = rules.ValidateOrder(quantity);
+            if (!valid.IsValid) return OrderResult.Failure(valid.Error!);
+            return Saved(order with { Lines = [.. order.Lines.Select(each => each.Id == lineId ? each with { Quantity = quantity } : each)] });
+        });
+
+    /// <summary>Takes a line off an In Progress order. The last line goes only with the order: without
+    /// <paramref name="deleteOrderIfLast"/> the rep is asked "Remove the last line and delete this order?" (US-013 S4).</summary>
+    public OrderResult RemoveLine(Guid orderId, Guid lineId, bool deleteOrderIfLast) =>
+        Change(orderId, OrderAction.RemoveLine, (item, order) =>
+            order.Lines.All(line => line.Id != lineId) ? OrderResult.Failure(NoSuchLine)
+            : order.Lines.Count > 1 ? Saved(order with { Lines = [.. order.Lines.Where(line => line.Id != lineId)] })
+            : deleteOrderIfLast ? Remove(item)
+            : OrderResult.Ask(LastLinePrompt));
+
+    /// <summary>Deletes an In Progress or Ready to Send order once the rep confirms (US-013 S3). It leaves the tablet and
+    /// nothing is sent. An order an upload has claimed, a refused one and a Sent one are never deleted here.</summary>
+    public OrderResult Delete(Guid orderId, bool confirmed) =>
+        Change(orderId, OrderAction.Delete, (item, _) => confirmed ? Remove(item) : OrderResult.Ask(DeletePrompt));
+
+    // Every change to a saved order: read it under the gate, check the table, then apply and save.
+    private OrderResult Change(Guid orderId, OrderAction action, Func<UnsentItem, TabletOrder, OrderResult> apply)
     {
         Gate.Wait();
         try
         {
             UnsentStore unsent = new(workspace);
-            UnsentItem? item = unsent.Find(orderId);
-            if (item?.Rejection is not null) return OrderResult.Failure(NotChangeable);
-            TabletOrder? order = Parse(item);
-            if (item is not null && order is null) return OrderResult.Failure(NotChangeable);
-            if (item is null && unsent.IsSent(orderId)) return OrderResult.Failure(NotChangeable);
-            if (order is null || order.Lines.Count == 0) return OrderResult.Failure(EmptyOrder);
-            if (order.State != OrderState.InProgress) return OrderResult.Failure(AlreadyReady);
-            TabletOrder ready = order with { State = OrderState.ReadyToSend };
-            Save(unsent, ready);
-            return new(ready, null);
+            OrderStanding standing = Standing(unsent, orderId, out UnsentItem? item, out TabletOrder? order);
+            if (OrderTransitions.After(standing, action) is null) return OrderResult.Failure(OrderTransitions.Refusal(standing, action));
+            OrderResult result = apply(item!, order!);
+            if (result is { Succeeded: true, Order: { } changed }) Save(unsent, changed);
+            return result;
         }
         finally { Gate.Release(); }
     }
+
+    private static OrderResult Saved(TabletOrder order) => new(order, null);
+
+    // The delete re-checks, in the same statement, that the item is unchanged, unrefused and unclaimed.
+    private OrderResult Remove(UnsentItem item) =>
+        new UnsentStore(workspace).DeleteUnclaimed(item) ? OrderResult.Gone : OrderResult.Failure(NotChangeable);
 
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
 

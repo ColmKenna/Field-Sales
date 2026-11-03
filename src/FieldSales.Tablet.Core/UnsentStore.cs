@@ -33,11 +33,11 @@ public sealed record SentItem(UnsentItem Item, DateTimeOffset SentUtc);
 
 /// <summary>The rep's Unsent work, in its own database. Snapshot replacement may read Location
 /// references to retain shop details, but never rewrites this database.</summary>
-/// <remarks>Format 2 adds confirmed items. Format 3 adds technical refusals separately from captured payloads.
-/// Confirmation moves work to Sent in one transaction and also removes its associated fault.</remarks>
+/// <remarks>Format 2 adds confirmed items. Format 3 adds technical refusals separately from captured payloads. Format 4 adds
+/// upload claims (T-5.2.1). Confirmation moves work to Sent in one transaction and also removes its fault and claim.</remarks>
 public sealed partial class UnsentStore(RepWorkspace workspace)
 {
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4;
     private const string SentTable = """
         CREATE TABLE sent(id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('Call','Order','ScheduleChange')),
             saved_utc TEXT NOT NULL, sent_utc TEXT NOT NULL, json TEXT NOT NULL);
@@ -45,7 +45,7 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
     private const string Schema = """
         CREATE TABLE work(id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('Call','Order','ScheduleChange')),
             saved_utc TEXT NOT NULL, json TEXT NOT NULL);
-        """ + SentTable + FaultTable;
+        """ + SentTable + FaultTable + ClaimTable;
 
     private const string SelectWork = """
         SELECT w.id, w.kind, w.saved_utc, w.json, f.fault, f.raw_reason, f.http_status, f.rejected_utc
@@ -59,9 +59,12 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
         {
             using SqliteCommand version = connection.CreateCommand();
             version.CommandText = "PRAGMA user_version";
+            // Older formats step up one at a time, keeping every item; a new database gets the whole schema at once.
             if ((long)version.ExecuteScalar()! == 1)
                 SqliteEngine.EnsureSchema(connection, 2, "", upgradeFromPrevious: SentTable);
-            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema, upgradeFromPrevious: FaultTable);
+            if ((long)version.ExecuteScalar()! == 2)
+                SqliteEngine.EnsureSchema(connection, 3, "", upgradeFromPrevious: FaultTable);
+            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema, upgradeFromPrevious: ClaimTable);
             return connection;
         }
         catch { connection.Dispose(); throw; }
@@ -169,6 +172,18 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
         while (reader.Read())
             items.Add(new(ReadItem(reader), DateTimeOffset.Parse(reader.GetString(4), CultureInfo.InvariantCulture)));
         return items;
+    }
+
+    /// <summary>The confirmed item with this id, as it was sent, or null. Asking never creates the database.</summary>
+    public SentItem? FindSent(Guid id)
+    {
+        if (!File.Exists(workspace.UnsentPath)) return null;
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT id, kind, saved_utc, json, sent_utc FROM sent WHERE id=$id";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? new(ReadItem(reader), DateTimeOffset.Parse(reader.GetString(4), CultureInfo.InvariantCulture)) : null;
     }
 
     /// <summary>Whether the server has confirmed an item with this id. Asking never creates the database.</summary>

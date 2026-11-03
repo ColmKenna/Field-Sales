@@ -246,13 +246,14 @@ public sealed partial class NewOrderComponentTests
         Assert.Contains("Vitamin D 1000IU 90s", text);
         Assert.Contains("1 line · €150.00", text);
         Assert.DoesNotContain("product-search", screen.Renderer.AttributeValues(screen.Id, "id"));
-        Assert.Equal(["Close"], screen.Renderer.Buttons(screen.Id));
+        // WI-046: no adding or line changes while Ready to Send; Reopen and Delete order are the only changes offered.
+        Assert.Equal(["Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id));
         Assert.Equal(orders.Calls[0].Order, Assert.Single(orders.Marked)); // The same order the lines went to.
         Assert.Equal(OrderState.ReadyToSend, orders.Order!.State);
 
         await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Tablet.Resume());
         await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Ready to Send. It goes to head office"));
-        Assert.Equal(["Close"], screen.Renderer.Buttons(screen.Id));
+        Assert.Equal(["Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id));
         await screen.Click("Close");
         Assert.Equal([$"/locations/{ShopId}"], screen.Navigation.Destinations);
     }
@@ -374,6 +375,7 @@ public sealed partial class NewOrderComponentTests
         }
 
         public Task Show() => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, ShopId));
+        public Task ShowOrder(Guid order) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, ShopId, order));
         public Task Type(string inputId, string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Type(Id, inputId, text));
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
         public Task ClickLabelled(string label) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLabelled(Id, label));
@@ -411,6 +413,8 @@ public sealed partial class NewOrderComponentTests
         public int Attach() => AssignRootComponentId(InstantiateComponent(typeof(NewOrder)));
         public Task Open(int id, Guid location) => RenderRootComponentAsync(id,
             ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(NewOrder.LocationId)] = location }));
+        public Task Open(int id, Guid location, Guid order) => RenderRootComponentAsync(id, ParameterView.FromDictionary(
+            new Dictionary<string, object?> { [nameof(NewOrder.LocationId)] = location, [nameof(NewOrder.OrderId)] = (Guid?)order }));
 
         private RenderTreeFrame[] Frames(int id)
         {

@@ -168,7 +168,7 @@ public sealed class NeedsAttentionTests : IDisposable
         string before = Store().Fingerprint();
         using (SqliteConnection connection = SqliteEngine.Open(tablet.Workspace().UnsentPath))
         {
-            SqliteEngine.Execute(connection, "DROP TABLE work_faults;");
+            SqliteEngine.Execute(connection, "DROP TABLE upload_claims; DROP TABLE work_faults;");
             if (format == 1) SqliteEngine.Execute(connection, "DROP TABLE sent;");
             SqliteEngine.Execute(connection, $"PRAGMA user_version={format};");
         }

@@ -12,11 +12,14 @@ public sealed partial class UnsentStore
             fault TEXT NULL, raw_reason TEXT NOT NULL, http_status INTEGER NOT NULL, rejected_utc TEXT NOT NULL);
         """;
 
-    /// <summary>Records a technical refusal only if this is still the version that was uploaded.</summary>
+    /// <summary>Records a technical refusal only if this is still the version that was uploaded. The server kept nothing,
+    /// so the upload's claim is cleared in the same transaction.</summary>
     public bool MarkNeedsAttention(UnsentItem uploaded, UploadRejection rejection)
     {
         using SqliteConnection connection = Open();
+        using SqliteTransaction transaction = connection.BeginTransaction();
         using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO work_faults(id, fault, raw_reason, http_status, rejected_utc)
             SELECT id, $fault, $raw, $status, $utc FROM work WHERE id=$id AND json=$json
@@ -29,7 +32,17 @@ public sealed partial class UnsentStore
         command.Parameters.AddWithValue("$raw", rejection.RawReason);
         command.Parameters.AddWithValue("$status", rejection.HttpStatus);
         command.Parameters.AddWithValue("$utc", rejection.RejectedUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-        return command.ExecuteNonQuery() == 1;
+        bool marked = command.ExecuteNonQuery() == 1;
+        if (marked)
+        {
+            using SqliteCommand release = connection.CreateCommand();
+            release.Transaction = transaction;
+            release.CommandText = "DELETE FROM upload_claims WHERE id=$id";
+            release.Parameters.AddWithValue("$id", uploaded.Id.ToString());
+            release.ExecuteNonQuery();
+        }
+        transaction.Commit();
+        return marked;
     }
 
     /// <summary>After review, offers the same rejected Ready to Send Order at the next manual Sync.
