@@ -90,5 +90,8 @@ that starts cold finds it there.
   `FieldSalesDemo_IdentityOperationalDb.dbo.PersistedGrants` (sqlcmd needs `-I` for the delete) once the access token is past its
   hour. `adb shell svc power stayon usb` keeps the screen on during a check (`stayon false` afterwards). Any resume rebuilds the
   routed page (`MainLayout`), so page fields don't survive the sign-in browser.
+- **Tablet system bars (fixed 2026-10-31, PR #31):** MAUI 10 draws pages edge to edge, so `MainPage` sets
+  `SafeAreaEdges="All"` to keep the app clear of the status bar, the Samsung taskbar and the keyboard. Keep it if the page changes.
+  Fixed-position CSS (e.g. `.order-footer`) relies on it.
 - **JS admin UI tests without repo noise:** copy the identity host's `package*.json`, `tests/` and
   `wwwroot/js/` to the scratchpad, `npm ci --ignore-scripts` there and run `node --test tests/*.test.mjs`.
