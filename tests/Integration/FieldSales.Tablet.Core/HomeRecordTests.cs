@@ -5,7 +5,7 @@ using Microsoft.Extensions.Time.Testing;
 
 namespace FieldSales.Tablet.Core.Tests;
 
-public sealed class HomeRecordTests
+public sealed partial class HomeRecordTests
 {
     [Fact]
     public async Task Should_ShowMurphysDoneAndNolansUnplannedWithTheirOrderStates_When_TheS2DayIsRead()
@@ -86,6 +86,7 @@ public sealed class HomeRecordTests
         day.CaptureS2();
         Assert.True(day.Orders.Reopen(day.MurphyOrder).Succeeded);
         Assert.Equal("In Progress", Murphy().State);
+        Assert.Equal(day.Clock.GetUtcNow(), Murphy().SavedAt);
         Assert.True(day.Orders.MarkReadyToSend(day.MurphyOrder).Succeeded);
         Assert.True(day.Store.Claim(day.Store.Find(day.MurphyOrder)!, day.Clock.GetUtcNow()));
         Assert.Equal("Sending", Murphy().State);

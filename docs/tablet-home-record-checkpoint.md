@@ -18,8 +18,11 @@ WI-032, WI-035 and WI-047 are done and present on that integration base.
    in the record. The Unsent count covers the entire queue, including older
    work, and only a positive count is a link.
 
-The original agent-assisted checkpoint remains mandatory. Resume only on
-**Continue T-4.5.1**. WI-048 is `active`, not complete.
+The original checkpoint was reached, committed and pushed. The developer then
+instructed: "ask any potential questions now and then batch through with a
+commit between each checkpoint". All required decisions are already resolved;
+this releases the stop and authorizes completing the remaining stages with a
+commit at each completed stage. WI-048 remains `active` until final verification.
 
 ## What is ready to review
 
