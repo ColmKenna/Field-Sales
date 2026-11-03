@@ -1,0 +1,17 @@
+@namespace FieldSales.Tablet.Components.Shared
+@using FieldSales.Tablet.Core
+
+<nav class="home-exceptions" aria-label="Day exceptions">
+    @foreach (HomeCounter counter in Counters)
+    {
+        @if (counter.Count > 0)
+        {
+            <a href="@counter.Href" @key="counter.Id">@counter.Label: @counter.Count@if (counter.Detail is not null) {<span> · @counter.Detail</span>}</a>
+        }
+        else { <span class="home-counter-zero" @key="counter.Id">@counter.Label: 0</span> }
+    }
+</nav>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<HomeCounter> Counters { get; set; } = [];
+}

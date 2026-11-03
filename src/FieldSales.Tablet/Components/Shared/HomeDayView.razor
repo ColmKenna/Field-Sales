@@ -1,0 +1,19 @@
+@namespace FieldSales.Tablet.Components.Shared
+@using FieldSales.Tablet.Core
+
+<HomeExceptionStrip Counters="Record.Counters" />
+@if (Record.HasUnreadableActivity)
+{
+    <p role="status" class="problem">Some saved activity couldn't be shown. Your work is still on this tablet. <a href="/sync">Open Sync &amp; unsent</a></p>
+}
+@foreach (HomeDaySection section in Record.Sections)
+{
+    <HomeRecordSection Section="section" @key="section.Id" />
+}
+@AdditionalSections
+
+@code {
+    [Parameter, EditorRequired] public HomeDayRecord Record { get; set; } = null!;
+    // Later features may compose a section with its own model and interactions after Today's record.
+    [Parameter] public RenderFragment? AdditionalSections { get; set; }
+}

@@ -1,0 +1,40 @@
+@namespace FieldSales.Tablet.Components.Shared
+@using System.Globalization
+@using FieldSales.Tablet.Core
+
+<section class="home-record-section" aria-labelledby="@($"home-{Section.Id}")">
+    <h2 id="@($"home-{Section.Id}")">@Section.Title <span class="home-section-count">(@Section.Locations.Count)</span></h2>
+    @if (Section.Locations.Count == 0) { <p class="home-empty">@Section.EmptyText</p> }
+    else
+    {
+        string? town = null;
+        <div class="home-record-rows" role="list">
+            @foreach (HomeDayLocation row in Section.Locations)
+            {
+                @if (row.Location.TownName != town)
+                {
+                    town = row.Location.TownName;
+                    @if (!string.IsNullOrEmpty(town)) { <h3 class="home-town">@town</h3> }
+                }
+                <div role="listitem" @key="row.Location.Id">
+                    <a class="home-record-row" href="@($"/locations/{row.Location.Id}")">
+                        <div class="home-row-identity"><strong>@row.Location.Name</strong>@if (row.Done) {<span class="home-done">Done</span>}</div>
+                        @if (!row.IsPlanned) { <span class="home-unplanned">Unplanned</span> }
+                        @foreach (HomeCall call in row.Calls)
+                        {
+                            <span class="home-activity" @key="call.Id">Call @call.SavedAt.ToString("HH:mm", CultureInfo.InvariantCulture) · @call.Channel</span>
+                        }
+                        @foreach (HomeOrder order in row.Orders)
+                        {
+                            <span class="home-activity" @key="order.Id">Order · @order.Lines @(order.Lines == 1 ? "line" : "lines") · @order.State · Saved @order.SavedAt.ToString("HH:mm", CultureInfo.InvariantCulture)</span>
+                        }
+                    </a>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public HomeDaySection Section { get; set; } = null!;
+}

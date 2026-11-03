@@ -32,6 +32,15 @@ public sealed class TabletApp
     public Task<SignInAnswer> SignInAsync() => SignIn();
     public HomeView Home { get; set; } = new("Last synced 07:42", []);
     public HomeView ReadHome(string rep) => Home;
+    public Func<string, HomeDayRecord>? ReadDay { get; set; }
+    public HomeDayRecord ReadHomeRecord(string rep)
+    {
+        if (ReadDay is not null) return ReadDay(rep);
+        UnsentSummary summary = ReadSummary(rep);
+        return new(new DateOnly(2026, 10, 1), [new("unsent", "Unsent", summary.Total, "/sync",
+            summary.NeedsAttention > 0 ? summary.AttentionText : null)],
+            [new("today", "Today", [], "No visits scheduled today"), new("unplanned", "Unplanned today", [])]);
+    }
     public void ResumeCleanup(string rep) { }
     public Func<string, ProductSearchIndex> ReadIndex { get; set; } = _ => new ProductSearchIndex(null, []);
     public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddWork { get; set; } =

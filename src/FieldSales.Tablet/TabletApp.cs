@@ -159,6 +159,8 @@ public sealed class TabletApp : IDisposable
         return new(active is null ? "No downloaded day yet" : SyncMessages.LastSynced(active.CompletedUtc, clock), store.ReadLocations());
     }
 
+    public HomeDayRecord ReadHomeRecord(string rep) => new HomeRecordReader(device.Workspace(rep), clock).Read();
+
     public OfflineProductPage ReadProducts(string rep, int page) => new SnapshotStore(device.Workspace(rep), clock).ReadProducts(page);
     public OfflineProductDetail? ReadProduct(string rep, Guid id) => new SnapshotStore(device.Workspace(rep), clock).ReadProduct(id);
 
