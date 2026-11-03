@@ -20,6 +20,10 @@ public sealed record UnsentSummary(int Total, int InProgress, int ReadyToSend, i
 public sealed record UnsentItem(Guid Id, UnsentKind Kind, DateTimeOffset SavedUtc, string Json)
 {
     public UploadRejection? Rejection { get; init; }
+
+    /// <summary>When an upload claimed this item and no answer has settled it yet (T-5.2.1). While set, the server may
+    /// hold this exact body, so the item must not change or be deleted.</summary>
+    public DateTimeOffset? UploadClaimedUtc { get; init; }
 }
 
 /// <summary>The server's technical refusal, separate from the captured work. RawReason is for support only.</summary>
@@ -33,11 +37,11 @@ public sealed record SentItem(UnsentItem Item, DateTimeOffset SentUtc);
 
 /// <summary>The rep's Unsent work, in its own database. Snapshot replacement may read Location
 /// references to retain shop details, but never rewrites this database.</summary>
-/// <remarks>Format 2 adds confirmed items. Format 3 adds technical refusals separately from captured payloads.
-/// Confirmation moves work to Sent in one transaction and also removes its associated fault.</remarks>
+/// <remarks>Format 2 adds confirmed items. Format 3 adds technical refusals separately from captured payloads. Format 4 adds
+/// upload claims (T-5.2.1). Confirmation moves work to Sent in one transaction and also removes its fault and claim.</remarks>
 public sealed partial class UnsentStore(RepWorkspace workspace)
 {
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4;
     private const string SentTable = """
         CREATE TABLE sent(id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('Call','Order','ScheduleChange')),
             saved_utc TEXT NOT NULL, sent_utc TEXT NOT NULL, json TEXT NOT NULL);
@@ -45,11 +49,11 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
     private const string Schema = """
         CREATE TABLE work(id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('Call','Order','ScheduleChange')),
             saved_utc TEXT NOT NULL, json TEXT NOT NULL);
-        """ + SentTable + FaultTable;
+        """ + SentTable + FaultTable + ClaimTable;
 
     private const string SelectWork = """
-        SELECT w.id, w.kind, w.saved_utc, w.json, f.fault, f.raw_reason, f.http_status, f.rejected_utc
-        FROM work w LEFT JOIN work_faults f ON f.id=w.id
+        SELECT w.id, w.kind, w.saved_utc, w.json, f.fault, f.raw_reason, f.http_status, f.rejected_utc, c.claimed_utc
+        FROM work w LEFT JOIN work_faults f ON f.id=w.id LEFT JOIN upload_claims c ON c.id=w.id
         """;
 
     private SqliteConnection Open()
@@ -59,9 +63,12 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
         {
             using SqliteCommand version = connection.CreateCommand();
             version.CommandText = "PRAGMA user_version";
+            // Older formats step up one at a time, keeping every item; a new database gets the whole schema at once.
             if ((long)version.ExecuteScalar()! == 1)
                 SqliteEngine.EnsureSchema(connection, 2, "", upgradeFromPrevious: SentTable);
-            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema, upgradeFromPrevious: FaultTable);
+            if ((long)version.ExecuteScalar()! == 2)
+                SqliteEngine.EnsureSchema(connection, 3, "", upgradeFromPrevious: FaultTable);
+            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema, upgradeFromPrevious: ClaimTable);
             return connection;
         }
         catch { connection.Dispose(); throw; }
@@ -171,6 +178,18 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
         return items;
     }
 
+    /// <summary>The confirmed item with this id, as it was sent, or null. Asking never creates the database.</summary>
+    public SentItem? FindSent(Guid id)
+    {
+        if (!File.Exists(workspace.UnsentPath)) return null;
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT id, kind, saved_utc, json, sent_utc FROM sent WHERE id=$id";
+        command.Parameters.AddWithValue("$id", id.ToString());
+        using SqliteDataReader reader = command.ExecuteReader();
+        return reader.Read() ? new(ReadItem(reader), DateTimeOffset.Parse(reader.GetString(4), CultureInfo.InvariantCulture)) : null;
+    }
+
     /// <summary>Whether the server has confirmed an item with this id. Asking never creates the database.</summary>
     public bool IsSent(Guid id)
     {
@@ -188,7 +207,9 @@ public sealed partial class UnsentStore(RepWorkspace workspace)
         {
             Rejection = reader.FieldCount >= 8 && !reader.IsDBNull(7)
                 ? new(reader.IsDBNull(4) ? null : reader.GetString(4), reader.GetString(5), reader.GetInt32(6),
-                    DateTimeOffset.Parse(reader.GetString(7), CultureInfo.InvariantCulture)) : null
+                    DateTimeOffset.Parse(reader.GetString(7), CultureInfo.InvariantCulture)) : null,
+            UploadClaimedUtc = reader.FieldCount >= 9 && !reader.IsDBNull(8)
+                ? DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture) : null
         };
 
     /// <summary>A logical fingerprint of every item (properties in ordinal order), independent of file bytes.</summary>
