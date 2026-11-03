@@ -375,6 +375,7 @@ public sealed partial class NewOrderComponentTests
         }
 
         public Task Show() => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, ShopId));
+        public Task ShowOrder(Guid order) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, ShopId, order));
         public Task Type(string inputId, string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Type(Id, inputId, text));
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
         public Task ClickLabelled(string label) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLabelled(Id, label));
@@ -412,6 +413,8 @@ public sealed partial class NewOrderComponentTests
         public int Attach() => AssignRootComponentId(InstantiateComponent(typeof(NewOrder)));
         public Task Open(int id, Guid location) => RenderRootComponentAsync(id,
             ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(NewOrder.LocationId)] = location }));
+        public Task Open(int id, Guid location, Guid order) => RenderRootComponentAsync(id, ParameterView.FromDictionary(
+            new Dictionary<string, object?> { [nameof(NewOrder.LocationId)] = location, [nameof(NewOrder.OrderId)] = (Guid?)order }));
 
         private RenderTreeFrame[] Frames(int id)
         {
