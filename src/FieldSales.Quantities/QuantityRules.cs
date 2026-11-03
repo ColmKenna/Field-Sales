@@ -64,16 +64,21 @@ public sealed record QuantityRules
         return true;
     }
 
-    public QuantityValidationResult ValidateOrder(decimal amount)
+    public QuantityValidationResult ValidateOrder(decimal amount) => Validate(amount, Minimum.Amount);
+
+    /// <summary>An addition to an existing line may be smaller than its minimum, but must be a positive whole step.</summary>
+    public QuantityValidationResult ValidateIncrement(decimal amount) => Validate(amount, Step.Amount);
+
+    private QuantityValidationResult Validate(decimal amount, decimal minimum)
     {
-        if (amount < Minimum.Amount || (Unit == UnitOfMeasure.Each && amount % 1m != 0))
+        if (amount < minimum || (Unit == UnitOfMeasure.Each && amount % 1m != 0))
             return new(null, OrderValidationMessage);
         if (!Quantity.TryCreate(Unit, amount, out Quantity quantity))
         {
             return new(null, "Enter a quantity with up to six decimal places within the supported amount.");
         }
         if (amount % Step.Amount != 0)
-            return new(null, OrderValidationMessage);
+            return new(null, $"Enter multiples of {Step.Amount.ToString("0.######", CultureInfo.InvariantCulture)} {Unit.ToCode()}");
         return new(quantity, null);
     }
 

@@ -28,6 +28,80 @@ public sealed class OrderModelTests : IDisposable
 
     private static string Json(TabletOrder order) => JsonSerializer.Serialize(order, OrderJsonContext.Default.TabletOrder);
 
+    private static TabletSnapshot Tea()
+    {
+        TabletSnapshot snapshot = Byrnes();
+        return snapshot with { Products = [snapshot.Products[0] with
+            { Name = "Loose Herbal Tea", Unit = "kg", QuantityStep = 0.5m, MinimumQuantity = 1m }, .. snapshot.Products.Skip(1)] };
+    }
+
+    [Fact]
+    public async Task Should_ExposeSnapshotQuantityRules_When_MeasuredProductsAreReadForOrderEntry()
+    {
+        TabletSnapshot snapshot = Tea();
+        await tablet.SyncAsync(snapshot);
+        ProductSearchIndex index = new SnapshotStore(tablet.Workspace(), tablet.Clock).ReadProductIndex(new DateOnly(2026, 10, 1));
+        ProductSearchResult product = Assert.Single(index.Search("Loose Herbal Tea").Results);
+        Assert.Equal(("kg", 0.5m, 1m), (product.Unit, product.QuantityStep, product.MinimumQuantity));
+        Assert.Equal(product, Assert.Single(index.Pad.Categories.SelectMany(Flatten).SelectMany(category => category.Products),
+            candidate => candidate.Id == product.Id));
+
+        static IEnumerable<OrderPadCategory> Flatten(OrderPadCategory category) =>
+            new[] { category }.Concat(category.Subcategories.SelectMany(Flatten));
+    }
+
+    [Fact]
+    public async Task Should_ValidateTheCombinedQuantity_When_AddingToAMeasuredLine()
+    {
+        TabletSnapshot snapshot = Tea();
+        await tablet.SyncAsync(snapshot);
+        Guid id = Guid.NewGuid(), shop = snapshot.Locations[0].Id, product = snapshot.Products[0].Id;
+        Assert.True(Store().AddLine(id, shop, product, 1m).Succeeded);
+        OrderResult added = Store().AddLine(id, shop, product, 0.5m);
+        Assert.True(added.Succeeded, added.Error);
+        Assert.Equal(1.5m, Assert.Single(added.Order!.Lines).Quantity);
+        string before = Json(Store().Find(id)!);
+        OrderResult invalid = Store().AddLine(id, shop, product, 1.2m);
+        Assert.Equal("Enter multiples of 0.5 kg", invalid.Error);
+        Assert.Equal(before, Json(Store().Find(id)!));
+    }
+
+    [Fact]
+    public async Task Should_PreserveCapturedUnit_When_OrderIsReloadedAndCatalogueUnitChanges()
+    {
+        TabletSnapshot snapshot = Tea();
+        await tablet.SyncAsync(snapshot);
+        Guid id = Guid.NewGuid(), shop = snapshot.Locations[0].Id, product = snapshot.Products[0].Id;
+        string captured = Json(Store().AddLine(id, shop, product, 1.5m).Order!);
+        await tablet.SyncAsync(snapshot with { Products = [snapshot.Products[0] with { Unit = "Each", QuantityStep = null, MinimumQuantity = null },
+            .. snapshot.Products.Skip(1)], Manifest = snapshot.Manifest with { BuiltUtc = snapshot.Manifest.BuiltUtc.AddDays(1) } });
+
+        Assert.Equal(captured, Json(Store().Find(id)!));
+        Assert.Equal((1.5m, "kg"), (Assert.Single(Store().Find(id)!.Lines).Quantity, Store().Find(id)!.Lines[0].Unit));
+        OrderResult refused = Store().AddLine(id, shop, product, 1m);
+        Assert.Equal("This product's unit changed since it was added. Start a new order for it.", refused.Error);
+        Assert.Equal(captured, Json(Store().Find(id)!));
+    }
+
+    [Theory]
+    [InlineData("1000000000000")]
+    [InlineData("79228162514264337593543950335")]
+    public async Task Should_RespectSupportedBoundsWithoutLosingWork_When_AmountsOrAccumulatedTotalsAreTooLarge(string excessive)
+    {
+        TabletSnapshot snapshot = Tea();
+        await tablet.SyncAsync(snapshot);
+        Guid id = Guid.NewGuid(), shop = snapshot.Locations[0].Id, product = snapshot.Products[0].Id;
+        OrderResult largest = Store().AddLine(id, shop, product, 999_999_999_999.5m);
+        Assert.True(largest.Succeeded, largest.Error);
+        string before = Json(largest.Order!);
+        Assert.False(Store().AddLine(id, shop, product, 0.5m).Succeeded);
+        decimal amount = decimal.Parse(excessive, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.False(Store().AddLine(id, shop, product, amount).Succeeded);
+        Assert.False(Store().AddLine(Guid.NewGuid(), shop, product, amount).Succeeded);
+        Assert.Equal(before, Json(Store().Find(id)!));
+        Assert.Single(new UnsentStore(tablet.Workspace()).Read());
+    }
+
     [Fact]
     public async Task Should_RecordCapturingRepAndShopWithNoCallLinked_When_TheFirstLineStartsAnOrder()
     {
@@ -98,7 +172,7 @@ public sealed class OrderModelTests : IDisposable
     [InlineData("Each", null, null, 0, "Enter a quantity of 1 or more")]
     [InlineData("Each", null, null, 1.5, "Enter a quantity of 1 or more")]
     [InlineData("Each", null, null, -3, "Enter a quantity of 1 or more")]
-    [InlineData("kg", 0.5, 1.0, 1.2, "Enter at least 1.0 kg in steps of 0.5 kg")]
+    [InlineData("kg", 0.5, 1.0, 1.2, "Enter multiples of 0.5 kg")]
     [InlineData("kg", 0.5, 1.0, 0.5, "Enter at least 1.0 kg in steps of 0.5 kg")]
     public async Task Should_RejectTheLineAndStoreNothing_When_TheQuantityBreaksTheProductRules(
         string unit, double? step, double? minimum, double quantity, string message)
