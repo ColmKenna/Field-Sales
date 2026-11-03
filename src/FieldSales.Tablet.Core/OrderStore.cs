@@ -81,7 +81,7 @@ public sealed class OrderStore
             // and the new total is what must meet the rules.
             string? invalid = current is null
                 ? rules.ValidateOrder(quantity).Error
-                : quantity <= 0 || quantity % rules.Step.Amount != 0 ? rules.OrderValidationMessage : null;
+                : rules.ValidateIncrement(quantity).Error;
             if (invalid is not null) return OrderResult.Failure(invalid);
             decimal total = (current?.Quantity ?? 0m) + quantity;
             QuantityValidationResult sum = rules.ValidateOrder(total);

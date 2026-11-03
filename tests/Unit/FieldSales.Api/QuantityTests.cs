@@ -22,19 +22,19 @@ public sealed class QuantityTests
     }
 
     [Theory]
-    [InlineData("0")]
-    [InlineData("-0.5")]
-    [InlineData("0.5")]
-    [InlineData("0.7")]
-    [InlineData("1.2")]
-    [InlineData("1.499999")]
-    [InlineData("1.500001")]
-    public void Should_RejectQuantityWithMeasureHint_When_BelowMinimumOrBetweenSteps(string text)
+    [InlineData("0", "Enter at least 1.0 kg in steps of 0.5 kg")]
+    [InlineData("-0.5", "Enter at least 1.0 kg in steps of 0.5 kg")]
+    [InlineData("0.5", "Enter at least 1.0 kg in steps of 0.5 kg")]
+    [InlineData("0.7", "Enter at least 1.0 kg in steps of 0.5 kg")]
+    [InlineData("1.2", "Enter multiples of 0.5 kg")]
+    [InlineData("1.499999", "Enter multiples of 0.5 kg")]
+    [InlineData("1.500001", "Enter multiples of 0.5 kg")]
+    public void Should_RejectQuantityWithMeasureHint_When_BelowMinimumOrBetweenSteps(string text, string message)
     {
         QuantityValidationResult result = Rules("kg", 0.5m, 1m).ValidateOrder(Number(text));
         Assert.False(result.IsValid);
         Assert.Null(result.Quantity);
-        Assert.Equal("Enter at least 1.0 kg in steps of 0.5 kg", result.Error);
+        Assert.Equal(message, result.Error);
     }
 
     [Theory]

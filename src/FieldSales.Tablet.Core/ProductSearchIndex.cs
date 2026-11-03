@@ -6,7 +6,7 @@ namespace FieldSales.Tablet.Core;
 /// <summary>A downloaded product as Order entry lists it: its breadcrumb and the base price in effect today
 /// (null when none is, so it cannot be ordered). <paramref name="CategoryId"/> places it on the Order Pad.</summary>
 public sealed record ProductSearchResult(Guid Id, string Code, string Name, string Breadcrumb, string Unit, decimal? Price,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null, decimal? QuantityStep = null, decimal? MinimumQuantity = null);
 
 /// <summary>The first <see cref="ProductSearchIndex.MaximumResults"/> matches, and how many matched in all.</summary>
 public sealed record ProductSearchOutcome(IReadOnlyList<ProductSearchResult> Results, int Total);
@@ -99,7 +99,7 @@ public sealed partial class SnapshotStore
             command.CommandText = """
                 SELECT p.id, p.code, p.name, p.category_id, p.unit,
                        (SELECT b.amount FROM base_prices b WHERE b.generation=p.generation AND b.product_id=p.id AND b.effective_from <= $today
-                        ORDER BY b.effective_from DESC LIMIT 1)
+                        ORDER BY b.effective_from DESC LIMIT 1), p.quantity_step, p.minimum_quantity
                 FROM products p WHERE p.generation=$g
                 """;
             command.Parameters.AddWithValue("$today", today.ToString("O", CultureInfo.InvariantCulture));
@@ -108,7 +108,7 @@ public sealed partial class SnapshotStore
             {
                 Guid category = Guid.Parse(rows.GetString(3));
                 products.Add(new(Guid.Parse(rows.GetString(0)), rows.GetString(1), rows.GetString(2), Path(category),
-                    rows.GetString(4), Number(rows, 5), category));
+                    rows.GetString(4), Number(rows, 5), category, Number(rows, 6), Number(rows, 7)));
             }
             transaction.Commit();
             return new(generation, products, padCategories);

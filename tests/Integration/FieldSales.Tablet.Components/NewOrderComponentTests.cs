@@ -20,7 +20,7 @@ public sealed partial class NewOrderComponentTests
     private static readonly ProductSearchResult[] Catalogue =
     [
         new(Guid.Parse("66000000-0000-0000-0000-000000000001"), "VITD-1000-90", "Vitamin D 1000IU 90s", "Health > Vitamins", "Each", 12.50m),
-        new(Guid.Parse("66000000-0000-0000-0000-000000000002"), "TEA-LOOSE", "Loose Herbal Tea", "Grocery > Tea", "kg", 4.80m),
+        new(Guid.Parse("66000000-0000-0000-0000-000000000002"), "TEA-LOOSE", "Loose Herbal Tea", "Grocery > Tea", "kg", 4.80m, QuantityStep: 0.5m, MinimumQuantity: 1m),
         new(Guid.Parse("66000000-0000-0000-0000-000000000003"), "VITC-500", "Vitamin C 500mg", "Health > Vitamins", "Each", null),
     ];
 
