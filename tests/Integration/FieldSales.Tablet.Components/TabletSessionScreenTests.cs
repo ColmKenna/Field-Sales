@@ -534,14 +534,21 @@ public sealed partial class TabletSessionScreenTests
             await Reopen();
         }
         public Task Close() => Renderer.Dispatcher.InvokeAsync(() => Renderer.Remove(Id));
+        // A rebuilt page gets the same route parameters as the page it replaces.
         public Task Reopen()
         {
             Id = Renderer.Attach(component);
-            return Open(new());
+            return Open(opened);
         }
-        public Task Open(Dictionary<string, object?> parameters) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, parameters));
+        private Dictionary<string, object?> opened = [];
+        public Task Open(Dictionary<string, object?> parameters)
+        {
+            opened = parameters;
+            return Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, parameters));
+        }
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
         public Task ClickLink(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLink(Id, text));
+        public Task Type(string elementId, string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Type(Id, elementId, text));
         public async Task Until(Func<bool> predicate)
         {
             for (int attempt = 0; attempt < 200; attempt++)
@@ -590,6 +597,42 @@ public sealed partial class TabletSessionScreenTests
             _ => ""
         }));
         public string[] Buttons(int id) => Events(id).Select(e => e.Text).ToArray();
+
+        /// <summary>Raises the input event of the element (input or textarea) with this id, as typing does.</summary>
+        public Task Type(int id, string elementId, string text) => DispatchEventAsync(
+            ElementAttributes(id, attributes => attributes.Any(a => a.AttributeName == "id" && a.AttributeValue?.ToString() == elementId))
+                .Single(a => a.AttributeName == "oninput").AttributeEventHandlerId, null, new ChangeEventArgs { Value = text });
+
+        /// <summary>The value of an attribute on the button whose text is <paramref name="text"/>, or null when it is absent.</summary>
+        public string? ButtonAttribute(int id, string text, string name)
+        {
+            RenderTreeFrame[] frames = Frames(id);
+            for (int i = 0; i < frames.Length; i++)
+            {
+                if (frames[i].FrameType != RenderTreeFrameType.Element || frames[i].ElementName != "button") continue;
+                RenderTreeFrame[] children = frames.Skip(i + 1).Take(frames[i].ElementSubtreeLength - 1).ToArray();
+                if (string.Concat(children.Where(f => f.FrameType == RenderTreeFrameType.Text).Select(f => f.TextContent)) != text) continue;
+                return children.FirstOrDefault(f => f.FrameType == RenderTreeFrameType.Attribute && f.AttributeName == name).AttributeValue?.ToString();
+            }
+            throw new InvalidOperationException($"Button {text} was not found.");
+        }
+
+        public IReadOnlyList<string> AttributeValues(int id, string name) => Frames(id)
+            .Where(frame => frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == name)
+            .Select(frame => frame.AttributeValue?.ToString() ?? "").ToArray();
+
+        private RenderTreeFrame[] ElementAttributes(int id, Func<RenderTreeFrame[], bool> match)
+        {
+            RenderTreeFrame[] frames = Frames(id);
+            for (int i = 0; i < frames.Length; i++)
+            {
+                if (frames[i].FrameType != RenderTreeFrameType.Element) continue;
+                RenderTreeFrame[] attributes = frames.Skip(i + 1).Take(frames[i].ElementSubtreeLength - 1)
+                    .TakeWhile(f => f.FrameType == RenderTreeFrameType.Attribute).ToArray();
+                if (match(attributes)) return attributes;
+            }
+            throw new InvalidOperationException("The element was not found.");
+        }
         public Task Click(int id, string text) => DispatchEventAsync(Events(id).First(e => e.Text == text).Event, null, EventArgs.Empty);
         public Task ClickLink(int id, string text) => DispatchEventAsync(Events(id, "a").First(e => e.Text.Contains(text, StringComparison.Ordinal)).Event, null, EventArgs.Empty);
         private IEnumerable<(string Text, ulong Event)> Events(int id, string element = "button")
