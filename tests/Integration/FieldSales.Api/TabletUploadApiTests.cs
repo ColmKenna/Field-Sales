@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Ordering;
+using FieldSales.Calls.Contracts;
 using FieldSales.Directory.Contracts;
 using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
@@ -183,11 +184,11 @@ public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClass
     }
 
     [Fact]
-    public async Task Should_StoreTheCallAsReceivedAndConfirmOnce_When_ASavedCallIsUploadedTwice()
+    public async Task Should_StoreTheCallOnce_When_ARecordedCallIsUploadedTwice()
     {
-        // Record Call (WI-047) defines a Call's contents; until then the server stores whatever object the tablet saved.
+        // WI-047 scenario 12: a Call recorded on T-06 is stored verbatim in the ledger and confirmed once.
         Guid id = Guid.NewGuid();
-        string body = $$"""{"id":"{{id}}","locationId":"{{Hickeys}}","channel":"InPerson","pitchNotes":"Autumn range"}""";
+        string body = CallJson(Call(id, Hickeys));
 
         using HttpResponseMessage first = await UploadAsync("colm", id, body, TabletUploadContract.CallPath(id));
         using HttpResponseMessage again = await UploadAsync("colm", id, body, TabletUploadContract.CallPath(id));
@@ -216,6 +217,8 @@ public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClass
     [InlineData("call", "not json", UploadFaults.Corrupt)]
     [InlineData("call", "[]", UploadFaults.Corrupt)]
     [InlineData("call", "id mismatch", UploadFaults.Incomplete)]
+    [InlineData("call", "nothing recorded", UploadFaults.Incomplete)]
+    [InlineData("call", "another rep", UploadFaults.NotYours)]
     public async Task Should_RefuseWithoutStoring_When_TheBodyIsCorruptIncompleteOrUnsupported(string kind, string fault, string expected)
     {
         Guid id = Guid.NewGuid();
@@ -232,7 +235,9 @@ public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClass
             ("order", "no lines") => Json(order with { Lines = [] }),
             ("order", "no snapshot") => Json(order with { Snapshot = null! }),
             ("order", "zero quantity") => Json(order with { Lines = [order.Lines[0] with { Quantity = 0m }] }),
-            ("call", "id mismatch") => $$"""{"id":"{{Guid.NewGuid()}}"}""",
+            ("call", "id mismatch") => CallJson(Call(Guid.NewGuid(), Hickeys)),
+            ("call", "nothing recorded") => CallJson(Call(id, Hickeys, notes: null)),
+            ("call", "another rep") => CallJson(Call(id, Hickeys, rep: "aoife")),
             _ => throw new ArgumentOutOfRangeException(nameof(fault))
         };
 
@@ -265,7 +270,7 @@ public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClass
 
         using HttpResponseMessage response = clash == "another rep"
             ? await UploadAsync("aoife", colms.Id, Json(colms with { CapturingRep = "aoife" }))
-            : await UploadAsync("colm", colms.Id, $$"""{"id":"{{colms.Id}}"}""", TabletUploadContract.CallPath(colms.Id));
+            : await UploadAsync("colm", colms.Id, CallJson(Call(colms.Id, Hickeys)), TabletUploadContract.CallPath(colms.Id));
 
         Assert.Equal((HttpStatusCode.Conflict, UploadFaults.IdInUse), (response.StatusCode, await FaultAsync(response)));
         ReceivedWork work = Assert.Single(await WorkAsync());
@@ -305,6 +310,24 @@ public sealed class TabletUploadApiTests(TabletSnapshotFixture fixture) : IClass
     }
 
     private static string Json(TabletOrder order) => JsonSerializer.Serialize(order, OrderJsonContext.Default.TabletOrder);
+
+    private static TabletCall Call(Guid id, Guid locationId, string rep = "colm", string? notes = "Presented autumn cold & flu range") =>
+        new(CallContract.Schema, CallContract.CurrentVersion, id, locationId, rep, new DateOnly(2026, 9, 22),
+            new DateTimeOffset(2026, 9, 22, 9, 15, 0, TimeSpan.FromHours(1)), CallChannel.InPerson, new(Morning.Version, Morning.BuiltUtc), notes);
+
+    private static string CallJson(TabletCall call) => JsonSerializer.Serialize(call, CallJsonContext.Default.TabletCall);
+
+    [Fact]
+    public async Task Should_SaveAndAcceptTheCall_When_TheShopWasReassignedAfterTheSnapshot()
+    {
+        // WI-047 scenario 7 (D6): the server never checks the directory, so a Call at a shop that is no longer colm's is accepted.
+        Guid id = Guid.NewGuid(), elsewhere = Guid.NewGuid();
+
+        using HttpResponseMessage response = await UploadAsync("colm", id, CallJson(Call(id, elsewhere)), TabletUploadContract.CallPath(id));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(ReceivedWorkKind.Call, Assert.Single(await WorkAsync()).Kind);
+    }
 
     private static StringContent Content(string body) => new(body, Encoding.UTF8, TabletUploadContract.MediaType);
 

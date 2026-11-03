@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
 
 namespace FieldSales.Tablet.Core;
@@ -49,6 +50,8 @@ public sealed partial class UnsentStore
                 ? snapshot?.ReadLocation(locationId)?.Location.Name ?? "Shop details unavailable" : "Shop details unavailable";
             string? channel = item.Kind == UnsentKind.Call && root.TryGetProperty("channel", out JsonElement value)
                 && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+            // A recorded Call names its channel as the rep reads it; an older body keeps whatever it held.
+            if (Enum.TryParse(channel, out CallChannel known)) channel = CallContract.Label(known);
             TabletOrder? order = OrderStore.Parse(item);
             if (order is not null && order.Lines.Any(line => line is null || line.Price is null)) order = null;
             return new UnsentView(item, location, order, channel)

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using FieldSales.Api.Catalogue;
+using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
 using Microsoft.EntityFrameworkCore;
@@ -38,12 +39,16 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         return await StoreAsync(id, ReceivedWorkKind.Order, repSubject, body, order, ct);
     }
 
-    /// <summary>Stores a saved Call as received. Its contents are defined with Record Call (WI-047), which adds its own
-    /// structure checks; until then a Call must be a JSON object and, when it names an id, name this one.</summary>
+    /// <summary>Stores a recorded Call as received (T-5.3.1). Only its structure is checked; the Location it names may have
+    /// been reassigned since the rep's snapshot, and that never refuses it. Calls stay in the ledger until Sales Operations
+    /// has a store of its own.</summary>
     public async Task<ReceiveResult> ReceiveCallAsync(Guid id, string repSubject, byte[] body, CancellationToken ct)
     {
-        ReceiveResult? refused = ReadCall(id, body);
-        return refused ?? await StoreAsync(id, ReceivedWorkKind.Call, repSubject, body, null, ct);
+        TabletCall? call = ReadCall(id, body, out ReceiveResult? refused);
+        if (call is null) return refused!;
+        if (!string.Equals(call.CapturingRep, repSubject, StringComparison.Ordinal))
+            return ReceiveResult.Refused(UploadFaults.NotYours, "The call was recorded by a different rep.");
+        return await StoreAsync(id, ReceivedWorkKind.Call, repSubject, body, null, ct);
     }
 
     private async Task<ReceiveResult> StoreAsync(Guid id, ReceivedWorkKind kind, string repSubject, byte[] body,
@@ -118,20 +123,41 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         _ => null
     };
 
-    internal static ReceiveResult? ReadCall(Guid id, byte[] body)
+    // Structure only: the body must be a Call this server can read, naming who, where, when, how, and something recorded.
+    internal static TabletCall? ReadCall(Guid id, byte[] body, out ReceiveResult? refused)
     {
+        refused = null;
+        TabletCall? call = null;
+        bool hasChannel = false;
         try
         {
-            using JsonDocument document = JsonDocument.Parse(body);
-            JsonElement root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object) return ReceiveResult.Refused(UploadFaults.Corrupt, "The call couldn't be read.");
-            if (root.TryGetProperty("id", out JsonElement named)
-                && !(named.ValueKind == JsonValueKind.String && named.TryGetGuid(out Guid value) && value == id))
-                return Incomplete("The call's id doesn't match where it was sent.");
-            return null;
+            using (JsonDocument document = JsonDocument.Parse(body))
+                if (document.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    // A missing channel would read as the enum's default, so its presence is checked on the raw body.
+                    hasChannel = document.RootElement.TryGetProperty("channel", out JsonElement channel) && channel.ValueKind == JsonValueKind.String;
+                    call = JsonSerializer.Deserialize(body, CallJsonContext.Default.TabletCall);
+                }
         }
-        catch (JsonException) { return ReceiveResult.Refused(UploadFaults.Corrupt, "The call couldn't be read."); }
+        catch (JsonException) { }
+        refused = call is null ? ReceiveResult.Refused(UploadFaults.Corrupt, "The call couldn't be read.") : CallFault(id, call, hasChannel);
+        return refused is null ? call : null;
     }
+
+    private static ReceiveResult? CallFault(Guid id, TabletCall call, bool hasChannel) => call switch
+    {
+        { Schema: not CallContract.Schema } => ReceiveResult.Refused(UploadFaults.Unsupported, "This isn't a call."),
+        { Version: < 1 or > CallContract.CurrentVersion } => ReceiveResult.Refused(UploadFaults.Unsupported, "This call version isn't supported."),
+        _ when call.Id != id => Incomplete("The call's id doesn't match where it was sent."),
+        _ when call.LocationId == Guid.Empty => Incomplete("The call has no Location."),
+        _ when string.IsNullOrWhiteSpace(call.CapturingRep) => Incomplete("The call has no rep."),
+        _ when call.CalledOn == default || call.SavedAt == default => Incomplete("The call has no date."),
+        _ when !hasChannel => Incomplete("The call has no channel."),
+        _ when call.Snapshot is null || string.IsNullOrWhiteSpace(call.Snapshot.Version) || call.Snapshot.Version.Length > 20
+            || call.Snapshot.BuiltUtc == default => Incomplete("The call has no snapshot reference."),
+        _ when call.Content.Problem is { } problem => Incomplete($"The call can't be accepted: {problem}."),
+        _ => null
+    };
 
     private static ReceiveResult Incomplete(string detail) => ReceiveResult.Refused(UploadFaults.Incomplete, detail);
 
