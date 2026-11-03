@@ -50,6 +50,19 @@ public sealed class TabletApp
     public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
         AddWork(rep, orderId, locationId, productId, quantity);
     public TabletOrder? ReadOrder(string rep, Guid orderId) => FindOrder(rep, orderId);
+    /// <summary>By default the order FindOrder returns, standing as its state says; set it to show Sending, Sent and so on.</summary>
+    public Func<string, Guid, OrderView?>? FindView { get; set; }
+    public OrderView? ReadOrderView(string rep, Guid orderId) => FindView is { } find ? find(rep, orderId)
+        : FindOrder(rep, orderId) is { } order
+            ? new(order, order.State == OrderState.ReadyToSend ? OrderStanding.ReadyToSend : OrderStanding.InProgress) : null;
+    public Func<string, Guid, Guid, decimal, OrderResult> ChangeLine { get; set; } = (_, _, _, _) => new OrderResult(null, "Not set up in this test.");
+    public OrderResult ChangeOrderLine(string rep, Guid orderId, Guid lineId, decimal quantity) => ChangeLine(rep, orderId, lineId, quantity);
+    public Func<string, Guid, Guid, bool, OrderResult> RemoveLine { get; set; } = (_, _, _, _) => new OrderResult(null, "Not set up in this test.");
+    public OrderResult RemoveOrderLine(string rep, Guid orderId, Guid lineId, bool deleteOrderIfLast) => RemoveLine(rep, orderId, lineId, deleteOrderIfLast);
+    public Func<string, Guid, OrderResult> Reopen { get; set; } = (_, _) => new OrderResult(null, "Not set up in this test.");
+    public OrderResult ReopenOrder(string rep, Guid orderId) => Reopen(rep, orderId);
+    public Func<string, Guid, bool, OrderResult> DeleteWork { get; set; } = (_, _, _) => new OrderResult(null, "Not set up in this test.");
+    public OrderResult DeleteOrder(string rep, Guid orderId, bool confirmed) => DeleteWork(rep, orderId, confirmed);
     public Func<string, CancellationToken, Task<SyncOutcome>> SyncWork { get; set; } = (_, _) =>
         Task.FromResult(new SyncOutcome(SyncStatus.Completed, "Last synced 07:42", null));
     public IProgress<UploadProgress>? Progress { get; private set; }

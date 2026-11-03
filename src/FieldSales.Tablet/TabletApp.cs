@@ -175,6 +175,20 @@ public sealed class TabletApp : IDisposable
 
     public OrderResult MarkOrderReady(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).MarkReadyToSend(orderId);
 
+    // Changing an unsent order before Sync (T-5.2.1); OrderTransitions decides what each standing allows.
+    public OrderView? ReadOrderView(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Read(orderId);
+
+    public OrderResult ChangeOrderLine(string rep, Guid orderId, Guid lineId, decimal quantity) =>
+        new OrderStore(device.Workspace(rep), clock).ChangeQuantity(orderId, lineId, quantity);
+
+    public OrderResult RemoveOrderLine(string rep, Guid orderId, Guid lineId, bool deleteOrderIfLast) =>
+        new OrderStore(device.Workspace(rep), clock).RemoveLine(orderId, lineId, deleteOrderIfLast);
+
+    public OrderResult ReopenOrder(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Reopen(orderId);
+
+    public OrderResult DeleteOrder(string rep, Guid orderId, bool confirmed) =>
+        new OrderStore(device.Workspace(rep), clock).Delete(orderId, confirmed);
+
     /// <summary>The rep's Unsent count: every saved item, and how many orders are in progress or ready to send.</summary>
     public UnsentSummary ReadUnsentSummary(string rep) => new UnsentStore(device.Workspace(rep)).Summarise();
 

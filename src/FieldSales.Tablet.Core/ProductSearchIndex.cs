@@ -17,7 +17,7 @@ public sealed class ProductSearchIndex
 {
     public const int MaximumResults = 50;
     private readonly (ProductSearchResult Product, string Name, string Code)[] rows;
-    private readonly HashSet<Guid> productIds;
+    private readonly Dictionary<Guid, ProductSearchResult> products;
     private readonly IReadOnlyList<PadCategory> categories;
     private OrderPad? pad;
 
@@ -31,12 +31,15 @@ public sealed class ProductSearchIndex
             .ThenBy(row => LocationSearchIndex.Normalize(row.Product.Breadcrumb), StringComparer.Ordinal)
             .ThenBy(row => row.Code, StringComparer.Ordinal)
             .ThenBy(row => row.Product.Id).ToArray();
-        productIds = rows.Select(row => row.Product.Id).ToHashSet();
+        this.products = rows.ToDictionary(row => row.Product.Id, row => row.Product);
     }
 
     public string? Generation { get; }
     public int Count => rows.Length;
-    public bool Contains(Guid productId) => productIds.Contains(productId);
+    public bool Contains(Guid productId) => products.ContainsKey(productId);
+
+    /// <summary>The downloaded product with this id, or null when it isn't on the current snapshot.</summary>
+    public ProductSearchResult? Find(Guid productId) => products.GetValueOrDefault(productId);
 
     /// <summary>The same products by category, built on first use. Like the index, it is never changed afterwards.</summary>
     public OrderPad Pad => pad ??= OrderPad.Build(categories, rows.Select(row => row.Product));

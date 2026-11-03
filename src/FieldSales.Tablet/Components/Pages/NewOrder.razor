@@ -1,4 +1,5 @@
 @page "/locations/{LocationId:guid}/orders/new"
+@page "/locations/{LocationId:guid}/orders/{OrderId:guid}"
 @inherits OfflineCataloguePage
 @using System.Diagnostics
 @using System.Globalization
@@ -8,30 +9,32 @@
 @using Microsoft.JSInterop
 @inject IServiceProvider Services
 
-@* T-07 · Order entry: the Order Pad by category (T7.3) and search. The Low tab and Review come later. *@
+@* T-07 · Order entry: the Order Pad by category (T7.3) and search. The Low tab and Review come later.
+   T-5.2.1: the same screen opens a saved order by id; OrderTransitions decides which controls its standing gets. *@
 <section class="new-order">
     <nav class="shop-back" aria-label="Order navigation"><a href="@($"/locations/{LocationId}")">Back to shop</a></nav>
-    @if (!Ready) { <h1>New order</h1><p role="status">Opening order…</p> }
-    else if (problem is not null) { <h1>New order unavailable</h1><p role="alert">@problem</p> }
-    else if (detail is not { IsAssigned: true }) { <h1>New order unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
+    @if (!Ready) { <h1>@Heading</h1><p role="status">Opening order…</p> }
+    else if (problem is not null) { <h1>@Heading unavailable</h1><p role="alert">@problem</p> }
+    else if (OrderId is null && detail is not { IsAssigned: true }) { <h1>New order unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
+    else if (OrderId is not null && order is null) { <h1>Order unavailable</h1><p role="alert">@OrderStore.NotFound</p> }
     else
     {
         <header class="order-header">
-            <h1>New order</h1>
-            <p class="order-shop">@detail.Location.Name</p>
+            <h1>@Heading</h1>
+            <p class="order-shop">@(detail?.Location.Name ?? "Shop details unavailable")</p>
         </header>
-        @if (IsReady)
+        @if (StatusNotice is { } notice)
         {
-            <p class="ready-notice" role="status">Ready to Send. It goes to head office at your next Sync.</p>
+            <p class="ready-notice" role="status">@notice</p>
         }
-        else
+        @if (CanAdd)
         {
             <div class="search-field">
                 <label for="product-search">Find a product</label>
                 <input id="product-search" type="search" value="@query" @oninput="SearchAsync" autocomplete="off" />
             </div>
         }
-        @if (!IsReady && !string.IsNullOrWhiteSpace(query))
+        @if (CanAdd && !string.IsNullOrWhiteSpace(query))
         {
             <div role="status" aria-live="polite">
                 @if (results.Total == 0) { <p>No products match '@query.Trim()'</p> }
@@ -52,7 +55,7 @@
             </ul>
             @if (selected is not null) { @AddLine }
         }
-        else if (!IsReady && index is not null)
+        else if (CanAdd && index is not null)
         {
             <section class="order-pad" aria-label="Order pad">
                 @if (index.Pad.Categories.Count == 0) { <p>No products in your downloaded day.</p> }
@@ -75,28 +78,67 @@
                             <span class="line-total">@Money(line.Price.Amount * line.Quantity)</span>
                             @if (index is not null && !index.Contains(line.ProductId))
                             { <span class="captured-line-notice">@OrderStore.NoLongerAvailable</span> }
+                            @if (editingLine == line.Id) { @ChangeLine(line) }
+                            else if (CanChangeLines && confirm is null)
+                            {
+                                <div class="line-actions">
+                                    <button type="button" class="secondary" aria-label="@($"Change {line.ProductName}")" disabled="@busy"
+                                            @onclick="() => StartChange(line)">Change</button>
+                                    <button type="button" class="secondary" aria-label="@($"Remove {line.ProductName}")" disabled="@busy"
+                                            @onclick="() => RemoveAsync(line)">Remove</button>
+                                </div>
+                            }
                         </li>
                     }
                 </ul>
             }
         </section>
+        @if (confirm is { } ask)
+        {
+            <section class="order-confirm" role="alertdialog" aria-labelledby="order-confirm-question">
+                <p id="order-confirm-question" class="confirm-question"><strong>@ask.Question</strong></p>
+                <div class="order-actions">
+                    <button type="button" class="danger" disabled="@busy" @onclick="ConfirmAsync">@ask.Yes</button>
+                    <button type="button" class="secondary" disabled="@busy" @onclick="() => confirm = null">@ask.No</button>
+                </div>
+            </section>
+        }
         <footer class="order-footer">
             <p class="order-summary" role="status">@Summary</p>
             @if (readyError is not null) { <p class="problem" role="alert">@readyError</p> }
-            <div class="order-actions">
-                <button type="button" class="secondary" @onclick="SaveAndClose">@(IsReady ? "Close" : "Save and close")</button>
-                @if (!IsReady) { <button type="button" class="primary" disabled="@busy" @onclick="MarkReadyAsync">Mark Ready to Send</button> }
-            </div>
+            @if (confirm is null)
+            {
+                <div class="order-actions">
+                    <button type="button" class="secondary" @onclick="SaveAndClose">@(CanEdit ? "Save and close" : "Close")</button>
+                    @if (CanEdit) { <button type="button" class="primary" disabled="@busy" @onclick="MarkReadyAsync">Mark Ready to Send</button> }
+                    @if (Standing == OrderStanding.ReadyToSend)
+                    { <button type="button" class="primary" disabled="@busy" @onclick="ReopenAsync">Reopen</button> }
+                    @if (CanChangeLines || Standing == OrderStanding.ReadyToSend)
+                    { <button type="button" class="danger" disabled="@busy" @onclick="AskDelete">Delete order</button> }
+                </div>
+            }
         </footer>
     }
 </section>
 
 @code {
     [Parameter] public Guid LocationId { get; set; }
+    /// <summary>A saved order to open (T-5.2.1). Absent on the New Order route.</summary>
+    [Parameter] public Guid? OrderId { get; set; }
+
+    private const string SaveFailed = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
 
     // One order for the whole screen: the id is chosen here, so repeating an add can never start a second order.
     private Guid orderId = Guid.NewGuid();
     private Guid orderShop;
+    private Guid? openedOrder;
+    // The standing last read from the tablet; Sending, Sent and Needs Attention can only change by reading again.
+    private OrderStanding readStanding = OrderStanding.New;
+    private DateTimeOffset? sentUtc;
+    private Guid? editingLine;
+    private string editText = "";
+    private string? lineError;
+    private Confirmation? confirm;
     private string? rep;
     private OfflineLocationDetail? detail;
     private ProductSearchIndex? index;
@@ -114,7 +156,58 @@
     private readonly HashSet<Guid> expanded = [];
     private long? searchStarted;
 
-    private bool IsReady => order is { State: OrderState.ReadyToSend };
+    private string Heading => OrderId is null ? "New order" : "Order";
+
+    private OrderStanding Standing => readStanding is OrderStanding.Sending or OrderStanding.Sent or OrderStanding.NeedsAttention
+        ? readStanding
+        : order is null ? OrderStanding.New : order.State == OrderState.ReadyToSend ? OrderStanding.ReadyToSend : OrderStanding.InProgress;
+
+    // Adding follows the current snapshot, so it needs the shop assigned; changing captured lines doesn't (D4).
+    private bool CanEdit => Standing is OrderStanding.New or OrderStanding.InProgress;
+    private bool CanAdd => CanEdit && detail is { IsAssigned: true };
+    private bool CanChangeLines => Standing == OrderStanding.InProgress && order is { Lines.Count: > 0 };
+
+    private string? StatusNotice => Standing switch
+    {
+        OrderStanding.ReadyToSend => "Ready to Send. It goes to head office at your next Sync.",
+        OrderStanding.Sending => OrderStore.SendingUnconfirmed,
+        OrderStanding.Sent => sentUtc is { } at
+            ? $"Sent {at.ToLocalTime().ToString("d MMM HH:mm", CultureInfo.InvariantCulture)}. It can't be changed on this tablet."
+            : "Sent. It can't be changed on this tablet.",
+        OrderStanding.NeedsAttention => "This order needs attention. Review it from Sync.",
+        OrderStanding.InProgress when detail is not { IsAssigned: true } =>
+            $"{OrderStore.NotAssigned} You can change or remove its lines but not add products.",
+        _ => null
+    };
+
+    /// <summary>A question the rep answers before an order goes: Delete order, or removing its last line (US-013 S3, S4).</summary>
+    private sealed record Confirmation(string Question, string Yes, string No, Guid? LineId)
+    {
+        public static Confirmation DeleteOrder { get; } = new(OrderStore.DeletePrompt, "Delete order", "Keep order", null);
+        public static Confirmation LastLine(Guid line) => new(OrderStore.LastLinePrompt, "Remove and delete", "Keep line", line);
+    }
+
+    /// <summary>Changing one line's quantity: the field opens with what is on the order; measured products keep their stepper.</summary>
+    private RenderFragment ChangeLine(OrderLine line) => @<div class="change-line">
+        <label for="edit-quantity">New quantity@(line.Unit == "Each" ? "" : $" ({line.Unit})")</label>
+        <input id="edit-quantity" type="text" inputmode="decimal" value="@editText" @oninput="EditChanged" autocomplete="off"
+               aria-describedby="@(lineError is null ? null : "edit-error")" />
+        @if (line.Unit != "Each" && EditRules(line) is { } rules)
+        {
+            <div class="quantity-stepper" role="group" aria-label="New quantity controls">
+                <button type="button" class="secondary" aria-label="Decrease new quantity" disabled="@(busy || EditStep(rules, false) is null)"
+                        @onclick="() => StepEdit(rules, false)">−</button>
+                <span>@line.Unit</span>
+                <button type="button" class="secondary" aria-label="Increase new quantity" disabled="@(busy || EditStep(rules, true) is null)"
+                        @onclick="() => StepEdit(rules, true)">+</button>
+            </div>
+        }
+        <div class="order-actions">
+            <button type="button" class="primary" disabled="@busy" @onclick="() => SaveChangeAsync(line)">Save</button>
+            <button type="button" class="secondary" disabled="@busy" @onclick="CancelChange">Cancel</button>
+        </div>
+        @if (lineError is not null) { <p id="edit-error" class="problem" role="alert">@lineError</p> }
+    </div>;
 
     /// <summary>One category header with the full breadcrumb (T7.3). Expanded: its subcategories first, then the products
     /// directly in it under "In {name} (n)" (the T-1.1.2 ordering).</summary>
@@ -194,36 +287,51 @@
 
     protected override Task OnParametersSetAsync()
     {
-        if (orderShop != LocationId) { orderShop = LocationId; orderId = Guid.NewGuid(); expanded.Clear(); ResetEntry(); }
+        if (orderShop != LocationId || openedOrder != OrderId)
+        {
+            orderShop = LocationId; openedOrder = OrderId; orderId = OrderId ?? Guid.NewGuid(); expanded.Clear(); ResetEntry();
+        }
         return base.OnParametersSetAsync();
     }
 
-    protected override void Clear() { rep = null; detail = null; index = null; order = null; problem = null; ResetEntry(); }
+    protected override void Clear()
+    {
+        rep = null; detail = null; index = null; order = null; problem = null; readStanding = OrderStanding.New; sentUtc = null;
+        ResetEntry();
+    }
 
     private void Toggle(Guid category) { if (!expanded.Remove(category)) expanded.Add(category); }
 
     private decimal? OnOrder(Guid product) =>
         order?.Lines.Where(line => line.ProductId == product).Select(line => line.Quantity).DefaultIfEmpty().Sum() is decimal sum and > 0 ? sum : null;
 
-    private void ResetEntry() { ++revision; query = ""; results = new([], 0); selected = null; quantityText = ""; addError = null; readyError = null; }
+    private void ResetEntry()
+    {
+        ++revision; query = ""; results = new([], 0); selected = null; quantityText = ""; addError = null; readyError = null;
+        editingLine = null; lineError = null; confirm = null;
+    }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
     {
         Guid shop = LocationId, id = orderId;
+        bool saved = OrderId is not null;
         try
         {
             OfflineLocationDetail? readDetail = null;
             ProductSearchIndex? readIndex = null;
-            TabletOrder? readOrder = null;
+            OrderView? readView = null;
             await Task.Run(() =>
             {
                 readDetail = Tablet.ReadLocation(repSubject, shop);
-                if (readDetail is not { IsAssigned: true }) return;
+                // A new order needs the shop assigned; a saved one opens whatever happened to the shop since (D4).
+                if (!saved && readDetail is not { IsAssigned: true }) return;
                 readIndex = Tablet.ReadProductIndex(repSubject);
-                readOrder = Tablet.ReadOrder(repSubject, id);
+                readView = Tablet.ReadOrderView(repSubject, id);
             });
             if (!isCurrent()) return;
-            rep = repSubject; detail = readDetail; index = readIndex; order = readOrder;
+            rep = repSubject; detail = readDetail; index = readIndex;
+            order = readView?.Order; readStanding = readView?.Standing ?? OrderStanding.New; sentUtc = readView?.SentUtc;
+            if (order is not null && order.LocationId != shop) problem = "This order is for a different shop.";
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {
@@ -319,7 +427,7 @@
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {
-            if (version == Tablet.SessionVersion) addError = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
+            if (version == Tablet.SessionVersion) addError = SaveFailed;
         }
         finally { busy = false; }
     }
@@ -341,16 +449,122 @@
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {
-            if (version == Tablet.SessionVersion) readyError = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
+            if (version == Tablet.SessionVersion) readyError = SaveFailed;
         }
         finally { busy = false; }
     }
 
     private void SaveAndClose() => Navigation.NavigateTo($"/locations/{LocationId}");
 
+    // T-5.2.1: changes to a saved order. The store applies OrderTransitions; the screen only offers what the standing allows.
+    private void StartChange(OrderLine line)
+    {
+        if (busy || !CanChangeLines) return;
+        editingLine = line.Id; editText = Number(line.Quantity, line.Unit); lineError = null; readyError = null;
+    }
+
+    private void CancelChange() { editingLine = null; lineError = null; }
+
+    private void EditChanged(ChangeEventArgs args) { editText = args.Value?.ToString() ?? ""; lineError = null; }
+
+    private QuantityRules? EditRules(OrderLine line) => index?.Find(line.ProductId) is { } product
+        && QuantityRules.TryCreate(product.Unit, product.QuantityStep, product.MinimumQuantity, out QuantityRules? rules, out _) ? rules : null;
+
+    private decimal? EditStep(QuantityRules rules, bool increase)
+    {
+        decimal current = ParseQuantity(editText);
+        if (!rules.ValidateOrder(current).IsValid) return null;
+        decimal next = current + (increase ? rules.Step.Amount : -rules.Step.Amount);
+        return rules.ValidateOrder(next).IsValid ? next : null;
+    }
+
+    private void StepEdit(QuantityRules rules, bool increase)
+    {
+        if (busy || EditStep(rules, increase) is not decimal next) return;
+        editText = next.ToString("0.0#####", CultureInfo.InvariantCulture);
+        lineError = null;
+    }
+
+    private async Task SaveChangeAsync(OrderLine line)
+    {
+        decimal quantity = ParseQuantity(editText);
+        if (await ActAsync((repSubject, id) => Tablet.ChangeOrderLine(repSubject, id, line.Id, quantity)) is not { } result) return;
+        if (result.Succeeded || Standing != OrderStanding.InProgress) editingLine = null;
+        if (!result.Succeeded) { if (editingLine is null) readyError = result.Error; else lineError = result.Error; }
+    }
+
+    private async Task RemoveAsync(OrderLine line)
+    {
+        if (busy || !CanChangeLines) return;
+        // S4: the last line goes only with the order, so ask first.
+        if (order!.Lines.Count == 1) { confirm = Confirmation.LastLine(line.Id); editingLine = null; return; }
+        OrderResult? result = await ActAsync((repSubject, id) => Tablet.RemoveOrderLine(repSubject, id, line.Id, false));
+        if (result is { NeedsConfirmation: true }) confirm = Confirmation.LastLine(line.Id);
+        else if (result is { Succeeded: false }) readyError = result.Error;
+    }
+
+    private void AskDelete()
+    {
+        if (busy) return;
+        confirm = Confirmation.DeleteOrder; editingLine = null; readyError = null;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (confirm is not { } ask) return;
+        OrderResult? result = await ActAsync((repSubject, id) => ask.LineId is Guid line
+            ? Tablet.RemoveOrderLine(repSubject, id, line, true) : Tablet.DeleteOrder(repSubject, id, true));
+        if (result is null || result.Deleted) return;
+        confirm = null;
+        if (!result.Succeeded) readyError = result.Error;
+    }
+
+    private async Task ReopenAsync()
+    {
+        if (await ActAsync((repSubject, id) => Tablet.ReopenOrder(repSubject, id)) is not { } result) return;
+        if (result.Succeeded) ResetEntry();
+        else readyError = result.Error;
+    }
+
+    /// <summary>Runs one change on a worker thread for the rep and session that started it. A deleted order returns the rep to
+    /// the shop. A refused change re-reads the order, because a Sync may have claimed, sent or refused it meanwhile.</summary>
+    private async Task<OrderResult?> ActAsync(Func<string, Guid, OrderResult> change)
+    {
+        if (busy || rep is null) return null;
+        busy = true;
+        readyError = null; lineError = null;
+        string repSubject = rep;
+        Guid shop = LocationId, id = orderId;
+        long version = Tablet.SessionVersion;
+        try
+        {
+            OrderResult result = await Task.Run(() => change(repSubject, id));
+            if (version != Tablet.SessionVersion || orderShop != shop) return null;
+            if (result.Deleted) { Navigation.NavigateTo($"/locations/{shop}"); return result; }
+            if (result.Succeeded) { order = result.Order; return result; }
+            if (!result.NeedsConfirmation)
+            {
+                OrderView? now = await Task.Run(() => Tablet.ReadOrderView(repSubject, id));
+                if (version != Tablet.SessionVersion || orderShop != shop) return null;
+                if (now is not null) { order = now.Order; readStanding = now.Standing; sentUtc = now.SentUtc; }
+            }
+            return result;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version == Tablet.SessionVersion) readyError = SaveFailed;
+            return null;
+        }
+        finally { busy = false; }
+    }
+
+    private static decimal ParseQuantity(string text) =>
+        decimal.TryParse(text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal amount) ? amount : 0m;
+
     private static string Money(decimal amount) => "€" + amount.ToString("N2", CultureInfo.InvariantCulture);
     private static string PerUnit(string unit) => unit == "Each" ? "" : $" per {unit}";
     private static string LineQuantity(OrderLine line) => Quantity(line.Quantity, line.Unit);
-    private static string Quantity(decimal quantity, string unit) =>
-        quantity.ToString(unit == "Each" ? "0" : "0.0#####", CultureInfo.InvariantCulture) + (unit == "Each" ? "" : $" {unit}");
+    private static string Number(decimal quantity, string unit) =>
+        quantity.ToString(unit == "Each" ? "0" : "0.0#####", CultureInfo.InvariantCulture);
+    private static string Quantity(decimal quantity, string unit) => Number(quantity, unit) + (unit == "Each" ? "" : $" {unit}");
 }
