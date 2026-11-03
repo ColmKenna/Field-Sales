@@ -10,7 +10,10 @@
 {
     <HomeRecordSection Section="section" @key="section.Id" />
 }
+@AdditionalSections
 
 @code {
     [Parameter, EditorRequired] public HomeDayRecord Record { get; set; } = null!;
+    // Later features may compose a section with its own model and interactions after Today's record.
+    [Parameter] public RenderFragment? AdditionalSections { get; set; }
 }

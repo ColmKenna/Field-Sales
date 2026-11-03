@@ -63,6 +63,31 @@ public sealed class HomeRecordComponentTests
     }
 
     [Fact]
+    public async Task Should_RenderAnIndependentSection_When_AFeatureSuppliesItsOwnContent()
+    {
+        RenderFragment extra = builder =>
+        {
+            builder.OpenElement(0, "section");
+            builder.AddAttribute(1, "aria-label", "Example independent section");
+            builder.OpenElement(2, "h2");
+            builder.AddContent(3, "Example request section");
+            builder.CloseElement();
+            builder.OpenElement(4, "a");
+            builder.AddAttribute(5, "href", "/fixture-request");
+            builder.AddContent(6, "Example request action");
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+        string html = await Render(S2(), extra);
+        Assert.Contains("Example request section", html);
+        Assert.Contains("href=\"/fixture-request\"", html);
+        Assert.Contains("Example request action", html);
+        Assert.Contains("Murphy's Pharmacy", html);
+        Assert.Contains("Saved 11:15", html);
+        Assert.True(html.IndexOf("Unplanned today", StringComparison.Ordinal) < html.IndexOf("Example request section", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Should_ShowZeroAsTextInsteadOfAnActiveException_When_ThereIsNothingUnsent()
     {
         var empty = S2() with { Counters = [new("unsent", "Unsent", 0, "/sync")], Sections = [] };
@@ -77,14 +102,14 @@ public sealed class HomeRecordComponentTests
          new("unplanned", "Unplanned today", [new(Nolans, false, [],
             [new(Guid.NewGuid(), At.AddMinutes(95), OrderStanding.ReadyToSend, 3)])])]);
 
-    private static async Task<string> Render(HomeDayRecord record)
+    private static async Task<string> Render(HomeDayRecord record, RenderFragment? extra = null)
     {
         await using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
         await using HtmlRenderer renderer = new(services, services.GetRequiredService<ILoggerFactory>());
         return await renderer.Dispatcher.InvokeAsync(async () =>
         {
             var result = await renderer.RenderComponentAsync<HomeDayView>(ParameterView.FromDictionary(
-                new Dictionary<string, object?> { [nameof(HomeDayView.Record)] = record }));
+                new Dictionary<string, object?> { [nameof(HomeDayView.Record)] = record, [nameof(HomeDayView.AdditionalSections)] = extra }));
             return WebUtility.HtmlDecode(result.ToHtmlString());
         });
     }
