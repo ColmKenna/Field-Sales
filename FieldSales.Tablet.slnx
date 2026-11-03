@@ -1,6 +1,7 @@
 <Solution>
   <!-- Mobile workloads (Android, plus iOS on macOS) stay outside the server solution. -->
   <Project Path="src/FieldSales.Snapshot.Contracts/FieldSales.Snapshot.Contracts.csproj" />
+  <Project Path="src/FieldSales.Calls.Contracts/FieldSales.Calls.Contracts.csproj" />
   <Project Path="src/FieldSales.Ordering.Contracts/FieldSales.Ordering.Contracts.csproj" />
   <Project Path="src/FieldSales.Quantities/FieldSales.Quantities.csproj" />
   <Project Path="src/FieldSales.Tablet.Core/FieldSales.Tablet.Core.csproj" />

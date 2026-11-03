@@ -3,6 +3,24 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-047 the Call body and Record Call (2026-11-03, developer, plan approval)
+
+The developer replied **Approved** to the WI-047 plan with the recommended D1–D10, then **Apply** with the remaining stops lifted, and
+answered D11: **push, open a PR, merge once CI passes, then update local main**. Full text in `WI-047.md`.
+
+- **Call body v1** (`FieldSales.Calls.Contracts`): `schema "field-sales-call"`, `version`, `id`, `locationId` (top level, read by shop
+  retention), `capturingRep` (sign-in subject; names resolve from identity), `calledOn`, `savedAt`, `channel` InPerson|Phone,
+  `snapshot {version, builtUtc}`, `pitchNotes` (absent when none; trimmed; at most 4,000 characters).
+- **Extension points are reserved optional sections within version 1**, absent meaning empty: `stockEntries[]` (T-5.4.1, T-5.3.2, with
+  a per-entry `low` for T-5.5.1), `competitorNotes[]` (T-5.8.1), `followUpOf` (T-5.7.1), `campaignOutcomes[]` (E20), `rangeReview{}`
+  (E23). Call Purposes are derived from the sections present. Visit Due completion (E13) derives from location, rep and date.
+- **A saved Call is immutable:** `CallStore` has Save only. Corrections (WI-055) add their own operation behind the WI-046 upload claim.
+- **Checks shared by tablet and server:** no channel → "Choose In person or Phone"; nothing recorded (either channel) → "Add pitch notes,
+  a stock check or a competitor note". The server refuses a malformed Call as `unsupported` / `incomplete` / `not-yours`; it never checks
+  the directory, so a Call at a shop reassigned since the snapshot is accepted. Calls stay in `ReceivedWork` only (no server table yet).
+- **Review dialog:** "Save this call?", the one-line summary joined with " · ", **Back** and **Save** (story wording over the T-06 lines).
+- **Unsaved drafts** live in app memory per rep, session and shop, so a resume rebuild restores them; leaving with content asks first.
+
 ## WI-046 editing unsent orders and the upload claim (2026-11-03, developer, plan approval)
 
 The developer replied **Approved** to the WI-046 plan with the recommended D1–D6, then **Apply**. Full table and scenarios in `WI-046.md`.

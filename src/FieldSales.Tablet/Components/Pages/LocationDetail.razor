@@ -33,7 +33,7 @@
         @if (detail.IsAssigned)
         {
             <div class="shop-actions" aria-label="Start work at this shop">
-                <button class="primary" @onclick='() => ExplainAction("Record Call")'>Record Call</button>
+                <button class="primary" @onclick="RecordCall">Record Call</button>
                 <button class="primary" @onclick="NewOrder">New Order</button>
             </div>
             @if (actionMessage is not null) { <p class="action-message" role="status">@actionMessage</p> }
@@ -58,7 +58,8 @@
     private string? actionMessage;
     private string? problem;
     protected override void Clear() { detail = null; actionMessage = null; problem = null; }
-    private void ExplainAction(string action) => actionMessage = $"{action} isn't available on this tablet yet.";
+    public const string CallSaved = "Call saved. It goes to head office at your next Sync.";
+    private void RecordCall() => Navigation.NavigateTo($"/locations/{Id}/calls/new");
     private void NewOrder() => Navigation.NavigateTo($"/locations/{Id}/orders/new");
     protected override async Task ReadAsync(string rep, Func<bool> isCurrent)
     {
@@ -66,7 +67,10 @@
         try
         {
             OfflineLocationDetail? read = await Task.Run(() => Tablet.ReadLocation(rep, id));
-            if (isCurrent()) detail = read;
+            if (!isCurrent()) return;
+            detail = read;
+            // Back from T-06 after saving: say so once (WI-047).
+            if (Tablet.CallDrafts.TakeSaved(rep, Tablet.SessionVersion, id)) actionMessage = CallSaved;
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {

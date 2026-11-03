@@ -1,3 +1,4 @@
+using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
 using FieldSales.Tablet.Core;
 
@@ -24,6 +25,9 @@ public sealed class TabletApp
     public Task<bool> SignOutAsync(long version) => End(version);
     public const string SignInNeedsConnection = "Sign-in needs a connection. Try again when you have signal.";
     public SyncNotices SyncNotices { get; } = new();
+    public CallDrafts CallDrafts { get; } = new();
+    public Func<string, Guid, Guid, CallContent, CallResult> SaveWork { get; set; } = (_, _, _, _) => new CallResult(null, "Not set up in this test.");
+    public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content) => SaveWork(rep, callId, locationId, content);
     public Func<Task<SignInAnswer>> SignIn { get; set; } = () => Task.FromResult(new SignInAnswer(null, null));
     public Task<SignInAnswer> SignInAsync() => SignIn();
     public HomeView Home { get; set; } = new("Last synced 07:42", []);

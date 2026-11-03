@@ -169,3 +169,20 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .change-line .problem { flex-basis: 100%; margin: 0; }
 .order-confirm { margin-top: 24px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--alert); border-radius: 8px; }
 .order-confirm .confirm-question { margin: 0 0 16px; }
+
+/* WI-047 (T-5.3.1): T-06 Record call. The selected channel is marked by more than colour (T6.2, never colour alone). */
+.call-channel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 24px; padding: 0; border: none; }
+.call-channel legend { grid-column: 1 / -1; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.channel-option { min-height: 96px; font-size: 1.25rem; background: var(--surface); color: var(--brand); border-width: 2px; }
+.channel-option[aria-pressed="true"] { background: var(--brand); color: #fff; border-width: 4px; }
+.channel-option[aria-pressed="true"]::before { content: "\2713\00a0"; }
+.call-section { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.call-section-heading { margin: 0; }
+.section-header { width: 100%; text-align: left; background: none; border: none; border-radius: 8px; color: var(--ink); font-weight: 600; min-height: 56px; }
+.section-header[aria-expanded="false"]::after { content: " \25BE"; }
+.section-header[aria-expanded="true"]::after { content: " \25B4"; }
+.call-section-body { display: flex; flex-direction: column; gap: 8px; padding: 0 24px 20px; }
+.call-section-body textarea { font: inherit; padding: 8px 12px; border: 1px solid var(--muted); border-radius: 6px; resize: vertical; }
+.call-review { margin-top: 24px; padding: 20px 24px; background: var(--surface); border: 2px solid var(--brand); border-radius: 8px; }
+.call-review h2 { color: var(--ink); margin-top: 0; }
+.call-summary { font-size: 1.1rem; font-weight: 600; margin: 0 0 20px; }

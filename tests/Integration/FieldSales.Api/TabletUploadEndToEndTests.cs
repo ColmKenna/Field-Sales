@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Ordering;
+using FieldSales.Calls.Contracts;
 using FieldSales.Directory.Contracts;
 using FieldSales.StaffAccess;
 using FieldSales.Tablet.Core;
@@ -94,9 +95,8 @@ public sealed class TabletUploadEndToEndTests(TabletSnapshotFixture fixture) : I
         Guid orderId = Guid.NewGuid();
         Assert.True(orders.AddLine(orderId, quinns, vitamin, 12m).Succeeded);
         Assert.True(orders.MarkReadyToSend(orderId).Succeeded);
-        Guid callId = Guid.NewGuid();
-        new UnsentStore(Workspace).Save(new(callId, UnsentKind.Call, _clock.GetUtcNow(),
-            $$"""{"id":"{{callId}}","locationId":"{{quinns}}","channel":"Phone","note":"Café — rang back"}"""));
+        // A Call recorded the way T-06 records it (WI-047), so the server checks the real body.
+        Assert.True(new CallStore(Workspace, _clock).Save(Guid.NewGuid(), quinns, new(CallChannel.Phone, "Café — rang back")).Succeeded);
 
         SyncOutcome first = await SyncAsync();
         SyncOutcome second = await SyncAsync();

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using FieldSales.Api.Ordering;
+using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
 
@@ -86,33 +87,69 @@ public sealed class TabletWorkPayloadTests
         Assert.False(string.IsNullOrWhiteSpace(refused.Detail));
     }
 
-    [Theory]
-    [InlineData("{}")]
-    [InlineData("{\"notes\":\"Shop closed\"}")]
-    [InlineData("matching id")]
-    public void Should_AcceptTheCall_When_ItIsAnObjectNamingNoOtherId(string body)
+    private static TabletCall Call(Guid id) => new(CallContract.Schema, CallContract.CurrentVersion, id, Shop, "colm",
+        new DateOnly(2026, 9, 22), new DateTimeOffset(2026, 9, 22, 9, 15, 0, TimeSpan.FromHours(1)), CallChannel.InPerson,
+        new(Morning.Version, Morning.BuiltUtc), "Presented autumn cold & flu range");
+
+    private static byte[] Body(TabletCall call) => JsonSerializer.SerializeToUtf8Bytes(call, CallJsonContext.Default.TabletCall);
+
+    [Fact]
+    public void Should_AcceptTheCall_When_ItIsARecordedCall()
     {
         Guid id = Guid.NewGuid();
-        if (body == "matching id") body = $$"""{"id":"{{id}}"}""";
 
-        Assert.Null(TabletWorkReceiver.ReadCall(id, Encoding.UTF8.GetBytes(body)));
+        TabletCall? call = TabletWorkReceiver.ReadCall(id, Body(Call(id)), out ReceiveResult? refused);
+
+        Assert.Null(refused);
+        Assert.Equal((id, Shop, CallChannel.InPerson, "Presented autumn cold & flu range"),
+            (call!.Id, call.LocationId, call.Channel, call.PitchNotes));
     }
 
+    // WI-047 scenario 13: a Call is refused for its own structure only, never for what changed since the snapshot.
     [Theory]
-    [InlineData("{\"id\":", UploadFaults.Corrupt)]
-    [InlineData("[]", UploadFaults.Corrupt)]
-    [InlineData("\"call\"", UploadFaults.Corrupt)]
-    [InlineData("other id", UploadFaults.Incomplete)]
-    [InlineData("{\"id\":42}", UploadFaults.Incomplete)]
-    [InlineData("{\"id\":\"not-a-guid\"}", UploadFaults.Incomplete)]
-    public void Should_RefuseTheCall_When_ItIsUnreadableOrNamesAnotherId(string body, string expected)
+    [InlineData("not json", UploadFaults.Corrupt)]
+    [InlineData("array", UploadFaults.Corrupt)]
+    [InlineData("unknown channel", UploadFaults.Corrupt)]
+    [InlineData("other schema", UploadFaults.Unsupported)]
+    [InlineData("newer version", UploadFaults.Unsupported)]
+    [InlineData("id mismatch", UploadFaults.Incomplete)]
+    [InlineData("no location", UploadFaults.Incomplete)]
+    [InlineData("no rep", UploadFaults.Incomplete)]
+    [InlineData("no date", UploadFaults.Incomplete)]
+    [InlineData("no channel", UploadFaults.Incomplete)]
+    [InlineData("no snapshot", UploadFaults.Incomplete)]
+    [InlineData("nothing recorded", UploadFaults.Incomplete)]
+    [InlineData("notes too long", UploadFaults.Incomplete)]
+    public void Should_RefuseTheCall_When_ItsStructureIsWrong(string fault, string expected)
     {
         Guid id = Guid.NewGuid();
-        if (body == "other id") body = $$"""{"id":"{{Guid.NewGuid()}}"}""";
+        TabletCall call = Call(id);
+        string json = Encoding.UTF8.GetString(Body(call));
+        string body = fault switch
+        {
+            "not json" => "{\"id\":",
+            "array" => "[]",
+            "unknown channel" => json.Replace("\"InPerson\"", "\"Carrier pigeon\"", StringComparison.Ordinal),
+            "other schema" => Json(call with { Schema = OrderContract.Schema }),
+            "newer version" => Json(call with { Version = CallContract.CurrentVersion + 1 }),
+            "id mismatch" => Json(call with { Id = Guid.NewGuid() }),
+            "no location" => Json(call with { LocationId = Guid.Empty }),
+            "no rep" => Json(call with { CapturingRep = " " }),
+            "no date" => Json(call with { CalledOn = default }),
+            "no channel" => json.Replace("\"channel\":\"InPerson\",", "", StringComparison.Ordinal),
+            "no snapshot" => Json(call with { Snapshot = null! }),
+            "nothing recorded" => Json(call with { PitchNotes = null }),
+            "notes too long" => Json(call with { PitchNotes = new string('x', CallContract.MaximumPitchNotesLength + 1) }),
+            _ => throw new ArgumentOutOfRangeException(nameof(fault))
+        };
 
-        ReceiveResult? refused = TabletWorkReceiver.ReadCall(id, Encoding.UTF8.GetBytes(body));
+        TabletCall? read = TabletWorkReceiver.ReadCall(id, Encoding.UTF8.GetBytes(body), out ReceiveResult? refused);
 
+        Assert.Null(read);
         Assert.Equal((ReceiveOutcome.Refused, expected), (refused!.Outcome, refused.Fault));
+        Assert.False(string.IsNullOrWhiteSpace(refused.Detail));
+
+        static string Json(TabletCall changed) => JsonSerializer.Serialize(changed, CallJsonContext.Default.TabletCall);
     }
 
     private static TabletOrder Order(Guid id)

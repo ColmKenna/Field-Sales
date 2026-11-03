@@ -117,13 +117,14 @@ public sealed class LocationDetailComponentTests
     }
 
     [Fact]
-    public async Task Should_ExplainTemporaryUnavailability_When_RecordCallIsTapped()
+    public async Task Should_OpenRecordCallForTheShop_When_RecordCallIsTapped()
     {
+        // WI-047 replaces the "isn't available yet" stub (part of scenario 2).
         await using var screen = new Screen((_, _) => Shop());
         await screen.Open(ShopId);
         await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Renderer.Click(screen.Id, "Record Call"));
-        Assert.Contains("Record Call isn't available on this tablet yet.", screen.Renderer.Text(screen.Id));
-        Assert.Empty(screen.Navigation.Destinations);
+        Assert.Equal([$"/locations/{ShopId}/calls/new"], screen.Navigation.Destinations);
+        Assert.DoesNotContain("isn't available", screen.Renderer.Text(screen.Id));
     }
 
     [Fact]
