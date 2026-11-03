@@ -22,7 +22,8 @@ The original checkpoint was reached, committed and pushed. The developer then
 instructed: "ask any potential questions now and then batch through with a
 commit between each checkpoint". All required decisions are already resolved;
 this releases the stop and authorizes completing the remaining stages with a
-commit at each completed stage. WI-048 remains `active` until final verification.
+commit at each completed stage. Final results are in the
+[delivery report](tablet-home-record-delivery.md).
 
 ## What is ready to review
 
@@ -104,10 +105,8 @@ Local review artifacts:
 .artifacts/wi048/checkpoint-build.log
 ```
 
-The preview is not an Android/device validation. The complete application test
-suite, Android publish, remaining date/time/recovery checks and final acceptance
-report are still required after the checkpoint is released. Do not mark done
-or propose integration at this checkpoint.
+The preview is not an Android/device validation. The subsequent full suite,
+Android publish and final acceptance report are recorded in the delivery report.
 
 ## Scope and missing information
 
