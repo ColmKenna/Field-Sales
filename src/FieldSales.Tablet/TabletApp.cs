@@ -1,3 +1,4 @@
+using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
 using FieldSales.Tablet.Core;
@@ -174,6 +175,12 @@ public sealed class TabletApp : IDisposable
     public TabletOrder? ReadOrder(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Find(orderId);
 
     public OrderResult MarkOrderReady(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).MarkReadyToSend(orderId);
+
+    // Recording a Call (T-5.3.1): the draft survives page rebuilds; saving records it once as an Unsent Call.
+    public CallDrafts CallDrafts { get; } = new();
+
+    public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content) =>
+        new CallStore(device.Workspace(rep), clock).Save(callId, locationId, content);
 
     // Changing an unsent order before Sync (T-5.2.1); OrderTransitions decides what each standing allows.
     public OrderView? ReadOrderView(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Read(orderId);

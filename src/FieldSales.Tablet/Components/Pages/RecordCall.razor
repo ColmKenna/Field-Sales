@@ -1,0 +1,172 @@
+@page "/locations/{Id:guid}/calls/new"
+@inherits OfflineCataloguePage
+@using FieldSales.Calls.Contracts
+
+@* T-06 · Record call (T-5.3.1): one scrolling page (T6.1); the channel first, as two unselected options (T6.2); the save review
+   is a dialog (T6.4). Stock check, competitor notes and campaign outcomes join this page with their own items. *@
+<section class="record-call">
+    <nav class="shop-back" aria-label="Call navigation">
+        <a href="@($"/locations/{Id}")" @onclick="BackToShop" @onclick:preventDefault="true">Back to shop</a>
+    </nav>
+    @if (!Ready) { <h1>Record call</h1><p role="status">Opening call…</p> }
+    else if (problem is not null) { <h1>Record call unavailable</h1><p role="alert">@problem</p> }
+    else if (detail is not { IsAssigned: true }) { <h1>Record call unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
+    else
+    {
+        <header class="order-header">
+            <h1>Record call</h1>
+            <p class="order-shop">@detail.Location.Name</p>
+        </header>
+        <fieldset class="call-channel">
+            <legend>How</legend>
+            @foreach (CallChannel option in Enum.GetValues<CallChannel>())
+            {
+                <button type="button" class="channel-option" aria-pressed="@(draft.Channel == option ? "true" : "false")"
+                        disabled="@busy" @onclick="() => Choose(option)">@CallContract.Label(option)</button>
+            }
+        </fieldset>
+        <section class="call-section">
+            <h2 class="call-section-heading">
+                <button type="button" class="section-header" aria-expanded="@(draft.NotesOpen ? "true" : "false")" aria-controls="pitch-notes-body"
+                        @onclick="ToggleNotes">Pitch notes@(draft.Content.HasPitch ? " · added" : "")</button>
+            </h2>
+            @if (draft.NotesOpen)
+            {
+                <div id="pitch-notes-body" class="call-section-body">
+                    <label for="pitch-notes">What did you pitch?</label>
+                    <textarea id="pitch-notes" rows="4" maxlength="@CallContract.MaximumPitchNotesLength" value="@draft.Notes"
+                              @oninput="NotesChanged" disabled="@busy"></textarea>
+                </div>
+            }
+        </section>
+        @if (message is not null) { <p class="problem" role="alert">@message</p> }
+        @if (reviewing)
+        {
+            <section class="call-review" role="dialog" aria-modal="true" aria-labelledby="call-review-heading">
+                <h2 id="call-review-heading">Save this call?</h2>
+                <p class="call-summary">@draft.Content.Summary</p>
+                <div class="order-actions">
+                    <button type="button" class="secondary" disabled="@busy" @onclick="() => reviewing = false">Back</button>
+                    <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Save</button>
+                </div>
+            </section>
+        }
+        @if (leaving)
+        {
+            <section class="order-confirm" role="alertdialog" aria-labelledby="call-leave-question">
+                <p id="call-leave-question" class="confirm-question"><strong>Leave without saving this call?</strong></p>
+                <div class="order-actions">
+                    <button type="button" class="danger" @onclick="Leave">Leave</button>
+                    <button type="button" class="secondary" @onclick="() => leaving = false">Stay</button>
+                </div>
+            </section>
+        }
+        @if (!reviewing && !leaving)
+        {
+            <footer class="order-footer">
+                <div class="order-actions">
+                    <button type="button" class="primary" disabled="@busy" @onclick="Review">Review and save</button>
+                </div>
+            </footer>
+        }
+    }
+</section>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private string? rep;
+    private OfflineLocationDetail? detail;
+    private string? problem;
+    private CallDraft draft = New();
+    private string? message;
+    private bool reviewing;
+    private bool leaving;
+    private bool busy;
+
+    private static CallDraft New() => new(Guid.NewGuid(), null, "", false);
+
+    protected override void Clear()
+    {
+        rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
+    }
+
+    protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
+    {
+        Guid shop = Id;
+        try
+        {
+            OfflineLocationDetail? read = await Task.Run(() => Tablet.ReadLocation(repSubject, shop));
+            if (!isCurrent()) return;
+            rep = repSubject; detail = read;
+            // A resume rebuilds this page; the Call being recorded comes back, with the same id.
+            draft = Tablet.CallDrafts.Read(repSubject, Tablet.SessionVersion, shop) ?? New();
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (isCurrent()) problem = "Shop details couldn't be opened. Your saved work is still on this tablet.";
+        }
+    }
+
+    private void Change(CallDraft changed)
+    {
+        draft = changed;
+        message = null;
+        if (rep is not null) Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, draft);
+    }
+
+    private void Choose(CallChannel channel) { if (!busy) Change(draft with { Channel = channel }); }
+
+    private void ToggleNotes() => Change(draft with { NotesOpen = !draft.NotesOpen });
+
+    private void NotesChanged(ChangeEventArgs args) => Change(draft with { Notes = args.Value?.ToString() ?? "" });
+
+    // S4 and S5: what is missing is said on the page, and the review only opens for a Call that can be saved.
+    private void Review()
+    {
+        if (busy) return;
+        message = draft.Content.Problem;
+        reviewing = message is null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || rep is null) return;
+        busy = true;
+        string repSubject = rep;
+        Guid shop = Id;
+        CallDraft saving = draft;
+        long version = Tablet.SessionVersion;
+        try
+        {
+            CallResult result = await Task.Run(() => Tablet.SaveCall(repSubject, saving.CallId, shop, saving.Content));
+            if (version != Tablet.SessionVersion || shop != Id) return;
+            if (result.Succeeded)
+            {
+                Tablet.CallDrafts.Saved(repSubject, version, shop);
+                Navigation.NavigateTo($"/locations/{shop}");
+                return;
+            }
+            reviewing = false;
+            message = result.Error;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version == Tablet.SessionVersion) { reviewing = false; message = "That couldn't be saved. Your call is still here. Try again."; }
+        }
+        finally { busy = false; }
+    }
+
+    private void BackToShop()
+    {
+        if (busy) return;
+        if (draft.HasWork) { leaving = true; reviewing = false; return; }
+        Leave();
+    }
+
+    private void Leave()
+    {
+        if (rep is not null) Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, null);
+        Navigation.NavigateTo($"/locations/{Id}");
+    }
+}
