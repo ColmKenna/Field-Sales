@@ -22,6 +22,9 @@
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Layout/MainLayout.razor" Link="MainLayout.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/Sync.razor" Link="Sync.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/Home.razor" Link="Home.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Shared/HomeExceptionStrip.razor" Link="Shared/HomeExceptionStrip.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Shared/HomeRecordSection.razor" Link="Shared/HomeRecordSection.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Shared/HomeDayView.razor" Link="Shared/HomeDayView.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/LocationDetail.razor" Link="LocationDetail.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/NewOrder.razor" Link="NewOrder.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/RecordCall.razor" Link="RecordCall.razor" />

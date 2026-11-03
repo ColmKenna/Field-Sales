@@ -40,6 +40,18 @@ button:disabled { opacity: .45; cursor: default; }
 
 .home-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .home-header .last-sync { margin: 0; flex: 1; }
+.home-exceptions { display: flex; flex-wrap: wrap; gap: 8px 24px; border-block: 1px solid var(--line); margin: 16px 0 24px; padding: 8px 12px; background: var(--surface); }
+.home-exceptions a, .home-counter-zero { display: inline-flex; align-items: center; min-height: 48px; color: var(--brand); }
+.home-counter-zero { color: var(--muted); }
+.home-record-section { margin: 24px 0; }
+.home-record-section h2 { color: var(--ink); font-size: 1.25rem; }
+.home-section-count, .home-unplanned { color: var(--muted); font-size: .9rem; }
+.home-town { font-size: .95rem; text-transform: uppercase; color: var(--muted); margin: 20px 0 8px; }
+.home-record-row { display: flex; flex-direction: column; gap: 8px; min-height: 80px; margin-bottom: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); text-decoration: none; color: var(--ink); overflow-wrap: anywhere; }
+.home-row-identity { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 12px; }
+.home-row-identity strong { font-size: 1.2rem; }
+.home-done { border: 1px solid var(--brand); border-radius: 4px; padding: 2px 10px; color: var(--brand); }
+.home-activity { font-size: .95rem; }
 .catalogue-link { padding: 12px; }
 .catalogue h1, .product-detail h1 { margin-top: 24px; }
 /* Leave scroll room above Android's overlaid taskbar for the page controls. */
