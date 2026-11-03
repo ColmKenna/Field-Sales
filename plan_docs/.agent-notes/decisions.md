@@ -3,6 +3,23 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-046 editing unsent orders and the upload claim (2026-11-03, developer, plan approval)
+
+The developer replied **Approved** to the WI-046 plan with the recommended D1–D6, then **Apply**. Full table and scenarios in `WI-046.md`.
+
+- **No change after an upload starts.** Before sending an item, the uploader claims it (`upload_attempts`) under the same per-rep gate
+  order changes use, and only if the saved body is still the queued body. Reopen, edit and delete refuse a claimed order. Confirmation
+  (Sent) and a technical refusal (Needs Attention) clear the claim; so do 401/403 and a request that provably never reached the server.
+  A lost connection mid-request, a timeout, a 5xx or an unreadable receipt keep it, so the order stays locked until a later Sync gets an
+  answer. This settles WI-039 D1's open question for orders: an id the server may hold is never re-sent with a changed body or deleted.
+- **D1:** additive local migration allowed: Unsent DB format 4 adds `upload_attempts`; upgrades keep all work and Sent items.
+- **D2:** Needs Attention orders cannot be reopened or edited; WI-042's Open, re-mark and Delete remain.
+- **D3:** deleting an order removes only the order; a saved Call stays and still uploads (WI-047 decides any Call-side display).
+- **D4 (inferred):** at a shop no longer assigned, reopen/change/remove/delete are allowed; adding a product still needs assignment.
+- **D5 (inferred):** a line whose product is missing from today's snapshot can be removed but its quantity can't change.
+- **D6 (inferred):** a quantity change keeps the captured price (breaks are E6).
+- **WI-055 (Call corrections) should reuse the same claim** before letting a saved Call change.
+
 ## WI-043 restricted-product retention (2026-10-31, developer)
 
 The developer explicitly selected **A — restrict active reads; keep recovery snapshots**.
