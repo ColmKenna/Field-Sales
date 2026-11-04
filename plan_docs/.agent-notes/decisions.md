@@ -3,6 +3,19 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-052 the Low tab in order entry (2026-11-04, developer, plan approval)
+
+The developer replied **Approved** to the WI-052 plan with the recommended D1–D9, then **Apply**. Full text in `WI-052.md`.
+
+- **Tabs:** `Order pad` (today's screen, search included) and `Low (n)` only; "Search all" waits for Ranges.
+- **From a call:** Record call's **Open order** opens the Call's order (or a new one) with **Back to call**; a new order opened from a
+  Call is linked to it on its first line.
+- **One source for each Low item's state:** ADDED whenever the product is on the order; REMOVED only when not on the order and the
+  Call's draft recorded the line was taken off; not added otherwise. "Taken off" lives on the draft only, so after the Call is saved a
+  removed item reads not added.
+- **Count** is not added only; unticking Low drops the item from the tab and never touches the order.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-051 Low to order through a quantity popover (2026-11-04, developer, plan approval)
 
 The developer replied **Approved** to the WI-051 plan with the recommended D1–D10, then **Apply**. Full text in `WI-051.md`.

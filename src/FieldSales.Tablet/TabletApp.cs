@@ -195,6 +195,13 @@ public sealed class TabletApp : IDisposable
     public OrderResult AddOrderLineFromCall(string rep, Guid callId, Guid locationId, Guid productId, decimal quantity) =>
         new OrderStore(device.Workspace(rep), clock).AddFromCall(callId, locationId, productId, quantity);
 
+    // Order entry opened from a Call (T-5.1.4): lines go on the order on screen, linking a new order to the Call; its Low tab reads
+    // the Call's draft, or the saved Call once it is saved.
+    public OrderResult AddOrderLineForCall(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity, Guid callId) =>
+        new OrderStore(device.Workspace(rep), clock).AddLine(orderId, locationId, productId, quantity, callId);
+
+    public TabletCall? ReadCall(string rep, Guid callId) => new CallStore(device.Workspace(rep), clock).Read(callId);
+
     // Changing an unsent order before Sync (T-5.2.1); OrderTransitions decides what each standing allows.
     public OrderView? ReadOrderView(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Read(orderId);
 

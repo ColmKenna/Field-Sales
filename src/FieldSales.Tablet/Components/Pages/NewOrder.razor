@@ -1,18 +1,23 @@
 @page "/locations/{LocationId:guid}/orders/new"
 @page "/locations/{LocationId:guid}/orders/{OrderId:guid}"
+@page "/locations/{LocationId:guid}/calls/{CallId:guid}/orders/new"
+@page "/locations/{LocationId:guid}/calls/{CallId:guid}/orders/{OrderId:guid}"
 @inherits OfflineCataloguePage
 @using System.Diagnostics
 @using System.Globalization
+@using FieldSales.Calls.Contracts
 @using FieldSales.Ordering.Contracts
 @using FieldSales.Quantities
+@using FieldSales.Tablet.Components.Shared
 @using Microsoft.Extensions.DependencyInjection
 @using Microsoft.JSInterop
 @inject IServiceProvider Services
 
-@* T-07 · Order entry: the Order Pad by category (T7.3) and search. The Low tab and Review come later.
-   T-5.2.1: the same screen opens a saved order by id; OrderTransitions decides which controls its standing gets. *@
+@* T-07 · Order entry: the Order Pad by category (T7.3) and search, and the Low tab (T-5.1.4, T7.1). Review comes later.
+   T-5.2.1: the same screen opens a saved order by id; OrderTransitions decides which controls its standing gets.
+   T-5.1.4: opened from Record call (the calls/{CallId} routes) it adds for that Call and goes back to it. *@
 <section class="new-order">
-    <nav class="shop-back" aria-label="Order navigation"><a href="@($"/locations/{LocationId}")">Back to shop</a></nav>
+    <nav class="shop-back" aria-label="Order navigation"><a href="@BackHref">@(CallId is null ? "Back to shop" : "Back to call")</a></nav>
     @if (!Ready) { <h1>@Heading</h1><p role="status">Opening order…</p> }
     else if (problem is not null) { <h1>@Heading unavailable</h1><p role="alert">@problem</p> }
     else if (OrderId is null && detail is not { IsAssigned: true }) { <h1>New order unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
@@ -29,38 +34,55 @@
         }
         @if (CanAdd)
         {
-            <div class="search-field">
-                <label for="product-search">Find a product</label>
-                <input id="product-search" type="search" value="@query" @oninput="SearchAsync" autocomplete="off" />
+            @* T7.1: the Low list is a tab, its count always in view. "Search all" joins when Ranges split the pad from the catalogue. *@
+            <div class="order-tabs" role="tablist" aria-label="Order entry">
+                <button type="button" role="tab" aria-selected="@(lowTab ? "false" : "true")" @onclick="ShowPad">Order pad</button>
+                <button type="button" role="tab" aria-selected="@(lowTab ? "true" : "false")" @onclick="ShowLow">Low (@Low.Outstanding)</button>
             </div>
         }
-        @if (CanAdd && !string.IsNullOrWhiteSpace(query))
+        @if (CanAdd && lowTab) { @LowTab }
+        else
         {
-            <div role="status" aria-live="polite">
-                @if (results.Total == 0) { <p>No products match '@query.Trim()'</p> }
-                else if (results.Total > results.Results.Count) { <p>Showing @results.Results.Count of @results.Total matching products. Keep typing to narrow the list.</p> }
-                else { <p>@results.Total matching @(results.Total == 1 ? "product" : "products")</p> }
-            </div>
-            <ul class="product-results">
-                @foreach (ProductSearchResult product in results.Results)
-                {
-                    <li @key="product.Id">
-                        <button type="button" class="product-result" @onclick="() => Select(product)">
-                            <strong>@product.Name</strong>
-                            <span>@product.Code · @product.Breadcrumb</span>
-                            <span class="product-price">@(product.Price is decimal price ? Money(price) + PerUnit(product.Unit) : "No price yet")</span>
-                        </button>
-                    </li>
-                }
-            </ul>
-            @if (selected is not null) { @AddLine }
+            @if (CanAdd)
+            {
+                <div class="search-field">
+                    <label for="product-search">Find a product</label>
+                    <input id="product-search" type="search" value="@query" @oninput="SearchAsync" autocomplete="off" />
+                </div>
+            }
+            @if (CanAdd && !string.IsNullOrWhiteSpace(query))
+            {
+                <div role="status" aria-live="polite">
+                    @if (results.Total == 0) { <p>No products match '@query.Trim()'</p> }
+                    else if (results.Total > results.Results.Count) { <p>Showing @results.Results.Count of @results.Total matching products. Keep typing to narrow the list.</p> }
+                    else { <p>@results.Total matching @(results.Total == 1 ? "product" : "products")</p> }
+                </div>
+                <ul class="product-results">
+                    @foreach (ProductSearchResult product in results.Results)
+                    {
+                        <li @key="product.Id">
+                            <button type="button" class="product-result" @onclick="() => Select(product)">
+                                <strong>@product.Name</strong>
+                                <span>@product.Code · @product.Breadcrumb</span>
+                                <span class="product-price">@(product.Price is decimal price ? Money(price) + PerUnit(product.Unit) : "No price yet")</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+                @if (selected is not null) { @AddLine }
+            }
+            else if (CanAdd && index is not null)
+            {
+                <section class="order-pad" aria-label="Order pad">
+                    @if (index.Pad.Categories.Count == 0) { <p>No products in your downloaded day.</p> }
+                    @foreach (OrderPadCategory category in index.Pad.Categories) { @PadSection(category) }
+                </section>
+            }
         }
-        else if (CanAdd && index is not null)
+        @if (lowProduct is { } adding && lowEntry is { } marked)
         {
-            <section class="order-pad" aria-label="Order pad">
-                @if (index.Pad.Categories.Count == 0) { <p>No products in your downloaded day.</p> }
-                @foreach (OrderPadCategory category in index.Pad.Categories) { @PadSection(category) }
-            </section>
+            <QuantityPopover @key="adding.Id" Product="adding" Recorded="@LowItem.Recorded(marked)" Busy="busy" Error="@lowError"
+                             OnAdd="AddLowAsync" OnCancel="CloseLow" />
         }
         <section class="order-lines" aria-labelledby="order-lines-heading">
             <h2 id="order-lines-heading">On this order</h2>
@@ -125,6 +147,8 @@
     [Parameter] public Guid LocationId { get; set; }
     /// <summary>A saved order to open (T-5.2.1). Absent on the New Order route.</summary>
     [Parameter] public Guid? OrderId { get; set; }
+    /// <summary>The Call order entry was opened from (T-5.1.4 D2): lines link a new order to it, and Back returns to it.</summary>
+    [Parameter] public Guid? CallId { get; set; }
 
     private const string SaveFailed = "That couldn't be saved. Your saved work is still on this tablet. Try again.";
 
@@ -155,8 +179,30 @@
     // Expanded Order Pad headers (D2: top-level categories start collapsed). Kept through search and adds; reset with the screen.
     private readonly HashSet<Guid> expanded = [];
     private long? searchStarted;
+    private Guid? openedCall;
+    // T-5.1.4: the Low tab, the saved Call it reads once that Call is no longer being recorded, and its open popover.
+    private bool lowTab;
+    private TabletCall? savedCall;
+    private ProductSearchResult? lowProduct;
+    private CallStockEntry? lowEntry;
+    private string? lowError;
 
     private string Heading => OrderId is null ? "New order" : "Order";
+
+    private string BackHref => CallId is null ? $"/locations/{LocationId}" : $"/locations/{LocationId}/calls/new";
+
+    /// <summary>The Call whose Low items the tab lists: the one order entry was opened from, else the one the order is linked to.</summary>
+    private Guid? CallFor => CallId ?? order?.CallId;
+
+    /// <summary>That Call's draft while it is being recorded at this shop (the Low marks as they are now, and what was taken off).</summary>
+    private CallDraft? Draft => rep is not null && CallFor is { } call
+        && Tablet.CallDrafts.Read(rep, Tablet.SessionVersion, LocationId) is { } draft && draft.CallId == call ? draft : null;
+
+    /// <summary>Each Low item's state, worked out from the Call and the order as it is now (D5).</summary>
+    private LowList Low => Draft is { } draft ? draft.Low(order)
+        : savedCall is { } call && call.Id == CallFor ? LowItems.Of(call.StockEntries ?? [], order, []) : LowList.None;
+
+    private bool HasCall => Draft is not null || (savedCall is { } call && call.Id == CallFor);
 
     private OrderStanding Standing => readStanding is OrderStanding.Sending or OrderStanding.Sent or OrderStanding.NeedsAttention
         ? readStanding
@@ -276,6 +322,35 @@
         }
     </text>;
 
+    /// <summary>T-5.1.4's Low tab (T-07): each item marked Low on the Call with one state; Add on not added and REMOVED items
+    /// opens the quantity popover. One row at a time: there is no Add all (T7.6).</summary>
+    private RenderFragment LowTab => @<section class="low-tab" aria-label="Low items">
+        @if (!HasCall) { <p class="low-empty">No stock check with this order.</p> }
+        else if (Low.Items.Count == 0) { <p class="low-empty">Nothing marked Low on this call.</p> }
+        else
+        {
+            <p class="low-source">From your stock check at @(detail?.Location.Name ?? "this shop")</p>
+            <ul class="low-items">
+                @foreach (LowItem item in Low.Items)
+                {
+                    <li class="low-item" @key="item.Entry.ProductId" data-low-item="@($"{item.Entry.ProductName}: {item.StateText}")">
+                        <div class="low-item-text">
+                            <strong>@item.Entry.ProductName</strong>
+                            <span class="low-detail">@item.Detail</span>
+                        </div>
+                        <span class="@(item.State == LowItemState.NotAdded ? "low-state low-open" : "low-state")">@item.StateText</span>
+                        @if (item.CanAdd && index?.Find(item.Entry.ProductId) is { } product)
+                        {
+                            <button type="button" class="secondary" aria-label="@($"Add {item.Entry.ProductName} to order")" disabled="@busy"
+                                    @onclick="() => OpenLow(item, product)">Add</button>
+                        }
+                        else if (item.CanAdd) { <span class="captured-line-notice">@OrderStore.NoLongerAvailable</span> }
+                    </li>
+                }
+            </ul>
+        }
+    </section>;
+
     private string Summary
     {
         get
@@ -287,9 +362,10 @@
 
     protected override Task OnParametersSetAsync()
     {
-        if (orderShop != LocationId || openedOrder != OrderId)
+        if (orderShop != LocationId || openedOrder != OrderId || openedCall != CallId)
         {
-            orderShop = LocationId; openedOrder = OrderId; orderId = OrderId ?? Guid.NewGuid(); expanded.Clear(); ResetEntry();
+            orderShop = LocationId; openedOrder = OrderId; openedCall = CallId; orderId = OrderId ?? Guid.NewGuid(); expanded.Clear();
+            lowTab = false; ResetEntry();
         }
         return base.OnParametersSetAsync();
     }
@@ -297,7 +373,68 @@
     protected override void Clear()
     {
         rep = null; detail = null; index = null; order = null; problem = null; readStanding = OrderStanding.New; sentUtc = null;
-        ResetEntry();
+        savedCall = null; ResetEntry();
+    }
+
+    private void ShowPad() { lowTab = false; CloseLow(); }
+
+    private void ShowLow() { lowTab = true; selected = null; addError = null; }
+
+    // The popover opens empty from every route (T7.7); it closes on add, back to the Low tab (US-008 S14).
+    private void OpenLow(LowItem item, ProductSearchResult product)
+    {
+        if (busy) return;
+        lowProduct = product; lowEntry = item.Entry; lowError = null;
+    }
+
+    private void CloseLow()
+    {
+        if (busy) return;
+        lowProduct = null; lowEntry = null; lowError = null;
+    }
+
+    private async Task AddLowAsync(decimal quantity)
+    {
+        if (busy || rep is null || lowProduct is not { } product) return;
+        busy = true;
+        lowError = null;
+        string repSubject = rep;
+        Guid shop = LocationId, id = orderId;
+        Guid? call = CallId;
+        long version = Tablet.SessionVersion;
+        try
+        {
+            OrderResult result = await Task.Run(() => Add(repSubject, id, shop, product.Id, quantity, call));
+            if (version != Tablet.SessionVersion || orderShop != shop) return;
+            if (result.Succeeded) { Added(result.Order); lowProduct = null; lowEntry = null; }
+            else lowError = result.Error;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version == Tablet.SessionVersion) lowError = SaveFailed;
+        }
+        finally { busy = false; }
+    }
+
+    // Opened from a Call, a line links a new order to it (D3); otherwise the plain add, exactly as before.
+    private OrderResult Add(string repSubject, Guid id, Guid shop, Guid product, decimal quantity, Guid? call) => call is Guid forCall
+        ? Tablet.AddOrderLineForCall(repSubject, id, shop, product, quantity, forCall)
+        : Tablet.AddOrderLine(repSubject, id, shop, product, quantity);
+
+    private void Added(TabletOrder? saved)
+    {
+        order = saved;
+        if (rep is not null && CallId is not null && Draft is { } draft)
+            Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, LocationId, draft with { AddedToOrder = true });
+    }
+
+    // D5: the one fact the order can't tell. A product whose line this screen took off (or whose order it deleted) reads REMOVED
+    // on the Call's Low tab, until it is on the order again.
+    private void TookOff(TabletOrder? before, TabletOrder? after)
+    {
+        if (rep is null || before is null || Draft is not { } draft) return;
+        Guid[] gone = [.. before.Lines.Select(line => line.ProductId).Except(after?.Lines.Select(line => line.ProductId) ?? [])];
+        if (gone.Length > 0) Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, LocationId, draft.TakeOff(gone));
     }
 
     private void Toggle(Guid category) { if (!expanded.Remove(category)) expanded.Add(category); }
@@ -314,12 +451,14 @@
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
     {
         Guid shop = LocationId, id = orderId;
+        Guid? openedFrom = CallId;
         bool saved = OrderId is not null;
         try
         {
             OfflineLocationDetail? readDetail = null;
             ProductSearchIndex? readIndex = null;
             OrderView? readView = null;
+            TabletCall? readCall = null;
             await Task.Run(() =>
             {
                 readDetail = Tablet.ReadLocation(repSubject, shop);
@@ -327,9 +466,11 @@
                 if (!saved && readDetail is not { IsAssigned: true }) return;
                 readIndex = Tablet.ReadProductIndex(repSubject);
                 readView = Tablet.ReadOrderView(repSubject, id);
+                // T-5.1.4 D4: once the Call is saved, its Low marks come from the saved Call.
+                if ((openedFrom ?? readView?.Order.CallId) is Guid call) readCall = Tablet.ReadCall(repSubject, call);
             });
             if (!isCurrent()) return;
-            rep = repSubject; detail = readDetail; index = readIndex;
+            rep = repSubject; detail = readDetail; index = readIndex; savedCall = readCall;
             order = readView?.Order; readStanding = readView?.Standing ?? OrderStanding.New; sentUtc = readView?.SentUtc;
             if (order is not null && order.LocationId != shop) problem = "This order is for a different shop.";
         }
@@ -415,14 +556,15 @@
         addError = null;
         string repSubject = rep;
         Guid shop = LocationId, id = orderId;
+        Guid? call = CallId;
         long version = Tablet.SessionVersion;
         // Only digits and a decimal point count; anything else is "no quantity", and the product's own rule says what to enter.
         decimal quantity = decimal.TryParse(quantityText.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal parsed) ? parsed : 0m;
         try
         {
-            OrderResult result = await Task.Run(() => Tablet.AddOrderLine(repSubject, id, shop, product.Id, quantity));
+            OrderResult result = await Task.Run(() => Add(repSubject, id, shop, product.Id, quantity, call));
             if (version != Tablet.SessionVersion || orderShop != shop) return;
-            if (result.Succeeded) { order = result.Order; ResetEntry(); }
+            if (result.Succeeded) { Added(result.Order); ResetEntry(); }
             else addError = result.Error;
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
@@ -454,7 +596,7 @@
         finally { busy = false; }
     }
 
-    private void SaveAndClose() => Navigation.NavigateTo($"/locations/{LocationId}");
+    private void SaveAndClose() => Navigation.NavigateTo(BackHref);
 
     // T-5.2.1: changes to a saved order. The store applies OrderTransitions; the screen only offers what the standing allows.
     private void StartChange(OrderLine line)
@@ -527,7 +669,8 @@
     }
 
     /// <summary>Runs one change on a worker thread for the rep and session that started it. A deleted order returns the rep to
-    /// the shop. A refused change re-reads the order, because a Sync may have claimed, sent or refused it meanwhile.</summary>
+    /// the shop, or to the Call it was opened from. A refused change re-reads the order, because a Sync may have claimed, sent or
+    /// refused it meanwhile.</summary>
     private async Task<OrderResult?> ActAsync(Func<string, Guid, OrderResult> change)
     {
         if (busy || rep is null) return null;
@@ -536,12 +679,13 @@
         string repSubject = rep;
         Guid shop = LocationId, id = orderId;
         long version = Tablet.SessionVersion;
+        TabletOrder? before = order;
         try
         {
             OrderResult result = await Task.Run(() => change(repSubject, id));
             if (version != Tablet.SessionVersion || orderShop != shop) return null;
-            if (result.Deleted) { Navigation.NavigateTo($"/locations/{shop}"); return result; }
-            if (result.Succeeded) { order = result.Order; return result; }
+            if (result.Deleted) { TookOff(before, null); Navigation.NavigateTo(BackHref); return result; }
+            if (result.Succeeded) { TookOff(before, result.Order); order = result.Order; return result; }
             if (!result.NeedsConfirmation)
             {
                 OrderView? now = await Task.Run(() => Tablet.ReadOrderView(repSubject, id));

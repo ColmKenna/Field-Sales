@@ -104,10 +104,16 @@ public sealed class OrderStore
     /// <summary>Adds <paramref name="quantity"/> of a product to the order, starting the order at
     /// <paramref name="locationId"/> when it has no line yet. The shop must be assigned to the rep on the
     /// current snapshot, and the quantity must follow the product's rules.</summary>
-    public OrderResult AddLine(Guid orderId, Guid locationId, Guid productId, decimal quantity)
+    public OrderResult AddLine(Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
+        AddLine(orderId, locationId, productId, quantity, callId: null);
+
+    /// <summary>The same add for order entry opened from a Call (T-5.1.4 D3): the line goes on <paramref name="orderId"/>, and an
+    /// order this starts, or one with no Call yet, is linked to <paramref name="callId"/>. An order linked to another Call keeps
+    /// that link.</summary>
+    public OrderResult AddLine(Guid orderId, Guid locationId, Guid productId, decimal quantity, Guid? callId)
     {
         Gate.Wait();
-        try { return AddLine(new UnsentStore(workspace), orderId, locationId, productId, quantity, callId: null); }
+        try { return AddLine(new UnsentStore(workspace), orderId, locationId, productId, quantity, callId); }
         finally { Gate.Release(); }
     }
 

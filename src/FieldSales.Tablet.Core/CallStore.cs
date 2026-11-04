@@ -51,6 +51,15 @@ public sealed class CallStore(RepWorkspace workspace, TimeProvider? clock = null
     /// <summary>The unsent Call with this id, or null when there is none or it can't be read as a Call.</summary>
     public TabletCall? Find(Guid callId) => Parse(new UnsentStore(workspace).Find(callId));
 
+    /// <summary>The saved Call with this id, unsent or already sent; null when this tablet has none (T-5.1.4: an order's Low tab
+    /// after its Call was saved). Asking never creates the database.</summary>
+    public TabletCall? Read(Guid callId)
+    {
+        if (!File.Exists(workspace.UnsentPath)) return null;
+        UnsentStore unsent = new(workspace);
+        return Parse(unsent.Find(callId)) ?? Parse(unsent.FindSent(callId)?.Item);
+    }
+
     internal static TabletCall? Parse(UnsentItem? item)
     {
         if (item is not { Kind: UnsentKind.Call }) return null;

@@ -76,6 +76,7 @@
         {
             <footer class="order-footer">
                 <div class="order-actions">
+                    <button type="button" class="secondary" disabled="@busy" @onclick="OpenOrder">Open order</button>
                     <button type="button" class="primary" disabled="@busy" @onclick="Review">Review and save</button>
                 </div>
             </footer>
@@ -485,6 +486,17 @@
             if (version == Tablet.SessionVersion) orderError = "That couldn't be added. Try again.";
         }
         finally { busy = false; }
+    }
+
+    // T-5.1.4 D2: order entry for this Call's order (or a new one linked to it on its first line), with its Low tab. The draft is
+    // kept first, so Back to call finds the same Call even if nothing was entered yet.
+    private void OpenOrder()
+    {
+        if (busy || rep is null) return;
+        Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, draft);
+        Navigation.NavigateTo(callOrder is { } order
+            ? $"/locations/{Id}/calls/{draft.CallId}/orders/{order.Id}"
+            : $"/locations/{Id}/calls/{draft.CallId}/orders/new");
     }
 
     private void BackToShop()

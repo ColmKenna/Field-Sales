@@ -223,6 +223,19 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .mark-option[aria-pressed="true"] { background: var(--brand); color: #fff; }
 .mark-option[aria-pressed="true"]::before { content: "\2713\00a0"; }
 .stock-on-order { display: inline-flex; align-items: center; min-height: 56px; padding: 0 12px; color: var(--brand); font-weight: 600; }
+/* T-07 order entry tabs (T-5.1.4, T7.1) and the Low tab: each item marked Low on the Call, with one state. */
+.order-tabs { display: flex; gap: 8px; margin: 8px 0 16px; border-bottom: 1px solid var(--line); }
+.order-tabs [role="tab"] { min-height: 56px; padding: 0 20px; background: var(--surface); color: var(--brand); border: 0; border-bottom: 4px solid transparent; border-radius: 0; font-weight: 600; }
+.order-tabs [role="tab"][aria-selected="true"] { border-bottom-color: var(--brand); color: var(--ink); }
+.low-tab { margin-bottom: 16px; }
+.low-source, .low-empty { color: var(--muted); margin: 8px 0; }
+.low-items { list-style: none; margin: 0; padding: 0; }
+.low-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.low-item-text { display: flex; flex-direction: column; gap: 4px; flex: 1 1 14rem; min-width: 0; }
+.low-detail { color: var(--muted); font-size: .9rem; }
+.low-state { font-weight: 600; }
+.low-state.low-open { color: var(--alert); }
+.low-item button { min-height: 56px; min-width: 96px; }
 /* T-5.5.1 quantity popover (T7.7): over the page, above the footer; shared with the order's Low tab. */
 .quantity-popover { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 20; max-width: 32rem; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 20px 24px; background: var(--surface); border: 2px solid var(--brand); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
 .quantity-popover-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
