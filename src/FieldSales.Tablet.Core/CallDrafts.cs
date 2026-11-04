@@ -12,30 +12,61 @@ public sealed record CallDraft(Guid CallId, CallChannel? Channel, string Notes, 
 {
     public IReadOnlyList<StockLine> Lines => Stock ?? [];
 
-    /// <summary>The stock check is part of an In-person Call; on Phone it is hidden and not saved, but its rows are kept in
-    /// case the rep switches back (WI-049 D5; Phone's "Stock mentioned" is T-5.3.2).</summary>
-    public bool StockShown => Channel != CallChannel.Phone;
+    /// <summary>On Phone the same rows read as "Stock mentioned" (T-5.3.2 S8): Low, Out and Add count instead of a stepper.
+    /// Switching channel keeps every row, count and mark (S12).</summary>
+    public bool Mentioning => Channel == CallChannel.Phone;
 
-    /// <summary>What would be saved: uncounted rows go as Not checked; removed rows aren't on the list at all.</summary>
+    /// <summary>The rows the Call would save. In person, every row: uncounted rows go as Not checked, removed rows aren't on
+    /// the list at all. On Phone, only what was mentioned (S11): untouched rows are not saved.</summary>
+    public IReadOnlyList<StockLine> Saved => Mentioning ? [.. Lines.Where(line => line.Mentioned)] : Lines;
+
+    /// <summary>What would be saved.</summary>
     public CallContent Content => new(Channel, Notes,
-        Channel == CallChannel.InPerson && Lines.Count > 0 ? [.. Lines.Select(line => line.Entry)] : null);
+        Channel is not null && Saved.Count > 0 ? [.. Saved.Select(line => line.Entry)] : null);
 
-    /// <summary>Why this can't be saved yet: a count that isn't valid comes before the Call-level checks.</summary>
+    /// <summary>The stock section's heading line: on Phone "2 marked Low (1 out)", blank when nothing is mentioned; In person
+    /// "10 counted, 3 not checked", with "· 2 Low" when rows are marked.</summary>
+    public string StockSummary
+    {
+        get
+        {
+            if (Mentioning)
+                return CallContent.MentionedSummary(Lines.Count(line => line.Low), Lines.Count(line => line.Out),
+                    Lines.Count(line => line.Counted && !line.Low));
+            if (Lines.Count == 0) return "";
+            string counts = CallContent.StockSummary(Lines.Count(line => line.Counted), Lines.Count(line => !line.Counted));
+            int low = Lines.Count(line => line.Low);
+            return low == 0 ? counts : $"{counts} · {low} Low";
+        }
+    }
+
+    /// <summary>Why this can't be saved yet: a count that isn't valid on a row being saved comes before the Call-level checks.</summary>
     public string? Problem => Channel is null ? CallContract.ChooseChannel
-        : (StockShown ? Lines.Select(line => line.Problem).FirstOrDefault(problem => problem is not null) : null) ?? Content.Problem;
+        : Saved.Select(line => line.Problem).FirstOrDefault(problem => problem is not null) ?? Content.Problem;
 
     /// <summary>Whether the rep has entered anything that leaving would lose.</summary>
-    public bool HasWork => Channel is not null || !string.IsNullOrWhiteSpace(Notes) || StockChanged || Lines.Any(line => line.Counted);
+    public bool HasWork => Channel is not null || !string.IsNullOrWhiteSpace(Notes) || StockChanged || Lines.Any(line => line.Mentioned);
 }
 
-/// <summary>One row of a Stock Check being recorded: the product, why it was suggested (none when the rep added it), and the
-/// count as typed. Blank means Not checked.</summary>
-public sealed record StockLine(ProductSearchResult Product, SuggestionSources Sources, string Count = "")
+/// <summary>One row of a Stock Check being recorded: the product, why it was suggested (none when the rep added it), the
+/// count as typed (blank means Not checked) and the Low mark.</summary>
+/// <param name="CountOpen">On Phone, the rep tapped "Add count", so the row shows its count box (T-5.3.2 D6).</param>
+public sealed record StockLine(ProductSearchResult Product, SuggestionSources Sources, string Count = "", bool Low = false,
+    bool CountOpen = false)
 {
     private const NumberStyles CountStyle = NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite
         | NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint;
 
     public bool Counted => !string.IsNullOrWhiteSpace(Count);
+
+    /// <summary>Out is Low with a count of 0 (T-5.3.2 S10).</summary>
+    public bool Out => Low && Counted && Amount == 0m;
+
+    /// <summary>The rep said something about this product: a count or a Low mark. A phone Call saves only these rows.</summary>
+    public bool Mentioned => Counted || Low;
+
+    /// <summary>Whether a phone row shows its count box: after "Add count", or when it already has a count.</summary>
+    public bool CountShown => CountOpen || Counted;
 
     public decimal? Amount => Counted && decimal.TryParse(Count, CountStyle, CultureInfo.InvariantCulture, out decimal amount) ? amount : null;
 
@@ -44,7 +75,18 @@ public sealed record StockLine(ProductSearchResult Product, SuggestionSources So
 
     public string Label => SuggestedList.Label(Sources);
 
-    public CallStockEntry Entry => new(Product.Id, Product.Code, Product.Name, Product.Unit, Counted ? Amount : null);
+    public CallStockEntry Entry => new(Product.Id, Product.Code, Product.Name, Product.Unit, Counted ? Amount : null, Low);
+
+    /// <summary>Low on or off. Turning Low off also clears Out: its count of 0 goes with it (D6).</summary>
+    public StockLine ToggleLow() => !Low ? this with { Low = true }
+        : Out ? this with { Low = false, Count = "", CountOpen = false } : this with { Low = false };
+
+    /// <summary>Out marks Low and records a count of 0, replacing any count (S10). Out off removes the 0 and keeps Low (D6).</summary>
+    public StockLine ToggleOut() => Out ? this with { Count = "", CountOpen = false } : this with { Low = true, Count = "0" };
+
+    /// <summary>"Add count" on a phone row: its count box opens, with no stepper. Clearing the box leaves the row untouched
+    /// unless it is Low.</summary>
+    public StockLine OpenCount() => this with { CountOpen = true };
 
     /// <summary>The count one step up or down (1 in the product's unit), never below 0. From Not checked, + gives 1 and − gives 0.</summary>
     public StockLine Step(int direction) => this with

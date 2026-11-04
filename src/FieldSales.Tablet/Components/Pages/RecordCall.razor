@@ -3,8 +3,8 @@
 @using FieldSales.Calls.Contracts
 
 @* T-06 · Record call (T-5.3.1): one scrolling page (T6.1); the channel first, as two unselected options (T6.2); the save review
-   is a dialog (T6.4). The stock check (T-5.4.1) starts from the shop's Suggested List; on Phone it is hidden until T-5.3.2's
-   "Stock mentioned". Low marks, competitor notes and campaign outcomes join this page with their own items. *@
+   is a dialog (T6.4). The stock check (T-5.4.1) starts from the shop's Suggested List; on Phone the same rows read as "Stock
+   mentioned" (T-5.3.2, T6.5). In-person Low ticks, competitor notes and campaign outcomes join this page with their own items. *@
 <section class="record-call">
     <nav class="shop-back" aria-label="Call navigation">
         <a href="@($"/locations/{Id}")" @onclick="BackToShop" @onclick:preventDefault="true">Back to shop</a>
@@ -26,7 +26,7 @@
                         disabled="@busy" @onclick="() => Choose(option)">@CallContract.Label(option)</button>
             }
         </fieldset>
-        @if (draft.StockShown) { @StockCheck }
+        @StockCheck
         <section class="call-section">
             <h2 class="call-section-heading">
                 <button type="button" class="section-header" aria-expanded="@(draft.NotesOpen ? "true" : "false")" aria-controls="pitch-notes-body"
@@ -174,19 +174,20 @@
         finally { busy = false; }
     }
 
-    /// <summary>T-06's stock check: the Suggested List as rows with their source, a count (blank is Not checked), remove,
-    /// and Add product by search or by category.</summary>
+    /// <summary>T-06's stock section. In person, the stock check: the Suggested List as rows with their source, a count (blank
+    /// is Not checked), remove, and Add product by search or by category. On Phone, "Stock mentioned": the same rows with Low,
+    /// Out, Add to order (with ordering from a call) and Add count.</summary>
     private RenderFragment StockCheck => @<section class="call-section stock-check" aria-labelledby="stock-check-heading">
         <header class="stock-check-header">
-            <h2 id="stock-check-heading" class="call-section-heading">Stock check</h2>
-            @if (draft.Lines.Count > 0)
+            <h2 id="stock-check-heading" class="call-section-heading">@(draft.Mentioning ? "Stock mentioned" : "Stock check")</h2>
+            @if (draft.StockSummary.Length > 0) { <span class="stock-summary">@draft.StockSummary</span> }
+            @if (!draft.Mentioning)
             {
-                <span class="stock-summary">@CallContent.StockSummary(draft.Lines.Count(line => line.Counted), draft.Lines.Count(line => !line.Counted))</span>
+                <button type="button" class="secondary" aria-expanded="@(adding ? "true" : "false")" disabled="@busy"
+                        @onclick="ToggleAdding">Add product</button>
             }
-            <button type="button" class="secondary" aria-expanded="@(adding ? "true" : "false")" disabled="@busy"
-                    @onclick="ToggleAdding">Add product</button>
         </header>
-        @if (adding) { @AddProduct }
+        @if (adding && !draft.Mentioning) { @AddProduct }
         @if (draft.Lines.Count == 0) { <p class="stock-empty">@SuggestedList.Empty</p> }
         else
         {
@@ -197,7 +198,11 @@
                         <div class="stock-line-text">
                             <strong>@line.Product.Name</strong>
                             @if (line.Label.Length > 0) { <span class="stock-source">@line.Label</span> }
+                            @if (line.Low && !draft.Mentioning) { <span class="stock-mark">@(line.Out ? "Out" : "Low")</span> }
                         </div>
+                        @if (draft.Mentioning) { @Mentioned(line) }
+                        else
+                        {
                         <div class="stock-count">
                             <button type="button" class="stepper" aria-label="@($"Less {line.Product.Name}")" disabled="@busy"
                                     @onclick="() => Step(line, -1)">−</button>
@@ -210,12 +215,35 @@
                             <button type="button" class="secondary stock-remove" aria-label="@($"Remove {line.Product.Name}")"
                                     disabled="@busy" @onclick="() => Remove(line)">Remove</button>
                         </div>
+                        }
                         @if (line.Problem is { } countProblem) { <p class="problem" role="alert">@countProblem</p> }
                     </li>
                 }
             </ul>
         }
     </section>;
+
+    /// <summary>A phone row (S8): Low and Out as toggles, Add to order shown but not yet available, and a count only after
+    /// Add count, with no stepper (D6).</summary>
+    private RenderFragment Mentioned(StockLine line) => @<div class="stock-marks">
+        <button type="button" class="mark-option" aria-pressed="@(line.Low ? "true" : "false")" aria-label="@($"Low {line.Product.Name}")"
+                disabled="@busy" @onclick="() => ChangeLine(line, row => row.ToggleLow())">Low</button>
+        <button type="button" class="mark-option" aria-pressed="@(line.Out ? "true" : "false")" aria-label="@($"Out {line.Product.Name}")"
+                disabled="@busy" @onclick="() => ChangeLine(line, row => row.ToggleOut())">Out</button>
+        <button type="button" class="secondary" aria-label="@($"Add {line.Product.Name} to order")" disabled>Add to order</button>
+        @if (line.CountShown)
+        {
+            <input id="@($"count-{line.Product.Id}")" class="count-input" inputmode="decimal" autocomplete="off"
+                   aria-label="@($"Count for {line.Product.Name}")" placeholder="count" value="@line.Count"
+                   disabled="@busy" @oninput="args => Count(line, args)" />
+            @if (line.Product.Unit != "Each") { <span class="count-unit">@line.Product.Unit</span> }
+        }
+        else
+        {
+            <button type="button" class="secondary" aria-label="@($"Add count for {line.Product.Name}")" disabled="@busy"
+                    @onclick="() => ChangeLine(line, row => row.OpenCount())">Add count</button>
+        }
+    </div>;
 
     /// <summary>Search the downloaded catalogue, or browse it by category when nothing is typed (S3).</summary>
     private RenderFragment AddProduct => @<div class="stock-add">
@@ -279,14 +307,15 @@
     private void ChangeStock(Func<IReadOnlyList<StockLine>, IEnumerable<StockLine>> change, bool rows) =>
         Change(draft with { Stock = [.. change(draft.Lines)], StockChanged = draft.StockChanged || rows });
 
-    private void Count(StockLine line, ChangeEventArgs args) =>
-        ChangeStock(lines => lines.Select(row => row.Product.Id == line.Product.Id ? row with { Count = args.Value?.ToString() ?? "" } : row), false);
-
-    private void Step(StockLine line, int direction)
+    private void ChangeLine(StockLine line, Func<StockLine, StockLine> change)
     {
         if (busy) return;
-        ChangeStock(lines => lines.Select(row => row.Product.Id == line.Product.Id ? row.Step(direction) : row), false);
+        ChangeStock(lines => lines.Select(row => row.Product.Id == line.Product.Id ? change(row) : row), false);
     }
+
+    private void Count(StockLine line, ChangeEventArgs args) => ChangeLine(line, row => row with { Count = args.Value?.ToString() ?? "" });
+
+    private void Step(StockLine line, int direction) => ChangeLine(line, row => row.Step(direction));
 
     private void Remove(StockLine line)
     {
