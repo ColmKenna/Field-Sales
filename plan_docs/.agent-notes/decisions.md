@@ -3,6 +3,20 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-051 Low to order through a quantity popover (2026-11-04, developer, plan approval)
+
+The developer replied **Approved** to the WI-051 plan with the recommended D1–D10, then **Apply**. Full text in `WI-051.md`.
+
+- **Call → Order link:** the Call carries optional `orderId` (written only when set); the Order body is unchanged; both stay version 1.
+  Server stores it nullable with no FK and refuses an empty id.
+- **Find-or-create:** the call's linked order if still In Progress, else the rep's latest In Progress order at the shop, else a new
+  one; chosen and added in one step under the per-rep order lock. The link moves if the linked order left In Progress.
+- **Low tick In person on every row;** unticking keeps the count. Phone's Add to order works on every row without marking Low.
+- **"On order (N)"** replaces Add to order when the product is on the call's order; unticking Low never removes a line.
+- **Quantity popover** (`Components/Shared/QuantityPopover.razor`) is shared with the future Low tab; quantity never pre-filled;
+  "list price" on screen, "Base price" stays in the contract. Lines added stay on the order if the call is left unsaved.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-050 Stock mentioned on a phone call (2026-11-04, developer, plan approval)
 
 The developer replied **Approved** to the WI-050 plan with the recommended D1–D9, then **Apply**. Full text in `WI-050.md`.
