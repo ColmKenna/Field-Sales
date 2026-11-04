@@ -16,6 +16,14 @@ public sealed record CallDraft(Guid CallId, CallChannel? Channel, string Notes, 
     /// Switching channel keeps every row, count and mark (S12).</summary>
     public bool Mentioning => Channel == CallChannel.Phone;
 
+    /// <summary>The rows a phone Call's "Filter or search" box leaves showing (T-5.3.2 S9): every word typed in the product's
+    /// name or code, as the order search matches; all rows when nothing is typed.</summary>
+    public IReadOnlyList<StockLine> Filtered(string? filter)
+    {
+        string[] terms = ProductSearchIndex.Terms(filter);
+        return terms.Length == 0 ? Lines : [.. Lines.Where(line => ProductSearchIndex.Matches(line.Product, terms))];
+    }
+
     /// <summary>The rows the Call would save. In person, every row: uncounted rows go as Not checked, removed rows aren't on
     /// the list at all. On Phone, only what was mentioned (S11): untouched rows are not saved.</summary>
     public IReadOnlyList<StockLine> Saved => Mentioning ? [.. Lines.Where(line => line.Mentioned)] : Lines;

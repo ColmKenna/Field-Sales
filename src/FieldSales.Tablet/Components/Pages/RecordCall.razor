@@ -82,6 +82,9 @@
     private StockCheckStart start = StockCheckStart.Empty;
     private bool adding;
     private string query = "";
+    private string filter = "";
+    private ProductSearchOutcome filterFound = new([], 0);
+    private int filterRevision;
     private ProductSearchOutcome found = new([], 0);
     private int searchRevision;
     private readonly HashSet<Guid> expanded = [];
@@ -97,7 +100,7 @@
     protected override void Clear()
     {
         rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
-        start = StockCheckStart.Empty; CloseAdding();
+        start = StockCheckStart.Empty; CloseAdding(); filter = ""; filterFound = new([], 0); ++filterRevision;
     }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
@@ -176,7 +179,7 @@
 
     /// <summary>T-06's stock section. In person, the stock check: the Suggested List as rows with their source, a count (blank
     /// is Not checked), remove, and Add product by search or by category. On Phone, "Stock mentioned": the same rows with Low,
-    /// Out, Add to order (with ordering from a call) and Add count.</summary>
+    /// Out, Add to order (with ordering from a call) and Add count, narrowed by one "Filter or search" box.</summary>
     private RenderFragment StockCheck => @<section class="call-section stock-check" aria-labelledby="stock-check-heading">
         <header class="stock-check-header">
             <h2 id="stock-check-heading" class="call-section-heading">@(draft.Mentioning ? "Stock mentioned" : "Stock check")</h2>
@@ -188,11 +191,12 @@
             }
         </header>
         @if (adding && !draft.Mentioning) { @AddProduct }
+        @if (draft.Mentioning) { @FilterOrSearch }
         @if (draft.Lines.Count == 0) { <p class="stock-empty">@SuggestedList.Empty</p> }
-        else
+        else if (Shown.Count > 0)
         {
             <ul class="stock-lines">
-                @foreach (StockLine line in draft.Lines)
+                @foreach (StockLine line in Shown)
                 {
                     <li class="stock-line" @key="line.Product.Id">
                         <div class="stock-line-text">
@@ -222,6 +226,32 @@
             </ul>
         }
     </section>;
+
+    /// <summary>The rows on screen: on Phone, those the filter leaves; In person, all of them.</summary>
+    private IReadOnlyList<StockLine> Shown => draft.Mentioning ? draft.Filtered(filter) : draft.Lines;
+
+    /// <summary>Phone's one box (S9, D7): it narrows the rows by name or code, and when nothing on the list matches it offers
+    /// the downloaded catalogue, where Add makes the product a row.</summary>
+    private RenderFragment FilterOrSearch => @<div class="stock-filter">
+        <div class="search-field">
+            <label for="stock-filter">Filter or search</label>
+            <input id="stock-filter" type="search" value="@filter" @oninput="FilterAsync" autocomplete="off" disabled="@busy" />
+        </div>
+        @if (!string.IsNullOrWhiteSpace(filter) && Shown.Count == 0)
+        {
+            <div role="status" aria-live="polite">
+                @if (filterFound.Total == 0) { <p>No products match '@filter.Trim()'</p> }
+                else
+                {
+                    <p>Nothing on the list matches '@filter.Trim()'. From the catalogue:</p>
+                    @if (filterFound.Total > filterFound.Results.Count) { <p>Showing @filterFound.Results.Count of @filterFound.Total matching products. Keep typing to narrow the list.</p> }
+                }
+            </div>
+            <ul class="product-results">
+                @foreach (ProductSearchResult product in filterFound.Results) { @AddRow(product) }
+            </ul>
+        }
+    </div>;
 
     /// <summary>A phone row (S8): Low and Out as toggles, Add to order shown but not yet available, and a count only after
     /// Add count, with no stepper (D6).</summary>
@@ -323,7 +353,8 @@
         ChangeStock(lines => lines.Where(row => row.Product.Id != line.Product.Id), true);
     }
 
-    // Added rows join the list in name order, like the suggested ones (D8).
+    // Added rows join the list in name order, like the suggested ones (WI-049 D8). On Phone the filter stays, so the added row is
+    // what it shows, ready to mark.
     private void Add(ProductSearchResult product)
     {
         if (busy || draft.Lines.Any(line => line.Product.Id == product.Id)) return;
@@ -344,6 +375,19 @@
     }
 
     private void Expand(Guid category) { if (!expanded.Remove(category)) expanded.Add(category); }
+
+    // The rows are filtered as typed; the catalogue is searched off the UI thread only when no row matches.
+    private async Task FilterAsync(ChangeEventArgs args)
+    {
+        int current = ++filterRevision;
+        filter = args.Value?.ToString() ?? "";
+        filterFound = new([], 0);
+        if (string.IsNullOrWhiteSpace(filter) || draft.Filtered(filter).Count > 0) return;
+        string text = filter;
+        ProductSearchIndex products = start.Products;
+        ProductSearchOutcome outcome = await Task.Run(() => products.Search(text));
+        if (current == filterRevision) filterFound = outcome;
+    }
 
     private async Task SearchAsync(ChangeEventArgs args)
     {
