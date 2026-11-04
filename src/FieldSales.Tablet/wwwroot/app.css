@@ -214,4 +214,13 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .count-unit { min-width: 3rem; color: var(--muted); }
 .stock-remove { min-height: 56px; }
 .stock-line .problem { flex-basis: 100%; margin: 0; }
+/* T-06 Stock mentioned on Phone (T-5.3.2): Low and Out toggles, Add to order, Add count (no stepper). */
+.stock-mark { align-self: flex-start; padding: 2px 8px; border-radius: 4px; background: var(--page); color: var(--alert); border: 1px solid var(--alert); font-size: .9rem; font-weight: 600; }
+.stock-filter { margin-bottom: 8px; }
+.stock-filter .product-results { margin-top: 8px; }
+.stock-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.stock-marks button { min-height: 56px; }
+.mark-option { min-width: 72px; background: var(--surface); color: var(--brand); border-width: 2px; }
+.mark-option[aria-pressed="true"] { background: var(--brand); color: #fff; }
+.mark-option[aria-pressed="true"]::before { content: "\2713\00a0"; }
 .stock-add { margin-bottom: 12px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }

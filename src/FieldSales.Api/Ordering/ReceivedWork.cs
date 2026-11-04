@@ -83,18 +83,20 @@ public sealed class ReceivedCall
     };
 }
 
-/// <summary>One product on a received Stock Check: its count in its unit, or Not checked (no count).</summary>
+/// <summary>One product on a received Call: its count in its unit, or Not checked (no count), and the rep's Low mark. On a
+/// phone Call only mentioned products are kept, so each has a count or Low (T-5.3.2); Out is Low with a count of 0.</summary>
 public sealed class ReceivedCallStockEntry
 {
     private ReceivedCallStockEntry() { }
 
     internal ReceivedCallStockEntry(Guid callId, CallStockEntry entry)
     {
-        CallId = callId; ProductId = entry.ProductId; Unit = entry.Unit; Count = entry.Count;
+        CallId = callId; ProductId = entry.ProductId; Unit = entry.Unit; Count = entry.Count; Low = entry.Low;
     }
 
     public Guid CallId { get; private set; }
     public Guid ProductId { get; private set; }
     public string Unit { get; private set; } = "";
     public decimal? Count { get; private set; }
+    public bool Low { get; private set; }
 }

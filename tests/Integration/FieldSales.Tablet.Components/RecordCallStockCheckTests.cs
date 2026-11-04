@@ -184,7 +184,8 @@ public sealed partial class TabletSessionScreenTests
     }
 
     [Fact]
-    public async Task Should_HideTheStockCheckAndKeepItsCounts_When_PhoneIsChosenThenInPerson()
+    // WI-049 D5 hid the rows on Phone; WI-050 (T-5.3.2 S8, S11) shows them as Stock mentioned and saves only what was mentioned.
+    public async Task Should_ShowStockMentionedAndKeepItsCounts_When_PhoneIsChosenThenInPerson()
     {
         SavedCalls calls = new();
         await using Screen screen = await StockCheckAsync(calls, MurphysStock());
@@ -192,18 +193,18 @@ public sealed partial class TabletSessionScreenTests
         await CountAsync(screen, Numbered[0], "4");
 
         await screen.Click("Phone");
-        Assert.DoesNotContain("Stock check", screen.Renderer.Text(screen.Id));
+        Assert.Contains("Stock mentioned", screen.Renderer.Text(screen.Id));
+        Assert.Equal("4", screen.Renderer.Value(screen.Id, $"count-{Numbered[0].Id}"));
         await screen.Click("In person");
         Assert.Equal("4", screen.Renderer.Value(screen.Id, $"count-{Numbered[0].Id}"));
 
-        // A Phone call saves no stock entries (Stock mentioned is T-5.3.2).
+        // On Phone the counted product is the only one mentioned; the 13 untouched rows aren't saved.
         await screen.Click("Phone");
         await EnterNotesAsync(screen, Pitch);
         await screen.Click("Review and save");
-        Assert.Contains("Phone · Pitch notes", screen.Renderer.Text(screen.Id));
-        Assert.DoesNotContain("counted", screen.Renderer.Text(screen.Id));
+        Assert.Contains("Phone · Pitch notes · 1 counted", screen.Renderer.Text(screen.Id));
         await screen.Click("Save");
         await screen.Until(() => calls.Saves.Count == 1);
-        Assert.Null(calls.Saves[0].Content.StockEntries);
+        Assert.Equal([new CallStockEntry(Numbered[0].Id, Numbered[0].Code, Numbered[0].Name, "Each", 4m)], calls.Saves[0].Content.StockEntries);
     }
 }

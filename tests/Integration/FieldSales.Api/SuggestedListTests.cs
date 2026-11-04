@@ -21,7 +21,7 @@ namespace FieldSales.Api.Tests;
 [Trait("Category", "Integration")]
 [Trait("Requires", "SqlServer")]
 [Trait("Area", "TabletSync")]
-public sealed class SuggestedListTests(TabletSnapshotFixture fixture) : IClassFixture<TabletSnapshotFixture>, IAsyncLifetime
+public sealed partial class SuggestedListTests(TabletSnapshotFixture fixture) : IClassFixture<TabletSnapshotFixture>, IAsyncLifetime
 {
     private static readonly CallSnapshotRef CallMorning = new("1.3", new DateTimeOffset(2026, 9, 1, 6, 30, 0, TimeSpan.Zero));
     private static readonly OrderSnapshotRef OrderMorning = new("1.3", new DateTimeOffset(2026, 9, 1, 6, 30, 0, TimeSpan.Zero));

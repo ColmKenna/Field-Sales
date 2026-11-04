@@ -642,6 +642,11 @@ public sealed partial class TabletSessionScreenTests
                     && attributes.Any(a => a.AttributeName == "onclick"))
                 .Single(a => a.AttributeName == "onclick").AttributeEventHandlerId, null, EventArgs.Empty);
 
+        /// <summary>An attribute of the element whose accessible name (aria-label) is <paramref name="label"/>, or null when it is absent.</summary>
+        public string? LabelledAttribute(int id, string label, string name) =>
+            ElementAttributes(id, attributes => attributes.Any(a => a.AttributeName == "aria-label" && a.AttributeValue?.ToString() == label))
+                .FirstOrDefault(a => a.AttributeName == name).AttributeValue?.ToString();
+
         /// <summary>The value attribute of the element with this id.</summary>
         public string? Value(int id, string elementId) =>
             ElementAttributes(id, attributes => attributes.Any(a => a.AttributeName == "id" && a.AttributeValue?.ToString() == elementId))

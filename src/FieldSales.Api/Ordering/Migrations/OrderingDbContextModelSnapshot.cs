@@ -73,6 +73,9 @@ namespace FieldSales.Api.Ordering.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("decimal(18,6)");
 
+                    b.Property<bool>("Low")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Unit")
                         .IsRequired()
                         .HasMaxLength(20)

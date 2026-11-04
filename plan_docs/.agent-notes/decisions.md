@@ -3,6 +3,20 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-050 Stock mentioned on a phone call (2026-11-04, developer, plan approval)
+
+The developer replied **Approved** to the WI-050 plan with the recommended D1–D9, then **Apply**. Full text in `WI-050.md`.
+
+- **Low on a stock entry:** `CallStockEntry` gains optional `low` (true or absent); Call stays version 1. Out is Low with a count of 0,
+  not a field of its own.
+- **Phone saves only what was mentioned:** rows marked Low/Out or given a count. Untouched rows are never saved as Not checked.
+  A Low mark counts as recording something on either channel.
+- **Review:** "Phone · 2 marked Low (1 out)" ("(… out)" omitted at 0), plus "· 1 counted" for counted rows without Low. In person keeps
+  its stock summary and adds "· 2 Low".
+- **Channel switch keeps everything;** Low marks are saved In person too (read-only note there until WI-051).
+- **Server:** accepts `low`; refuses a Phone entry with neither a count nor Low as incomplete. Phone is never the last stock check.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-049 the suggested stock-check list (2026-11-04, developer, plan approval)
 
 The developer replied **Approved** to the WI-049 plan with the recommended D1–D11, then **Apply**. Full text in `WI-049.md`.

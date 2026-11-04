@@ -46,8 +46,7 @@ public sealed class ProductSearchIndex
 
     public ProductSearchOutcome Search(string? query)
     {
-        if (string.IsNullOrWhiteSpace(query)) return new([], 0);
-        string[] terms = LocationSearchIndex.Normalize(query.Trim()).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        string[] terms = Terms(query);
         if (terms.Length == 0) return new([], 0);
         List<ProductSearchResult> matches = [];
         int total = 0;
@@ -58,6 +57,19 @@ public sealed class ProductSearchIndex
             if (matches.Count < MaximumResults) matches.Add(product);
         }
         return new(matches, total);
+    }
+
+    /// <summary>The words typed, ignoring case and accents; empty when nothing is typed.</summary>
+    public static string[] Terms(string? query) => string.IsNullOrWhiteSpace(query) ? []
+        : LocationSearchIndex.Normalize(query.Trim()).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+    /// <summary>Whether this product matches as <see cref="Search"/> would match it: every word in its name or code. No words
+    /// match everything.</summary>
+    public static bool Matches(ProductSearchResult product, IReadOnlyCollection<string> terms)
+    {
+        if (terms.Count == 0) return true;
+        string name = LocationSearchIndex.Normalize(product.Name), code = LocationSearchIndex.Normalize(product.Code);
+        return terms.All(term => name.Contains(term, StringComparison.Ordinal) || code.Contains(term, StringComparison.Ordinal));
     }
 }
 
