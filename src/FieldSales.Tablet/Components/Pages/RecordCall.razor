@@ -3,7 +3,8 @@
 @using FieldSales.Calls.Contracts
 
 @* T-06 · Record call (T-5.3.1): one scrolling page (T6.1); the channel first, as two unselected options (T6.2); the save review
-   is a dialog (T6.4). Stock check, competitor notes and campaign outcomes join this page with their own items. *@
+   is a dialog (T6.4). The stock check (T-5.4.1) starts from the shop's Suggested List; on Phone it is hidden until T-5.3.2's
+   "Stock mentioned". Low marks, competitor notes and campaign outcomes join this page with their own items. *@
 <section class="record-call">
     <nav class="shop-back" aria-label="Call navigation">
         <a href="@($"/locations/{Id}")" @onclick="BackToShop" @onclick:preventDefault="true">Back to shop</a>
@@ -25,6 +26,7 @@
                         disabled="@busy" @onclick="() => Choose(option)">@CallContract.Label(option)</button>
             }
         </fieldset>
+        @if (draft.StockShown) { @StockCheck }
         <section class="call-section">
             <h2 class="call-section-heading">
                 <button type="button" class="section-header" aria-expanded="@(draft.NotesOpen ? "true" : "false")" aria-controls="pitch-notes-body"
@@ -77,6 +79,12 @@
 
     private string? rep;
     private OfflineLocationDetail? detail;
+    private StockCheckStart start = StockCheckStart.Empty;
+    private bool adding;
+    private string query = "";
+    private ProductSearchOutcome found = new([], 0);
+    private int searchRevision;
+    private readonly HashSet<Guid> expanded = [];
     private string? problem;
     private CallDraft draft = New();
     private string? message;
@@ -89,6 +97,7 @@
     protected override void Clear()
     {
         rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
+        start = StockCheckStart.Empty; CloseAdding();
     }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
@@ -96,11 +105,19 @@
         Guid shop = Id;
         try
         {
-            OfflineLocationDetail? read = await Task.Run(() => Tablet.ReadLocation(repSubject, shop));
+            OfflineLocationDetail? read = null;
+            StockCheckStart readStart = StockCheckStart.Empty;
+            await Task.Run(() =>
+            {
+                read = Tablet.ReadLocation(repSubject, shop);
+                if (read is { IsAssigned: true }) readStart = Tablet.ReadStockCheckStart(repSubject, shop);
+            });
             if (!isCurrent()) return;
-            rep = repSubject; detail = read;
-            // A resume rebuilds this page; the Call being recorded comes back, with the same id.
+            rep = repSubject; detail = read; start = readStart;
+            // A resume rebuilds this page; the Call being recorded comes back, with the same id and its stock rows.
             draft = Tablet.CallDrafts.Read(repSubject, Tablet.SessionVersion, shop) ?? New();
+            if (draft.Stock is null)
+                draft = draft with { Stock = [.. start.Suggested.Select(row => new StockLine(row.Product, row.Sources))] };
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {
@@ -125,7 +142,7 @@
     private void Review()
     {
         if (busy) return;
-        message = draft.Content.Problem;
+        message = draft.Problem;
         reviewing = message is null;
     }
 
@@ -156,6 +173,159 @@
         }
         finally { busy = false; }
     }
+
+    /// <summary>T-06's stock check: the Suggested List as rows with their source, a count (blank is Not checked), remove,
+    /// and Add product by search or by category.</summary>
+    private RenderFragment StockCheck => @<section class="call-section stock-check" aria-labelledby="stock-check-heading">
+        <header class="stock-check-header">
+            <h2 id="stock-check-heading" class="call-section-heading">Stock check</h2>
+            @if (draft.Lines.Count > 0)
+            {
+                <span class="stock-summary">@CallContent.StockSummary(draft.Lines.Count(line => line.Counted), draft.Lines.Count(line => !line.Counted))</span>
+            }
+            <button type="button" class="secondary" aria-expanded="@(adding ? "true" : "false")" disabled="@busy"
+                    @onclick="ToggleAdding">Add product</button>
+        </header>
+        @if (adding) { @AddProduct }
+        @if (draft.Lines.Count == 0) { <p class="stock-empty">@SuggestedList.Empty</p> }
+        else
+        {
+            <ul class="stock-lines">
+                @foreach (StockLine line in draft.Lines)
+                {
+                    <li class="stock-line" @key="line.Product.Id">
+                        <div class="stock-line-text">
+                            <strong>@line.Product.Name</strong>
+                            @if (line.Label.Length > 0) { <span class="stock-source">@line.Label</span> }
+                        </div>
+                        <div class="stock-count">
+                            <button type="button" class="stepper" aria-label="@($"Less {line.Product.Name}")" disabled="@busy"
+                                    @onclick="() => Step(line, -1)">−</button>
+                            <input id="@($"count-{line.Product.Id}")" class="count-input" inputmode="decimal" autocomplete="off"
+                                   aria-label="@($"Count for {line.Product.Name}")" placeholder="not checked" value="@line.Count"
+                                   disabled="@busy" @oninput="args => Count(line, args)" />
+                            <button type="button" class="stepper" aria-label="@($"More {line.Product.Name}")" disabled="@busy"
+                                    @onclick="() => Step(line, 1)">+</button>
+                            @if (line.Product.Unit != "Each") { <span class="count-unit">@line.Product.Unit</span> }
+                            <button type="button" class="secondary stock-remove" aria-label="@($"Remove {line.Product.Name}")"
+                                    disabled="@busy" @onclick="() => Remove(line)">Remove</button>
+                        </div>
+                        @if (line.Problem is { } countProblem) { <p class="problem" role="alert">@countProblem</p> }
+                    </li>
+                }
+            </ul>
+        }
+    </section>;
+
+    /// <summary>Search the downloaded catalogue, or browse it by category when nothing is typed (S3).</summary>
+    private RenderFragment AddProduct => @<div class="stock-add">
+        <div class="search-field">
+            <label for="stock-search">Find a product</label>
+            <input id="stock-search" type="search" value="@query" @oninput="SearchAsync" autocomplete="off" />
+        </div>
+        @if (!string.IsNullOrWhiteSpace(query))
+        {
+            <div role="status" aria-live="polite">
+                @if (found.Total == 0) { <p>No products match '@query.Trim()'</p> }
+                else if (found.Total > found.Results.Count) { <p>Showing @found.Results.Count of @found.Total matching products. Keep typing to narrow the list.</p> }
+            </div>
+            <ul class="product-results">
+                @foreach (ProductSearchResult product in found.Results) { @AddRow(product) }
+            </ul>
+        }
+        else
+        {
+            <section class="order-pad" aria-label="Browse by category">
+                @if (start.Products.Pad.Categories.Count == 0) { <p>No products in your downloaded day.</p> }
+                @foreach (OrderPadCategory category in start.Products.Pad.Categories) { @Browse(category) }
+            </section>
+        }
+    </div>;
+
+    private RenderFragment Browse(OrderPadCategory category) => @<section class="pad-category" @key="category.Id">
+        <h3 class="pad-heading">
+            <button type="button" class="pad-header" aria-expanded="@(expanded.Contains(category.Id) ? "true" : "false")"
+                    @onclick="() => Expand(category.Id)">
+                <span class="pad-breadcrumb">@category.Breadcrumb</span>
+                <span class="pad-count">@category.Beneath @(category.Beneath == 1 ? "product" : "products")</span>
+            </button>
+        </h3>
+        @if (expanded.Contains(category.Id))
+        {
+            <div class="pad-body">
+                @foreach (OrderPadCategory subcategory in category.Subcategories) { @Browse(subcategory) }
+                @if (category.Here > 0)
+                {
+                    <ul class="pad-products">
+                        @foreach (ProductSearchResult product in category.Products) { @AddRow(product) }
+                    </ul>
+                }
+            </div>
+        }
+    </section>;
+
+    private RenderFragment AddRow(ProductSearchResult product) => @<li class="pad-product" @key="product.Id">
+        <div class="pad-product-text">
+            <strong>@product.Name</strong>
+            <span>@product.Code · @product.Breadcrumb</span>
+        </div>
+        @if (draft.Lines.Any(line => line.Product.Id == product.Id)) { <span class="pad-on-order">On the list</span> }
+        else
+        {
+            <button type="button" class="secondary pad-add" aria-label="@($"Add {product.Name}")" @onclick="() => Add(product)">Add</button>
+        }
+    </li>;
+
+    private void ChangeStock(Func<IReadOnlyList<StockLine>, IEnumerable<StockLine>> change, bool rows) =>
+        Change(draft with { Stock = [.. change(draft.Lines)], StockChanged = draft.StockChanged || rows });
+
+    private void Count(StockLine line, ChangeEventArgs args) =>
+        ChangeStock(lines => lines.Select(row => row.Product.Id == line.Product.Id ? row with { Count = args.Value?.ToString() ?? "" } : row), false);
+
+    private void Step(StockLine line, int direction)
+    {
+        if (busy) return;
+        ChangeStock(lines => lines.Select(row => row.Product.Id == line.Product.Id ? row.Step(direction) : row), false);
+    }
+
+    private void Remove(StockLine line)
+    {
+        if (busy) return;
+        ChangeStock(lines => lines.Where(row => row.Product.Id != line.Product.Id), true);
+    }
+
+    // Added rows join the list in name order, like the suggested ones (D8).
+    private void Add(ProductSearchResult product)
+    {
+        if (busy || draft.Lines.Any(line => line.Product.Id == product.Id)) return;
+        ChangeStock(lines => lines.Append(new StockLine(product, SuggestionSources.None))
+            .OrderBy(line => line.Product.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(line => line.Product.Id), true);
+        CloseAdding();
+    }
+
+    private void ToggleAdding()
+    {
+        if (adding) CloseAdding();
+        else adding = true;
+    }
+
+    private void CloseAdding()
+    {
+        adding = false; query = ""; found = new([], 0); ++searchRevision; expanded.Clear();
+    }
+
+    private void Expand(Guid category) { if (!expanded.Remove(category)) expanded.Add(category); }
+
+    private async Task SearchAsync(ChangeEventArgs args)
+    {
+        int current = ++searchRevision;
+        query = args.Value?.ToString() ?? "";
+        string text = query;
+        ProductSearchIndex products = start.Products;
+        ProductSearchOutcome outcome = await Task.Run(() => products.Search(text));
+        if (current == searchRevision) found = outcome;
+    }
+
 
     private void BackToShop()
     {

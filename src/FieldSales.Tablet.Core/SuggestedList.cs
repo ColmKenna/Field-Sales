@@ -52,8 +52,22 @@ public static class SuggestedList
     };
 }
 
+/// <summary>What a Stock Check starts from: the downloaded products (for search and browsing) and the shop's Suggested List,
+/// both from the same snapshot copy.</summary>
+public sealed record StockCheckStart(ProductSearchIndex Products, IReadOnlyList<SuggestedProduct> Suggested)
+{
+    public static StockCheckStart Empty { get; } = new(new ProductSearchIndex(null, []), []);
+}
+
 public sealed partial class SnapshotStore
 {
+    /// <summary>The products and the shop's Suggested List from the active snapshot, for T-06's stock check.</summary>
+    public StockCheckStart ReadStockCheckStart(Guid locationId, DateOnly today)
+    {
+        ProductSearchIndex products = ReadProductIndex(today);
+        return new(products, SuggestedList.Build(ReadStockHistory(products.Generation, locationId), products));
+    }
+
     /// <summary>The Location's stock history in one generation, normally <see cref="ProductSearchIndex.Generation"/>, so the
     /// list and its products come from the same copy. Empty when the generation has none (a 1.2 snapshot, or no history).</summary>
     public LocationStockHistory ReadStockHistory(string? generation, Guid locationId)
