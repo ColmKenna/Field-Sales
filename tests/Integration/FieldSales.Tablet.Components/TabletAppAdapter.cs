@@ -34,6 +34,16 @@ public sealed class TabletApp
         (_, _, _, _, _) => new OrderResult(null, "Order entry isn't set up in this test.");
     public OrderResult AddOrderLineFromCall(string rep, Guid callId, Guid locationId, Guid productId, decimal quantity) =>
         AddFromCall(rep, callId, locationId, productId, quantity);
+    /// <summary>By default the plain add (AddWork), recording the Call it was for in <see cref="AddedForCalls"/>.</summary>
+    public Func<string, Guid, Guid, Guid, decimal, Guid, OrderResult>? AddForCall { get; set; }
+    public List<Guid> AddedForCalls { get; } = [];
+    public OrderResult AddOrderLineForCall(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity, Guid callId)
+    {
+        AddedForCalls.Add(callId);
+        return AddForCall is { } add ? add(rep, orderId, locationId, productId, quantity, callId) : AddWork(rep, orderId, locationId, productId, quantity);
+    }
+    public Func<string, Guid, TabletCall?> FindCall { get; set; } = (_, _) => null;
+    public TabletCall? ReadCall(string rep, Guid callId) => FindCall(rep, callId);
     public Func<Task<SignInAnswer>> SignIn { get; set; } = () => Task.FromResult(new SignInAnswer(null, null));
     public Task<SignInAnswer> SignInAsync() => SignIn();
     public HomeView Home { get; set; } = new("Last synced 07:42", []);

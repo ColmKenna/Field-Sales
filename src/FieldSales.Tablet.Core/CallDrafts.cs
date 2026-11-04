@@ -1,5 +1,6 @@
 using System.Globalization;
 using FieldSales.Calls.Contracts;
+using FieldSales.Ordering.Contracts;
 
 namespace FieldSales.Tablet.Core;
 
@@ -9,10 +10,19 @@ namespace FieldSales.Tablet.Core;
 /// <param name="StockChanged">Whether the rep added or removed a row, so leaving would lose something.</param>
 /// <param name="AddedToOrder">Whether a product went on the order from this Call (T-5.5.1). Those lines are already saved on the
 /// order and stay there if the Call is left unsaved (D8).</param>
+/// <param name="TakenOff">Products whose line the rep took off this Call's order in order entry (T-5.1.4 D5): the one fact the order
+/// can't tell, so a Low item reads REMOVED rather than not added. It never decides ADDED; the order does.</param>
 public sealed record CallDraft(Guid CallId, CallChannel? Channel, string Notes, bool NotesOpen,
-    IReadOnlyList<StockLine>? Stock = null, bool StockChanged = false, bool AddedToOrder = false)
+    IReadOnlyList<StockLine>? Stock = null, bool StockChanged = false, bool AddedToOrder = false,
+    IReadOnlyList<Guid>? TakenOff = null)
 {
     public IReadOnlyList<StockLine> Lines => Stock ?? [];
+
+    /// <summary>The Low tab for this Call against <paramref name="order"/> (T-5.1.4).</summary>
+    public LowList Low(TabletOrder? order) => LowItems.Of(Lines.Select(line => line.Entry), order, TakenOff ?? []);
+
+    /// <summary>Records that these products' lines were taken off the order.</summary>
+    public CallDraft TakeOff(IEnumerable<Guid> products) => this with { TakenOff = [.. (TakenOff ?? []).Union(products)] };
 
     /// <summary>On Phone the same rows read as "Stock mentioned" (T-5.3.2 S8): Low, Out and Add count instead of a stepper.
     /// Switching channel keeps every row, count and mark (S12).</summary>

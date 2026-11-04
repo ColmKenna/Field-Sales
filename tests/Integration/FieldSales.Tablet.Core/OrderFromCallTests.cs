@@ -121,4 +121,21 @@ public sealed class OrderFromCallTests : IDisposable
         Assert.Equal(newer, Store().AddFromCall(otherCall, shop, products[2], 1m).Order!.Id);
         Assert.Equal(call, Store().Find(mine)!.CallId);
     }
+
+    // WI-052 scenario 13 (T-5.1.4 D3): order entry opened from a Call adds to the order on screen, and that order is the Call's.
+    [Fact]
+    public async Task Should_LinkANewOrderToTheCall_When_ItsFirstLineIsAddedFromOrderEntryOpenedFromTheCall()
+    {
+        (Guid shop, Guid[] products) = await MurphysAsync();
+        Guid call = Guid.NewGuid(), onScreen = Guid.NewGuid(), standalone = Guid.NewGuid();
+
+        OrderResult first = Store().AddLine(onScreen, shop, products[0], 2m, call);
+        OrderResult second = Store().AddLine(onScreen, shop, products[1], 3m, Guid.NewGuid()); // Already the first Call's: kept.
+        OrderResult plain = Store().AddLine(standalone, shop, products[2], 1m);
+
+        Assert.True(first.Succeeded && second.Succeeded && plain.Succeeded);
+        Assert.Equal((onScreen, (Guid?)call, 2), (second.Order!.Id, second.Order.CallId, second.Order.Lines.Count));
+        Assert.Null(plain.Order!.CallId);
+        Assert.Equal(onScreen, Store().FindForCall(call, shop)?.Id); // Record call finds the same order afterwards.
+    }
 }
