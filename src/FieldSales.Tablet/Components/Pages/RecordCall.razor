@@ -298,10 +298,23 @@
         }
     </div>;
 
-    /// <summary>Add to order (T-5.5.1): In person on a Low row, on Phone on every row. It opens the quantity popover.</summary>
-    private RenderFragment ToOrder(StockLine line) =>
-        @<button type="button" class="secondary" aria-label="@($"Add {line.Product.Name} to order")" disabled="@busy"
-                 @onclick="() => OpenOrdering(line)">Add to order</button>;
+    /// <summary>Add to order (T-5.5.1): In person on a Low row, on Phone on every row. It opens the quantity popover. Once the
+    /// product is on the Call's order, however it got there, the row says "On order (24)" instead (S3, D5).</summary>
+    private RenderFragment ToOrder(StockLine line) => @<text>
+        @if (OnOrder(line.Product) is { } quantity) { <span class="stock-on-order">On order (@quantity)</span> }
+        else
+        {
+            <button type="button" class="secondary" aria-label="@($"Add {line.Product.Name} to order")" disabled="@busy"
+                    @onclick="() => OpenOrdering(line)">Add to order</button>
+        }
+    </text>;
+
+    /// <summary>The product's quantity on the Call's order as the rep reads it, "24" or "2.5 kg"; null when it isn't on it.</summary>
+    private string? OnOrder(ProductSearchResult product) =>
+        callOrder?.Lines.FirstOrDefault(line => line.ProductId == product.Id) is { } line
+            ? line.Quantity.ToString(line.Unit == "Each" ? "0" : "0.0#####", System.Globalization.CultureInfo.InvariantCulture)
+                + (line.Unit == "Each" ? "" : $" {line.Unit}")
+            : null;
 
     /// <summary>Search the downloaded catalogue, or browse it by category when nothing is typed (S3).</summary>
     private RenderFragment AddProduct => @<div class="stock-add">

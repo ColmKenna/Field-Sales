@@ -222,6 +222,7 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .mark-option { min-width: 72px; background: var(--surface); color: var(--brand); border-width: 2px; }
 .mark-option[aria-pressed="true"] { background: var(--brand); color: #fff; }
 .mark-option[aria-pressed="true"]::before { content: "\2713\00a0"; }
+.stock-on-order { display: inline-flex; align-items: center; min-height: 56px; padding: 0 12px; color: var(--brand); font-weight: 600; }
 /* T-5.5.1 quantity popover (T7.7): over the page, above the footer; shared with the order's Low tab. */
 .quantity-popover { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 20; max-width: 32rem; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 20px 24px; background: var(--surface); border: 2px solid var(--brand); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
 .quantity-popover-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
