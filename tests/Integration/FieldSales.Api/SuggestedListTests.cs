@@ -140,6 +140,49 @@ public sealed class SuggestedListTests(TabletSnapshotFixture fixture) : IClassFi
         Assert.Equal(expected.Order(), snapshot.RecentOrderLines!.Select(line => line.ProductId).Order());
     }
 
+    [Fact]
+    public async Task Should_PutTheNotCheckedProductsOnTheNextVisitsList_When_TheCallSyncsAndTheDayDownloadsAgain()
+    {
+        (Guid murphys, Guid[] product) = await MurphysAsync(products: 5);
+        // An earlier visit counted product 3; it was ordered too, so it is "Ordered recently" whatever this visit does.
+        await ReceiveCallAsync(murphys, new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.FromHours(1)), CallChannel.InPerson, (product[3], 6m));
+        await ReceiveOrderAsync(murphys, new DateOnly(2026, 9, 1), accepted: true, product[4]);
+        Assert.True((await SyncAsync()).Completed);
+        ProductSearchIndex morning = new SnapshotStore(Workspace).ReadProductIndex(new DateOnly(2026, 9, 22));
+        CallStockEntry Entry(int index, decimal? count)
+        {
+            ProductSearchResult item = morning.Find(product[index])!;
+            return new(item.Id, item.Code, item.Name, item.Unit, count);
+        }
+        // Today: product 0 counted, 1 and 2 left Not checked; product 3 was removed from the list, so it isn't saved.
+        Assert.True(new CallStore(Workspace, _clock).Save(Guid.NewGuid(), murphys,
+            new(CallChannel.InPerson, null, [Entry(0, 4m), Entry(1, null), Entry(2, null)])).Succeeded);
+
+        SyncOutcome evening = await SyncAsync();
+
+        Assert.Equal(new UploadSummary(1, 1), evening.Upload);
+        Assert.Equal([("Product 00", "Last visit"), ("Product 01", "Last visit"), ("Product 02", "Last visit"), ("Product 04", "Ordered recently")],
+            SuggestedFor(murphys).Select(row => (row.Product.Name, row.Label)).ToArray());
+    }
+
+    [Fact]
+    public async Task Should_KeepTheProductOnTheList_When_ItIsNotCheckedAgain()
+    {
+        (Guid murphys, Guid[] product) = await MurphysAsync(products: 4);
+        await ReceiveCallAsync(murphys, new DateTimeOffset(2026, 9, 1, 10, 0, 0, TimeSpan.FromHours(1)), CallChannel.InPerson,
+            (product[0], 4m), (product[1], null));
+        Assert.Equal(new[] { product[0], product[1] }.Order(), (await _app.SyncAsync("colm")).LastStockCheckLines!.Select(line => line.ProductId).Order());
+
+        await ReceiveCallAsync(murphys, new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.FromHours(1)), CallChannel.InPerson,
+            (product[1], null), (product[2], 7m));
+        // A later Phone call doesn't replace the last Stock Check (Stock mentioned, T-5.3.2, isn't a count of the shelf).
+        await ReceiveCallAsync(murphys, new DateTimeOffset(2026, 9, 16, 10, 0, 0, TimeSpan.FromHours(1)), CallChannel.Phone, (product[3], 0m));
+
+        TabletSnapshot next = await _app.SyncAsync("colm");
+
+        Assert.Equal(new[] { product[1], product[2] }.Order(), next.LastStockCheckLines!.Select(line => line.ProductId).Order());
+    }
+
     private async Task<(Guid Murphys, Guid[] Products)> MurphysAsync(int products)
     {
         Geography places = await _app.SeedGeographyAsync();

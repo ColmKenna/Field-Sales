@@ -6,7 +6,7 @@ using Microsoft.Data.Sqlite;
 
 namespace FieldSales.Tablet.Core.Tests;
 
-/// <summary>WI-049 agreed scenarios 17 and 18: snapshot 1.3's stock history on the tablet — reading older snapshots,
+/// <summary>WI-049 agreed scenarios 2, 17 and 18: snapshot 1.3's stock history on the tablet — reading older snapshots,
 /// refusing history that doesn't match its snapshot, and stepping the local database up to format 3 safely.</summary>
 [Trait("Category", "Integration")]
 public sealed class SnapshotStockHistoryTests : IDisposable
@@ -48,7 +48,7 @@ public sealed class SnapshotStockHistoryTests : IDisposable
     }
 
     [Fact]
-    public async Task Should_ReadTheShopsHistory_When_A13SnapshotIsImported()
+    public async Task Should_LabelTheProductLastVisitAndOrderedRecently_When_ItIsOnBothTheLastCheckAndARecentAcceptedOrder()
     {
         TabletSnapshot snapshot = WithHistory();
 

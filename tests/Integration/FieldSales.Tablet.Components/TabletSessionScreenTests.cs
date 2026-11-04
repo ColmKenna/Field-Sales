@@ -547,6 +547,7 @@ public sealed partial class TabletSessionScreenTests
             return Renderer.Dispatcher.InvokeAsync(() => Renderer.Open(Id, parameters));
         }
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
+        public Task ClickLabelled(string label) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLabelled(Id, label));
         public Task ClickLink(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLink(Id, text));
         public Task Type(string elementId, string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Type(Id, elementId, text));
         public async Task Until(Func<bool> predicate)
@@ -634,6 +635,18 @@ public sealed partial class TabletSessionScreenTests
             throw new InvalidOperationException("The element was not found.");
         }
         public Task Click(int id, string text) => DispatchEventAsync(Events(id).First(e => e.Text == text).Event, null, EventArgs.Empty);
+
+        /// <summary>Clicks the button whose accessible name (aria-label) is <paramref name="label"/>, as a screen reader names it.</summary>
+        public Task ClickLabelled(int id, string label) => DispatchEventAsync(
+            ElementAttributes(id, attributes => attributes.Any(a => a.AttributeName == "aria-label" && a.AttributeValue?.ToString() == label)
+                    && attributes.Any(a => a.AttributeName == "onclick"))
+                .Single(a => a.AttributeName == "onclick").AttributeEventHandlerId, null, EventArgs.Empty);
+
+        /// <summary>The value attribute of the element with this id.</summary>
+        public string? Value(int id, string elementId) =>
+            ElementAttributes(id, attributes => attributes.Any(a => a.AttributeName == "id" && a.AttributeValue?.ToString() == elementId))
+                .FirstOrDefault(a => a.AttributeName == "value").AttributeValue?.ToString();
+
         public Task ClickLink(int id, string text) => DispatchEventAsync(Events(id, "a").First(e => e.Text.Contains(text, StringComparison.Ordinal)).Event, null, EventArgs.Empty);
         private IEnumerable<(string Text, ulong Event)> Events(int id, string element = "button")
         {

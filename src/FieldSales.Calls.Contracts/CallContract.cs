@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FieldSales.Quantities;
@@ -47,16 +46,9 @@ public static class CallContract
     {
         if (count is not { } amount) return null;
         if (amount < 0) return CountBelowZero;
-        bool known = UnitOfMeasure.TryParse(unit, out UnitOfMeasure measure);
+        bool known = UnitOfMeasureExtensions.TryParse(unit, out UnitOfMeasure measure);
         if (known && measure == UnitOfMeasure.Each && amount % 1m != 0) return CountNotWhole;
         return known && Quantity.TryCreate(measure, amount, out _) ? null : CountTooPrecise;
-    }
-
-    /// <summary>A count as the rep reads it: "4", "3.5 kg".</summary>
-    public static string FormatCount(decimal count, string unit)
-    {
-        string amount = count.ToString("0.######", CultureInfo.InvariantCulture);
-        return UnitOfMeasure.TryParse(unit, out UnitOfMeasure measure) && measure == UnitOfMeasure.Each ? amount : $"{amount} {unit}";
     }
 
     /// <summary>The reserved optional sections, in the order the summary will read them.</summary>
