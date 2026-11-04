@@ -192,6 +192,32 @@ public sealed class TabletWorkPayloadTests
         Assert.NotNull(TabletWorkReceiver.ReadCall(id, Body(valid), out _));
     }
 
+    // WI-050 scenario 12 (D8): a phone Call carries only mentioned products, each with Low or a count; Out is Low with 0.
+    [Fact]
+    public void Should_AcceptLowMarksAndRefuseAnUntouchedPhoneEntry_When_ACallIsReceived()
+    {
+        Guid id = Guid.NewGuid();
+        CallStockEntry low = new(Product, "SPF-30", "SPF30 Sun Lotion 200ml", "Each", null, true);
+        CallStockEntry @out = new(Guid.NewGuid(), "SUD-125", "Sudocrem 125g", "Each", 0m, true);
+        TabletCall phone = Call(id) with { Channel = CallChannel.Phone, PitchNotes = null, StockEntries = [low, @out] };
+
+        TabletCall? accepted = TabletWorkReceiver.ReadCall(id, Body(phone), out ReceiveResult? none);
+
+        Assert.Null(none);
+        Assert.Equal([low, @out], accepted!.StockEntries);
+        Assert.Equal("Phone · 2 marked Low (1 out)", accepted.Content.Summary);
+        // Low is written only when true, so an unmarked entry's body is unchanged from WI-049's.
+        string json = Encoding.UTF8.GetString(Body(phone with { StockEntries = [low with { Low = false, Count = 3m }] }));
+        Assert.DoesNotContain("\"low\"", json);
+
+        TabletCall untouched = phone with { StockEntries = [low, new(Guid.NewGuid(), "P-01", "Product 01", "Each")] };
+        Assert.Null(TabletWorkReceiver.ReadCall(id, Body(untouched), out ReceiveResult? refused));
+        Assert.Equal((ReceiveOutcome.Refused, UploadFaults.Incomplete), (refused!.Outcome, refused.Fault));
+        Assert.Contains(CallContract.MentionedOnly, refused.Detail);
+        // In person the same untouched product is Not checked, and a Low mark alone records something there too (D3, D5).
+        Assert.NotNull(TabletWorkReceiver.ReadCall(id, Body(untouched with { Channel = CallChannel.InPerson }), out _));
+    }
+
     private static TabletOrder Order(Guid id)
     {
         OrderLine line = new(Guid.NewGuid(), Product, "VD-1000", "Vitamin D 1000IU 90s", 12m, "Each",

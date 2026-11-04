@@ -15,7 +15,8 @@ namespace FieldSales.Calls.Contracts;
 /// <list type="table">
 /// <item><term><c>stockEntries</c></term><description>T-5.4.1 Stock Check from the Suggested List (and T-5.3.2 Stock mentioned
 /// on a phone Call): one entry per product with its count or Not checked, captured name and code.</description></item>
-/// <item><term><c>stockEntries[].low</c></term><description>T-5.5.1 Low marks, on the entry they belong to.</description></item>
+/// <item><term><c>stockEntries[].low</c></term><description>Low marks, on the entry they belong to (T-5.3.2 on Phone, T-5.5.1 In
+/// person). Out is Low with a count of 0.</description></item>
 /// <item><term><c>competitorNotes</c></term><description>T-5.8.1 Competitor Notes, each with one link type.</description></item>
 /// <item><term><c>followUpOf</c></term><description>T-5.7.1 the earlier Call at the same Location that this one follows up.</description></item>
 /// <item><term><c>campaignOutcomes</c></term><description>E20 one outcome per open campaign.</description></item>
@@ -39,6 +40,10 @@ public static class CallContract
     public const string CountBelowZero = "Enter 0 or more";
     public const string CountNotWhole = "Enter a whole number";
     public const string CountTooPrecise = "Enter a count with up to six decimal places";
+
+    /// <summary>A phone Call keeps only the products that were mentioned (T-5.3.2 S11). The tablet never sends an untouched
+    /// row, so only a malformed upload meets this.</summary>
+    public const string MentionedOnly = "A product on a phone call needs Low, Out or a count";
 
     /// <summary>Why a stock count can't be saved for a product counted in <paramref name="unit"/>, or null when it can
     /// (T-5.4.1 S5). No count means Not checked, which is always allowed. Zero is a count.</summary>
@@ -73,8 +78,9 @@ public sealed record CallSnapshotRef(string Version, DateTimeOffset BuiltUtc);
 /// <param name="CalledOn">The tablet's local date when the Call was saved.</param>
 /// <param name="SavedAt">When it was saved, in the tablet's local time with its offset.</param>
 /// <param name="PitchNotes">What was pitched; absent when the Call has no Pitch.</param>
-/// <param name="StockEntries">The Stock Check (T-5.4.1): one entry per product kept on the list, counted or Not checked;
-/// absent when the Call has no Stock Check.</param>
+/// <param name="StockEntries">In person, the Stock Check (T-5.4.1): one entry per product kept on the list, counted or Not
+/// checked. On Phone, Stock mentioned (T-5.3.2): only the products marked Low or Out or given a count. Absent when there are
+/// none.</param>
 public sealed record TabletCall(string Schema, int Version, Guid Id, Guid LocationId, string CapturingRep, DateOnly CalledOn,
     DateTimeOffset SavedAt, CallChannel Channel, CallSnapshotRef Snapshot,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? PitchNotes = null,
@@ -87,12 +93,21 @@ public sealed record TabletCall(string Schema, int Version, Guid Id, Guid Locati
 
 /// <summary>One product on a Stock Check. Code and name are kept as captured, like an order line, so the entry still reads
 /// correctly if the product is later renamed or hidden. <paramref name="Count"/> is in <paramref name="Unit"/>; absent means
-/// Not checked: the product stays on the next visit's Suggested List. T-5.5.1 adds <c>low</c> here.</summary>
+/// Not checked: the product stays on the next visit's Suggested List. <paramref name="Low"/> is the rep's "reorder this" mark,
+/// written only when true; Out is Low with a count of 0 (T-5.3.2 D1), so it needs no field of its own.</summary>
 public sealed record CallStockEntry(Guid ProductId, string ProductCode, string ProductName, string Unit,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Count = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Count = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Low = false)
 {
     [JsonIgnore]
     public bool Counted => Count is not null;
+
+    [JsonIgnore]
+    public bool Out => Low && Count == 0m;
+
+    /// <summary>Whether the entry says anything: a count or a Low mark. A phone Call saves only these.</summary>
+    [JsonIgnore]
+    public bool Mentioned => Counted || Low;
 }
 
 /// <summary>What a Call records apart from who, where and when: the part the rep fills in on T-06. The tablet checks a
@@ -108,32 +123,51 @@ public sealed record CallContent(CallChannel? Channel, string? PitchNotes, IRead
 
     public int Counted => Stock.Count(entry => entry.Counted);
     public int NotChecked => Stock.Count(entry => !entry.Counted);
+    public int Low => Stock.Count(entry => entry.Low);
+    public int Out => Stock.Count(entry => entry.Out);
 
     /// <summary>A Stock Check counts as recorded only when at least one product was counted (WI-049 D6): a list left
     /// entirely Not checked records nothing.</summary>
     public bool HasStockCheck => Counted > 0;
 
-    /// <summary>Whether anything was recorded. Competitor notes (T-5.8.1) will count too.</summary>
-    public bool RecordsSomething => HasPitch || HasStockCheck;
+    /// <summary>Whether anything was recorded: a Low mark counts on either channel (T-5.3.2 D3). Competitor notes (T-5.8.1)
+    /// will count too.</summary>
+    public bool RecordsSomething => HasPitch || HasStockCheck || Low > 0;
 
     /// <summary>Why this can't be saved yet, in the rep's words, or null when it can.</summary>
     public string? Problem =>
         Channel is null ? CallContract.ChooseChannel
         : Stock.Select(entry => CallContract.CountProblem(entry.Unit, entry.Count)).FirstOrDefault(problem => problem is not null) is { } count ? count
+        : Channel == CallChannel.Phone && !Stock.All(entry => entry.Mentioned) ? CallContract.MentionedOnly
         : !RecordsSomething ? CallContract.RecordSomething
         : Notes?.Length > CallContract.MaximumPitchNotesLength ? CallContract.PitchNotesTooLong
         : null;
 
-    /// <summary>The save review's one line, e.g. "In person · Pitch notes · 10 counted, 3 not checked". Later sections add
-    /// "2 Low" and "1 competitor note" in that order.</summary>
+    /// <summary>The save review's one line, e.g. "In person · Pitch notes · 10 counted, 3 not checked · 2 Low", or on Phone
+    /// "Phone · 2 marked Low (1 out)". Competitor notes (T-5.8.1) add "1 competitor note" last.</summary>
     public string Summary => string.Join(" · ", Parts());
 
     private IEnumerable<string> Parts()
     {
         if (Channel is { } channel) yield return CallContract.Label(channel);
         if (HasPitch) yield return "Pitch notes";
-        if (Stock.Count > 0) yield return StockSummary(Counted, NotChecked);
+        if (Stock.Count == 0) yield break;
+        if (Channel == CallChannel.Phone)
+        {
+            yield return MentionedSummary(Low, Out, Stock.Count(entry => entry.Counted && !entry.Low));
+            yield break;
+        }
+        yield return StockSummary(Counted, NotChecked);
+        if (Low > 0) yield return $"{Low} Low";
     }
+
+    /// <summary>Stock mentioned on a phone Call (T-5.3.2 D4): "2 marked Low (1 out) · 1 counted", leaving out "(… out)" at 0
+    /// and each part with nothing in it; empty when nothing was mentioned.</summary>
+    public static string MentionedSummary(int low, int @out, int counted) => string.Join(" · ", new[]
+    {
+        low == 0 ? "" : @out == 0 ? $"{low} marked Low" : $"{low} marked Low ({@out} out)",
+        counted == 0 ? "" : $"{counted} counted"
+    }.Where(part => part.Length > 0));
 
     /// <summary>"10 counted, 3 not checked"; "13 counted" when nothing was left; "3 not checked" when nothing was counted.</summary>
     public static string StockSummary(int counted, int notChecked) => (counted, notChecked) switch
