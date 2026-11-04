@@ -1,3 +1,4 @@
+using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
 
 namespace FieldSales.Api.Ordering;
@@ -28,8 +29,10 @@ public sealed class ReceivedWork
     };
 }
 
-/// <summary>Where a received order stands in the order lifecycle. Acceptance at the cut-off arrives with T-7.1.1.</summary>
-public enum OrderLifecycleStatus { Pending }
+/// <summary>Where a received order stands in the order lifecycle.</summary>
+/// <remarks><see cref="Accepted"/> feeds the Suggested List's "Ordered recently" (T-5.4.1). Nothing sets it yet: acceptance at
+/// the cut-off arrives with T-7.1.1 (WI-067), so until then every received order stays Pending (WI-049 D1).</remarks>
+public enum OrderLifecycleStatus { Pending, Accepted }
 
 /// <summary>An order received from a tablet. Its lines stay in the received body; this row holds what the order
 /// lifecycle needs to find it.</summary>
@@ -55,4 +58,43 @@ public sealed class ReceivedOrder
         SnapshotVersion = order.Snapshot.Version, SnapshotBuiltUtc = order.Snapshot.BuiltUtc,
         ReceivedUtc = receivedUtc.ToUniversalTime()
     };
+}
+
+/// <summary>A Call received from a tablet (T-5.3.1). Its full record stays in the received body; this row and its stock
+/// entries hold what the next Morning Snapshot needs to find a Location's last Stock Check (T-5.4.1).</summary>
+public sealed class ReceivedCall
+{
+    private ReceivedCall() { }
+
+    public Guid Id { get; private set; }
+    public Guid LocationId { get; private set; }
+    public string CapturingRep { get; private set; } = "";
+    public DateOnly CalledOn { get; private set; }
+    public DateTimeOffset SavedAt { get; private set; }
+    public CallChannel Channel { get; private set; }
+    public DateTimeOffset ReceivedUtc { get; private set; }
+    public List<ReceivedCallStockEntry> StockEntries { get; private set; } = [];
+
+    public static ReceivedCall From(TabletCall call, DateTimeOffset receivedUtc) => new()
+    {
+        Id = call.Id, LocationId = call.LocationId, CapturingRep = call.CapturingRep, CalledOn = call.CalledOn,
+        SavedAt = call.SavedAt, Channel = call.Channel, ReceivedUtc = receivedUtc.ToUniversalTime(),
+        StockEntries = [.. (call.StockEntries ?? []).Select(entry => new ReceivedCallStockEntry(call.Id, entry))]
+    };
+}
+
+/// <summary>One product on a received Stock Check: its count in its unit, or Not checked (no count).</summary>
+public sealed class ReceivedCallStockEntry
+{
+    private ReceivedCallStockEntry() { }
+
+    internal ReceivedCallStockEntry(Guid callId, CallStockEntry entry)
+    {
+        CallId = callId; ProductId = entry.ProductId; Unit = entry.Unit; Count = entry.Count;
+    }
+
+    public Guid CallId { get; private set; }
+    public Guid ProductId { get; private set; }
+    public string Unit { get; private set; } = "";
+    public decimal? Count { get; private set; }
 }

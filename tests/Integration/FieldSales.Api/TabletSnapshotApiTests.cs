@@ -153,7 +153,7 @@ public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture
 
         await _app.RetireContactAsync(mary);
         TabletSnapshot after = await _app.SyncAsync("colm");
-        Assert.Equal("1.2", after.Manifest.Version);
+        Assert.Equal("1.3", after.Manifest.Version);
         foreach (Guid location in new[] { rathdrum, arklow })
         {
             SnapshotLocation shop = after.Locations.Single(shop => shop.Id == location);
@@ -362,7 +362,7 @@ public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture
         using HttpResponseMessage response = await TabletSnapshotApplication.RequestAsync(client, SnapshotContract.Path, majors);
         Assert.Equal(expected, response.StatusCode);
         if (expected == HttpStatusCode.OK)
-            Assert.Equal("1.2", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
+            Assert.Equal("1.3", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
         if (expected == HttpStatusCode.NotAcceptable)
             Assert.Equal(SnapshotContract.UpdateRequiredTitle, (await response.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
     }
@@ -585,7 +585,8 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
         Assert.Equal(SnapshotContract.Schema, snapshot.Manifest.Schema);
         Assert.Equal(Header(response, SnapshotContract.VersionHeader), snapshot.Manifest.Version);
         Assert.Equal(new SnapshotCounts(snapshot.Locations.Count, snapshot.Categories.Count, snapshot.Products.Count,
-            snapshot.BasePrices.Count, snapshot.ProductAttributes?.Count ?? 0), snapshot.Manifest.Counts);
+            snapshot.BasePrices.Count, snapshot.ProductAttributes?.Count ?? 0, snapshot.LastStockCheckLines?.Count ?? 0,
+            snapshot.RecentOrderLines?.Count ?? 0), snapshot.Manifest.Counts);
         return snapshot;
     }
 

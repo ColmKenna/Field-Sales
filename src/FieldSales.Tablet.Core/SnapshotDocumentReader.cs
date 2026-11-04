@@ -13,7 +13,8 @@ namespace FieldSales.Tablet.Core;
 internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferBytes = 1024 * 1024)
 {
     private static readonly string[] OriginalFamilies = ["locations", "categories", "products", "basePrices"];
-    internal static readonly string[] Families = [.. OriginalFamilies, "productAttributes"];
+    private static readonly string[] HistoryFamilies = ["lastStockCheckLines", "recentOrderLines"];
+    internal static readonly string[] Families = [.. OriginalFamilies, "productAttributes", .. HistoryFamilies];
     private byte[] buffer = new byte[Math.Min(64 * 1024, maximumBufferBytes)];
     private int start, length;
     private bool final;
@@ -24,7 +25,7 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
         RequireToken(JsonTokenType.StartObject, ct);
         HashSet<string> seen = new(StringComparer.Ordinal);
         bool hasManifest = false;
-        bool requiresAttributes = false;
+        bool requiresAttributes = false, requiresHistory = false;
         while (true)
         {
             var (token, name) = Token(ct);
@@ -37,7 +38,9 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
                 SnapshotManifest received = value.RootElement.Deserialize<SnapshotManifest>(SnapshotContract.JsonOptions)
                     ?? throw new InvalidDataException("The snapshot manifest is empty.");
                 manifest(received);
-                requiresAttributes = int.Parse(received.Version.Split('.')[1], CultureInfo.InvariantCulture) >= 1;
+                int minor = int.Parse(received.Version.Split('.')[1], CultureInfo.InvariantCulture);
+                requiresAttributes = minor >= 1;
+                requiresHistory = minor >= 3;
                 hasManifest = true;
             }
             else if (Families.Contains(name))
@@ -55,7 +58,8 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
             else Skip(ct);
         }
         if (!hasManifest || OriginalFamilies.Any(family => !seen.Contains(family))
-            || (requiresAttributes && !seen.Contains("productAttributes")))
+            || (requiresAttributes && !seen.Contains("productAttributes"))
+            || (requiresHistory && HistoryFamilies.Any(family => !seen.Contains(family))))
             throw new InvalidDataException("The snapshot is missing a required field.");
         // Read to the end so the plain hash covers every byte.
         while (true)

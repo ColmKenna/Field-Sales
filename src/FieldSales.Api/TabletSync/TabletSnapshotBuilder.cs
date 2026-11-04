@@ -1,10 +1,15 @@
 using System.Data;
+using System.Text.Json;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Coverage;
 using FieldSales.Api.Directory;
+using FieldSales.Api.Ordering;
+using FieldSales.Calls.Contracts;
 using FieldSales.Directory.Contracts;
+using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FieldSales.Api.TabletSync;
 
@@ -13,10 +18,12 @@ namespace FieldSales.Api.TabletSync;
 /// Locations come from T-3.1.1's resolver, never a copy of its rule. Product visibility uses
 /// <see cref="RestrictedProductVisibility"/> with the rep's current permissions, read in the same
 /// catalogue transaction as the products and their facts.
-/// Each database is read in one serializable transaction. The two families do not reference each other.
+/// The directory and catalogue are each read in one serializable transaction. The 1.3 history families (T-5.4.1) are read
+/// from received work afterwards and keep only the rep's Locations and the products included here.
 /// </remarks>
 public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, CoverageOwnershipReader ownership,
-    CatalogueDbContext catalogue, RestrictionPermissionReader permissions, TimeProvider clock)
+    CatalogueDbContext catalogue, RestrictionPermissionReader permissions, OrderingDbContext ordering,
+    IOptions<TabletSnapshotOptions> options, TimeProvider clock)
 {
     public async Task<TabletSnapshot> BuildAsync(string repSubject, CancellationToken ct)
     {
@@ -26,9 +33,62 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
         SnapshotLocation[] locations = await ReadLocationsAsync(repSubject, ct);
         (SnapshotCategory[] categories, SnapshotProduct[] products, SnapshotBasePrice[] prices, SnapshotProductAttribute[] attributes) =
             await ReadCatalogueAsync(repSubject, buildDate, ct);
+        HashSet<Guid> shops = [.. locations.Select(location => location.Id)];
+        HashSet<Guid> included = [.. products.Select(product => product.Id)];
+        SnapshotStockCheckLine[] lastChecks = await ReadLastStockChecksAsync(shops, included, ct);
+        SnapshotRecentOrderLine[] recentOrders = await ReadRecentOrdersAsync(shops, included, ct);
         var manifest = new SnapshotManifest(SnapshotContract.Schema, SnapshotContract.CurrentVersion, repSubject,
-            builtUtc, buildDate, new(locations.Length, categories.Length, products.Length, prices.Length, attributes.Length));
-        return new(manifest, locations, categories, products, prices, attributes);
+            builtUtc, buildDate, new(locations.Length, categories.Length, products.Length, prices.Length, attributes.Length,
+                lastChecks.Length, recentOrders.Length));
+        return new(manifest, locations, categories, products, prices, attributes, lastChecks, recentOrders);
+    }
+
+    // Each Location's last Stock Check: its newest In-person Call with stock entries, whoever recorded it. Received Calls
+    // never change and a Call's entries are stored with it, so a plain read sees whole Stock Checks.
+    private async Task<SnapshotStockCheckLine[]> ReadLastStockChecksAsync(HashSet<Guid> shops, HashSet<Guid> included,
+        CancellationToken ct)
+    {
+        Guid[] locationIds = [.. shops];
+        Guid[] lastCallIds = await ordering.Calls.AsNoTracking()
+            .Where(call => locationIds.Contains(call.LocationId) && call.Channel == CallChannel.InPerson && call.StockEntries.Any())
+            .GroupBy(call => call.LocationId)
+            .Select(group => group.OrderByDescending(call => call.SavedAt).ThenByDescending(call => call.Id).Select(call => call.Id).First())
+            .ToArrayAsync(ct);
+        var lines = await (from entry in ordering.CallStockEntries.AsNoTracking()
+                           where lastCallIds.Contains(entry.CallId)
+                           join call in ordering.Calls on entry.CallId equals call.Id
+                           select new { call.LocationId, entry.ProductId }).ToArrayAsync(ct);
+        return [.. lines.Where(line => included.Contains(line.ProductId))
+            .Select(line => new SnapshotStockCheckLine(line.LocationId, line.ProductId))
+            .OrderBy(line => line.LocationId).ThenBy(line => line.ProductId)];
+    }
+
+    // The products on each Location's most recent Accepted Orders, once per Location. Pending orders never count.
+    private async Task<SnapshotRecentOrderLine[]> ReadRecentOrdersAsync(HashSet<Guid> shops, HashSet<Guid> included,
+        CancellationToken ct)
+    {
+        Guid[] locationIds = [.. shops];
+        int count = options.Value.SuggestedListOrderCount;
+        // An order is recent when fewer than `count` Accepted orders at its Location are newer (by date taken, then
+        // received), which SQL Server answers per Location from the (LocationId, Status, TakenOn) index.
+        IQueryable<ReceivedOrder> accepted = ordering.Orders.AsNoTracking().Where(order => order.Status == OrderLifecycleStatus.Accepted);
+        Guid[] orderIds = await accepted
+            .Where(order => locationIds.Contains(order.LocationId))
+            .Where(order => accepted.Count(newer => newer.LocationId == order.LocationId
+                && (newer.TakenOn > order.TakenOn
+                    || (newer.TakenOn == order.TakenOn && (newer.ReceivedUtc > order.ReceivedUtc
+                        || (newer.ReceivedUtc == order.ReceivedUtc && newer.Id.CompareTo(order.Id) > 0))))) < count)
+            .Select(order => order.Id)
+            .ToArrayAsync(ct);
+        // An order's lines stay in its received body, as accepted from the tablet.
+        string[] bodies = await ordering.ReceivedWork.AsNoTracking().Where(item => orderIds.Contains(item.Id))
+            .Select(item => item.Body).ToArrayAsync(ct);
+        return [.. bodies.Select(body => JsonSerializer.Deserialize(body, OrderJsonContext.Default.TabletOrder)!)
+            .SelectMany(order => order.Lines.Select(line => (order.LocationId, line.ProductId)))
+            .Where(line => shops.Contains(line.LocationId) && included.Contains(line.ProductId))
+            .Distinct()
+            .Select(line => new SnapshotRecentOrderLine(line.LocationId, line.ProductId))
+            .OrderBy(line => line.LocationId).ThenBy(line => line.ProductId)];
     }
 
     private Task<SnapshotLocation[]> ReadLocationsAsync(string repSubject, CancellationToken ct) =>

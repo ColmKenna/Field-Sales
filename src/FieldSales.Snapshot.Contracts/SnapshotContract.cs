@@ -13,7 +13,7 @@ public static class SnapshotContract
 {
     public const string Schema = "field-sales-snapshot";
     public const int CurrentMajor = 1;
-    public const int CurrentMinor = 2;
+    public const int CurrentMinor = 3;
     public static string CurrentVersion => $"{CurrentMajor}.{CurrentMinor}";
 
     /// <summary>The majors this server can build, newest first.</summary>
@@ -60,14 +60,18 @@ public sealed record SnapshotManifest(string Schema, string Version, string RepS
     DateOnly BuildDate, SnapshotCounts Counts);
 
 public sealed record SnapshotCounts(int Locations, int Categories, int Products, int BasePrices,
-    int ProductAttributes = 0);
+    int ProductAttributes = 0, int LastStockCheckLines = 0, int RecentOrderLines = 0);
 
 /// <summary>Version 1 of the rep's Morning Snapshot.</summary>
 public sealed record TabletSnapshot(SnapshotManifest Manifest, IReadOnlyList<SnapshotLocation> Locations,
     IReadOnlyList<SnapshotCategory> Categories, IReadOnlyList<SnapshotProduct> Products,
     IReadOnlyList<SnapshotBasePrice> BasePrices,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<SnapshotProductAttribute>? ProductAttributes = null);
+    IReadOnlyList<SnapshotProductAttribute>? ProductAttributes = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotStockCheckLine>? LastStockCheckLines = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotRecentOrderLine>? RecentOrderLines = null);
 
 /// <summary>An assigned Location. Locations hold no address lines yet, so its address is Town and Eircode.</summary>
 public sealed record SnapshotLocation(Guid Id, string Name, Guid CustomerId, string CustomerName, SnapshotTown Town,
@@ -98,3 +102,13 @@ public sealed record SnapshotBasePrice(Guid ProductId, DateOnly EffectiveFrom, d
 /// <remarks>Separate rows keep import bounded per attribute, even when a product has many attributes.
 /// A 1.0 snapshot has no attribute family; names and values retain their saved text.</remarks>
 public sealed record SnapshotProductAttribute(Guid ProductId, int Position, string Name, string Value, bool IsArchived);
+
+/// <summary>A product on a Location's last Stock Check, counted or Not checked, added in 1.3 (T-5.4.1). The last Stock
+/// Check is the Location's newest In-person Call with stock entries, by whoever recorded it.</summary>
+/// <remarks>Rows name only included products and the rep's own Locations, so restricted products never appear.</remarks>
+public sealed record SnapshotStockCheckLine(Guid LocationId, Guid ProductId);
+
+/// <summary>A product on one of a Location's most recent Accepted Orders, once per Location, added in 1.3 (T-5.4.1). How
+/// many orders count is a server setting (three by default). Orders not yet Accepted never contribute.</summary>
+/// <remarks>Rows name only included products and the rep's own Locations, so restricted products never appear.</remarks>
+public sealed record SnapshotRecentOrderLine(Guid LocationId, Guid ProductId);

@@ -40,19 +40,19 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
     }
 
     /// <summary>Stores a recorded Call as received (T-5.3.1). Only its structure is checked; the Location it names may have
-    /// been reassigned since the rep's snapshot, and that never refuses it. Calls stay in the ledger until Sales Operations
-    /// has a store of its own.</summary>
+    /// been reassigned since the rep's snapshot, and that never refuses it. Its stock entries are kept beside the ledger row
+    /// so the Location's next Suggested List can start from them (T-5.4.1).</summary>
     public async Task<ReceiveResult> ReceiveCallAsync(Guid id, string repSubject, byte[] body, CancellationToken ct)
     {
         TabletCall? call = ReadCall(id, body, out ReceiveResult? refused);
         if (call is null) return refused!;
         if (!string.Equals(call.CapturingRep, repSubject, StringComparison.Ordinal))
             return ReceiveResult.Refused(UploadFaults.NotYours, "The call was recorded by a different rep.");
-        return await StoreAsync(id, ReceivedWorkKind.Call, repSubject, body, null, ct);
+        return await StoreAsync(id, ReceivedWorkKind.Call, repSubject, body, null, ct, call);
     }
 
     private async Task<ReceiveResult> StoreAsync(Guid id, ReceivedWorkKind kind, string repSubject, byte[] body,
-        TabletOrder? order, CancellationToken ct)
+        TabletOrder? order, CancellationToken ct, TabletCall? call = null)
     {
         string hash = Convert.ToHexStringLower(SHA256.HashData(body));
         if (await ExistingAsync(id, kind, repSubject, hash, ct) is { } existing) return existing;
@@ -60,9 +60,10 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         DateTimeOffset now = clock.GetUtcNow();
         db.ReceivedWork.Add(ReceivedWork.Create(id, kind, repSubject, now, hash, Encoding.UTF8.GetString(body)));
         if (order is not null) db.Orders.Add(ReceivedOrder.Pending(order, now));
+        if (call is not null) db.Calls.Add(ReceivedCall.From(call, now));
         try
         {
-            // One SaveChanges is one transaction: the ledger row and the Pending order are stored together or not at all.
+            // One SaveChanges is one transaction: the ledger row and its order or Call row are stored together or not at all.
             await db.SaveChangesAsync(ct);
             return ReceiveResult.Received;
         }
@@ -155,9 +156,17 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         _ when !hasChannel => Incomplete("The call has no channel."),
         _ when call.Snapshot is null || string.IsNullOrWhiteSpace(call.Snapshot.Version) || call.Snapshot.Version.Length > 20
             || call.Snapshot.BuiltUtc == default => Incomplete("The call has no snapshot reference."),
+        _ when call.StockEntries is { } stock && !AreStockEntries(stock) => Incomplete("A stock entry is incomplete."),
         _ when call.Content.Problem is { } problem => Incomplete($"The call can't be accepted: {problem}."),
         _ => null
     };
+
+    // Each entry names a product once, with its captured code and name and a unit this system knows; counts are judged by
+    // the shared rule in CallContent.Problem.
+    private static bool AreStockEntries(IReadOnlyList<CallStockEntry?> stock) =>
+        stock.All(entry => entry is not null && entry.ProductId != Guid.Empty && !string.IsNullOrWhiteSpace(entry.ProductCode)
+            && !string.IsNullOrWhiteSpace(entry.ProductName) && FieldSales.Quantities.UnitOfMeasureExtensions.TryParse(entry.Unit, out _))
+        && stock.Select(entry => entry!.ProductId).Distinct().Count() == stock.Count;
 
     private static ReceiveResult Incomplete(string detail) => ReceiveResult.Refused(UploadFaults.Incomplete, detail);
 

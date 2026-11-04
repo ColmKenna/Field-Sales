@@ -33,6 +33,8 @@ builder.Services.AddScoped<RestrictionPermissionStore>();
 builder.Services.AddScoped<RestrictionPermissionCohortStore>();
 builder.Services.AddScoped<ReportingLineStore>();
 builder.Services.AddScoped<TabletSnapshotBuilder>();
+builder.Services.AddOptions<TabletSnapshotOptions>().Bind(builder.Configuration.GetSection(TabletSnapshotOptions.Section))
+    .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddScoped<TabletWorkReceiver>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddLocationCoordinates(builder.Configuration);
