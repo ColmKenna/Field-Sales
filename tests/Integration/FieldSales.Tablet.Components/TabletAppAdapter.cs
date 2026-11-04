@@ -28,6 +28,12 @@ public sealed class TabletApp
     public CallDrafts CallDrafts { get; } = new();
     public Func<string, Guid, Guid, CallContent, CallResult> SaveWork { get; set; } = (_, _, _, _) => new CallResult(null, "Not set up in this test.");
     public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content) => SaveWork(rep, callId, locationId, content);
+    public Func<string, Guid, Guid, TabletOrder?> FindCallOrder { get; set; } = (_, _, _) => null;
+    public TabletOrder? ReadCallOrder(string rep, Guid callId, Guid locationId) => FindCallOrder(rep, callId, locationId);
+    public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddFromCall { get; set; } =
+        (_, _, _, _, _) => new OrderResult(null, "Order entry isn't set up in this test.");
+    public OrderResult AddOrderLineFromCall(string rep, Guid callId, Guid locationId, Guid productId, decimal quantity) =>
+        AddFromCall(rep, callId, locationId, productId, quantity);
     public Func<Task<SignInAnswer>> SignIn { get; set; } = () => Task.FromResult(new SignInAnswer(null, null));
     public Task<SignInAnswer> SignInAsync() => SignIn();
     public HomeView Home { get; set; } = new("Last synced 07:42", []);

@@ -7,8 +7,10 @@ namespace FieldSales.Tablet.Core;
 /// a restored draft still saves as the same Call.</summary>
 /// <param name="Stock">The Stock Check rows (T-5.4.1), starting from the Suggested List; null until the page has built them.</param>
 /// <param name="StockChanged">Whether the rep added or removed a row, so leaving would lose something.</param>
+/// <param name="AddedToOrder">Whether a product went on the order from this Call (T-5.5.1). Those lines are already saved on the
+/// order and stay there if the Call is left unsaved (D8).</param>
 public sealed record CallDraft(Guid CallId, CallChannel? Channel, string Notes, bool NotesOpen,
-    IReadOnlyList<StockLine>? Stock = null, bool StockChanged = false)
+    IReadOnlyList<StockLine>? Stock = null, bool StockChanged = false, bool AddedToOrder = false)
 {
     public IReadOnlyList<StockLine> Lines => Stock ?? [];
 
@@ -88,6 +90,10 @@ public sealed record StockLine(ProductSearchResult Product, SuggestionSources So
     /// <summary>Low on or off. Turning Low off also clears Out: its count of 0 goes with it (D6).</summary>
     public StockLine ToggleLow() => !Low ? this with { Low = true }
         : Out ? this with { Low = false, Count = "", CountOpen = false } : this with { Low = false };
+
+    /// <summary>The In-person Low tick (T-5.5.1 D3): on or off, keeping the count, because 0 counted on the shelf is a real count
+    /// there.</summary>
+    public StockLine Tick() => this with { Low = !Low };
 
     /// <summary>Out marks Low and records a count of 0, replacing any count (S10). Out off removes the 0 and keeps Low (D6).</summary>
     public StockLine ToggleOut() => Out ? this with { Count = "", CountOpen = false } : this with { Low = true, Count = "0" };
