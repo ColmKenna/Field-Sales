@@ -258,13 +258,13 @@ public sealed class TabletStorageScenarios : IDisposable
     [Fact]
     public async Task Should_IgnoreAdditiveFields_When_TheServerSendsANewerMinorVersion()
     {
-        // P3: a minor version only adds fields; this app reads 1.x and skips what it does not know.
-        TabletSnapshot snapshot = Snapshots.Build("colm", locations: 2, products: 300, version: "1.3");
+        // P3: a minor version only adds fields; this app reads 1.x and skips what it does not know. 1.3 is current (WI-049).
+        TabletSnapshot snapshot = Snapshots.Build("colm", locations: 2, products: 300, version: "1.4");
         JsonObject json = JsonSerializer.SerializeToNode(snapshot, SnapshotContract.JsonOptions)!.AsObject();
         json["promotions"] = new JsonArray(Enumerable.Range(0, 2000).Select(index => (JsonNode)new JsonObject { ["id"] = index }).ToArray());
         json["campaign"] = "Autumn";
         json["locations"]![0]!["profile"] = "Pharmacy";
-        _tablet.Server.Serve(EncodedSnapshot.FromJson(Encoding.UTF8.GetBytes(json.ToJsonString()), "1.3"));
+        _tablet.Server.Serve(EncodedSnapshot.FromJson(Encoding.UTF8.GetBytes(json.ToJsonString()), "1.4"));
         SyncOutcome outcome = await _tablet.Sync().SyncAsync();
         Assert.Equal(SyncStatus.Completed, outcome.Status);
         Assert.Equal(snapshot.Manifest.Counts, outcome.Active!.Manifest.Counts);
@@ -308,7 +308,7 @@ public sealed class TabletStorageScenarios : IDisposable
         {
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "PRAGMA user_version=3";
+            command.CommandText = "PRAGMA user_version=4"; // Format 3 is current (WI-049).
             command.ExecuteNonQuery();
         }
         Assert.Throws<InvalidOperationException>(() => new SnapshotStore(workspace));

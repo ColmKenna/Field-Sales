@@ -60,6 +60,8 @@ public sealed class TabletApp
     public Func<string, int> CountWaiting { get; set; } = _ => 0;
     public int CountWaitingToSend(string rep) => CountWaiting(rep);
     public ProductSearchIndex ReadProductIndex(string rep) => ReadIndex(rep);
+    public Func<string, Guid, StockCheckStart> ReadStock { get; set; } = (_, _) => StockCheckStart.Empty;
+    public StockCheckStart ReadStockCheckStart(string rep, Guid locationId) => ReadStock(rep, locationId);
     public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
         AddWork(rep, orderId, locationId, productId, quantity);
     public TabletOrder? ReadOrder(string rep, Guid orderId) => FindOrder(rep, orderId);

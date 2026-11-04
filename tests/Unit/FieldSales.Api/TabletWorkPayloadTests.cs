@@ -152,6 +152,46 @@ public sealed class TabletWorkPayloadTests
         static string Json(TabletCall changed) => JsonSerializer.Serialize(changed, CallJsonContext.Default.TabletCall);
     }
 
+    // WI-049 scenario 16: each stock entry names one product with its captured code, name and a known unit, and its count
+    // passes the same check the tablet used. Everything else about the product is judged as captured.
+    [Theory]
+    [InlineData("negative count", "Enter 0 or more")]
+    [InlineData("fraction of an item", "Enter a whole number")]
+    [InlineData("too precise", "Enter a count with up to six decimal places")]
+    [InlineData("duplicate product", "A stock entry is incomplete.")]
+    [InlineData("no product", "A stock entry is incomplete.")]
+    [InlineData("no name", "A stock entry is incomplete.")]
+    [InlineData("unknown unit", "A stock entry is incomplete.")]
+    [InlineData("all not checked", CallContract.RecordSomething)]
+    public void Should_RefuseTheCallAsIncomplete_When_AStockEntryIsMalformed(string fault, string detail)
+    {
+        Guid id = Guid.NewGuid();
+        CallStockEntry counted = new(Product, "VD-1000", "Vitamin D 1000IU 90s", "Each", 4m);
+        CallStockEntry oats = new(Guid.NewGuid(), "OAT-1", "Loose Porridge Oats", "kg", 3.5m);
+        CallStockEntry[] entries = fault switch
+        {
+            "negative count" => [counted with { Count = -2m }],
+            "fraction of an item" => [counted with { Count = 2.5m }],
+            "too precise" => [oats with { Count = 0.0000001m }],
+            "duplicate product" => [counted, counted with { Count = null }],
+            "no product" => [counted with { ProductId = Guid.Empty }],
+            "no name" => [counted with { ProductName = " " }],
+            "unknown unit" => [counted with { Unit = "crate" }],
+            "all not checked" => [counted with { Count = null }],
+            _ => throw new ArgumentOutOfRangeException(nameof(fault))
+        };
+        TabletCall call = Call(id) with { PitchNotes = null, StockEntries = entries };
+
+        TabletCall? read = TabletWorkReceiver.ReadCall(id, Body(call), out ReceiveResult? refused);
+
+        Assert.Null(read);
+        Assert.Equal((ReceiveOutcome.Refused, UploadFaults.Incomplete), (refused!.Outcome, refused.Fault));
+        Assert.Contains(detail, refused.Detail);
+        // The same entries with a valid count are accepted: a measured product counts in decimals with its unit.
+        TabletCall valid = Call(id) with { PitchNotes = null, StockEntries = [counted, oats, counted with { ProductId = Guid.NewGuid(), Count = null }] };
+        Assert.NotNull(TabletWorkReceiver.ReadCall(id, Body(valid), out _));
+    }
+
     private static TabletOrder Order(Guid id)
     {
         OrderLine line = new(Guid.NewGuid(), Product, "VD-1000", "Vitamin D 1000IU 90s", 12m, "Each",

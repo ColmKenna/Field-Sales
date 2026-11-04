@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FieldSales.Quantities;
 
 namespace FieldSales.Calls.Contracts;
 
@@ -35,6 +36,21 @@ public static class CallContract
     public const string RecordSomething = "Add pitch notes, a stock check or a competitor note";
     public static readonly string PitchNotesTooLong = $"Pitch notes can be up to {MaximumPitchNotesLength:N0} characters";
 
+    public const string CountBelowZero = "Enter 0 or more";
+    public const string CountNotWhole = "Enter a whole number";
+    public const string CountTooPrecise = "Enter a count with up to six decimal places";
+
+    /// <summary>Why a stock count can't be saved for a product counted in <paramref name="unit"/>, or null when it can
+    /// (T-5.4.1 S5). No count means Not checked, which is always allowed. Zero is a count.</summary>
+    public static string? CountProblem(string? unit, decimal? count)
+    {
+        if (count is not { } amount) return null;
+        if (amount < 0) return CountBelowZero;
+        bool known = UnitOfMeasureExtensions.TryParse(unit, out UnitOfMeasure measure);
+        if (known && measure == UnitOfMeasure.Each && amount % 1m != 0) return CountNotWhole;
+        return known && Quantity.TryCreate(measure, amount, out _) ? null : CountTooPrecise;
+    }
+
     /// <summary>The reserved optional sections, in the order the summary will read them.</summary>
     public static readonly IReadOnlyList<string> ReservedSections =
         ["stockEntries", "competitorNotes", "followUpOf", "campaignOutcomes", "rangeReview"];
@@ -57,35 +73,58 @@ public sealed record CallSnapshotRef(string Version, DateTimeOffset BuiltUtc);
 /// <param name="CalledOn">The tablet's local date when the Call was saved.</param>
 /// <param name="SavedAt">When it was saved, in the tablet's local time with its offset.</param>
 /// <param name="PitchNotes">What was pitched; absent when the Call has no Pitch.</param>
+/// <param name="StockEntries">The Stock Check (T-5.4.1): one entry per product kept on the list, counted or Not checked;
+/// absent when the Call has no Stock Check.</param>
 public sealed record TabletCall(string Schema, int Version, Guid Id, Guid LocationId, string CapturingRep, DateOnly CalledOn,
     DateTimeOffset SavedAt, CallChannel Channel, CallSnapshotRef Snapshot,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? PitchNotes = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? PitchNotes = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<CallStockEntry>? StockEntries = null)
 {
     /// <summary>What the Call records, for the same checks and summary the tablet used before saving.</summary>
     [JsonIgnore]
-    public CallContent Content => new(Channel, PitchNotes);
+    public CallContent Content => new(Channel, PitchNotes, StockEntries);
+}
+
+/// <summary>One product on a Stock Check. Code and name are kept as captured, like an order line, so the entry still reads
+/// correctly if the product is later renamed or hidden. <paramref name="Count"/> is in <paramref name="Unit"/>; absent means
+/// Not checked: the product stays on the next visit's Suggested List. T-5.5.1 adds <c>low</c> here.</summary>
+public sealed record CallStockEntry(Guid ProductId, string ProductCode, string ProductName, string Unit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] decimal? Count = null)
+{
+    [JsonIgnore]
+    public bool Counted => Count is not null;
 }
 
 /// <summary>What a Call records apart from who, where and when: the part the rep fills in on T-06. The tablet checks a
 /// draft with it before saving, and the server checks a received Call with it. Later sections add their parts here.</summary>
-public sealed record CallContent(CallChannel? Channel, string? PitchNotes)
+public sealed record CallContent(CallChannel? Channel, string? PitchNotes, IReadOnlyList<CallStockEntry>? StockEntries = null)
 {
+    private IReadOnlyList<CallStockEntry> Stock => StockEntries ?? [];
+
     /// <summary>The notes as they are saved: trimmed, and null when blank.</summary>
     public string? Notes => string.IsNullOrWhiteSpace(PitchNotes) ? null : PitchNotes.Trim();
 
     public bool HasPitch => Notes is not null;
 
-    /// <summary>Whether anything was recorded. Stock entries (T-5.4.1) and competitor notes (T-5.8.1) will count too.</summary>
-    public bool RecordsSomething => HasPitch;
+    public int Counted => Stock.Count(entry => entry.Counted);
+    public int NotChecked => Stock.Count(entry => !entry.Counted);
+
+    /// <summary>A Stock Check counts as recorded only when at least one product was counted (WI-049 D6): a list left
+    /// entirely Not checked records nothing.</summary>
+    public bool HasStockCheck => Counted > 0;
+
+    /// <summary>Whether anything was recorded. Competitor notes (T-5.8.1) will count too.</summary>
+    public bool RecordsSomething => HasPitch || HasStockCheck;
 
     /// <summary>Why this can't be saved yet, in the rep's words, or null when it can.</summary>
     public string? Problem =>
         Channel is null ? CallContract.ChooseChannel
+        : Stock.Select(entry => CallContract.CountProblem(entry.Unit, entry.Count)).FirstOrDefault(problem => problem is not null) is { } count ? count
         : !RecordsSomething ? CallContract.RecordSomething
-        : Notes!.Length > CallContract.MaximumPitchNotesLength ? CallContract.PitchNotesTooLong
+        : Notes?.Length > CallContract.MaximumPitchNotesLength ? CallContract.PitchNotesTooLong
         : null;
 
-    /// <summary>The save review's one line, e.g. "In person · Pitch notes". Later sections add "13 counted, 3 not checked",
+    /// <summary>The save review's one line, e.g. "In person · Pitch notes · 10 counted, 3 not checked". Later sections add
     /// "2 Low" and "1 competitor note" in that order.</summary>
     public string Summary => string.Join(" · ", Parts());
 
@@ -93,10 +132,20 @@ public sealed record CallContent(CallChannel? Channel, string? PitchNotes)
     {
         if (Channel is { } channel) yield return CallContract.Label(channel);
         if (HasPitch) yield return "Pitch notes";
+        if (Stock.Count > 0) yield return StockSummary(Counted, NotChecked);
     }
+
+    /// <summary>"10 counted, 3 not checked"; "13 counted" when nothing was left; "3 not checked" when nothing was counted.</summary>
+    public static string StockSummary(int counted, int notChecked) => (counted, notChecked) switch
+    {
+        (_, 0) => $"{counted} counted",
+        (0, _) => $"{notChecked} not checked",
+        _ => $"{counted} counted, {notChecked} not checked"
+    };
 }
 
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(TabletCall))]
 [JsonSerializable(typeof(CallSnapshotRef))]
+[JsonSerializable(typeof(CallStockEntry))]
 public sealed partial class CallJsonContext : JsonSerializerContext;

@@ -22,6 +22,71 @@ namespace FieldSales.Api.Ordering.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCall", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("CalledOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("CapturingRep")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<Guid>("LocationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ReceivedUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("SavedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LocationId", "Channel", "SavedAt");
+
+                    b.ToTable("ReceivedCalls", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ReceivedCalls_Received", "[LocationId] <> '00000000-0000-0000-0000-000000000000' AND LEN([CapturingRep]) > 0\nAND DATEPART(TZOFFSET, [ReceivedUtc]) = 0");
+                        });
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallStockEntry", b =>
+                {
+                    b.Property<Guid>("CallId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("Count")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("CallId", "ProductId");
+
+                    b.ToTable("ReceivedCallStockEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ReceivedCallStockEntries_Entry", "[ProductId] <> '00000000-0000-0000-0000-000000000000' AND LEN([Unit]) > 0 AND ([Count] IS NULL OR [Count] >= 0)");
+                        });
+                });
+
             modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -66,6 +131,8 @@ namespace FieldSales.Api.Ordering.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Status", "ReceivedUtc");
+
+                    b.HasIndex("LocationId", "Status", "TakenOn");
 
                     b.ToTable("Orders", null, t =>
                         {
@@ -118,6 +185,24 @@ namespace FieldSales.Api.Ordering.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCall", b =>
+                {
+                    b.HasOne("FieldSales.Api.Ordering.ReceivedWork", null)
+                        .WithOne()
+                        .HasForeignKey("FieldSales.Api.Ordering.ReceivedCall", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallStockEntry", b =>
+                {
+                    b.HasOne("FieldSales.Api.Ordering.ReceivedCall", null)
+                        .WithMany("StockEntries")
+                        .HasForeignKey("CallId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedOrder", b =>
                 {
                     b.HasOne("FieldSales.Api.Ordering.ReceivedWork", null)
@@ -125,6 +210,11 @@ namespace FieldSales.Api.Ordering.Migrations
                         .HasForeignKey("FieldSales.Api.Ordering.ReceivedOrder", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCall", b =>
+                {
+                    b.Navigation("StockEntries");
                 });
 #pragma warning restore 612, 618
         }

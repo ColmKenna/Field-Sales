@@ -40,7 +40,8 @@ public sealed class CallStore(RepWorkspace workspace, TimeProvider? clock = null
             DateTimeOffset now = time.GetLocalNow();
             TabletCall call = new(CallContract.Schema, CallContract.CurrentVersion, callId, locationId, workspace.RepSubject,
                 DateOnly.FromDateTime(now.DateTime), now, content.Channel!.Value,
-                new(active.Manifest.Version, active.Manifest.BuiltUtc), content.Notes);
+                new(active.Manifest.Version, active.Manifest.BuiltUtc), content.Notes,
+                content.StockEntries is { Count: > 0 } stock ? [.. stock] : null);
             unsent.Save(new(callId, UnsentKind.Call, time.GetUtcNow(), JsonSerializer.Serialize(call, CallJsonContext.Default.TabletCall)));
             return new(call, null);
         }

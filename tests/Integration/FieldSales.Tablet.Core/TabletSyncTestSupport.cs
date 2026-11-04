@@ -44,7 +44,9 @@ public static class Snapshots
             new SnapshotBasePrice(product.Id, new DateOnly(2026, 10, 1).AddMonths(offset), 2.50m + offset))).ToArray();
         SnapshotManifest manifest = new(SnapshotContract.Schema, version, rep, new DateTimeOffset(2026, 10, 1, 6, 30, 0, TimeSpan.Zero),
             new DateOnly(2026, 10, 1), counts ?? new(shops.Length, categories.Length, items.Length, prices.Length));
-        return new(manifest, shops, categories, items, prices, version == "1.0" ? null : []);
+        bool history = int.Parse(version.Split('.')[1], System.Globalization.CultureInfo.InvariantCulture) >= 3;
+        return new(manifest, shops, categories, items, prices, version == "1.0" ? null : [],
+            history ? [] : null, history ? [] : null);
     }
 }
 

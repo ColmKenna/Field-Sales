@@ -15,6 +15,7 @@ using CatalogueDbContext = CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbCon
 using Product = CatalogueApi::FieldSales.Api.Catalogue.Product;
 using AttributeName = CatalogueApi::FieldSales.Api.Catalogue.AttributeName;
 using DirectoryDbContext = CatalogueApi::FieldSales.Api.Directory.DirectoryDbContext;
+using OrderingDbContext = CatalogueApi::FieldSales.Api.Ordering.OrderingDbContext;
 
 namespace FieldSales.Web.Tests;
 
@@ -33,9 +34,16 @@ public sealed class ProductAttributeIntegrationTests(ProductApplication app) : I
             services.RemoveAll<DirectoryDbContext>();
             services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>()
                 .UseSqlServer(app.ConnectionString).Options));
+            // Snapshot 1.3 (WI-049) reads stock history from received work, so the snapshot needs the Ordering database too.
+            services.RemoveAll<OrderingDbContext>();
+            services.AddScoped(_ => new OrderingDbContext(new DbContextOptionsBuilder<OrderingDbContext>()
+                .UseSqlServer(app.ConnectionString).Options));
         }));
         await using (var scope = api.Services.CreateAsyncScope())
+        {
             await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
+            await scope.ServiceProvider.GetRequiredService<OrderingDbContext>().Database.MigrateAsync();
+        }
         await using (StaffWebsiteFactory website = app.CreateWebsite(api))
         {
             using HttpClient browser = website.CreateBrowser();

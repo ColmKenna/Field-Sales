@@ -3,6 +3,21 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-049 the suggested stock-check list (2026-11-04, developer, plan approval)
+
+The developer replied **Approved** to the WI-049 plan with the recommended D1–D11, then **Apply**. Full text in `WI-049.md`.
+
+- **Accepted orders:** `OrderLifecycleStatus.Accepted` exists with no transition until WI-067; "Ordered recently" reads Accepted orders
+  only, so production lists show only "Last visit" products until then.
+- **MI-12 stopgap:** the order count is API configuration `TabletSnapshot:SuggestedListOrderCount` (default 3, 1–10). No settings screen.
+- **Snapshot 1.3** adds two optional (locationId, productId) families: last stock check lines and products on the last N Accepted orders,
+  filtered to the rep's Locations and visible products. The tablet merges them in one function (`SuggestedList`).
+- **Received Calls** get server tables (`ReceivedCalls`, `ReceivedCallStockEntries`). Last stock check = the Location's latest In-person
+  Call with stock entries by saved time. A Phone call saves no stock entries until T-5.3.2.
+- **Stock entries** keep product id, code and name as captured, the unit, and a count (absent = Not checked). A Call whose stock lines are
+  all Not checked records nothing. Counts: "Enter 0 or more"; Each needs "Enter a whole number"; measures up to 6 decimals.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-047 the Call body and Record Call (2026-11-03, developer, plan approval)
 
 The developer replied **Approved** to the WI-047 plan with the recommended D1–D10, then **Apply** with the remaining stops lifted, and
