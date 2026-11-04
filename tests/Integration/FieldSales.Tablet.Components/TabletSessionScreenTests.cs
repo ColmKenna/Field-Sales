@@ -548,6 +548,7 @@ public sealed partial class TabletSessionScreenTests
         }
         public Task Click(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Click(Id, text));
         public Task ClickLabelled(string label) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLabelled(Id, label));
+        public Task ClickContaining(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickContaining(Id, text));
         public Task ClickLink(string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.ClickLink(Id, text));
         public Task Type(string elementId, string text) => Renderer.Dispatcher.InvokeAsync(() => Renderer.Type(Id, elementId, text));
         public async Task Until(Func<bool> predicate)
@@ -643,6 +644,10 @@ public sealed partial class TabletSessionScreenTests
             return null;
         }
         public Task Click(int id, string text) => DispatchEventAsync(Events(id).First(e => e.Text == text).Event, null, EventArgs.Empty);
+
+        /// <summary>Clicks the first button whose text contains <paramref name="text"/>, e.g. a search result naming a product.</summary>
+        public Task ClickContaining(int id, string text) =>
+            DispatchEventAsync(Events(id).First(e => e.Text.Contains(text, StringComparison.Ordinal)).Event, null, EventArgs.Empty);
 
         /// <summary>Clicks the button whose accessible name (aria-label) is <paramref name="label"/>, as a screen reader names it.</summary>
         public Task ClickLabelled(int id, string label) => DispatchEventAsync(
