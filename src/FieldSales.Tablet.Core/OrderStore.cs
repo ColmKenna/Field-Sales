@@ -107,52 +107,88 @@ public sealed class OrderStore
     public OrderResult AddLine(Guid orderId, Guid locationId, Guid productId, decimal quantity)
     {
         Gate.Wait();
+        try { return AddLine(new UnsentStore(workspace), orderId, locationId, productId, quantity, callId: null); }
+        finally { Gate.Release(); }
+    }
+
+    /// <summary>The order a Call at <paramref name="locationId"/> adds to (T-5.5.1 D2): the In Progress order linked to the
+    /// Call, else the rep's most recently saved In Progress order at that shop, else null (the first add starts one). An order
+    /// being sent, refused or Ready to Send is never added to, so if the linked order left In Progress the Call finds or starts
+    /// another.</summary>
+    public TabletOrder? FindForCall(Guid callId, Guid locationId) =>
+        File.Exists(workspace.UnsentPath) ? ForCall(new UnsentStore(workspace), callId, locationId) : null;
+
+    /// <summary>Adds a product from a Call (T-5.5.1): to the order <see cref="FindForCall"/> picks, or to a new order linked to the
+    /// Call. Picking and adding happen under the one per-rep gate, so two adds for one Call can't start two orders. An order
+    /// with no Call yet becomes linked to this one; an order already linked to another Call keeps that link.</summary>
+    public OrderResult AddFromCall(Guid callId, Guid locationId, Guid productId, decimal quantity)
+    {
+        Gate.Wait();
         try
         {
             UnsentStore unsent = new(workspace);
-            // A Sent order is read-only, and its id must never start a second order the server would treat as a re-send.
-            OrderStanding standing = Standing(unsent, orderId, out _, out TabletOrder? existing);
-            if (OrderTransitions.After(standing, OrderAction.AddLine) is null)
-                return OrderResult.Failure(OrderTransitions.Refusal(standing, OrderAction.AddLine));
-            if (existing is not null && (existing.LocationId != locationId)) return OrderResult.Failure(NotChangeable);
-
-            SnapshotStore snapshot = new(workspace, clock);
-            if (snapshot.ReadLocation(locationId) is not { IsAssigned: true }) return OrderResult.Failure(NotAssigned);
-
-            OrderableProduct? product = snapshot.ReadOrderableProduct(productId, Today());
-            if (product is null) return OrderResult.Failure(NotDownloaded);
-            if (product.Price is not decimal price) return OrderResult.Failure(NoPrice);
-
-            if (!QuantityRules.TryCreate(product.Product.Unit, product.Product.QuantityStep, product.Product.MinimumQuantity,
-                    out QuantityRules? rules, out _))
-                return OrderResult.Failure(RulesUnreadable);
-            string unit = rules.Unit.ToCode();
-            OrderLine? current = existing?.Lines.FirstOrDefault(line => line.ProductId == productId);
-            if (current is not null && current.Unit != unit) return OrderResult.Failure(UnitChanged);
-            // A new line must meet the product's minimum and step. Adding to a line only needs whole steps,
-            // and the new total is what must meet the rules.
-            string? invalid = current is null
-                ? rules.ValidateOrder(quantity).Error
-                : rules.ValidateIncrement(quantity).Error;
-            if (invalid is not null) return OrderResult.Failure(invalid);
-            decimal total = (current?.Quantity ?? 0m) + quantity;
-            QuantityValidationResult sum = rules.ValidateOrder(total);
-            if (!sum.IsValid) return OrderResult.Failure(sum.Error!);
-
-            OrderSnapshotRef source = new(product.Manifest.Version, product.Manifest.BuiltUtc);
-            IReadOnlyList<OrderLine> lines = current is null
-                ? [.. existing?.Lines ?? [], new OrderLine(Guid.NewGuid(), productId, product.Product.Code, product.Product.Name, total, unit,
-                    new OrderLinePrice(price, OrderContract.BasePriceKind, OrderContract.BasePriceLabel,
-                        [new OrderPriceCandidate(OrderContract.BasePriceKind, OrderContract.BasePriceLabel, price, true)]), source)]
-                : [.. existing!.Lines.Select(line => line.ProductId == productId ? line with { Quantity = total } : line)];
-            TabletOrder order = existing is null
-                ? new(OrderContract.Schema, OrderContract.CurrentVersion, orderId, OrderState.InProgress, locationId, locationId,
-                    workspace.RepSubject, Today(), null, source, lines)
-                : existing with { Lines = lines };
-            Save(unsent, order);
-            return new(order, null);
+            Guid orderId = ForCall(unsent, callId, locationId)?.Id ?? Guid.NewGuid();
+            return AddLine(unsent, orderId, locationId, productId, quantity, callId);
         }
         finally { Gate.Release(); }
+    }
+
+    private static TabletOrder? ForCall(UnsentStore unsent, Guid callId, Guid locationId)
+    {
+        TabletOrder[] open = [.. unsent.Read()
+            .Where(item => item.Kind == UnsentKind.Order)
+            .Select(item => (Item: item, Order: Parse(item)))
+            .Where(each => each.Order is { State: OrderState.InProgress } order && order.LocationId == locationId
+                && StandingOf(each.Item, order, unsent.IsClaimed(order.Id)) == OrderStanding.InProgress)
+            .OrderByDescending(each => each.Item.SavedUtc)
+            .Select(each => each.Order!)];
+        return open.FirstOrDefault(order => order.CallId == callId) ?? open.FirstOrDefault();
+    }
+
+    // Called under the gate.
+    private OrderResult AddLine(UnsentStore unsent, Guid orderId, Guid locationId, Guid productId, decimal quantity, Guid? callId)
+    {
+        // A Sent order is read-only, and its id must never start a second order the server would treat as a re-send.
+        OrderStanding standing = Standing(unsent, orderId, out _, out TabletOrder? existing);
+        if (OrderTransitions.After(standing, OrderAction.AddLine) is null)
+            return OrderResult.Failure(OrderTransitions.Refusal(standing, OrderAction.AddLine));
+        if (existing is not null && (existing.LocationId != locationId)) return OrderResult.Failure(NotChangeable);
+
+        SnapshotStore snapshot = new(workspace, clock);
+        if (snapshot.ReadLocation(locationId) is not { IsAssigned: true }) return OrderResult.Failure(NotAssigned);
+
+        OrderableProduct? product = snapshot.ReadOrderableProduct(productId, Today());
+        if (product is null) return OrderResult.Failure(NotDownloaded);
+        if (product.Price is not decimal price) return OrderResult.Failure(NoPrice);
+
+        if (!QuantityRules.TryCreate(product.Product.Unit, product.Product.QuantityStep, product.Product.MinimumQuantity,
+                out QuantityRules? rules, out _))
+            return OrderResult.Failure(RulesUnreadable);
+        string unit = rules.Unit.ToCode();
+        OrderLine? current = existing?.Lines.FirstOrDefault(line => line.ProductId == productId);
+        if (current is not null && current.Unit != unit) return OrderResult.Failure(UnitChanged);
+        // A new line must meet the product's minimum and step. Adding to a line only needs whole steps,
+        // and the new total is what must meet the rules.
+        string? invalid = current is null
+            ? rules.ValidateOrder(quantity).Error
+            : rules.ValidateIncrement(quantity).Error;
+        if (invalid is not null) return OrderResult.Failure(invalid);
+        decimal total = (current?.Quantity ?? 0m) + quantity;
+        QuantityValidationResult sum = rules.ValidateOrder(total);
+        if (!sum.IsValid) return OrderResult.Failure(sum.Error!);
+
+        OrderSnapshotRef source = new(product.Manifest.Version, product.Manifest.BuiltUtc);
+        IReadOnlyList<OrderLine> lines = current is null
+            ? [.. existing?.Lines ?? [], new OrderLine(Guid.NewGuid(), productId, product.Product.Code, product.Product.Name, total, unit,
+                new OrderLinePrice(price, OrderContract.BasePriceKind, OrderContract.BasePriceLabel,
+                    [new OrderPriceCandidate(OrderContract.BasePriceKind, OrderContract.BasePriceLabel, price, true)]), source)]
+            : [.. existing!.Lines.Select(line => line.ProductId == productId ? line with { Quantity = total } : line)];
+        TabletOrder order = existing is null
+            ? new(OrderContract.Schema, OrderContract.CurrentVersion, orderId, OrderState.InProgress, locationId, locationId,
+                workspace.RepSubject, Today(), callId, source, lines)
+            : existing with { Lines = lines, CallId = existing.CallId ?? callId };
+        Save(unsent, order);
+        return new(order, null);
     }
 
     /// <summary>Moves an In Progress order to Ready to Send, so it uploads at the next Sync. An order with no

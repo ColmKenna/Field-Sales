@@ -188,6 +188,13 @@ public sealed class TabletApp : IDisposable
     public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content) =>
         new CallStore(device.Workspace(rep), clock).Save(callId, locationId, content);
 
+    // Adding to the order from a Call (T-5.5.1): the Call's order is found or started under the order gate.
+    public TabletOrder? ReadCallOrder(string rep, Guid callId, Guid locationId) =>
+        new OrderStore(device.Workspace(rep), clock).FindForCall(callId, locationId);
+
+    public OrderResult AddOrderLineFromCall(string rep, Guid callId, Guid locationId, Guid productId, decimal quantity) =>
+        new OrderStore(device.Workspace(rep), clock).AddFromCall(callId, locationId, productId, quantity);
+
     // Changing an unsent order before Sync (T-5.2.1); OrderTransitions decides what each standing allows.
     public OrderView? ReadOrderView(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Read(orderId);
 
