@@ -618,21 +618,29 @@ public sealed partial class TabletSessionScreenTests
             throw new InvalidOperationException($"Button {text} was not found.");
         }
 
+        /// <summary>Every value of this attribute, in document order, child components included.</summary>
         public IReadOnlyList<string> AttributeValues(int id, string name) => Frames(id)
-            .Where(frame => frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == name)
-            .Select(frame => frame.AttributeValue?.ToString() ?? "").ToArray();
+            .SelectMany(frame => frame.FrameType == RenderTreeFrameType.Component ? AttributeValues(frame.ComponentId, name)
+                : frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == name ? [frame.AttributeValue?.ToString() ?? ""]
+                : [])
+            .ToArray();
 
-        private RenderTreeFrame[] ElementAttributes(int id, Func<RenderTreeFrame[], bool> match)
+        private RenderTreeFrame[] ElementAttributes(int id, Func<RenderTreeFrame[], bool> match) =>
+            FindAttributes(id, match) ?? throw new InvalidOperationException("The element was not found.");
+
+        // The first matching element in document order, looking inside child components (e.g. a shared popover) too.
+        private RenderTreeFrame[]? FindAttributes(int id, Func<RenderTreeFrame[], bool> match)
         {
             RenderTreeFrame[] frames = Frames(id);
             for (int i = 0; i < frames.Length; i++)
             {
+                if (frames[i].FrameType == RenderTreeFrameType.Component && FindAttributes(frames[i].ComponentId, match) is { } inner) return inner;
                 if (frames[i].FrameType != RenderTreeFrameType.Element) continue;
                 RenderTreeFrame[] attributes = frames.Skip(i + 1).Take(frames[i].ElementSubtreeLength - 1)
                     .TakeWhile(f => f.FrameType == RenderTreeFrameType.Attribute).ToArray();
                 if (match(attributes)) return attributes;
             }
-            throw new InvalidOperationException("The element was not found.");
+            return null;
         }
         public Task Click(int id, string text) => DispatchEventAsync(Events(id).First(e => e.Text == text).Event, null, EventArgs.Empty);
 

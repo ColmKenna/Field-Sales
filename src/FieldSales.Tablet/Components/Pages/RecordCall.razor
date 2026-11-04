@@ -1,10 +1,13 @@
 @page "/locations/{Id:guid}/calls/new"
 @inherits OfflineCataloguePage
 @using FieldSales.Calls.Contracts
+@using FieldSales.Ordering.Contracts
+@using FieldSales.Tablet.Components.Shared
 
 @* T-06 · Record call (T-5.3.1): one scrolling page (T6.1); the channel first, as two unselected options (T6.2); the save review
    is a dialog (T6.4). The stock check (T-5.4.1) starts from the shop's Suggested List; on Phone the same rows read as "Stock
-   mentioned" (T-5.3.2, T6.5). In-person Low ticks, competitor notes and campaign outcomes join this page with their own items. *@
+   mentioned" (T-5.3.2, T6.5). A Low item goes on the shop's order through the quantity popover (T-5.5.1, T7.7). Competitor
+   notes and campaign outcomes join this page with their own items. *@
 <section class="record-call">
     <nav class="shop-back" aria-label="Call navigation">
         <a href="@($"/locations/{Id}")" @onclick="BackToShop" @onclick:preventDefault="true">Back to shop</a>
@@ -42,6 +45,11 @@
             }
         </section>
         @if (message is not null) { <p class="problem" role="alert">@message</p> }
+        @if (ordering is { } product)
+        {
+            <QuantityPopover @key="product.Id" Product="product" Recorded="@Recorded(product)" Busy="busy" Error="@orderError"
+                             OnAdd="AddToOrderAsync" OnCancel="CloseOrdering" />
+        }
         @if (reviewing)
         {
             <section class="call-review" role="dialog" aria-modal="true" aria-labelledby="call-review-heading">
@@ -57,6 +65,7 @@
         {
             <section class="order-confirm" role="alertdialog" aria-labelledby="call-leave-question">
                 <p id="call-leave-question" class="confirm-question"><strong>Leave without saving this call?</strong></p>
+                @if (draft.AddedToOrder) { <p>Lines added to the order stay on it.</p> }
                 <div class="order-actions">
                     <button type="button" class="danger" @onclick="Leave">Leave</button>
                     <button type="button" class="secondary" @onclick="() => leaving = false">Stay</button>
@@ -94,6 +103,10 @@
     private bool reviewing;
     private bool leaving;
     private bool busy;
+    // T-5.5.1: the shop's order this Call adds to (null until there is one), and the product whose quantity popover is open.
+    private TabletOrder? callOrder;
+    private ProductSearchResult? ordering;
+    private string? orderError;
 
     private static CallDraft New() => new(Guid.NewGuid(), null, "", false);
 
@@ -101,6 +114,7 @@
     {
         rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
         start = StockCheckStart.Empty; CloseAdding(); filter = ""; filterFound = new([], 0); ++filterRevision;
+        callOrder = null; ordering = null; orderError = null;
     }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
@@ -108,17 +122,21 @@
         Guid shop = Id;
         try
         {
+            // A resume rebuilds this page; the Call being recorded comes back, with the same id and its stock rows.
+            CallDraft restored = Tablet.CallDrafts.Read(repSubject, Tablet.SessionVersion, shop) ?? New();
             OfflineLocationDetail? read = null;
             StockCheckStart readStart = StockCheckStart.Empty;
+            TabletOrder? readOrder = null;
             await Task.Run(() =>
             {
                 read = Tablet.ReadLocation(repSubject, shop);
-                if (read is { IsAssigned: true }) readStart = Tablet.ReadStockCheckStart(repSubject, shop);
+                if (read is not { IsAssigned: true }) return;
+                readStart = Tablet.ReadStockCheckStart(repSubject, shop);
+                readOrder = Tablet.ReadCallOrder(repSubject, restored.CallId, shop);
             });
             if (!isCurrent()) return;
-            rep = repSubject; detail = read; start = readStart;
-            // A resume rebuilds this page; the Call being recorded comes back, with the same id and its stock rows.
-            draft = Tablet.CallDrafts.Read(repSubject, Tablet.SessionVersion, shop) ?? New();
+            rep = repSubject; detail = read; start = readStart; callOrder = readOrder;
+            draft = restored;
             if (draft.Stock is null)
                 draft = draft with { Stock = [.. start.Suggested.Select(row => new StockLine(row.Product, row.Sources))] };
         }
@@ -202,7 +220,6 @@
                         <div class="stock-line-text">
                             <strong>@line.Product.Name</strong>
                             @if (line.Label.Length > 0) { <span class="stock-source">@line.Label</span> }
-                            @if (line.Low && !draft.Mentioning) { <span class="stock-mark">@(line.Out ? "Out" : "Low")</span> }
                         </div>
                         @if (draft.Mentioning) { @Mentioned(line) }
                         else
@@ -218,6 +235,12 @@
                             @if (line.Product.Unit != "Each") { <span class="count-unit">@line.Product.Unit</span> }
                             <button type="button" class="secondary stock-remove" aria-label="@($"Remove {line.Product.Name}")"
                                     disabled="@busy" @onclick="() => Remove(line)">Remove</button>
+                        </div>
+                        <div class="stock-marks">
+                            <button type="button" class="mark-option" aria-pressed="@(line.Low ? "true" : "false")"
+                                    aria-label="@($"Low {line.Product.Name}")" disabled="@busy"
+                                    @onclick="() => ChangeLine(line, row => row.Tick())">Low</button>
+                            @if (line.Low) { @ToOrder(line) }
                         </div>
                         }
                         @if (line.Problem is { } countProblem) { <p class="problem" role="alert">@countProblem</p> }
@@ -253,14 +276,14 @@
         }
     </div>;
 
-    /// <summary>A phone row (S8): Low and Out as toggles, Add to order shown but not yet available, and a count only after
-    /// Add count, with no stepper (D6).</summary>
+    /// <summary>A phone row (S8): Low and Out as toggles, Add to order on every row (T-5.5.1 D4, without marking Low), and a
+    /// count only after Add count, with no stepper (D6).</summary>
     private RenderFragment Mentioned(StockLine line) => @<div class="stock-marks">
         <button type="button" class="mark-option" aria-pressed="@(line.Low ? "true" : "false")" aria-label="@($"Low {line.Product.Name}")"
                 disabled="@busy" @onclick="() => ChangeLine(line, row => row.ToggleLow())">Low</button>
         <button type="button" class="mark-option" aria-pressed="@(line.Out ? "true" : "false")" aria-label="@($"Out {line.Product.Name}")"
                 disabled="@busy" @onclick="() => ChangeLine(line, row => row.ToggleOut())">Out</button>
-        <button type="button" class="secondary" aria-label="@($"Add {line.Product.Name} to order")" disabled>Add to order</button>
+        @ToOrder(line)
         @if (line.CountShown)
         {
             <input id="@($"count-{line.Product.Id}")" class="count-input" inputmode="decimal" autocomplete="off"
@@ -274,6 +297,11 @@
                     @onclick="() => ChangeLine(line, row => row.OpenCount())">Add count</button>
         }
     </div>;
+
+    /// <summary>Add to order (T-5.5.1): In person on a Low row, on Phone on every row. It opens the quantity popover.</summary>
+    private RenderFragment ToOrder(StockLine line) =>
+        @<button type="button" class="secondary" aria-label="@($"Add {line.Product.Name} to order")" disabled="@busy"
+                 @onclick="() => OpenOrdering(line)">Add to order</button>;
 
     /// <summary>Search the downloaded catalogue, or browse it by category when nothing is typed (S3).</summary>
     private RenderFragment AddProduct => @<div class="stock-add">
@@ -399,6 +427,52 @@
         if (current == searchRevision) found = outcome;
     }
 
+
+    // The popover opens with an empty quantity each time (T7.7); opening another row's replaces it.
+    private void OpenOrdering(StockLine line)
+    {
+        if (busy) return;
+        ordering = line.Product; orderError = null;
+    }
+
+    private void CloseOrdering()
+    {
+        if (busy) return;
+        ordering = null; orderError = null;
+    }
+
+    /// <summary>"counted 3" (with the unit for a measured product) or "not counted", from the row as it is now.</summary>
+    private string Recorded(ProductSearchResult product) =>
+        draft.Lines.FirstOrDefault(line => line.Product.Id == product.Id) is { Counted: true } line
+            ? $"counted {line.Count.Trim()}{(product.Unit == "Each" ? "" : $" {product.Unit}")}" : "not counted";
+
+    // The store finds this Call's order or starts one, under the order gate (D2); the popover closes on add.
+    private async Task AddToOrderAsync(decimal quantity)
+    {
+        if (busy || rep is null || ordering is not { } product) return;
+        busy = true;
+        orderError = null;
+        string repSubject = rep;
+        Guid shop = Id, call = draft.CallId;
+        long version = Tablet.SessionVersion;
+        try
+        {
+            OrderResult result = await Task.Run(() => Tablet.AddOrderLineFromCall(repSubject, call, shop, product.Id, quantity));
+            if (version != Tablet.SessionVersion || shop != Id) return;
+            if (result.Succeeded)
+            {
+                callOrder = result.Order;
+                ordering = null;
+                Change(draft with { AddedToOrder = true });
+            }
+            else orderError = result.Error;
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (version == Tablet.SessionVersion) orderError = "That couldn't be added. Try again.";
+        }
+        finally { busy = false; }
+    }
 
     private void BackToShop()
     {

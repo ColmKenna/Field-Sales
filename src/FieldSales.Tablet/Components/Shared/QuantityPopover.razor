@@ -1,0 +1,72 @@
+@namespace FieldSales.Tablet.Components.Shared
+@using System.Globalization
+@using FieldSales.Quantities
+@using FieldSales.Tablet.Core
+
+@* T-5.5.1 (UX T7.7): the quantity popover a Low item opens to go on the order. The quantity starts empty every time, and Add
+   to order stays unavailable until the product's own rules accept it. Shared with the order's Low tab (T-5.1.4); break prompts
+   (T-6.5.1) go in its slot under the price. *@
+<section class="quantity-popover" role="dialog" aria-modal="true" aria-labelledby="quantity-popover-heading">
+    <header class="quantity-popover-header">
+        <h2 id="quantity-popover-heading">@Product.Name</h2>
+        <button type="button" class="secondary popover-close" aria-label="Close" disabled="@Busy" @onclick="CancelAsync">✕</button>
+    </header>
+    @if (Recorded.Length > 0) { <p class="popover-recorded">@Recorded</p> }
+    @if (Product.Price is decimal price) { <p class="popover-price">@PriceText(price, Product.Unit)</p> }
+    else { <p class="problem" role="status">@OrderStore.NoPrice</p> }
+    @ChildContent
+    <label for="popover-quantity">Quantity@(Product.Unit == "Each" ? "" : $" ({Product.Unit})")</label>
+    <input id="popover-quantity" type="text" inputmode="decimal" autocomplete="off" value="@text" @oninput="Changed"
+           disabled="@(Busy || Product.Price is null)" aria-describedby="@(Problem is null ? null : "popover-quantity-problem")" />
+    @if (Problem is { } problem) { <p id="popover-quantity-problem" class="problem" role="alert">@problem</p> }
+    @if (Error is not null) { <p class="problem" role="alert">@Error</p> }
+    <div class="order-actions">
+        <button type="button" class="secondary" disabled="@Busy" @onclick="CancelAsync">Cancel</button>
+        @* Named as shown; the rows behind name theirs "Add {product} to order". *@
+        <button type="button" class="primary" aria-label="Add to order" disabled="@(!CanAdd)" @onclick="AddAsync">Add to order</button>
+    </div>
+</section>
+
+@code {
+    /// <summary>The product to order, with its price and ordering rules from the downloaded day.</summary>
+    [Parameter, EditorRequired] public ProductSearchResult Product { get; set; } = default!;
+
+    /// <summary>What was recorded for it on this visit, e.g. "counted 3" or "not counted"; nothing shown when blank.</summary>
+    [Parameter] public string Recorded { get; set; } = "";
+
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Why the last add was refused, in the rep's words.</summary>
+    [Parameter] public string? Error { get; set; }
+
+    [Parameter] public EventCallback<decimal> OnAdd { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    /// <summary>Shown under the price: where T-6.5.1's break prompt goes.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string text = "";
+
+    private QuantityRules? Rules => QuantityRules.TryCreate(Product.Unit, Product.QuantityStep, Product.MinimumQuantity,
+        out QuantityRules? rules, out _) ? rules : null;
+
+    // Only digits and a decimal point count; anything else is no quantity, and the product's rule says what to enter.
+    private decimal Amount => decimal.TryParse(text.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture,
+        out decimal amount) ? amount : 0m;
+
+    /// <summary>Nothing until something is typed; then the product's own message, e.g. "Enter a quantity of 1 or more".</summary>
+    private string? Problem => Product.Price is null || text.Length == 0 ? null
+        : Rules is { } rules ? rules.ValidateOrder(Amount).Error : OrderStore.RulesUnreadable;
+
+    private bool CanAdd => !Busy && Product.Price is not null && text.Trim().Length > 0 && Problem is null;
+
+    private void Changed(ChangeEventArgs args) => text = args.Value?.ToString() ?? "";
+
+    private Task AddAsync() => CanAdd ? OnAdd.InvokeAsync(Amount) : Task.CompletedTask;
+
+    private Task CancelAsync() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();
+
+    /// <summary>"€8.95 · list price", or "€3.20 per kg · list price" for a measured product.</summary>
+    public static string PriceText(decimal price, string unit) =>
+        "€" + price.ToString("N2", CultureInfo.InvariantCulture) + (unit == "Each" ? "" : $" per {unit}") + " · list price";
+}

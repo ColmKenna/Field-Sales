@@ -215,7 +215,6 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .stock-remove { min-height: 56px; }
 .stock-line .problem { flex-basis: 100%; margin: 0; }
 /* T-06 Stock mentioned on Phone (T-5.3.2): Low and Out toggles, Add to order, Add count (no stepper). */
-.stock-mark { align-self: flex-start; padding: 2px 8px; border-radius: 4px; background: var(--page); color: var(--alert); border: 1px solid var(--alert); font-size: .9rem; font-weight: 600; }
 .stock-filter { margin-bottom: 8px; }
 .stock-filter .product-results { margin-top: 8px; }
 .stock-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -223,4 +222,13 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .mark-option { min-width: 72px; background: var(--surface); color: var(--brand); border-width: 2px; }
 .mark-option[aria-pressed="true"] { background: var(--brand); color: #fff; }
 .mark-option[aria-pressed="true"]::before { content: "\2713\00a0"; }
+/* T-5.5.1 quantity popover (T7.7): over the page, above the footer; shared with the order's Low tab. */
+.quantity-popover { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 20; max-width: 32rem; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 20px 24px; background: var(--surface); border: 2px solid var(--brand); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+.quantity-popover-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.quantity-popover-header h2 { margin: 0; color: var(--ink); }
+.popover-close { min-width: 56px; min-height: 56px; }
+.popover-recorded, .popover-price { margin: 0; }
+.popover-recorded { color: var(--muted); }
+.quantity-popover input { min-height: 56px; font: inherit; font-size: 1.2rem; padding: 0 12px; border: 1px solid var(--muted); border-radius: 6px; }
+.quantity-popover .order-actions button { min-height: 56px; }
 .stock-add { margin-bottom: 12px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }

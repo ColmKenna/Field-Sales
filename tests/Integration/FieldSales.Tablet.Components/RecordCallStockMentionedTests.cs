@@ -76,7 +76,9 @@ public sealed partial class TabletSessionScreenTests
         foreach (string name in rows)
         {
             Assert.Equal(("false", "false"), (Pressed(screen, $"Low {name}"), Pressed(screen, $"Out {name}")));
-            Assert.NotNull(screen.Renderer.LabelledAttribute(screen.Id, $"Add {name} to order", "disabled"));
+            // WI-050 showed Add to order disabled; WI-051 (T-5.5.1 D4) makes it available on every phone row.
+            Assert.True(Labelled(screen, $"Add {name} to order"));
+            Assert.Null(screen.Renderer.LabelledAttribute(screen.Id, $"Add {name} to order", "disabled"));
             Assert.True(Labelled(screen, $"Add count for {name}"));
             Assert.False(Labelled(screen, $"Less {name}") || Labelled(screen, $"More {name}") || Labelled(screen, $"Count for {name}"));
         }
@@ -263,7 +265,8 @@ public sealed partial class TabletSessionScreenTests
         await ReviewAndSaveAsync(screen, calls, "Phone · 1 marked Low");
     }
 
-    // Scenario 11 (D5): marks made on Phone are saved on an In-person Call and shown there.
+    // Scenario 11 (D5): marks made on Phone are saved on an In-person Call and shown there. WI-050 showed them as a read-only
+    // "Low"/"Out" note; WI-051 (T-5.5.1 D3) shows them as the In-person Low tick, with Out's count of 0.
     [Fact]
     public async Task Should_SaveLowMarksAndShowThem_When_TheCallIsSavedInPersonAfterPhone()
     {
@@ -274,10 +277,9 @@ public sealed partial class TabletSessionScreenTests
 
         await screen.Click("In person");
 
-        string text = screen.Renderer.Text(screen.Id);
-        Assert.Contains("Stock check", text);
-        Assert.Contains(Spf30.Name + "Last visitLow", text);
-        Assert.Contains(Sudocrem.Name + "Last visitOut", text);
+        Assert.Contains("Stock check", screen.Renderer.Text(screen.Id));
+        Assert.Equal(("true", "true", "false"),
+            (Pressed(screen, $"Low {Spf30.Name}"), Pressed(screen, $"Low {Sudocrem.Name}"), Pressed(screen, $"Low {Numbered[0].Name}")));
         Assert.Equal("0", screen.Renderer.Value(screen.Id, $"count-{Sudocrem.Id}"));
         CallContent saved = await ReviewAndSaveAsync(screen, calls, "In person · 1 counted, 15 not checked · 2 Low");
         Assert.Equal(16, saved.StockEntries!.Count);
