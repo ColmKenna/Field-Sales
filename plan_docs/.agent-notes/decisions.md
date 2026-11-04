@@ -7,8 +7,11 @@ and where it came up. Don't change an entry without a new human decision; add a 
 
 The developer replied **Approved** to the WI-051 plan with the recommended D1–D10, then **Apply**. Full text in `WI-051.md`.
 
-- **Call → Order link:** the Call carries optional `orderId` (written only when set); the Order body is unchanged; both stay version 1.
-  Server stores it nullable with no FK and refuses an empty id.
+- **Call → Order link — amended 2026-11-04 (developer, after Apply):** the link is the Order's existing reserved `callId`, not a new
+  `orderId` on the Call. A new order from a Call gets `callId`; an In Progress order with none gets it on the first add from a Call; an
+  order already linked to another Call keeps that link. No contract, server or schema change. (Originally approved: the Call carries
+  `orderId` with a server column; dropped once the existing `callId` came to light.)
+- **A Call with only order lines isn't saved** (developer, 2026-11-04): the S5 rule stands; the lines stay on the order.
 - **Find-or-create:** the call's linked order if still In Progress, else the rep's latest In Progress order at the shop, else a new
   one; chosen and added in one step under the per-rep order lock. The link moves if the linked order left In Progress.
 - **Low tick In person on every row;** unticking keeps the count. Phone's Add to order works on every row without marking Low.
