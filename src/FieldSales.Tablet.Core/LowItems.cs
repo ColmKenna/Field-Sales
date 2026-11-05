@@ -9,8 +9,9 @@ namespace FieldSales.Tablet.Core;
 public enum LowItemState { NotAdded, Added, Removed }
 
 /// <summary>One product marked Low on the Call, with its one state. <paramref name="Line"/> is its line on the order when
-/// <see cref="LowItemState.Added"/>.</summary>
-public sealed record LowItem(CallStockEntry Entry, LowItemState State, OrderLine? Line)
+/// <see cref="LowItemState.Added"/>. <paramref name="MarkedLowOn"/> is the date of the earlier Call a carried gap was left on
+/// (T-5.1.5).</summary>
+public sealed record LowItem(CallStockEntry Entry, LowItemState State, OrderLine? Line, DateOnly? MarkedLowOn = null)
 {
     /// <summary>"not added", "ADDED - 24" (or "ADDED - 2.5 kg"), "REMOVED".</summary>
     public string StateText => State switch
@@ -20,8 +21,13 @@ public sealed record LowItem(CallStockEntry Entry, LowItemState State, OrderLine
         _ => "not added"
     };
 
-    /// <summary>The line under the name: what was recorded, or that the rep took it off the order.</summary>
-    public string Detail => State == LowItemState.Removed ? "you took this off the order" : Recorded(Entry);
+    /// <summary>The line under the name: what was recorded, that the rep took it off the order, or, for a gap carried from an
+    /// earlier Call, when it was marked Low ("marked Low 15 Sep").</summary>
+    public string Detail => State == LowItemState.Removed ? "you took this off the order" : WhatWasRecorded;
+
+    /// <summary>What the quantity popover shows about the item: the count, or when a carried gap was marked Low.</summary>
+    public string WhatWasRecorded => MarkedLowOn is { } on
+        ? $"marked Low {on.ToString("d MMM", CultureInfo.InvariantCulture)}" : Recorded(Entry);
 
     /// <summary>Not added and REMOVED items offer Add; an ADDED one is changed on the order's own line.</summary>
     public bool CanAdd => State != LowItemState.Added;
@@ -34,8 +40,9 @@ public sealed record LowItem(CallStockEntry Entry, LowItemState State, OrderLine
         quantity.ToString(unit == "Each" ? "0.######" : "0.0#####", CultureInfo.InvariantCulture) + (unit == "Each" ? "" : $" {unit}");
 }
 
-/// <summary>The Low tab's list: every product marked Low on the Call, in the Call's order, and how many still want something.</summary>
-public sealed record LowList(IReadOnlyList<LowItem> Items)
+/// <summary>The Low tab's list: every product marked Low on the Call, in the Call's order, and how many still want something.
+/// <paramref name="CarriedFrom"/> is set when the items are gaps carried from an earlier Call to an order with no Call (T-5.1.5).</summary>
+public sealed record LowList(IReadOnlyList<LowItem> Items, CarriedLow? CarriedFrom = null)
 {
     public static LowList None { get; } = new([]);
 
@@ -54,4 +61,9 @@ public static class LowItems
             order?.Lines.FirstOrDefault(line => line.ProductId == entry.ProductId) is { } line
                 ? new LowItem(entry, LowItemState.Added, line)
                 : new LowItem(entry, takenOff.Contains(entry.ProductId) ? LowItemState.Removed : LowItemState.NotAdded, null))]);
+
+    /// <summary>The gaps an earlier Call left, carried to an order with no Call (T-5.1.5): ADDED when on this order, else not
+    /// added. Nothing is ever REMOVED here: that Call isn't being recorded, so nothing was taken off for it.</summary>
+    public static LowList Carried(CarriedLow carried, TabletOrder? order) =>
+        new([.. Of(carried.Entries, order, []).Items.Select(item => item with { MarkedLowOn = carried.CalledOn })], carried);
 }

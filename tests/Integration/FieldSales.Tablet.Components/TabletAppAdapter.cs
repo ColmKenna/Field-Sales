@@ -44,6 +44,12 @@ public sealed class TabletApp
     }
     public Func<string, Guid, TabletCall?> FindCall { get; set; } = (_, _) => null;
     public TabletCall? ReadCall(string rep, Guid callId) => FindCall(rep, callId);
+    public Func<string, Guid, Guid, OrderResult> LinkWork { get; set; } = (_, _, _) => new OrderResult(null, "Not set up in this test.");
+    public OrderResult LinkOrderToCall(string rep, Guid orderId, Guid callId) => LinkWork(rep, orderId, callId);
+    /// <summary>The shop's carried gaps for an order with no Call (rep, shop, order on screen); none by default.</summary>
+    public Func<string, Guid, Guid, CarriedLow?> FindCarried { get; set; } = (_, _, _) => null;
+    public CarriedLow? ReadCarriedLow(string rep, Guid locationId, Guid orderId, ProductSearchIndex index) =>
+        FindCarried(rep, locationId, orderId);
     public Func<Task<SignInAnswer>> SignIn { get; set; } = () => Task.FromResult(new SignInAnswer(null, null));
     public Task<SignInAnswer> SignInAsync() => SignIn();
     public HomeView Home { get; set; } = new("Last synced 07:42", []);

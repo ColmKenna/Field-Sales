@@ -15,7 +15,8 @@
 
 @* T-07 · Order entry: the Order Pad by category (T7.3) and search, and the Low tab (T-5.1.4, T7.1). Review comes later.
    T-5.2.1: the same screen opens a saved order by id; OrderTransitions decides which controls its standing gets.
-   T-5.1.4: opened from Record call (the calls/{CallId} routes) it adds for that Call and goes back to it. *@
+   T-5.1.4: opened from Record call (the calls/{CallId} routes) it adds for that Call and goes back to it.
+   T-5.1.5: an order with no Call carries the gaps the shop's last Call left, and Record call links the order to a new one. *@
 <section class="new-order">
     <nav class="shop-back" aria-label="Order navigation"><a href="@BackHref">@(CallId is null ? "Back to shop" : "Back to call")</a></nav>
     @if (!Ready) { <h1>@Heading</h1><p role="status">Opening order…</p> }
@@ -81,7 +82,7 @@
         }
         @if (lowProduct is { } adding && lowEntry is { } marked)
         {
-            <QuantityPopover @key="adding.Id" Product="adding" Recorded="@LowItem.Recorded(marked)" Busy="busy" Error="@lowError"
+            <QuantityPopover @key="adding.Id" Product="adding" Recorded="@(lowRecorded ?? LowItem.Recorded(marked))" Busy="busy" Error="@lowError"
                              OnAdd="AddLowAsync" OnCancel="CloseLow" />
         }
         <section class="order-lines" aria-labelledby="order-lines-heading">
@@ -186,10 +187,16 @@
     private ProductSearchResult? lowProduct;
     private CallStockEntry? lowEntry;
     private string? lowError;
+    private string? lowRecorded;
+    // T-5.1.5: the shop's last Call gaps still open, read for an order with no Call.
+    private CarriedLow? carried;
 
     private string Heading => OrderId is null ? "New order" : "Order";
 
     private string BackHref => CallId is null ? $"/locations/{LocationId}" : $"/locations/{LocationId}/calls/new";
+
+    /// <summary>T-5.1.5 D5: Record call from the Low tab, for this order; saving the Call links the order to it.</summary>
+    private string RecordCallHref => $"/locations/{LocationId}/orders/{orderId}/calls/new";
 
     /// <summary>The Call whose Low items the tab lists: the one order entry was opened from, else the one the order is linked to.</summary>
     private Guid? CallFor => CallId ?? order?.CallId;
@@ -200,7 +207,8 @@
 
     /// <summary>Each Low item's state, worked out from the Call and the order as it is now (D5).</summary>
     private LowList Low => Draft is { } draft ? draft.Low(order)
-        : savedCall is { } call && call.Id == CallFor ? LowItems.Of(call.StockEntries ?? [], order, []) : LowList.None;
+        : savedCall is { } call && call.Id == CallFor ? LowItems.Of(call.StockEntries ?? [], order, [])
+        : CallFor is null && carried is { } gaps ? LowItems.Carried(gaps, order) : LowList.None;
 
     private bool HasCall => Draft is not null || (savedCall is { } call && call.Id == CallFor);
 
@@ -325,11 +333,26 @@
     /// <summary>T-5.1.4's Low tab (T-07): each item marked Low on the Call with one state; Add on not added and REMOVED items
     /// opens the quantity popover. One row at a time: there is no Add all (T7.6).</summary>
     private RenderFragment LowTab => @<section class="low-tab" aria-label="Low items">
-        @if (!HasCall) { <p class="low-empty">No stock check with this order.</p> }
+        @if (!HasCall)
+        {
+            @* T-5.1.5 (US-012 S19–S21): no Call with this order, so the gaps the shop's last Call left, if any are still open. *@
+            <p class="low-empty">No stock check with this order.</p>
+            @if (Low.CarriedFrom is { } from)
+            {
+                <p class="low-source">Still open from your call at @(detail?.Location.Name ?? "this shop") - @from.CalledOn.ToString("ddd d MMM", CultureInfo.InvariantCulture)</p>
+                @LowRows
+            }
+            <a class="record-call" href="@RecordCallHref">Record call</a>
+        }
         else if (Low.Items.Count == 0) { <p class="low-empty">Nothing marked Low on this call.</p> }
         else
         {
             <p class="low-source">From your stock check at @(detail?.Location.Name ?? "this shop")</p>
+            @LowRows
+        }
+    </section>;
+
+    private RenderFragment LowRows => @<text>
             <ul class="low-items">
                 @foreach (LowItem item in Low.Items)
                 {
@@ -348,8 +371,7 @@
                     </li>
                 }
             </ul>
-        }
-    </section>;
+    </text>;
 
     private string Summary
     {
@@ -373,7 +395,7 @@
     protected override void Clear()
     {
         rep = null; detail = null; index = null; order = null; problem = null; readStanding = OrderStanding.New; sentUtc = null;
-        savedCall = null; ResetEntry();
+        savedCall = null; carried = null; ResetEntry();
     }
 
     private void ShowPad() { lowTab = false; CloseLow(); }
@@ -384,13 +406,13 @@
     private void OpenLow(LowItem item, ProductSearchResult product)
     {
         if (busy) return;
-        lowProduct = product; lowEntry = item.Entry; lowError = null;
+        lowProduct = product; lowEntry = item.Entry; lowRecorded = item.WhatWasRecorded; lowError = null;
     }
 
     private void CloseLow()
     {
         if (busy) return;
-        lowProduct = null; lowEntry = null; lowError = null;
+        lowProduct = null; lowEntry = null; lowRecorded = null; lowError = null;
     }
 
     private async Task AddLowAsync(decimal quantity)
@@ -406,7 +428,7 @@
         {
             OrderResult result = await Task.Run(() => Add(repSubject, id, shop, product.Id, quantity, call));
             if (version != Tablet.SessionVersion || orderShop != shop) return;
-            if (result.Succeeded) { Added(result.Order); lowProduct = null; lowEntry = null; }
+            if (result.Succeeded) { Added(result.Order); lowProduct = null; lowEntry = null; lowRecorded = null; }
             else lowError = result.Error;
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
@@ -459,6 +481,7 @@
             ProductSearchIndex? readIndex = null;
             OrderView? readView = null;
             TabletCall? readCall = null;
+            CarriedLow? readCarried = null;
             await Task.Run(() =>
             {
                 readDetail = Tablet.ReadLocation(repSubject, shop);
@@ -468,9 +491,11 @@
                 readView = Tablet.ReadOrderView(repSubject, id);
                 // T-5.1.4 D4: once the Call is saved, its Low marks come from the saved Call.
                 if ((openedFrom ?? readView?.Order.CallId) is Guid call) readCall = Tablet.ReadCall(repSubject, call);
+                // T-5.1.5: with no Call, the gaps the shop's last Call left, from the same downloaded day as the products.
+                else if (readIndex is not null) readCarried = Tablet.ReadCarriedLow(repSubject, shop, id, readIndex);
             });
             if (!isCurrent()) return;
-            rep = repSubject; detail = readDetail; index = readIndex; savedCall = readCall;
+            rep = repSubject; detail = readDetail; index = readIndex; savedCall = readCall; carried = readCarried;
             order = readView?.Order; readStanding = readView?.Standing ?? OrderStanding.New; sentUtc = readView?.SentUtc;
             if (order is not null && order.LocationId != shop) problem = "This order is for a different shop.";
         }

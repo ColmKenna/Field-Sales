@@ -1,4 +1,5 @@
 @page "/locations/{Id:guid}/calls/new"
+@page "/locations/{Id:guid}/orders/{OrderId:guid}/calls/new"
 @inherits OfflineCataloguePage
 @using FieldSales.Calls.Contracts
 @using FieldSales.Ordering.Contracts
@@ -7,10 +8,12 @@
 @* T-06 · Record call (T-5.3.1): one scrolling page (T6.1); the channel first, as two unselected options (T6.2); the save review
    is a dialog (T6.4). The stock check (T-5.4.1) starts from the shop's Suggested List; on Phone the same rows read as "Stock
    mentioned" (T-5.3.2, T6.5). A Low item goes on the shop's order through the quantity popover (T-5.5.1, T7.7). Competitor
-   notes and campaign outcomes join this page with their own items. *@
+   notes and campaign outcomes join this page with their own items.
+   T-5.1.5 D5: opened from an order's Low tab (the orders/{OrderId} route), saving links that order to this Call and returns to
+   order entry for it; Back returns to the order. *@
 <section class="record-call">
     <nav class="shop-back" aria-label="Call navigation">
-        <a href="@($"/locations/{Id}")" @onclick="BackToShop" @onclick:preventDefault="true">Back to shop</a>
+        <a href="@BackHref" @onclick="BackToShop" @onclick:preventDefault="true">@(OrderId is null ? "Back to shop" : "Back to order")</a>
     </nav>
     @if (!Ready) { <h1>Record call</h1><p role="status">Opening call…</p> }
     else if (problem is not null) { <h1>Record call unavailable</h1><p role="alert">@problem</p> }
@@ -86,6 +89,8 @@
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    /// <summary>The order whose Low tab opened this page (T-5.1.5 D5): saving links it to the Call, and Back returns to it.</summary>
+    [Parameter] public Guid? OrderId { get; set; }
 
     private string? rep;
     private OfflineLocationDetail? detail;
@@ -111,6 +116,10 @@
 
     private static CallDraft New() => new(Guid.NewGuid(), null, "", false);
 
+    // Back returns to the shop, or to the order this page was opened from; an order with no lines yet isn't saved, so a new one.
+    private string BackHref => OrderId is not { } from ? $"/locations/{Id}"
+        : callOrder?.Id == from ? $"/locations/{Id}/orders/{from}" : $"/locations/{Id}/orders/new";
+
     protected override void Clear()
     {
         rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
@@ -121,6 +130,7 @@
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
     {
         Guid shop = Id;
+        Guid? orderFrom = OrderId;
         try
         {
             // A resume rebuilds this page; the Call being recorded comes back, with the same id and its stock rows.
@@ -133,7 +143,10 @@
                 read = Tablet.ReadLocation(repSubject, shop);
                 if (read is not { IsAssigned: true }) return;
                 readStart = Tablet.ReadStockCheckStart(repSubject, shop);
-                readOrder = Tablet.ReadCallOrder(repSubject, restored.CallId, shop);
+                // Opened from an order's Low tab, the Call adds to that order (T-5.1.5); otherwise to the one T-5.5.1 picks.
+                readOrder = orderFrom is { } from
+                    ? Tablet.ReadOrder(repSubject, from) is { } opened && opened.LocationId == shop ? opened : null
+                    : Tablet.ReadCallOrder(repSubject, restored.CallId, shop);
             });
             if (!isCurrent()) return;
             rep = repSubject; detail = read; start = readStart; callOrder = readOrder;
@@ -175,15 +188,28 @@
         string repSubject = rep;
         Guid shop = Id;
         CallDraft saving = draft;
+        Guid? orderFrom = OrderId;
         long version = Tablet.SessionVersion;
         try
         {
-            CallResult result = await Task.Run(() => Tablet.SaveCall(repSubject, saving.CallId, shop, saving.Content));
+            OrderResult? link = null;
+            CallResult result = await Task.Run(() =>
+            {
+                CallResult saved = Tablet.SaveCall(repSubject, saving.CallId, shop, saving.Content);
+                // T-5.1.5 D5: the order whose Low tab opened this Call is linked to it once the Call is saved.
+                if (saved.Succeeded && orderFrom is { } from) link = Tablet.LinkOrderToCall(repSubject, from, saving.CallId);
+                return saved;
+            });
             if (version != Tablet.SessionVersion || shop != Id) return;
             if (result.Succeeded)
             {
                 Tablet.CallDrafts.Saved(repSubject, version, shop);
-                Navigation.NavigateTo($"/locations/{shop}");
+                // Back to order entry, now for this Call: on the linked order, else a new order opened from the Call (the order had
+                // no lines yet), else the order as it was if it could no longer be linked.
+                Navigation.NavigateTo(orderFrom is not { } order ? $"/locations/{shop}"
+                    : link is { Succeeded: true } ? $"/locations/{shop}/calls/{saving.CallId}/orders/{order}"
+                    : link?.Error == OrderStore.NotFound ? $"/locations/{shop}/calls/{saving.CallId}/orders/new"
+                    : $"/locations/{shop}/orders/{order}");
                 return;
             }
             reviewing = false;
@@ -471,7 +497,10 @@
         long version = Tablet.SessionVersion;
         try
         {
-            OrderResult result = await Task.Run(() => Tablet.AddOrderLineFromCall(repSubject, call, shop, product.Id, quantity));
+            Guid? orderFrom = OrderId;
+            OrderResult result = await Task.Run(() => orderFrom is { } from
+                ? Tablet.AddOrderLineForCall(repSubject, from, shop, product.Id, quantity, call)
+                : Tablet.AddOrderLineFromCall(repSubject, call, shop, product.Id, quantity));
             if (version != Tablet.SessionVersion || shop != Id) return;
             if (result.Succeeded)
             {
@@ -509,6 +538,6 @@
     private void Leave()
     {
         if (rep is not null) Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, null);
-        Navigation.NavigateTo($"/locations/{Id}");
+        Navigation.NavigateTo(BackHref);
     }
 }

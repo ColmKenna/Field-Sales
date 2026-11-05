@@ -139,6 +139,27 @@ public sealed class OrderStore
         finally { Gate.Release(); }
     }
 
+    /// <summary>Links an In Progress order with no Call to <paramref name="callId"/> (T-5.1.5 D5): a Call recorded from the order's
+    /// Low tab was saved. An order already linked to that Call is left as it is. One linked to another Call, or no longer In
+    /// Progress, isn't changed; with no such order the answer is <see cref="NotFound"/>.</summary>
+    public OrderResult LinkToCall(Guid orderId, Guid callId)
+    {
+        Gate.Wait();
+        try
+        {
+            UnsentStore unsent = new(workspace);
+            OrderStanding standing = Standing(unsent, orderId, out _, out TabletOrder? order);
+            if (standing == OrderStanding.New) return OrderResult.Failure(NotFound);
+            if (standing != OrderStanding.InProgress || order is null || (order.CallId is { } linked && linked != callId))
+                return OrderResult.Failure(NotChangeable);
+            if (order.CallId == callId) return Saved(order);
+            TabletOrder changed = order with { CallId = callId };
+            Save(unsent, changed);
+            return Saved(changed);
+        }
+        finally { Gate.Release(); }
+    }
+
     private static TabletOrder? ForCall(UnsentStore unsent, Guid callId, Guid locationId)
     {
         TabletOrder[] open = [.. unsent.Read()
