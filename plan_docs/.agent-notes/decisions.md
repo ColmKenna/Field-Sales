@@ -3,6 +3,20 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-058 the price engine (2026-11-05, developer, plan approval)
+
+The developer answered the WI-058 questions, replied **Approved** to the plan with D1–D10, then **Apply**. Full text in `WI-058.md`.
+These rules bind every later pricing item (tiers, breaks, display, promotions, allowances, self-service).
+
+- **Rounding (MI-48):** a unit price (per item or per kg) is rounded to the cent, halves away from zero, as soon as a percentage is
+  applied; a line's value is the rounded unit price × quantity, rounded the same way.
+- **Overrides (MI-47):** per product only. A percentage tier has a default percentage and product overrides (a percentage or a fixed
+  price); a price-list tier has fixed prices, and a product it doesn't list gets no tier price. No category overrides.
+- **Ties:** on an equal price the rep sees the tier, then the break, then the list price; equal tiers by name.
+- **Breaks:** every break at or below the quantity is reached and the lowest of them applies, so a rising break never does.
+- **One engine** in `FieldSales.Pricing`, shared by tablet and server: `Resolve(product, tiers, quantity, date, extraCandidates)`.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-057 competitor notes on a call (2026-11-05, developer, plan approval)
 
 The developer answered the WI-057 questions, replied **Approved** to the plan with D1–D10, then **Apply**. Full text in `WI-057.md`.
