@@ -144,6 +144,8 @@ a:focus-visible, button:focus-visible { outline: 3px solid #c77f09; outline-offs
 .review-lines { list-style: none; padding: 0; }
 .review-lines li { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .captured-line-notice { color: var(--alert); font-weight: 600; }
+.quantity-marker { color: var(--alert); font-weight: 600; }
+.order-lines .quantity-marker { grid-column: 1 / -1; }
 .order-lines .captured-line-notice { grid-column: 1 / -1; }
 /* Order Pad (WI-044, T7.3): every header carries the full breadcrumb, wrapped rather than cut, so a deep path stays readable;
    nested levels indent slightly and the whole header is the tap target. */

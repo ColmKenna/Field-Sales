@@ -2,11 +2,12 @@ using System.Text;
 using System.Text.Json;
 using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
+using FieldSales.Tablet.Core;
 
 namespace FieldSales.Api.Tests;
 
 /// <summary>WI-054 (T-5.1.6, REP-US-012 S14–S18): each recent order product's quantities, sent in snapshot 1.5 for the Review marker.
-/// Agreed scenarios S1 (server) and E1 (end to end, in <c>SuggestedListTests.QuantityMarker</c>).</summary>
+/// Agreed scenarios S1 (server) and E1 (end to end).</summary>
 public sealed partial class SuggestedListTests
 {
     // S1.
@@ -29,6 +30,36 @@ public sealed partial class SuggestedListTests
         Assert.Equal([new(6m, "Each"), new(6m, "Each")], quantities[product[1]]);
         Assert.Equal([new(2.5m, "kg")], quantities[product[2]]);
         Assert.Equal("1.5", snapshot.Manifest.Version);
+    }
+
+    // E1, end to end: three orders taken on the tablet are synced and accepted; the next snapshot lets the tablet mark 480 on a new
+    // order against the usual 48, with no server involved, and marking it ready asks for nothing.
+    [Fact]
+    public async Task Should_MarkTheLine_When_TheShopsLast3AcceptedOrdersAreSyncedAndAnOrderOf10TimesIsReviewed()
+    {
+        (Guid murphys, Guid[] product) = await MurphysAsync(products: 2);
+        Assert.True((await SyncAsync()).Completed);
+        OrderStore orders = new(Workspace, _clock);
+        Guid[] taken = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+        foreach ((Guid order, decimal quantity) in taken.Zip([48m, 50m, 44m]))
+        {
+            Assert.True(orders.AddLine(order, murphys, product[0], quantity).Succeeded);
+            Assert.True(orders.MarkReadyToSend(order).Succeeded);
+        }
+        Assert.Equal(new UploadSummary(3, 3), (await SyncAsync()).Upload);
+        await AcceptAsync(taken);
+        Assert.True((await SyncAsync()).Completed);
+
+        Guid next = Guid.NewGuid();
+        Assert.True(orders.AddLine(next, murphys, product[1], 5m).Succeeded); // Never ordered here before: no marker.
+        TabletOrder review = orders.AddLine(next, murphys, product[0], 480m).Order!; // 48 typed as 480.
+        SnapshotStore store = new(Workspace);
+        ProductSearchIndex index = store.ReadProductIndex(new DateOnly(2026, 9, 22));
+        IReadOnlyDictionary<Guid, IReadOnlyList<OrderedQuantity>> history = store.ReadOrderedQuantities(index.Generation, murphys);
+
+        Assert.Equal([("Product 01", (string?)null), ("Product 00", "Usually about 48 here")], review.Lines.Select(line =>
+            (line.ProductName, QuantityMarker.For(line, history.GetValueOrDefault(line.ProductId) ?? [], index.Find(line.ProductId)?.QuantityStep))));
+        Assert.Equal(OrderState.ReadyToSend, orders.MarkReadyToSend(next).Order!.State);
     }
 
     // Received through the same receiver the upload endpoint uses, with each line's quantity and unit.
