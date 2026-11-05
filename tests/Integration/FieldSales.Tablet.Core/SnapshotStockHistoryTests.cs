@@ -100,12 +100,13 @@ public sealed class SnapshotStockHistoryTests : IDisposable
         TabletSnapshot old = Snapshots.Build("colm", locations: 3, products: 5, version: "1.2");
         ActiveSnapshot active = await tablet.SyncAsync(old);
         string unsent = tablet.SaveWork().Fingerprint();
-        // Exact predecessor: format 2 had neither history table.
+        // Exact predecessor: format 2 had neither history table (nor format 4's last Call gaps, WI-053).
         using (SqliteConnection connection = new($"Data Source={tablet.Workspace().SnapshotPath};Pooling=False"))
         {
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE last_stock_check_lines; DROP TABLE recent_order_lines; PRAGMA user_version=2;";
+            command.CommandText = "DROP TABLE last_stock_check_lines; DROP TABLE recent_order_lines; DROP TABLE last_call_low_lines; "
+                + "PRAGMA user_version=2;";
             command.ExecuteNonQuery();
         }
 
@@ -120,7 +121,7 @@ public sealed class SnapshotStockHistoryTests : IDisposable
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
             command.CommandText = "PRAGMA user_version";
-            Assert.Equal(3L, command.ExecuteScalar());
+            Assert.Equal(4L, command.ExecuteScalar()); // Through format 3 to the current format 4.
         }
         TabletSnapshot next = WithHistory();
         await tablet.SyncAsync(next);
