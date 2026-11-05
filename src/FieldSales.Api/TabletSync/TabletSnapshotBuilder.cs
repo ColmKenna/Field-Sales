@@ -118,14 +118,22 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
                         || (newer.ReceivedUtc == order.ReceivedUtc && newer.Id.CompareTo(order.Id) > 0))))) < count)
             .Select(order => order.Id)
             .ToArrayAsync(ct);
-        // An order's lines stay in its received body, as accepted from the tablet.
-        string[] bodies = await ordering.ReceivedWork.AsNoTracking().Where(item => orderIds.Contains(item.Id))
-            .Select(item => item.Body).ToArrayAsync(ct);
-        return [.. bodies.Select(body => JsonSerializer.Deserialize(body, OrderJsonContext.Default.TabletOrder)!)
-            .SelectMany(order => order.Lines.Select(line => (order.LocationId, line.ProductId)))
-            .Where(line => shops.Contains(line.LocationId) && included.Contains(line.ProductId))
-            .Distinct()
-            .Select(line => new SnapshotRecentOrderLine(line.LocationId, line.ProductId))
+        // An order's lines stay in its received body, as accepted from the tablet. Newest first (by date taken, then received), so
+        // each product's quantities (1.5, T-5.1.6) list the most recent order first.
+        var received = await (from order in ordering.Orders.AsNoTracking()
+                              where orderIds.Contains(order.Id)
+                              join item in ordering.ReceivedWork on order.Id equals item.Id
+                              select new { order.Id, order.TakenOn, order.ReceivedUtc, item.Body }).ToArrayAsync(ct);
+        var lines = received.OrderByDescending(order => order.TakenOn).ThenByDescending(order => order.ReceivedUtc)
+            .ThenByDescending(order => order.Id)
+            .Select(order => JsonSerializer.Deserialize(order.Body, OrderJsonContext.Default.TabletOrder)!)
+            .SelectMany(order => order.Lines
+                .GroupBy(line => (line.ProductId, line.Unit))
+                .Select(same => (order.LocationId, same.Key.ProductId, Quantity: new SnapshotOrderedQuantity(same.Sum(line => line.Quantity), same.Key.Unit))))
+            .Where(line => shops.Contains(line.LocationId) && included.Contains(line.ProductId));
+        return [.. lines.GroupBy(line => (line.LocationId, line.ProductId))
+            .Select(product => new SnapshotRecentOrderLine(product.Key.LocationId, product.Key.ProductId,
+                [.. product.Select(line => line.Quantity)]))
             .OrderBy(line => line.LocationId).ThenBy(line => line.ProductId)];
     }
 

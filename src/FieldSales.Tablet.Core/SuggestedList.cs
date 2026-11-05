@@ -91,4 +91,28 @@ public sealed partial class SnapshotStore
         transaction.Commit();
         return history;
     }
+
+    /// <summary>T-5.1.6: each product's quantity on the Location's recent Accepted Orders in one generation, newest first, for the
+    /// out-of-pattern marker (<see cref="QuantityMarker"/>). Empty when the generation has none (a snapshot before 1.5).</summary>
+    public IReadOnlyDictionary<Guid, IReadOnlyList<OrderedQuantity>> ReadOrderedQuantities(string? generation, Guid locationId)
+    {
+        if (generation is null) return new Dictionary<Guid, IReadOnlyList<OrderedQuantity>>();
+        using SqliteConnection connection = Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT product_id, quantity, unit FROM recent_order_quantities WHERE generation=$g AND location_id=$l
+            ORDER BY product_id, position
+            """;
+        command.Parameters.AddWithValue("$g", generation);
+        command.Parameters.AddWithValue("$l", locationId.ToString());
+        using SqliteDataReader reader = command.ExecuteReader();
+        Dictionary<Guid, List<OrderedQuantity>> quantities = [];
+        while (reader.Read())
+        {
+            Guid product = Guid.Parse(reader.GetString(0));
+            if (!quantities.TryGetValue(product, out List<OrderedQuantity>? list)) quantities[product] = list = [];
+            list.Add(new(decimal.Parse(reader.GetString(1), System.Globalization.CultureInfo.InvariantCulture), reader.GetString(2)));
+        }
+        return quantities.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<OrderedQuantity>)pair.Value);
+    }
 }

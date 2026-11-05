@@ -44,7 +44,7 @@ public sealed partial class SuggestedListTests
         Assert.Equal(new[] { product[1], product[3] }.Order().Select(id => new SnapshotLastCallLowLine(murphys, lastCall, sep15, id)),
             snapshot.LastCallLowLines!);
         Assert.Equal(2, snapshot.Manifest.Counts.LastCallLowLines);
-        Assert.Equal("1.4", snapshot.Manifest.Version);
+        Assert.Equal(SnapshotContract.CurrentVersion, snapshot.Manifest.Version);
     }
 
     // Scenario 12, end to end: a Call marks two products Low and one goes on the Call's order; both are synced, and the next

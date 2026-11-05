@@ -19,7 +19,7 @@ public sealed class ProductAttributeStorageTests : IDisposable
         string unsent = tablet.SaveWork().Fingerprint();
         // Exact predecessor schema: v2 adds only this table (v3, WI-049, the two history tables; v4, WI-053, the last Call's
         // gaps). Remove the additive metadata too.
-        Execute("DROP TABLE product_attributes; DROP TABLE last_stock_check_lines; DROP TABLE recent_order_lines; DROP TABLE last_call_low_lines; "
+        Execute("DROP TABLE product_attributes; DROP TABLE last_stock_check_lines; DROP TABLE recent_order_lines; DROP TABLE last_call_low_lines; DROP TABLE recent_order_quantities; "
             + "UPDATE generations SET manifest=json_remove(manifest, '$.counts.productAttributes', '$.counts.lastStockCheckLines', '$.counts.recentOrderLines', '$.counts.lastCallLowLines'); "
             + "PRAGMA user_version=1;");
         var upgraded = new SnapshotStore(tablet.Workspace());
@@ -28,7 +28,7 @@ public sealed class ProductAttributeStorageTests : IDisposable
         Assert.Equal(50, upgraded.ReadProducts(0).Products.Count);
         Assert.Empty(upgraded.ReadProduct(old.Products[0].Id)!.Attributes);
         Assert.Equal(unsent, new UnsentStore(tablet.Workspace()).Fingerprint());
-        Assert.Equal(4L, Scalar("PRAGMA user_version")); // Stepped up through formats 2 and 3 to the current format 4.
+        Assert.Equal(5L, Scalar("PRAGMA user_version")); // Stepped up through formats 2, 3 and 4 to the current format 5.
         await tablet.SyncAsync(WithAttributes(products: 51));
         Assert.Equal("200 g", upgraded.ReadProduct(old.Products[0].Id)!.Attributes[0].Value);
         Assert.Equal(unsent, new UnsentStore(tablet.Workspace()).Fingerprint());

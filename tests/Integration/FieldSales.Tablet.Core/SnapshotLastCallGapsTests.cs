@@ -113,12 +113,12 @@ public sealed class SnapshotLastCallGapsTests : IDisposable
             command.CommandText = "PRAGMA user_version";
             return (long)command.ExecuteScalar()!;
         }
-        // Exact predecessor: format 3 had no last Call gaps table.
+        // Exact predecessor: format 3 had no last Call gaps table (nor format 5's order quantities, WI-054).
         using (SqliteConnection connection = new($"Data Source={tablet.Workspace().SnapshotPath};Pooling=False"))
         {
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE last_call_low_lines; PRAGMA user_version=3;";
+            command.CommandText = "DROP TABLE last_call_low_lines; DROP TABLE recent_order_quantities; PRAGMA user_version=3;";
             command.ExecuteNonQuery();
         }
 
@@ -128,7 +128,7 @@ public sealed class SnapshotLastCallGapsTests : IDisposable
         Assert.Equal(3, upgraded.ReadLocations().Count);
         Assert.Null(Gaps(old.Locations[0].Id));
         Assert.Equal(unsent, new UnsentStore(tablet.Workspace()).Fingerprint());
-        Assert.Equal(4L, Format());
+        Assert.Equal(5L, Format()); // Through format 4 to the current format 5.
         TabletSnapshot next = WithGaps();
         await tablet.SyncAsync(next);
         Assert.Equal(2, Gaps(next.Locations[0].Id)!.ProductIds.Count);

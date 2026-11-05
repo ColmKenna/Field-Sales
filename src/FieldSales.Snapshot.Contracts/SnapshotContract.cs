@@ -13,7 +13,7 @@ public static class SnapshotContract
 {
     public const string Schema = "field-sales-snapshot";
     public const int CurrentMajor = 1;
-    public const int CurrentMinor = 4;
+    public const int CurrentMinor = 5;
     public static string CurrentVersion => $"{CurrentMajor}.{CurrentMinor}";
 
     /// <summary>The majors this server can build, newest first.</summary>
@@ -112,8 +112,15 @@ public sealed record SnapshotStockCheckLine(Guid LocationId, Guid ProductId);
 
 /// <summary>A product on one of a Location's most recent Accepted Orders, once per Location, added in 1.3 (T-5.4.1). How
 /// many orders count is a server setting (three by default). Orders not yet Accepted never contribute.</summary>
-/// <remarks>Rows name only included products and the rep's own Locations, so restricted products never appear.</remarks>
-public sealed record SnapshotRecentOrderLine(Guid LocationId, Guid ProductId);
+/// <remarks>Rows name only included products and the rep's own Locations, so restricted products never appear.
+/// <see cref="Quantities"/>, added in 1.5 (T-5.1.6), is the product's quantity on each of those orders that contained it, newest
+/// first, in the unit it was ordered in; the tablet marks an order line far above them on Review.</remarks>
+public sealed record SnapshotRecentOrderLine(Guid LocationId, Guid ProductId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotOrderedQuantity>? Quantities = null);
+
+/// <summary>A product's quantity on one recent Accepted Order (summed if it was on the order twice), added in 1.5 (T-5.1.6).</summary>
+public sealed record SnapshotOrderedQuantity(decimal Quantity, string Unit);
 
 /// <summary>A product marked Low on a Location's most recent Call (any channel, whoever recorded it) and on no order at that
 /// Location taken on or after the Call's date, whatever the order's status, added in 1.4 (T-5.1.5). The tablet carries these

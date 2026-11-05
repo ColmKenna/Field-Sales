@@ -99,7 +99,7 @@ public sealed partial class SuggestedListTests(TabletSnapshotFixture fixture) : 
 
         TabletSnapshot snapshot = await _app.SyncAsync("colm");
 
-        Assert.Equal([new SnapshotRecentOrderLine(murphys, product[0])], snapshot.RecentOrderLines);
+        Assert.Equal([(murphys, product[0])], snapshot.RecentOrderLines!.Select(line => (line.LocationId, line.ProductId)));
     }
 
     [Fact]
