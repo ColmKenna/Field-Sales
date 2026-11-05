@@ -3,6 +3,18 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-054 the out-of-pattern quantity marker (2026-11-05, developer, plan approval)
+
+The developer chose the marker rule, replied **Approved** to the WI-054 plan with D1–D7, then **Apply**. Full text in `WI-054.md`.
+
+- **Rule (MI-49):** the product's quantity on whichever of the shop's last 3 accepted orders contained it; at least 2 such orders,
+  else no marker. Usual = the median (two: their average). Marked when the line is more than 3× usual. No absolute floor. High only.
+- **Text:** "Usually about 48 here", rounded to a whole number for Each and to the step for measured products, with the unit.
+  Quantities in another unit are ignored.
+- **Snapshot 1.5** adds optional `quantities` to each `recentOrderLines` row; the tablet stores them in local format 5.
+- **Where:** order-entry lines while In Progress or Ready to Send. Never blocks Mark Ready to Send; nothing to acknowledge.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-053 the last call's gaps on an order with no call (2026-11-04, developer, plan approval)
 
 The developer replied **Approved** to the WI-053 plan with the recommended D1–D7, then **Apply**. Full text in `WI-053.md`.
