@@ -157,6 +157,8 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         _ when call.Snapshot is null || string.IsNullOrWhiteSpace(call.Snapshot.Version) || call.Snapshot.Version.Length > 20
             || call.Snapshot.BuiltUtc == default => Incomplete("The call has no snapshot reference."),
         _ when call.StockEntries is { } stock && !AreStockEntries(stock) => Incomplete("A stock entry is incomplete."),
+        _ when call.FollowUpOf is { } original && (original == Guid.Empty || original == call.Id)
+            => Incomplete("The call's follow-up link must name another call."),
         _ when call.Content.Problem is { } problem => Incomplete($"The call can't be accepted: {problem}."),
         _ => null
     };

@@ -23,8 +23,12 @@ public sealed partial class CallStore(RepWorkspace workspace, TimeProvider? cloc
 
     private readonly TimeProvider time = clock ?? TimeProvider.System;
 
-    /// <summary>Saves the Call the rep reviewed. The content must pass <see cref="CallContent.Problem"/>.</summary>
-    public CallResult Save(Guid callId, Guid locationId, CallContent content)
+    public const string FollowUpOfMissing = "The call this follows up isn't on this tablet.";
+
+    /// <summary>Saves the Call the rep reviewed. The content must pass <see cref="CallContent.Problem"/>. A follow-up
+    /// (T-5.7.1) names the earlier Call it follows up in <paramref name="followUpOf"/>: a Call this tablet holds, unsent or sent,
+    /// at the same shop.</summary>
+    public CallResult Save(Guid callId, Guid locationId, CallContent content, Guid? followUpOf = null)
     {
         if (content.Problem is { } problem) return CallResult.Failure(problem);
         // Serialized with order changes and the uploader's claim, so a repeated Save can't record the Call twice.
@@ -36,12 +40,14 @@ public sealed partial class CallStore(RepWorkspace workspace, TimeProvider? cloc
             if (Find(callId) is { } saved) return new(saved, null);
             if (unsent.IsSent(callId)) return new(Parse(unsent.FindSent(callId)?.Item), null);
             if (new SnapshotStore(workspace, time).ReadActive() is not { } active) return CallResult.Failure(NotDownloaded);
+            if (followUpOf is Guid original && (original == callId || Read(original)?.LocationId != locationId))
+                return CallResult.Failure(FollowUpOfMissing);
 
             DateTimeOffset now = time.GetLocalNow();
             TabletCall call = new(CallContract.Schema, CallContract.CurrentVersion, callId, locationId, workspace.RepSubject,
                 DateOnly.FromDateTime(now.DateTime), now, content.Channel!.Value,
                 new(active.Manifest.Version, active.Manifest.BuiltUtc), content.Notes,
-                content.StockEntries is { Count: > 0 } stock ? [.. stock] : null);
+                content.StockEntries is { Count: > 0 } stock ? [.. stock] : null, followUpOf);
             unsent.Save(new(callId, UnsentKind.Call, time.GetUtcNow(), JsonSerializer.Serialize(call, CallJsonContext.Default.TabletCall)));
             return new(call, null);
         }
