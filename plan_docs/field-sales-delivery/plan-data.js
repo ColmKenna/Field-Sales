@@ -102,7 +102,7 @@ window.DELIVERY_PLAN = {
     "WI-052": "done",
     "WI-053": "done",
     "WI-054": "done",
-    "WI-055": "active"
+    "WI-055": "done"
   },
   "complexities": [
     "Simple",
