@@ -37,7 +37,12 @@ public sealed partial class SnapshotStore
     internal const int PurgeBatchRows = 2000;
     internal const long MaximumPlainBytes = 1L << 30;
     internal static readonly int[] ReadableMajors = [SnapshotContract.CurrentMajor];
-    private const int SchemaVersion = 3;
+    private const int SchemaVersion = 4;
+    // Format 4 (snapshot 1.4, T-5.1.5): the Low products a Location's most recent Call left unordered.
+    private const string LastCallSchema = """
+        CREATE TABLE last_call_low_lines(generation TEXT NOT NULL REFERENCES generations(id), location_id TEXT NOT NULL,
+            call_id TEXT NOT NULL, called_on TEXT NOT NULL, product_id TEXT NOT NULL, PRIMARY KEY(generation, location_id, product_id));
+        """;
     // Format 3 (snapshot 1.3, T-5.4.1): a Location's last Stock Check lines and the products on its recent Accepted Orders.
     private const string HistorySchema = """
         CREATE TABLE last_stock_check_lines(generation TEXT NOT NULL REFERENCES generations(id), location_id TEXT NOT NULL,
@@ -66,7 +71,7 @@ public sealed partial class SnapshotStore
             effective_from TEXT NOT NULL, amount TEXT NOT NULL, PRIMARY KEY(generation, product_id, effective_from));
         """;
     // Child tables are emptied before the generation row; the active pointer never names a retired generation.
-    private static readonly string[] ChildTables = ["last_stock_check_lines", "recent_order_lines", "product_attributes", "base_prices",
+    private static readonly string[] ChildTables = ["last_call_low_lines", "last_stock_check_lines", "recent_order_lines", "product_attributes", "base_prices",
         "products", "categories", "locations"];
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly RepWorkspace workspace;
@@ -93,8 +98,10 @@ public sealed partial class SnapshotStore
             using SqliteCommand version = connection.CreateCommand();
             version.CommandText = "PRAGMA user_version";
             // Older formats step up one at a time, keeping every generation; a new database gets the whole schema at once.
-            if ((long)version.ExecuteScalar()! == 1) SqliteEngine.EnsureSchema(connection, 2, "", AttributeSchema);
-            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema + AttributeSchema + HistorySchema, HistorySchema);
+            long current = (long)version.ExecuteScalar()!;
+            if (current == 1) { SqliteEngine.EnsureSchema(connection, 2, "", AttributeSchema); current = 2; }
+            if (current == 2) SqliteEngine.EnsureSchema(connection, 3, "", HistorySchema);
+            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema + AttributeSchema + HistorySchema + LastCallSchema, LastCallSchema);
         }
         catch { connection.Dispose(); throw; }
         return connection;
@@ -140,6 +147,7 @@ public sealed partial class SnapshotStore
                 + (SELECT COUNT(*) FROM product_attributes WHERE generation=g.id)
                 + (SELECT COUNT(*) FROM last_stock_check_lines WHERE generation=g.id)
                 + (SELECT COUNT(*) FROM recent_order_lines WHERE generation=g.id)
+                + (SELECT COUNT(*) FROM last_call_low_lines WHERE generation=g.id)
             FROM generations g ORDER BY g.completed, g.id
             """;
         using SqliteDataReader reader = command.ExecuteReader();
@@ -207,7 +215,7 @@ public sealed partial class SnapshotStore
             }
             SnapshotCounts declared = manifest!.Counts;
             if (declared != new SnapshotCounts(counts["locations"], counts["categories"], counts["products"], counts["basePrices"],
-                    counts["productAttributes"], counts["lastStockCheckLines"], counts["recentOrderLines"]))
+                    counts["productAttributes"], counts["lastStockCheckLines"], counts["recentOrderLines"], counts["lastCallLowLines"]))
                 throw new InvalidDataException("The downloaded snapshot is incomplete: its counts do not match.");
             using (SqliteCommand references = connection.CreateCommand())
             {
@@ -218,8 +226,8 @@ public sealed partial class SnapshotStore
                 references.Parameters.AddWithValue("$g", generation);
                 if ((long)references.ExecuteScalar()! != 0)
                     throw new InvalidDataException("An attribute refers to a product outside this snapshot.");
-                // History rows (1.3) must name a Location and a product this snapshot carries.
-                foreach (string table in (string[])["last_stock_check_lines", "recent_order_lines"])
+                // History rows (1.3) and the last Call's gaps (1.4) must name a Location and a product this snapshot carries.
+                foreach (string table in (string[])["last_stock_check_lines", "recent_order_lines", "last_call_low_lines"])
                 {
                     references.CommandText = $"""
                         SELECT EXISTS(SELECT 1 FROM {table} h
@@ -230,6 +238,12 @@ public sealed partial class SnapshotStore
                     if ((long)references.ExecuteScalar()! != 0)
                         throw new InvalidDataException("A stock history row refers to a Location or product outside this snapshot.");
                 }
+                references.CommandText = """
+                    SELECT EXISTS(SELECT 1 FROM last_call_low_lines WHERE generation=$g
+                        GROUP BY location_id HAVING COUNT(DISTINCT call_id) > 1 OR COUNT(DISTINCT called_on) > 1)
+                    """;
+                if ((long)references.ExecuteScalar()! != 0)
+                    throw new InvalidDataException("A Location's last Call gaps name more than one Call.");
             }
             WriteContactReplacements(connection, generation, manifest, contactReplacements);
             // Keep only the old active copy's referenced shop identities before it can be retired.
@@ -287,9 +301,10 @@ public sealed partial class SnapshotStore
             throw new InvalidDataException("The downloaded snapshot belongs to another rep.");
         if (manifest.Counts is null || manifest.Counts.Locations < 0 || manifest.Counts.Categories < 0
             || manifest.Counts.Products < 0 || manifest.Counts.BasePrices < 0 || manifest.Counts.ProductAttributes < 0
-            || manifest.Counts.LastStockCheckLines < 0 || manifest.Counts.RecentOrderLines < 0
+            || manifest.Counts.LastStockCheckLines < 0 || manifest.Counts.RecentOrderLines < 0 || manifest.Counts.LastCallLowLines < 0
             || (minor == 0 && manifest.Counts.ProductAttributes != 0)
-            || (minor < 3 && (manifest.Counts.LastStockCheckLines != 0 || manifest.Counts.RecentOrderLines != 0)))
+            || (minor < 3 && (manifest.Counts.LastStockCheckLines != 0 || manifest.Counts.RecentOrderLines != 0))
+            || (minor < 4 && manifest.Counts.LastCallLowLines != 0))
             throw new InvalidDataException("The snapshot manifest is invalid.");
     }
 
@@ -372,6 +387,23 @@ public sealed partial class SnapshotStore
                 catch (SqliteException repeated) when (repeated.SqliteErrorCode == 19)
                 {
                     throw new InvalidDataException("A stock history row is repeated.", repeated);
+                }
+                return;
+            case "lastCallLowLines":
+                if (new[] { "locationId", "callId", "calledOn", "productId" }.Any(field => !entity.TryGetProperty(field, out _)))
+                    throw new InvalidDataException("A last Call gap row is missing a required field.");
+                SnapshotLastCallLowLine gap = Entity<SnapshotLastCallLowLine>(entity);
+                if (gap.CallId == Guid.Empty) throw new InvalidDataException("A last Call gap row is invalid.");
+                insert.CommandText = """
+                    INSERT INTO last_call_low_lines(generation, location_id, call_id, called_on, product_id)
+                    VALUES($g, $location, $call, $on, $product)
+                    """;
+                Add("$location", gap.LocationId.ToString()); Add("$call", gap.CallId.ToString());
+                Add("$on", gap.CalledOn.ToString("O", CultureInfo.InvariantCulture)); Add("$product", gap.ProductId.ToString());
+                try { insert.ExecuteNonQuery(); }
+                catch (SqliteException repeated) when (repeated.SqliteErrorCode == 19)
+                {
+                    throw new InvalidDataException("A last Call gap row is repeated.", repeated);
                 }
                 return;
             default: throw new InvalidDataException("Unknown snapshot family.");

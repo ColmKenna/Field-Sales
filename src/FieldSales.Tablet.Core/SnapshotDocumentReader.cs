@@ -14,7 +14,7 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
 {
     private static readonly string[] OriginalFamilies = ["locations", "categories", "products", "basePrices"];
     private static readonly string[] HistoryFamilies = ["lastStockCheckLines", "recentOrderLines"];
-    internal static readonly string[] Families = [.. OriginalFamilies, "productAttributes", .. HistoryFamilies];
+    internal static readonly string[] Families = [.. OriginalFamilies, "productAttributes", .. HistoryFamilies, "lastCallLowLines"];
     private byte[] buffer = new byte[Math.Min(64 * 1024, maximumBufferBytes)];
     private int start, length;
     private bool final;
@@ -25,7 +25,7 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
         RequireToken(JsonTokenType.StartObject, ct);
         HashSet<string> seen = new(StringComparer.Ordinal);
         bool hasManifest = false;
-        bool requiresAttributes = false, requiresHistory = false;
+        bool requiresAttributes = false, requiresHistory = false, requiresLastCall = false;
         while (true)
         {
             var (token, name) = Token(ct);
@@ -41,6 +41,7 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
                 int minor = int.Parse(received.Version.Split('.')[1], CultureInfo.InvariantCulture);
                 requiresAttributes = minor >= 1;
                 requiresHistory = minor >= 3;
+                requiresLastCall = minor >= 4;
                 hasManifest = true;
             }
             else if (Families.Contains(name))
@@ -59,7 +60,8 @@ internal sealed class SnapshotDocumentReader(Stream input, int maximumBufferByte
         }
         if (!hasManifest || OriginalFamilies.Any(family => !seen.Contains(family))
             || (requiresAttributes && !seen.Contains("productAttributes"))
-            || (requiresHistory && HistoryFamilies.Any(family => !seen.Contains(family))))
+            || (requiresHistory && HistoryFamilies.Any(family => !seen.Contains(family)))
+            || (requiresLastCall && !seen.Contains("lastCallLowLines")))
             throw new InvalidDataException("The snapshot is missing a required field.");
         // Read to the end so the plain hash covers every byte.
         while (true)

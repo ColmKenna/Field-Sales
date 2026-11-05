@@ -3,6 +3,20 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-053 the last call's gaps on an order with no call (2026-11-04, developer, plan approval)
+
+The developer replied **Approved** to the WI-053 plan with the recommended D1–D7, then **Apply**. Full text in `WI-053.md`.
+
+- **Snapshot 1.4** adds one family, `LastCallLowLines`: each Location's most recent Call (any channel, by anyone), its Low products,
+  minus products on any received order there taken on or after the Call's date. "Ordered since" is worked out on the server.
+- **"Ordered since" (owner's ruling at the checkpoint, 2026-11-05):** "any order since the date" — every order at the Location dated
+  on or after the Call's date, whatever its status or route. No status filter on the server or the tablet.
+- **The tablet** also drops gaps on its own orders at the Location since the Call (except the order on screen, where they read ADDED),
+  and a newer unsynced Call at the Location replaces the snapshot's.
+- **Recording a Call from the Low tab** links the order to it on save and returns to order entry for that Call.
+- **Out of scope:** CAN'T ADD (E8), REPLACED (E10), customer online / chain orders until they exist.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-052 the Low tab in order entry (2026-11-04, developer, plan approval)
 
 The developer replied **Approved** to the WI-052 plan with the recommended D1–D9, then **Apply**. Full text in `WI-052.md`.

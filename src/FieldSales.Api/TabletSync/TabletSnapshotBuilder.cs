@@ -18,8 +18,9 @@ namespace FieldSales.Api.TabletSync;
 /// Locations come from T-3.1.1's resolver, never a copy of its rule. Product visibility uses
 /// <see cref="RestrictedProductVisibility"/> with the rep's current permissions, read in the same
 /// catalogue transaction as the products and their facts.
-/// The directory and catalogue are each read in one serializable transaction. The 1.3 history families (T-5.4.1) are read
-/// from received work afterwards and keep only the rep's Locations and the products included here.
+/// The directory and catalogue are each read in one serializable transaction. The 1.3 history families (T-5.4.1) and the 1.4
+/// last Call's gaps (T-5.1.5) are read from received work afterwards and keep only the rep's Locations and the products included
+/// here.
 /// </remarks>
 public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, CoverageOwnershipReader ownership,
     CatalogueDbContext catalogue, RestrictionPermissionReader permissions, OrderingDbContext ordering,
@@ -37,10 +38,47 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
         HashSet<Guid> included = [.. products.Select(product => product.Id)];
         SnapshotStockCheckLine[] lastChecks = await ReadLastStockChecksAsync(shops, included, ct);
         SnapshotRecentOrderLine[] recentOrders = await ReadRecentOrdersAsync(shops, included, ct);
+        SnapshotLastCallLowLine[] lastCallGaps = await ReadLastCallLowLinesAsync(shops, included, ct);
         var manifest = new SnapshotManifest(SnapshotContract.Schema, SnapshotContract.CurrentVersion, repSubject,
             builtUtc, buildDate, new(locations.Length, categories.Length, products.Length, prices.Length, attributes.Length,
-                lastChecks.Length, recentOrders.Length));
-        return new(manifest, locations, categories, products, prices, attributes, lastChecks, recentOrders);
+                lastChecks.Length, recentOrders.Length, lastCallGaps.Length));
+        return new(manifest, locations, categories, products, prices, attributes, lastChecks, recentOrders, lastCallGaps);
+    }
+
+    // The gaps each Location's most recent Call left (T-5.1.5): its Low products minus every product on any order at that
+    // Location taken on or after the Call's date, whatever the order's status ("any order since the date", WI-053).
+    private async Task<SnapshotLastCallLowLine[]> ReadLastCallLowLinesAsync(HashSet<Guid> shops, HashSet<Guid> included,
+        CancellationToken ct)
+    {
+        Guid[] locationIds = [.. shops];
+        // The most recent Call by the date it was made, then when it was saved; any channel, whoever recorded it.
+        Guid[] lastCallIds = await ordering.Calls.AsNoTracking()
+            .Where(call => locationIds.Contains(call.LocationId))
+            .GroupBy(call => call.LocationId)
+            .Select(group => group.OrderByDescending(call => call.CalledOn).ThenByDescending(call => call.SavedAt)
+                .ThenByDescending(call => call.Id).Select(call => call.Id).First())
+            .ToArrayAsync(ct);
+        var low = await (from entry in ordering.CallStockEntries.AsNoTracking()
+                         where lastCallIds.Contains(entry.CallId) && entry.Low
+                         join call in ordering.Calls on entry.CallId equals call.Id
+                         select new { call.LocationId, CallId = call.Id, call.CalledOn, entry.ProductId }).ToArrayAsync(ct);
+        low = [.. low.Where(line => included.Contains(line.ProductId))];
+        if (low.Length == 0) return [];
+        Guid[] gapCallIds = [.. low.Select(line => line.CallId).Distinct()];
+        Guid[] orderIds = await (from order in ordering.Orders.AsNoTracking()
+                                 join call in ordering.Calls on order.LocationId equals call.LocationId
+                                 where gapCallIds.Contains(call.Id) && order.TakenOn >= call.CalledOn
+                                 select order.Id).Distinct().ToArrayAsync(ct);
+        // An order's lines stay in its received body, as accepted from the tablet.
+        string[] bodies = await ordering.ReceivedWork.AsNoTracking().Where(item => orderIds.Contains(item.Id))
+            .Select(item => item.Body).ToArrayAsync(ct);
+        HashSet<(Guid LocationId, Guid ProductId)> ordered = [.. bodies
+            .Select(body => JsonSerializer.Deserialize(body, OrderJsonContext.Default.TabletOrder)!)
+            .SelectMany(order => order.Lines.Select(line => (order.LocationId, line.ProductId)))];
+        return [.. low.Where(line => !ordered.Contains((line.LocationId, line.ProductId)))
+            .Select(line => new SnapshotLastCallLowLine(line.LocationId, line.CallId, line.CalledOn, line.ProductId))
+            .Distinct()
+            .OrderBy(line => line.LocationId).ThenBy(line => line.ProductId)];
     }
 
     // Each Location's last Stock Check: its newest In-person Call with stock entries, whoever recorded it. Received Calls

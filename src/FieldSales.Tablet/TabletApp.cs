@@ -202,6 +202,15 @@ public sealed class TabletApp : IDisposable
 
     public TabletCall? ReadCall(string rep, Guid callId) => new CallStore(device.Workspace(rep), clock).Read(callId);
 
+    /// <summary>T-5.1.5 D5: a Call recorded from an order's Low tab was saved; the order is linked to it.</summary>
+    public OrderResult LinkOrderToCall(string rep, Guid orderId, Guid callId) =>
+        new OrderStore(device.Workspace(rep), clock).LinkToCall(orderId, callId);
+
+    /// <summary>T-5.1.5: the shop's last Call gaps still open, for an order with no Call; <paramref name="index"/> is the products
+    /// order entry already read, so the gaps come from the same downloaded day.</summary>
+    public CarriedLow? ReadCarriedLow(string rep, Guid locationId, Guid orderId, ProductSearchIndex index) =>
+        CarriedGaps.Read(device.Workspace(rep), locationId, orderId, index);
+
     // Changing an unsent order before Sync (T-5.2.1); OrderTransitions decides what each standing allows.
     public OrderView? ReadOrderView(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Read(orderId);
 

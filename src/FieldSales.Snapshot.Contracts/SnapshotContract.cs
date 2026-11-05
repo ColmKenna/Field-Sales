@@ -13,7 +13,7 @@ public static class SnapshotContract
 {
     public const string Schema = "field-sales-snapshot";
     public const int CurrentMajor = 1;
-    public const int CurrentMinor = 3;
+    public const int CurrentMinor = 4;
     public static string CurrentVersion => $"{CurrentMajor}.{CurrentMinor}";
 
     /// <summary>The majors this server can build, newest first.</summary>
@@ -60,7 +60,7 @@ public sealed record SnapshotManifest(string Schema, string Version, string RepS
     DateOnly BuildDate, SnapshotCounts Counts);
 
 public sealed record SnapshotCounts(int Locations, int Categories, int Products, int BasePrices,
-    int ProductAttributes = 0, int LastStockCheckLines = 0, int RecentOrderLines = 0);
+    int ProductAttributes = 0, int LastStockCheckLines = 0, int RecentOrderLines = 0, int LastCallLowLines = 0);
 
 /// <summary>Version 1 of the rep's Morning Snapshot.</summary>
 public sealed record TabletSnapshot(SnapshotManifest Manifest, IReadOnlyList<SnapshotLocation> Locations,
@@ -71,7 +71,9 @@ public sealed record TabletSnapshot(SnapshotManifest Manifest, IReadOnlyList<Sna
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     IReadOnlyList<SnapshotStockCheckLine>? LastStockCheckLines = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<SnapshotRecentOrderLine>? RecentOrderLines = null);
+    IReadOnlyList<SnapshotRecentOrderLine>? RecentOrderLines = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotLastCallLowLine>? LastCallLowLines = null);
 
 /// <summary>An assigned Location. Locations hold no address lines yet, so its address is Town and Eircode.</summary>
 public sealed record SnapshotLocation(Guid Id, string Name, Guid CustomerId, string CustomerName, SnapshotTown Town,
@@ -112,3 +114,10 @@ public sealed record SnapshotStockCheckLine(Guid LocationId, Guid ProductId);
 /// many orders count is a server setting (three by default). Orders not yet Accepted never contribute.</summary>
 /// <remarks>Rows name only included products and the rep's own Locations, so restricted products never appear.</remarks>
 public sealed record SnapshotRecentOrderLine(Guid LocationId, Guid ProductId);
+
+/// <summary>A product marked Low on a Location's most recent Call (any channel, whoever recorded it) and on no order at that
+/// Location taken on or after the Call's date, whatever the order's status, added in 1.4 (T-5.1.5). The tablet carries these
+/// gaps to a later order with no Call.</summary>
+/// <remarks>Rows name only included products and the rep's own Locations, so restricted products never appear. Every row for
+/// a Location names the same Call.</remarks>
+public sealed record SnapshotLastCallLowLine(Guid LocationId, Guid CallId, DateOnly CalledOn, Guid ProductId);

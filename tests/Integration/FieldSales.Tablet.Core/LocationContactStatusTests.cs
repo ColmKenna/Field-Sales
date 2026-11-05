@@ -43,7 +43,7 @@ public sealed class LocationContactStatusTests : IDisposable
         db.Open();
         using SqliteCommand schema = db.CreateCommand();
         schema.CommandText = "PRAGMA user_version";
-        Assert.Equal(3L, schema.ExecuteScalar()); // The current SQLite format; contact status needed no migration of its own.
+        Assert.Equal(4L, schema.ExecuteScalar()); // The current SQLite format; contact status needed no migration of its own.
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public sealed class LocationContactStatusTests : IDisposable
     [Fact]
     public void Should_KeepOriginalLocationFields_When_OldReaderReceivesVersion12Replacement()
     {
-        Assert.Equal("1.3", SnapshotContract.CurrentVersion); // 1.3 added stock history; the 1.2 fields are unchanged.
+        Assert.Equal("1.4", SnapshotContract.CurrentVersion); // 1.3 added stock history, 1.4 the last Call's gaps; the 1.2 fields are unchanged.
         TabletSnapshot snapshot = WithGap(Rathdrum());
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot, SnapshotContract.JsonOptions);
         using JsonDocument json = JsonDocument.Parse(bytes);
