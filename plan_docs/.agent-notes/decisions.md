@@ -9,6 +9,8 @@ The developer replied **Approved** to the WI-053 plan with the recommended D1–
 
 - **Snapshot 1.4** adds one family, `LastCallLowLines`: each Location's most recent Call (any channel, by anyone), its Low products,
   minus products on any received order there taken on or after the Call's date. "Ordered since" is worked out on the server.
+- **"Ordered since" (owner's ruling at the checkpoint, 2026-11-05):** "any order since the date" — every order at the Location dated
+  on or after the Call's date, whatever its status or route. No status filter on the server or the tablet.
 - **The tablet** also drops gaps on its own orders at the Location since the Call (except the order on screen, where they read ADDED),
   and a newer unsynced Call at the Location replaces the snapshot's.
 - **Recording a Call from the Low tab** links the order to it on save and returns to order entry for that Call.
