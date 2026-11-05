@@ -3,6 +3,17 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-056 follow-up calls (2026-11-05, developer, plan approval)
+
+The developer answered the WI-056 questions, replied **Approved** to the plan with D1–D8, then **Apply**. Full text in `WI-056.md`.
+
+- **The link:** a follow-up Call carries `followUpOf` (the Call it follows up); the server stores it. Version 1 of the Call contract.
+- **Current stock level:** one shared function, the latest count per product by the time the Call was saved; counted entries only.
+  No screen shows it yet.
+- **Suggested List:** a follow-up's products join its original's Stock Check; a follow-up never becomes the last check itself.
+- **Follow-up mode** starts with an empty stock section and is opened from Edit Call and the call page.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-055 correcting a saved call before it syncs (2026-11-05, developer, plan approval)
 
 The developer answered the WI-055 questions, replied **Approved** to the plan with D1–D8, then **Apply**. Full text in `WI-055.md`.

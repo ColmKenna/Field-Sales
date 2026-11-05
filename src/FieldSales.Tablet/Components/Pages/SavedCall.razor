@@ -4,7 +4,8 @@
 @using FieldSales.Calls.Contracts
 
 @* T-5.6.1 (US-015): a saved Call, read-only. Unsent, it offers Edit call (corrections before Sync) and Record a follow-up call; sent,
-   only the follow-up (S4). A Call is never deleted here. WI-075 brings sent calls a way in from the shop. *@
+   only the follow-up (S4). A Call is never deleted here. WI-075 brings sent calls a way in from the shop.
+   T-5.7.1 (WI-056 D3): Record a follow-up call opens the follow-up for this Call. *@
 <section class="saved-call">
     <nav class="shop-back" aria-label="Call navigation"><a href="@($"/locations/{Id}")">Back to shop</a></nav>
     @if (!Ready) { <h1>Call</h1><p role="status">Opening call…</p> }
@@ -43,7 +44,7 @@
                 }
                 @if (saved.Standing != CallStanding.NeedsAttention)
                 {
-                    <button type="button" class="secondary" @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/new"))">Record a follow-up call</button>
+                    <button type="button" class="secondary" @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/{CallId}/follow-up"))">Record a follow-up call</button>
                 }
             </div>
         </footer>

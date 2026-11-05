@@ -42,6 +42,9 @@ namespace FieldSales.Api.Ordering.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<Guid?>("FollowUpOf")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("LocationId")
                         .HasColumnType("uniqueidentifier");
 

@@ -28,6 +28,10 @@ public sealed class TabletApp
     public CallDrafts CallDrafts { get; } = new();
     public Func<string, Guid, Guid, CallContent, CallResult> SaveWork { get; set; } = (_, _, _, _) => new CallResult(null, "Not set up in this test.");
     public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content) => SaveWork(rep, callId, locationId, content);
+    public Func<string, Guid, Guid, CallContent, Guid, CallResult> FollowUpWork { get; set; } =
+        (_, _, _, _, _) => new CallResult(null, "Not set up in this test.");
+    public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content, Guid followUpOf) =>
+        FollowUpWork(rep, callId, locationId, content, followUpOf);
     public Func<string, Guid, Guid, TabletOrder?> FindCallOrder { get; set; } = (_, _, _) => null;
     public TabletOrder? ReadCallOrder(string rep, Guid callId, Guid locationId) => FindCallOrder(rep, callId, locationId);
     public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddFromCall { get; set; } =

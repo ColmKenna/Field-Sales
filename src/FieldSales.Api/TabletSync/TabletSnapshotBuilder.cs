@@ -81,23 +81,39 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
             .OrderBy(line => line.LocationId).ThenBy(line => line.ProductId)];
     }
 
-    // Each Location's last Stock Check: its newest In-person Call with stock entries, whoever recorded it. Received Calls
-    // never change and a Call's entries are stored with it, so a plain read sees whole Stock Checks.
+    // Each Location's last Stock Check: its newest In-person Call with stock entries that isn't a follow-up, whoever recorded it,
+    // joined by the products on its follow-ups and theirs, at the same Location (T-5.7.1 D5). A follow-up never becomes the last
+    // check itself. Received Calls never change and a Call's entries are stored with it, so a plain read sees whole Stock Checks.
     private async Task<SnapshotStockCheckLine[]> ReadLastStockChecksAsync(HashSet<Guid> shops, HashSet<Guid> included,
         CancellationToken ct)
     {
         Guid[] locationIds = [.. shops];
-        Guid[] lastCallIds = await ordering.Calls.AsNoTracking()
-            .Where(call => locationIds.Contains(call.LocationId) && call.Channel == CallChannel.InPerson && call.StockEntries.Any())
+        Dictionary<Guid, Guid> checks = await ordering.Calls.AsNoTracking()
+            .Where(call => locationIds.Contains(call.LocationId) && call.Channel == CallChannel.InPerson && call.FollowUpOf == null
+                && call.StockEntries.Any())
             .GroupBy(call => call.LocationId)
-            .Select(group => group.OrderByDescending(call => call.SavedAt).ThenByDescending(call => call.Id).Select(call => call.Id).First())
-            .ToArrayAsync(ct);
+            .Select(group => group.OrderByDescending(call => call.SavedAt).ThenByDescending(call => call.Id)
+                .Select(call => new { call.Id, call.LocationId }).First())
+            .ToDictionaryAsync(call => call.Id, call => call.LocationId, ct);
+        // Follow the links outward, one generation at a time; a Call already in a check is never visited again.
+        Guid[] frontier = [.. checks.Keys];
+        while (frontier.Length > 0)
+        {
+            var followUps = await ordering.Calls.AsNoTracking()
+                .Where(call => call.FollowUpOf != null && frontier.Contains(call.FollowUpOf.Value))
+                .Select(call => new { call.Id, call.LocationId, Original = call.FollowUpOf!.Value }).ToArrayAsync(ct);
+            frontier = [.. followUps
+                .Where(call => checks[call.Original] == call.LocationId && checks.TryAdd(call.Id, call.LocationId))
+                .Select(call => call.Id)];
+        }
+        Guid[] callIds = [.. checks.Keys];
         var lines = await (from entry in ordering.CallStockEntries.AsNoTracking()
-                           where lastCallIds.Contains(entry.CallId)
+                           where callIds.Contains(entry.CallId)
                            join call in ordering.Calls on entry.CallId equals call.Id
                            select new { call.LocationId, entry.ProductId }).ToArrayAsync(ct);
         return [.. lines.Where(line => included.Contains(line.ProductId))
             .Select(line => new SnapshotStockCheckLine(line.LocationId, line.ProductId))
+            .Distinct()
             .OrderBy(line => line.LocationId).ThenBy(line => line.ProductId)];
     }
 

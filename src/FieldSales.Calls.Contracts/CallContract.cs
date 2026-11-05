@@ -81,10 +81,13 @@ public sealed record CallSnapshotRef(string Version, DateTimeOffset BuiltUtc);
 /// <param name="StockEntries">In person, the Stock Check (T-5.4.1): one entry per product kept on the list, counted or Not
 /// checked. On Phone, Stock mentioned (T-5.3.2): only the products marked Low or Out or given a count. Absent when there are
 /// none.</param>
+/// <param name="FollowUpOf">The earlier Call at the same Location this one follows up (T-5.7.1): what was forgotten or done later,
+/// recorded as a new Call instead of rewriting the original. Absent on a Call that follows nothing up.</param>
 public sealed record TabletCall(string Schema, int Version, Guid Id, Guid LocationId, string CapturingRep, DateOnly CalledOn,
     DateTimeOffset SavedAt, CallChannel Channel, CallSnapshotRef Snapshot,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? PitchNotes = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<CallStockEntry>? StockEntries = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<CallStockEntry>? StockEntries = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? FollowUpOf = null)
 {
     /// <summary>What the Call records, for the same checks and summary the tablet used before saving.</summary>
     [JsonIgnore]

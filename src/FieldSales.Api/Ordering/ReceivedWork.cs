@@ -73,12 +73,15 @@ public sealed class ReceivedCall
     public DateTimeOffset SavedAt { get; private set; }
     public CallChannel Channel { get; private set; }
     public DateTimeOffset ReceivedUtc { get; private set; }
+    /// <summary>The earlier Call this one follows up (T-5.7.1), as the tablet sent it. That Call may arrive later in the same
+    /// Sync, or not at all, so it isn't a foreign key.</summary>
+    public Guid? FollowUpOf { get; private set; }
     public List<ReceivedCallStockEntry> StockEntries { get; private set; } = [];
 
     public static ReceivedCall From(TabletCall call, DateTimeOffset receivedUtc) => new()
     {
         Id = call.Id, LocationId = call.LocationId, CapturingRep = call.CapturingRep, CalledOn = call.CalledOn,
-        SavedAt = call.SavedAt, Channel = call.Channel, ReceivedUtc = receivedUtc.ToUniversalTime(),
+        SavedAt = call.SavedAt, Channel = call.Channel, ReceivedUtc = receivedUtc.ToUniversalTime(), FollowUpOf = call.FollowUpOf,
         StockEntries = [.. (call.StockEntries ?? []).Select(entry => new ReceivedCallStockEntry(call.Id, entry))]
     };
 }

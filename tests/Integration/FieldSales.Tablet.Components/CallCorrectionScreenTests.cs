@@ -198,15 +198,15 @@ public sealed partial class TabletSessionScreenTests
         Assert.Equal([$"/locations/{MurphysId}/calls/{MurphysCall}/edit"], page.Navigation.Destinations);
     }
 
-    // Scenario 8 (D3): until WI-056 links it, the follow-up is a new Call at the shop.
+    // Scenario 8 (D3), amended by WI-056 scenario 6 (T-5.7.1 D3): Edit Call opens the follow-up for the Call being corrected.
     [Fact]
-    public async Task Should_OpenRecordCallAtTheShop_When_RecordAFollowUpCallIsTapped()
+    public async Task Should_OpenTheFollowUpForThatCall_When_RecordAFollowUpCallIsTappedInEditCall()
     {
         await using Screen screen = await EditCallAsync(CountedAtMurphys, new());
 
         await screen.Click("Record a follow-up call");
 
-        Assert.Equal([$"/locations/{MurphysId}/calls/new"], screen.Navigation.Destinations);
+        Assert.Equal([$"/locations/{MurphysId}/calls/{MurphysCall}/follow-up"], screen.Navigation.Destinations);
     }
 
     // Scenario 9 (edge): a Call can't be deleted.
