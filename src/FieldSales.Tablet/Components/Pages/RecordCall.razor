@@ -1,5 +1,6 @@
 @page "/locations/{Id:guid}/calls/new"
 @page "/locations/{Id:guid}/orders/{OrderId:guid}/calls/new"
+@page "/locations/{Id:guid}/calls/{CallId:guid}/edit"
 @inherits OfflineCataloguePage
 @using FieldSales.Calls.Contracts
 @using FieldSales.Ordering.Contracts
@@ -10,19 +11,23 @@
    mentioned" (T-5.3.2, T6.5). A Low item goes on the shop's order through the quantity popover (T-5.5.1, T7.7). Competitor
    notes and campaign outcomes join this page with their own items.
    T-5.1.5 D5: opened from an order's Low tab (the orders/{OrderId} route), saving links that order to this Call and returns to
-   order entry for it; Back returns to the order. *@
+   order entry for it; Back returns to the order.
+   T-5.6.1 (US-015): the calls/{CallId}/edit route is Edit Call, for a saved Call before Sync. It changes and removes what was
+   recorded and never adds: no Add product, catalogue search, Add count, count on a Not checked row, new pitch notes, Add to order or
+   Open order, and no Delete. "Record a follow-up call" stands where adding would be (WI-055 D2, D3). *@
 <section class="record-call">
     <nav class="shop-back" aria-label="Call navigation">
-        <a href="@BackHref" @onclick="BackToShop" @onclick:preventDefault="true">@(OrderId is null ? "Back to shop" : "Back to order")</a>
+        <a href="@BackHref" @onclick="BackToShop" @onclick:preventDefault="true">@BackLabel</a>
     </nav>
     @if (!Ready) { <h1>Record call</h1><p role="status">Opening call…</p> }
-    else if (problem is not null) { <h1>Record call unavailable</h1><p role="alert">@problem</p> }
-    else if (detail is not { IsAssigned: true }) { <h1>Record call unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
+    else if (problem is not null) { <h1>@(Editing ? "Edit call unavailable" : "Record call unavailable")</h1><p role="alert">@problem</p> }
+    else if (Editing && original is null) { <h1>Edit call unavailable</h1><p role="alert">@CallStore.NotOnTablet</p> }
+    else if (!Editing && detail is not { IsAssigned: true }) { <h1>Record call unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
     else
     {
         <header class="order-header">
-            <h1>Record call</h1>
-            <p class="order-shop">@detail.Location.Name</p>
+            <h1>@(Editing ? "Edit call" : "Record call")</h1>
+            <p class="order-shop">@(detail?.Location.Name ?? "Shop details unavailable")</p>
         </header>
         <fieldset class="call-channel">
             <legend>How</legend>
@@ -33,6 +38,12 @@
             }
         </fieldset>
         @StockCheck
+        @if (Editing && !hadNotes)
+        {
+            <section class="call-section"><div class="order-actions">@FollowUp</div></section>
+        }
+        else
+        {
         <section class="call-section">
             <h2 class="call-section-heading">
                 <button type="button" class="section-header" aria-expanded="@(draft.NotesOpen ? "true" : "false")" aria-controls="pitch-notes-body"
@@ -47,6 +58,7 @@
                 </div>
             }
         </section>
+        }
         @if (message is not null) { <p class="problem" role="alert">@message</p> }
         @if (ordering is { } product)
         {
@@ -56,7 +68,7 @@
         @if (reviewing)
         {
             <section class="call-review" role="dialog" aria-modal="true" aria-labelledby="call-review-heading">
-                <h2 id="call-review-heading">Save this call?</h2>
+                <h2 id="call-review-heading">@(Editing ? "Save changes?" : "Save this call?")</h2>
                 <p class="call-summary">@draft.Content.Summary</p>
                 <div class="order-actions">
                     <button type="button" class="secondary" disabled="@busy" @onclick="() => reviewing = false">Back</button>
@@ -67,7 +79,7 @@
         @if (leaving)
         {
             <section class="order-confirm" role="alertdialog" aria-labelledby="call-leave-question">
-                <p id="call-leave-question" class="confirm-question"><strong>Leave without saving this call?</strong></p>
+                <p id="call-leave-question" class="confirm-question"><strong>@(Editing ? "Leave without saving these changes?" : "Leave without saving this call?")</strong></p>
                 @if (draft.AddedToOrder) { <p>Lines added to the order stay on it.</p> }
                 <div class="order-actions">
                     <button type="button" class="danger" @onclick="Leave">Leave</button>
@@ -79,7 +91,7 @@
         {
             <footer class="order-footer">
                 <div class="order-actions">
-                    <button type="button" class="secondary" disabled="@busy" @onclick="OpenOrder">Open order</button>
+                    @if (!Editing) { <button type="button" class="secondary" disabled="@busy" @onclick="OpenOrder">Open order</button> }
                     <button type="button" class="primary" disabled="@busy" @onclick="Review">Review and save</button>
                 </div>
             </footer>
@@ -91,6 +103,14 @@
     [Parameter] public Guid Id { get; set; }
     /// <summary>The order whose Low tab opened this page (T-5.1.5 D5): saving links it to the Call, and Back returns to it.</summary>
     [Parameter] public Guid? OrderId { get; set; }
+    /// <summary>The saved Call Edit Call corrects (T-5.6.1); absent when recording a new Call.</summary>
+    [Parameter] public Guid? CallId { get; set; }
+
+    private bool Editing => CallId is not null;
+    // T-5.6.1: the saved Call as it was, what it recorded (which lines had a count, whether it had notes) and whether it can change.
+    private TabletCall? original;
+    private HashSet<Guid> countedBefore = [];
+    private bool hadNotes;
 
     private string? rep;
     private OfflineLocationDetail? detail;
@@ -117,18 +137,21 @@
     private static CallDraft New() => new(Guid.NewGuid(), null, "", false);
 
     // Back returns to the shop, or to the order this page was opened from; an order with no lines yet isn't saved, so a new one.
-    private string BackHref => OrderId is not { } from ? $"/locations/{Id}"
+    private string BackLabel => Editing ? "Back to call" : OrderId is null ? "Back to shop" : "Back to order";
+
+    private string BackHref => Editing ? $"/locations/{Id}/calls/{CallId}" : OrderId is not { } from ? $"/locations/{Id}"
         : callOrder?.Id == from ? $"/locations/{Id}/orders/{from}" : $"/locations/{Id}/orders/new";
 
     protected override void Clear()
     {
         rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
         start = StockCheckStart.Empty; CloseAdding(); filter = ""; filterFound = new([], 0); ++filterRevision;
-        callOrder = null; ordering = null; orderError = null;
+        callOrder = null; ordering = null; orderError = null; original = null; countedBefore = []; hadNotes = false;
     }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
     {
+        if (CallId is Guid editing) { await ReadEditAsync(repSubject, isCurrent, editing); return; }
         Guid shop = Id;
         Guid? orderFrom = OrderId;
         try
@@ -160,11 +183,53 @@
         }
     }
 
+    // T-5.6.1: Edit Call opens the saved Call (or the correction kept across a resume). Only an unsent Call no upload has claimed can
+    // change (D5); a correction is judged as captured, so the shop needn't still be assigned.
+    private async Task ReadEditAsync(string repSubject, Func<bool> isCurrent, Guid callId)
+    {
+        Guid shop = Id;
+        try
+        {
+            OfflineLocationDetail? read = null;
+            CallView? saved = null;
+            ProductSearchIndex? products = null;
+            await Task.Run(() =>
+            {
+                read = Tablet.ReadLocation(repSubject, shop);
+                saved = Tablet.ReadCallView(repSubject, callId);
+                products = Tablet.ReadProductIndex(repSubject);
+            });
+            if (!isCurrent()) return;
+            rep = repSubject; detail = read;
+            if (saved is null || saved.Call.LocationId != shop) return;
+            if (!saved.CanCorrect)
+            {
+                problem = saved.Standing switch
+                {
+                    CallStanding.Sending => CallStore.BeingSent,
+                    CallStanding.Sent => CallStore.AlreadySent,
+                    _ => CallStore.NotCorrectable
+                };
+                return;
+            }
+            original = saved.Call;
+            countedBefore = [.. (original.StockEntries ?? []).Where(entry => entry.Count is not null).Select(entry => entry.ProductId)];
+            hadNotes = original.PitchNotes is not null;
+            draft = Tablet.CallDrafts.ReadEdit(repSubject, Tablet.SessionVersion, callId) ?? FromCall(original, products!);
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (isCurrent()) problem = "This call couldn't be opened. Your saved work is still on this tablet.";
+        }
+    }
+
     private void Change(CallDraft changed)
     {
         draft = changed;
         message = null;
-        if (rep is not null) Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, draft);
+        if (rep is null) return;
+        if (Editing) Tablet.CallDrafts.KeepEdit(rep, Tablet.SessionVersion, draft);
+        else Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, draft);
     }
 
     private void Choose(CallChannel channel) { if (!busy) Change(draft with { Channel = channel }); }
@@ -177,7 +242,7 @@
     private void Review()
     {
         if (busy) return;
-        message = draft.Problem;
+        message = (Editing ? Uncounted : null) ?? draft.Problem;
         reviewing = message is null;
     }
 
@@ -189,18 +254,26 @@
         Guid shop = Id;
         CallDraft saving = draft;
         Guid? orderFrom = OrderId;
+        bool editing = Editing;
         long version = Tablet.SessionVersion;
         try
         {
             OrderResult? link = null;
             CallResult result = await Task.Run(() =>
             {
+                if (editing) return Tablet.CorrectCall(repSubject, saving.CallId, shop, saving.Content);
                 CallResult saved = Tablet.SaveCall(repSubject, saving.CallId, shop, saving.Content);
                 // T-5.1.5 D5: the order whose Low tab opened this Call is linked to it once the Call is saved.
                 if (saved.Succeeded && orderFrom is { } from) link = Tablet.LinkOrderToCall(repSubject, from, saving.CallId);
                 return saved;
             });
             if (version != Tablet.SessionVersion || shop != Id) return;
+            if (result.Succeeded && editing)
+            {
+                Tablet.CallDrafts.Corrected(repSubject, version, saving.CallId);
+                Navigation.NavigateTo($"/locations/{shop}/calls/{saving.CallId}");
+                return;
+            }
             if (result.Succeeded)
             {
                 Tablet.CallDrafts.Saved(repSubject, version, shop);
@@ -229,13 +302,14 @@
         <header class="stock-check-header">
             <h2 id="stock-check-heading" class="call-section-heading">@(draft.Mentioning ? "Stock mentioned" : "Stock check")</h2>
             @if (draft.StockSummary.Length > 0) { <span class="stock-summary">@draft.StockSummary</span> }
-            @if (!draft.Mentioning)
+            @if (Editing) { @FollowUp }
+            else if (!draft.Mentioning)
             {
                 <button type="button" class="secondary" aria-expanded="@(adding ? "true" : "false")" disabled="@busy"
                         @onclick="ToggleAdding">Add product</button>
             }
         </header>
-        @if (adding && !draft.Mentioning) { @AddProduct }
+        @if (adding && !draft.Mentioning && !Editing) { @AddProduct }
         @if (draft.Mentioning) { @FilterOrSearch }
         @if (draft.Lines.Count == 0) { <p class="stock-empty">@SuggestedList.Empty</p> }
         else if (Shown.Count > 0)
@@ -252,6 +326,12 @@
                         else
                         {
                         <div class="stock-count">
+                            @if (Editing && !countedBefore.Contains(line.Product.Id))
+                            {
+                                <span class="stock-not-checked">not checked</span>
+                            }
+                            else
+                            {
                             <button type="button" class="stepper" aria-label="@($"Less {line.Product.Name}")" disabled="@busy"
                                     @onclick="() => Step(line, -1)">−</button>
                             <input id="@($"count-{line.Product.Id}")" class="count-input" inputmode="decimal" autocomplete="off"
@@ -260,6 +340,7 @@
                             <button type="button" class="stepper" aria-label="@($"More {line.Product.Name}")" disabled="@busy"
                                     @onclick="() => Step(line, 1)">+</button>
                             @if (line.Product.Unit != "Each") { <span class="count-unit">@line.Product.Unit</span> }
+                            }
                             <button type="button" class="secondary stock-remove" aria-label="@($"Remove {line.Product.Name}")"
                                     disabled="@busy" @onclick="() => Remove(line)">Remove</button>
                         </div>
@@ -267,7 +348,7 @@
                             <button type="button" class="mark-option" aria-pressed="@(line.Low ? "true" : "false")"
                                     aria-label="@($"Low {line.Product.Name}")" disabled="@busy"
                                     @onclick="() => ChangeLine(line, row => row.Tick())">Low</button>
-                            @if (line.Low) { @ToOrder(line) }
+                            @if (line.Low && !Editing) { @ToOrder(line) }
                         </div>
                         }
                         @if (line.Problem is { } countProblem) { <p class="problem" role="alert">@countProblem</p> }
@@ -287,7 +368,11 @@
             <label for="stock-filter">Filter or search</label>
             <input id="stock-filter" type="search" value="@filter" @oninput="FilterAsync" autocomplete="off" disabled="@busy" />
         </div>
-        @if (!string.IsNullOrWhiteSpace(filter) && Shown.Count == 0)
+        @if (Editing && !string.IsNullOrWhiteSpace(filter) && Shown.Count == 0)
+        {
+            <p role="status">Nothing on this call matches '@filter.Trim()'</p>
+        }
+        else if (!string.IsNullOrWhiteSpace(filter) && Shown.Count == 0)
         {
             <div role="status" aria-live="polite">
                 @if (filterFound.Total == 0) { <p>No products match '@filter.Trim()'</p> }
@@ -308,10 +393,13 @@
     private RenderFragment Mentioned(StockLine line) => @<div class="stock-marks">
         <button type="button" class="mark-option" aria-pressed="@(line.Low ? "true" : "false")" aria-label="@($"Low {line.Product.Name}")"
                 disabled="@busy" @onclick="() => ChangeLine(line, row => row.ToggleLow())">Low</button>
+        @if (!Editing || countedBefore.Contains(line.Product.Id))
+        {
         <button type="button" class="mark-option" aria-pressed="@(line.Out ? "true" : "false")" aria-label="@($"Out {line.Product.Name}")"
                 disabled="@busy" @onclick="() => ChangeLine(line, row => row.ToggleOut())">Out</button>
-        @ToOrder(line)
-        @if (line.CountShown)
+        }
+        @if (!Editing) { @ToOrder(line) }
+        @if (Editing ? countedBefore.Contains(line.Product.Id) : line.CountShown)
         {
             <input id="@($"count-{line.Product.Id}")" class="count-input" inputmode="decimal" autocomplete="off"
                    aria-label="@($"Count for {line.Product.Name}")" placeholder="count" value="@line.Count"
@@ -320,8 +408,16 @@
         }
         else
         {
+            @if (!Editing)
+            {
             <button type="button" class="secondary" aria-label="@($"Add count for {line.Product.Name}")" disabled="@busy"
                     @onclick="() => ChangeLine(line, row => row.OpenCount())">Add count</button>
+            }
+        }
+        @if (Editing)
+        {
+            <button type="button" class="secondary stock-remove" aria-label="@($"Remove {line.Product.Name}")"
+                    disabled="@busy" @onclick="() => Remove(line)">Remove</button>
         }
     </div>;
 
@@ -531,13 +627,39 @@
     private void BackToShop()
     {
         if (busy) return;
-        if (draft.HasWork) { leaving = true; reviewing = false; return; }
+        if (Editing ? !Unchanged : draft.HasWork) { leaving = true; reviewing = false; return; }
         Leave();
     }
 
     private void Leave()
     {
-        if (rep is not null) Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, null);
+        if (rep is not null)
+        {
+            if (Editing) Tablet.CallDrafts.KeepEdit(rep, Tablet.SessionVersion, null);
+            else Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, null);
+        }
         Navigation.NavigateTo(BackHref);
     }
+
+    // T-5.6.1 (D3): until WI-056 links it, the follow-up is a new Call at the shop.
+    private RenderFragment FollowUp => @<button type="button" class="secondary" disabled="@busy"
+        @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/new"))">Record a follow-up call</button>;
+
+    /// <summary>T-5.6.1: the saved Call as Edit Call starts it — its channel, notes and lines, each with what it recorded.</summary>
+    private static CallDraft FromCall(TabletCall call, ProductSearchIndex products) => new(call.Id, call.Channel, call.PitchNotes ?? "",
+        call.PitchNotes is not null,
+        [.. (call.StockEntries ?? []).Select(entry => new StockLine(
+            products.Find(entry.ProductId) ?? new ProductSearchResult(entry.ProductId, entry.ProductCode, entry.ProductName, "", entry.Unit, null),
+            SuggestionSources.None,
+            entry.Count?.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture) ?? "", entry.Low))]);
+
+    /// <summary>A correction can't clear a count (D2): Remove drops the line instead.</summary>
+    private string? Uncounted => draft.Saved.FirstOrDefault(line => countedBefore.Contains(line.Product.Id) && !line.Counted) is { } line
+        ? $"Enter a count for {line.Product.Name}, or remove it." : null;
+
+    /// <summary>Whether Edit Call still holds what the Call recorded, so Back needn't ask.</summary>
+    private bool Unchanged => original is { } call && draft.Channel == call.Channel
+        && draft.Content.Notes == call.PitchNotes
+        && draft.Saved.Select(line => (line.Product.Id, line.Entry.Count, line.Low))
+            .SequenceEqual((call.StockEntries ?? []).Select(entry => (entry.ProductId, entry.Count, entry.Low)));
 }

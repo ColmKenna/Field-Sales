@@ -10,6 +10,8 @@ public enum UnsentSection { NeedsAttention, ReadyToSend, InProgress, Other }
 public sealed record UnsentView(UnsentItem Item, string LocationName, TabletOrder? Order, string? CallChannel)
 {
     public IReadOnlySet<Guid> MissingProductIds { get; init; } = new HashSet<Guid>();
+    /// <summary>The shop the item is for, when its body names one (a Call's page is reached through it, T-5.6.1).</summary>
+    public Guid? LocationId { get; init; }
     public string KindLabel => Item.Kind == UnsentKind.ScheduleChange ? "Schedule change" : Item.Kind.ToString();
     public UnsentSection Section
     {
@@ -45,17 +47,19 @@ public sealed partial class UnsentStore
         {
             using JsonDocument body = JsonDocument.Parse(item.Json);
             JsonElement root = body.RootElement;
-            string location = root.TryGetProperty("locationId", out JsonElement shop) && shop.ValueKind == JsonValueKind.String
-                && shop.TryGetGuid(out Guid locationId)
-                ? snapshot?.ReadLocation(locationId)?.Location.Name ?? "Shop details unavailable" : "Shop details unavailable";
+            Guid? locationId = root.TryGetProperty("locationId", out JsonElement shop) && shop.ValueKind == JsonValueKind.String
+                && shop.TryGetGuid(out Guid id) ? id : null;
+            string location = locationId is Guid known
+                ? snapshot?.ReadLocation(known)?.Location.Name ?? "Shop details unavailable" : "Shop details unavailable";
             string? channel = item.Kind == UnsentKind.Call && root.TryGetProperty("channel", out JsonElement value)
                 && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
             // A recorded Call names its channel as the rep reads it; an older body keeps whatever it held.
-            if (Enum.TryParse(channel, out CallChannel known)) channel = CallContract.Label(known);
+            if (Enum.TryParse(channel, out CallChannel recorded)) channel = CallContract.Label(recorded);
             TabletOrder? order = OrderStore.Parse(item);
             if (order is not null && order.Lines.Any(line => line is null || line.Price is null)) order = null;
             return new UnsentView(item, location, order, channel)
             {
+                LocationId = locationId,
                 MissingProductIds = order?.Lines.Where(line => !productIds.Contains(line.ProductId))
                     .Select(line => line.ProductId).ToHashSet() ?? []
             };
