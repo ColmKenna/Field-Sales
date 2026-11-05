@@ -230,6 +230,13 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .mark-option { min-width: 72px; background: var(--surface); color: var(--brand); border-width: 2px; }
 .mark-option[aria-pressed="true"] { background: var(--brand); color: #fff; }
 .mark-option[aria-pressed="true"]::before { content: "\2713\00a0"; }
+/* T-5.8.1 Competitor notes: each note a block; its link type and picks as toggles. */
+.competitor-note { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.note-link-type { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
+.note-link-type legend { padding: 0; margin-bottom: 4px; }
+.note-picker { display: flex; flex-direction: column; gap: 8px; }
+.note-picker-heading, .note-link { margin: 0; color: var(--muted); }
+.note-picks { display: flex; flex-wrap: wrap; gap: 8px; }
 .stock-on-order { display: inline-flex; align-items: center; min-height: 56px; padding: 0 12px; color: var(--brand); font-weight: 600; }
 /* T-07 order entry tabs (T-5.1.4, T7.1) and the Low tab: each item marked Low on the Call, with one state. */
 .order-tabs { display: flex; gap: 8px; margin: 8px 0 16px; border-bottom: 1px solid var(--line); }

@@ -18,7 +18,9 @@
    Open order, and no Delete. "Record a follow-up call" stands where adding would be (WI-055 D2, D3).
    T-5.7.1 (US-016): the calls/{FollowUpOf}/follow-up route records a follow-up: a new Call at the shop, linked to the one it follows
    up, with its own channel (none chosen) and an empty stock section; notes, Add to order and Open order as for a new Call. Its draft
-   is kept apart, so a Call being recorded at the shop isn't lost (WI-056 D2). *@
+   is kept apart, so a Call being recorded at the shop isn't lost (WI-056 D2).
+   T-5.8.1 (US-018): a collapsed Competitor notes section, each note with one link type (WI-057 D3-D5). Edit Call changes a note's
+   text and removes notes, never adds one or changes its links (D6). *@
 <section class="record-call">
     <nav class="shop-back" aria-label="Call navigation">
         <a href="@BackHref" @onclick="BackToShop" @onclick:preventDefault="true">@BackLabel</a>
@@ -68,6 +70,7 @@
             }
         </section>
         }
+        @if (!Editing || hadCompetitorNotes) { @CompetitorNotes }
         @if (message is not null) { <p class="problem" role="alert">@message</p> }
         @if (ordering is { } product)
         {
@@ -130,6 +133,11 @@
     private TabletCall? original;
     private HashSet<Guid> countedBefore = [];
     private bool hadNotes;
+    private bool hadCompetitorNotes;
+    // T-5.8.1: a link-type switch waiting for the rep to confirm it (D5), and each note's product and category search as typed.
+    private (Guid Note, CompetitorLinkType To)? switching;
+    private readonly Dictionary<Guid, string> productSearch = [];
+    private readonly Dictionary<Guid, string> categorySearch = [];
 
     private string? rep;
     private OfflineLocationDetail? detail;
@@ -166,6 +174,7 @@
         rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
         start = StockCheckStart.Empty; CloseAdding(); filter = ""; filterFound = new([], 0); ++filterRevision;
         callOrder = null; ordering = null; orderError = null; original = null; countedBefore = []; hadNotes = false; followed = null;
+        hadCompetitorNotes = false; switching = null; productSearch.Clear(); categorySearch.Clear();
     }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
@@ -241,6 +250,7 @@
             original = saved.Call;
             countedBefore = [.. (original.StockEntries ?? []).Where(entry => entry.Count is not null).Select(entry => entry.ProductId)];
             hadNotes = original.PitchNotes is not null;
+            hadCompetitorNotes = original.CompetitorNotes is { Count: > 0 };
             draft = Tablet.CallDrafts.ReadEdit(repSubject, Tablet.SessionVersion, callId) ?? FromCall(original, products!);
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
@@ -683,13 +693,15 @@
     private RenderFragment FollowUp => @<button type="button" class="secondary" disabled="@busy"
         @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/{CallId}/follow-up"))">Record a follow-up call</button>;
 
-    /// <summary>T-5.6.1: the saved Call as Edit Call starts it — its channel, notes and lines, each with what it recorded.</summary>
+    /// <summary>T-5.6.1: the saved Call as Edit Call starts it — its channel, notes and lines, each with what it recorded, and its
+    /// Competitor Notes (T-5.8.1).</summary>
     private static CallDraft FromCall(TabletCall call, ProductSearchIndex products) => new(call.Id, call.Channel, call.PitchNotes ?? "",
         call.PitchNotes is not null,
         [.. (call.StockEntries ?? []).Select(entry => new StockLine(
             products.Find(entry.ProductId) ?? new ProductSearchResult(entry.ProductId, entry.ProductCode, entry.ProductName, "", entry.Unit, null),
             SuggestionSources.None,
-            entry.Count?.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture) ?? "", entry.Low))]);
+            entry.Count?.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture) ?? "", entry.Low))],
+        CompetitorNotes: call.CompetitorNotes, CompetitorOpen: call.CompetitorNotes is { Count: > 0 });
 
     /// <summary>A correction can't clear a count (D2): Remove drops the line instead.</summary>
     private string? Uncounted => draft.Saved.FirstOrDefault(line => countedBefore.Contains(line.Product.Id) && !line.Counted) is { } line
@@ -699,5 +711,164 @@
     private bool Unchanged => original is { } call && draft.Channel == call.Channel
         && draft.Content.Notes == call.PitchNotes
         && draft.Saved.Select(line => (line.Product.Id, line.Entry.Count, line.Low))
-            .SequenceEqual((call.StockEntries ?? []).Select(entry => (entry.ProductId, entry.Count, entry.Low)));
+            .SequenceEqual((call.StockEntries ?? []).Select(entry => (entry.ProductId, entry.Count, entry.Low)))
+        && (draft.Content.SavedNotes ?? []).Select(note => (note.Id, note.Text))
+            .SequenceEqual((call.CompetitorNotes ?? []).Select(note => (note.Id, note.Text)));
+
+    /// <summary>T-5.8.1: the collapsed Competitor notes section (D3), its header counting the notes. In Edit Call each note's text
+    /// can change and it can be removed; its links read as saved and no note can be added (D6).</summary>
+    private RenderFragment CompetitorNotes => @<section class="call-section competitor-notes">
+        <h2 class="call-section-heading">
+            <button type="button" class="section-header" aria-expanded="@(draft.CompetitorOpen ? "true" : "false")"
+                    aria-controls="competitor-notes-body" @onclick="ToggleCompetitor">Competitor notes@(draft.Competitor.Count > 0 ? $" ({draft.Competitor.Count})" : "")</button>
+        </h2>
+        @if (draft.CompetitorOpen)
+        {
+            <div id="competitor-notes-body" class="call-section-body">
+                @for (int index = 0; index < draft.Competitor.Count; index++) { @NoteEditor(draft.Competitor[index], index + 1) }
+                @if (!Editing)
+                {
+                    <div class="order-actions"><button type="button" class="secondary" disabled="@busy" @onclick="AddNote">Add competitor note</button></div>
+                }
+            </div>
+        }
+    </section>;
+
+    private RenderFragment NoteEditor(CallCompetitorNote note, int number) => @<div class="competitor-note" @key="note.Id">
+        <label for="@($"competitor-note-{number}")">What did you see?</label>
+        <textarea id="@($"competitor-note-{number}")" rows="3" maxlength="@CallCompetitorNote.MaximumTextLength" value="@note.Text"
+                  disabled="@busy" @oninput="args => NoteTextChanged(note, args)"></textarea>
+        @if (Editing) { <p class="note-link">Linked to: @note.LinkLabel</p> }
+        else
+        {
+            <fieldset class="note-link-type">
+                <legend>Link to</legend>
+                @foreach (CompetitorLinkType type in Enum.GetValues<CompetitorLinkType>())
+                {
+                    <button type="button" class="mark-option" aria-pressed="@(note.LinkTo == type ? "true" : "false")" disabled="@busy"
+                            aria-label="@($"Link note {number} to {type}")" @onclick="() => ChooseLink(note, type)">@type</button>
+                }
+            </fieldset>
+            @if (switching is { } pending && pending.Note == note.Id)
+            {
+                <section class="order-confirm" role="alertdialog" aria-labelledby="@($"note-switch-{number}")">
+                    <p id="@($"note-switch-{number}")" class="confirm-question"><strong>@CompetitorNoteDrafts.SwitchWarning(note)</strong></p>
+                    <div class="order-actions">
+                        <button type="button" class="danger" @onclick="ConfirmSwitch">Switch</button>
+                        <button type="button" class="secondary" @onclick="() => switching = null">Cancel</button>
+                    </div>
+                </section>
+            }
+            @if (note.LinkTo == CompetitorLinkType.Products) { @ProductPicker(note, number) }
+            else if (note.LinkTo == CompetitorLinkType.Category) { @CategoryPicker(note, number) }
+            else if (note.LinkTo == CompetitorLinkType.Range) { <p class="stock-empty">@CompetitorNoteDrafts.NoRanges</p> }
+        }
+        <div class="order-actions">
+            <button type="button" class="secondary" aria-label="@($"Remove note {number}")" disabled="@busy" @onclick="() => RemoveNote(note)">Remove note</button>
+        </div>
+    </div>;
+
+    /// <summary>D4: this Call's counted and Low products first, then any other product linked, then a search of every downloaded
+    /// product (restricted products are never downloaded).</summary>
+    private RenderFragment ProductPicker(CallCompetitorNote note, int number)
+    {
+        IReadOnlyList<ProductSearchResult> fromCall = CompetitorNoteDrafts.FromThisCall(draft.Lines);
+        HashSet<Guid> shown = [.. fromCall.Select(product => product.Id)];
+        ProductSearchResult[] linkedElsewhere = [.. (note.Products ?? []).Where(linked => !shown.Contains(linked.ProductId))
+            .Select(linked => start.Products.Find(linked.ProductId) ?? new ProductSearchResult(linked.ProductId, linked.ProductCode, linked.ProductName, "", "Each", null))];
+        shown.UnionWith(linkedElsewhere.Select(product => product.Id));
+        string query = productSearch.GetValueOrDefault(note.Id, "");
+        ProductSearchOutcome found = string.IsNullOrWhiteSpace(query) ? new([], 0) : start.Products.Search(query);
+        return @<div class="note-picker">
+            @if (fromCall.Count > 0)
+            {
+                <p class="note-picker-heading">From this call</p>
+                <div class="note-picks">@foreach (ProductSearchResult product in fromCall) { @ProductPick(note, number, product) }</div>
+            }
+            @if (linkedElsewhere.Length > 0)
+            {
+                <div class="note-picks">@foreach (ProductSearchResult product in linkedElsewhere) { @ProductPick(note, number, product) }</div>
+            }
+            <label for="@($"note-{number}-product-search")">Search all products</label>
+            <input id="@($"note-{number}-product-search")" type="search" autocomplete="off" value="@query" disabled="@busy"
+                   @oninput="args => productSearch[note.Id] = args.Value?.ToString() ?? string.Empty" />
+            @if (!string.IsNullOrWhiteSpace(query))
+            {
+                <div role="status" aria-live="polite">
+                    @if (found.Total == 0) { <p>No products match '@query.Trim()'</p> }
+                    else if (found.Total > found.Results.Count) { <p>Showing @found.Results.Count of @found.Total matching products. Keep typing to narrow the list.</p> }
+                </div>
+                <div class="note-picks">@foreach (ProductSearchResult product in found.Results.Where(product => !shown.Contains(product.Id))) { @ProductPick(note, number, product) }</div>
+            }
+        </div>;
+    }
+
+    private RenderFragment ProductPick(CallCompetitorNote note, int number, ProductSearchResult product) =>
+        @<button type="button" class="mark-option" @key="product.Id" disabled="@busy"
+                 aria-pressed="@((note.Products ?? []).Any(linked => linked.ProductId == product.Id) ? "true" : "false")"
+                 aria-label="@($"Link {product.Name} to note {number}")"
+                 @onclick="() => ChangeNote(note.Id, each => CompetitorNoteDrafts.Toggle(each, product))">@product.Name</button>;
+
+    /// <summary>D4: one category, found by any words of its breadcrumb.</summary>
+    private RenderFragment CategoryPicker(CallCompetitorNote note, int number)
+    {
+        string filter = categorySearch.GetValueOrDefault(note.Id, "");
+        (IReadOnlyList<OrderPadCategory> categories, int total) = CompetitorNoteDrafts.Categories(start.Products.Pad, filter);
+        return @<div class="note-picker">
+            @if (note.Category is { } chosen) { <p class="note-link">Linked to: @chosen.Name</p> }
+            <label for="@($"note-{number}-category-search")">Find a category</label>
+            <input id="@($"note-{number}-category-search")" type="search" autocomplete="off" value="@filter" disabled="@busy"
+                   @oninput="args => categorySearch[note.Id] = args.Value?.ToString() ?? string.Empty" />
+            @if (total == 0) { <p role="status">No categories match '@filter.Trim()'</p> }
+            else if (total > categories.Count) { <p role="status">Showing @categories.Count of @total categories. Keep typing to narrow the list.</p> }
+            <div class="note-picks">
+                @foreach (OrderPadCategory category in categories)
+                {
+                    <button type="button" class="mark-option" @key="category.Id" disabled="@busy"
+                            aria-pressed="@(note.Category?.Id == category.Id ? "true" : "false")" aria-label="@($"Link {category.Breadcrumb} to note {number}")"
+                            @onclick="() => ChangeNote(note.Id, each => each with { Category = new(category.Id, category.Breadcrumb) })">@category.Breadcrumb</button>
+                }
+            </div>
+        </div>;
+    }
+
+    private void NoteTextChanged(CallCompetitorNote note, ChangeEventArgs args) =>
+        ChangeNote(note.Id, each => each with { Text = args.Value?.ToString() ?? "" });
+
+    private void ToggleCompetitor() => Change(draft with { CompetitorOpen = !draft.CompetitorOpen });
+
+    private void AddNote()
+    {
+        if (busy || Editing) return;
+        Change(draft with { CompetitorNotes = [.. draft.Competitor, CompetitorNoteDrafts.New()], CompetitorOpen = true });
+    }
+
+    private void RemoveNote(CallCompetitorNote note)
+    {
+        if (busy) return;
+        if (switching?.Note == note.Id) switching = null;
+        IReadOnlyList<CallCompetitorNote> left = [.. draft.Competitor.Where(each => each.Id != note.Id)];
+        Change(draft with { CompetitorNotes = left.Count > 0 ? left : null });
+    }
+
+    private void ChangeNote(Guid id, Func<CallCompetitorNote, CallCompetitorNote> change)
+    {
+        if (busy) return;
+        Change(draft with { CompetitorNotes = [.. draft.Competitor.Select(note => note.Id == id ? change(note) : note)] });
+    }
+
+    // D5: switching away from picks asks first; with nothing picked it switches straight away.
+    private void ChooseLink(CallCompetitorNote note, CompetitorLinkType to)
+    {
+        if (busy || Editing || note.LinkTo == to) return;
+        if (CompetitorNoteDrafts.SwitchWarning(note) is null) { switching = null; ChangeNote(note.Id, each => CompetitorNoteDrafts.Switch(each, to)); }
+        else switching = (note.Id, to);
+    }
+
+    private void ConfirmSwitch()
+    {
+        if (switching is not { } pending) return;
+        switching = null;
+        ChangeNote(pending.Note, each => CompetitorNoteDrafts.Switch(each, pending.To));
+    }
 }

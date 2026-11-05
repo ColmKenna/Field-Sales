@@ -12,10 +12,14 @@ namespace FieldSales.Tablet.Core;
 /// order and stay there if the Call is left unsaved (D8).</param>
 /// <param name="TakenOff">Products whose line the rep took off this Call's order in order entry (T-5.1.4 D5): the one fact the order
 /// can't tell, so a Low item reads REMOVED rather than not added. It never decides ADDED; the order does.</param>
+/// <param name="CompetitorNotes">The Competitor Notes as written (T-5.8.1), each with its link type and picks; null when none.</param>
+/// <param name="CompetitorOpen">Whether the Competitor notes section is open.</param>
 public sealed record CallDraft(Guid CallId, CallChannel? Channel, string Notes, bool NotesOpen,
     IReadOnlyList<StockLine>? Stock = null, bool StockChanged = false, bool AddedToOrder = false,
-    IReadOnlyList<Guid>? TakenOff = null)
+    IReadOnlyList<Guid>? TakenOff = null, IReadOnlyList<CallCompetitorNote>? CompetitorNotes = null, bool CompetitorOpen = false)
 {
+    public IReadOnlyList<CallCompetitorNote> Competitor => CompetitorNotes ?? [];
+
     public IReadOnlyList<StockLine> Lines => Stock ?? [];
 
     /// <summary>The Low tab for this Call against <paramref name="order"/> (T-5.1.4).</summary>
@@ -42,7 +46,8 @@ public sealed record CallDraft(Guid CallId, CallChannel? Channel, string Notes, 
 
     /// <summary>What would be saved.</summary>
     public CallContent Content => new(Channel, Notes,
-        Channel is not null && Saved.Count > 0 ? [.. Saved.Select(line => line.Entry)] : null);
+        Channel is not null && Saved.Count > 0 ? [.. Saved.Select(line => line.Entry)] : null,
+        Competitor.Count > 0 ? Competitor : null);
 
     /// <summary>The stock section's heading line: on Phone "2 marked Low (1 out)", blank when nothing is mentioned; In person
     /// "10 counted, 3 not checked", with "· 2 Low" when rows are marked.</summary>
@@ -65,7 +70,8 @@ public sealed record CallDraft(Guid CallId, CallChannel? Channel, string Notes, 
         : Saved.Select(line => line.Problem).FirstOrDefault(problem => problem is not null) ?? Content.Problem;
 
     /// <summary>Whether the rep has entered anything that leaving would lose.</summary>
-    public bool HasWork => Channel is not null || !string.IsNullOrWhiteSpace(Notes) || StockChanged || Lines.Any(line => line.Mentioned);
+    public bool HasWork => Channel is not null || !string.IsNullOrWhiteSpace(Notes) || StockChanged || Lines.Any(line => line.Mentioned)
+        || Competitor.Count > 0;
 }
 
 /// <summary>One row of a Stock Check being recorded: the product, why it was suggested (none when the rep added it), the
