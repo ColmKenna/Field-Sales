@@ -3,6 +3,18 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-055 correcting a saved call before it syncs (2026-11-05, developer, plan approval)
+
+The developer answered the WI-055 questions, replied **Approved** to the plan with D1–D8, then **Apply**. Full text in `WI-055.md`.
+
+- **Call page:** a read-only page for a saved call, opened from Sync's Unsent review. Unsent: Edit call and Record a follow-up call.
+  Sent: Record a follow-up call only. Sent calls get a way in with WI-075.
+- **Edit Call changes, never adds:** channel, a counted line's count (not cleared), Low marks, notes only if the call had notes, and
+  removing lines. No new products, no count on a Not checked line, no new notes, no Add to order, no Delete.
+- **Record a follow-up call** sits in place of the add actions and opens Record call at the shop until WI-056 adds the link.
+- **Upload claims calls** as it does orders, so a call can't change while it is being sent.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-054 the out-of-pattern quantity marker (2026-11-05, developer, plan approval)
 
 The developer chose the marker rule, replied **Approved** to the WI-054 plan with D1–D7, then **Apply**. Full text in `WI-054.md`.

@@ -44,6 +44,12 @@ public sealed class TabletApp
     }
     public Func<string, Guid, TabletCall?> FindCall { get; set; } = (_, _) => null;
     public TabletCall? ReadCall(string rep, Guid callId) => FindCall(rep, callId);
+    public Func<string, Guid, CallView?> FindCallView { get; set; } = (_, _) => null;
+    public CallView? ReadCallView(string rep, Guid callId) => FindCallView(rep, callId);
+    public Func<string, Guid, Guid, CallContent, CallResult> CorrectWork { get; set; } =
+        (_, _, _, _) => new CallResult(null, "Not set up in this test.");
+    public CallResult CorrectCall(string rep, Guid callId, Guid locationId, CallContent content) =>
+        CorrectWork(rep, callId, locationId, content);
     /// <summary>The shop's recent order quantities per product (rep, shop); none by default.</summary>
     public Func<string, Guid, IReadOnlyDictionary<Guid, IReadOnlyList<OrderedQuantity>>> FindQuantities { get; set; } =
         (_, _) => new Dictionary<Guid, IReadOnlyList<OrderedQuantity>>();

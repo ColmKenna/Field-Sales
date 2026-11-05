@@ -103,6 +103,11 @@
                     {
                         <button disabled="@(busy || changing)" @onclick="@(() => Navigation.NavigateTo($"/locations/{opened.LocationId}/orders/{opened.Id}"))">Open order</button>
                     }
+                    @* T-5.6.1: a saved Call opens on its own page, where it can be corrected before Sync. *@
+                    @if (review.Item.Kind == UnsentKind.Call && review.Item.Rejection is null && review.LocationId is { } callShop)
+                    {
+                        <button disabled="@(busy || changing)" @onclick="@(() => Navigation.NavigateTo($"/locations/{callShop}/calls/{review.Item.Id}"))">Open call</button>
+                    }
                     @if (review.CanMarkReady)
                     {
                         <button class="primary" disabled="@(busy || changing)" @onclick="() => ChangeWorkAsync(review.Item.Id, false)">Mark ready to send</button>

@@ -202,6 +202,12 @@ public sealed class TabletApp : IDisposable
 
     public TabletCall? ReadCall(string rep, Guid callId) => new CallStore(device.Workspace(rep), clock).Read(callId);
 
+    // T-5.6.1: a saved Call with its standing, and its correction before Sync.
+    public CallView? ReadCallView(string rep, Guid callId) => new CallStore(device.Workspace(rep), clock).ReadView(callId);
+
+    public CallResult CorrectCall(string rep, Guid callId, Guid locationId, CallContent content) =>
+        new CallStore(device.Workspace(rep), clock).Correct(callId, locationId, content);
+
     /// <summary>T-5.1.5 D5: a Call recorded from an order's Low tab was saved; the order is linked to it.</summary>
     public OrderResult LinkOrderToCall(string rep, Guid orderId, Guid callId) =>
         new OrderStore(device.Workspace(rep), clock).LinkToCall(orderId, callId);

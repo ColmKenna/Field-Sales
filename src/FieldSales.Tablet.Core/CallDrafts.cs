@@ -127,6 +127,9 @@ public sealed class CallDrafts
 {
     private (string Rep, long Version, Guid Location, CallDraft Draft)? kept;
     private (string Rep, long Version, Guid Location)? saved;
+    // T-5.6.1 (WI-055 D6): a correction being made to a saved Call, kept apart from a Call being recorded at the same shop.
+    private (string Rep, long Version, CallDraft Draft)? editing;
+    private (string Rep, long Version, Guid Call)? corrected;
 
     public CallDraft? Read(string rep, long version, Guid location) =>
         kept is { } draft && draft.Rep == rep && draft.Version == version && draft.Location == location ? draft.Draft : null;
@@ -146,6 +149,27 @@ public sealed class CallDrafts
     {
         if (saved is not { } done || done.Rep != rep || done.Version != version || done.Location != location) return false;
         saved = null;
+        return true;
+    }
+
+    /// <summary>The correction being made to saved Call <paramref name="call"/> (T-5.6.1), restored when Edit Call is rebuilt.</summary>
+    public CallDraft? ReadEdit(string rep, long version, Guid call) =>
+        editing is { } edit && edit.Rep == rep && edit.Version == version && edit.Draft.CallId == call ? edit.Draft : null;
+
+    public void KeepEdit(string rep, long version, CallDraft? draft) => editing = draft is null ? null : (rep, version, draft);
+
+    /// <summary>The correction was saved: it goes, and the call page says so once.</summary>
+    public void Corrected(string rep, long version, Guid call)
+    {
+        editing = null;
+        corrected = (rep, version, call);
+    }
+
+    /// <summary>True once after a correction, for the same rep, session and Call.</summary>
+    public bool TakeCorrected(string rep, long version, Guid call)
+    {
+        if (corrected is not { } done || done.Rep != rep || done.Version != version || done.Call != call) return false;
+        corrected = null;
         return true;
     }
 }

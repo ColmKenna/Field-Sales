@@ -1,0 +1,108 @@
+@page "/locations/{Id:guid}/calls/{CallId:guid}"
+@inherits OfflineCataloguePage
+@using System.Globalization
+@using FieldSales.Calls.Contracts
+
+@* T-5.6.1 (US-015): a saved Call, read-only. Unsent, it offers Edit call (corrections before Sync) and Record a follow-up call; sent,
+   only the follow-up (S4). A Call is never deleted here. WI-075 brings sent calls a way in from the shop. *@
+<section class="saved-call">
+    <nav class="shop-back" aria-label="Call navigation"><a href="@($"/locations/{Id}")">Back to shop</a></nav>
+    @if (!Ready) { <h1>Call</h1><p role="status">Opening call…</p> }
+    else if (problem is not null) { <h1>Call unavailable</h1><p role="alert">@problem</p> }
+    else if (view is { } saved)
+    {
+        <header class="order-header">
+            <h1>Call</h1>
+            <p class="order-shop">@(shopName ?? "Shop details unavailable")</p>
+        </header>
+        @if (corrected) { <p class="action-message" role="status">Changes saved.</p> }
+        <p class="call-meta">@CallContract.Label(saved.Call.Channel) · @saved.Call.CalledOn.ToString("ddd d MMM", CultureInfo.InvariantCulture)</p>
+        <p class="ready-notice" role="status">@StandingText(saved)</p>
+        <p class="call-summary">@saved.Call.Content.Summary</p>
+        @if (saved.Call.PitchNotes is { } notes)
+        {
+            <section class="call-section"><h2 class="call-section-heading">Pitch notes</h2><p class="call-notes">@notes</p></section>
+        }
+        @if (saved.Call.StockEntries is { Count: > 0 } entries)
+        {
+            <section class="call-section">
+                <h2 class="call-section-heading">@(saved.Call.Channel == CallChannel.Phone ? "Stock mentioned" : "Stock check")</h2>
+                <ul class="saved-call-lines">
+                    @foreach (CallStockEntry entry in entries)
+                    {
+                        <li @key="entry.ProductId" data-call-line="@Line(entry)"><strong>@entry.ProductName</strong><span>@Recorded(entry)</span></li>
+                    }
+                </ul>
+            </section>
+        }
+        <footer class="order-footer">
+            <div class="order-actions">
+                @if (saved.CanCorrect)
+                {
+                    <button type="button" class="primary" @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/{CallId}/edit"))">Edit call</button>
+                }
+                @if (saved.Standing != CallStanding.NeedsAttention)
+                {
+                    <button type="button" class="secondary" @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/new"))">Record a follow-up call</button>
+                }
+            </div>
+        </footer>
+    }
+</section>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [Parameter] public Guid CallId { get; set; }
+
+    private CallView? view;
+    private string? shopName;
+    private string? problem;
+    private bool corrected;
+
+    protected override void Clear() { view = null; shopName = null; problem = null; corrected = false; }
+
+    protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
+    {
+        Guid shop = Id, id = CallId;
+        try
+        {
+            CallView? read = null;
+            string? name = null;
+            await Task.Run(() =>
+            {
+                read = Tablet.ReadCallView(repSubject, id);
+                name = Tablet.ReadLocation(repSubject, shop)?.Location.Name;
+            });
+            if (!isCurrent()) return;
+            view = read; shopName = name;
+            corrected = Tablet.CallDrafts.TakeCorrected(repSubject, Tablet.SessionVersion, id);
+            if (read is null) problem = CallStore.NotOnTablet;
+            else if (read.Call.LocationId != shop) problem = "This call is for a different shop.";
+        }
+        catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            if (isCurrent()) problem = "This call couldn't be opened. Your saved work is still on this tablet.";
+        }
+    }
+
+    private static string StandingText(CallView saved) => saved.Standing switch
+    {
+        CallStanding.Sending => CallStore.BeingSent,
+        CallStanding.Sent => saved.SentUtc is { } at
+            ? $"Sent {at.ToLocalTime().ToString("d MMM HH:mm", CultureInfo.InvariantCulture)}. It can't be changed on this tablet."
+            : "Sent. It can't be changed on this tablet.",
+        CallStanding.NeedsAttention => "This call needs attention. Review it from Sync.",
+        _ => "Saved. It goes to head office at your next Sync."
+    };
+
+    /// <summary>"counted 3 · Low", "counted 2.5 kg", "not checked" or "Low".</summary>
+    private static string Recorded(CallStockEntry entry)
+    {
+        string count = entry.Count is { } amount
+            ? $"counted {amount.ToString(entry.Unit == "Each" ? "0.######" : "0.0#####", CultureInfo.InvariantCulture)}{(entry.Unit == "Each" ? "" : $" {entry.Unit}")}"
+            : entry.Low ? "" : "not checked";
+        return entry.Low ? (count.Length == 0 ? "Low" : $"{count} · Low") : count;
+    }
+
+    private static string Line(CallStockEntry entry) => $"{entry.ProductName}: {Recorded(entry)}";
+}

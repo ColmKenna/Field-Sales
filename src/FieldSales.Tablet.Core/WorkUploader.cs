@@ -73,8 +73,8 @@ public sealed class WorkUploader(RepWorkspace workspace, HttpClient http, TimePr
             UnsentItem item = queue[index];
             // T-5.2.1: an order is claimed under the gate order changes hold, and only if unchanged since the queue was read. One
             // the rep reopened, changed or deleted meanwhile isn't sent and isn't counted; a claimed one can no longer change.
-            // Calls can't be changed by the rep yet, so they need no claim (WI-055 adds Call corrections and should claim them).
-            bool claimed = item.Kind == UnsentKind.Order;
+            // Calls are claimed the same way since they can be corrected before Sync (T-5.6.1, WI-055 D5).
+            bool claimed = item.Kind is UnsentKind.Order or UnsentKind.Call;
             if (claimed && !await ClaimAsync(unsent, item, ct)) { skipped++; continue; }
             int total = queue.Count - skipped;
             progress?.Report(new(index + 1 - skipped, total));

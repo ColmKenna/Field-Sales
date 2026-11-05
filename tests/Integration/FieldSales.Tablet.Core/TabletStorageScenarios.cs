@@ -169,8 +169,9 @@ public sealed class TabletStorageScenarios : IDisposable
     [Fact]
     public async Task Should_NeverAlterUnsentWork_When_ASnapshotIsDownloaded()
     {
-        await _tablet.SyncAsync(Snapshots.Build("colm", locations: 4, products: 300));
-        UnsentStore work = _tablet.SaveWork();
+        TabletSnapshot first = Snapshots.Build("colm", locations: 4, products: 300);
+        await _tablet.SyncAsync(first);
+        UnsentStore work = await _tablet.SaveClaimedWorkAsync(first);
         string fingerprint = work.Fingerprint();
         string files = _tablet.UnsentFileHash();
 

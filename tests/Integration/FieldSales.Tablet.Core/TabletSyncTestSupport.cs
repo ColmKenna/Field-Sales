@@ -175,6 +175,16 @@ public sealed class TestTablet : IDisposable
         return outcome.Active!;
     }
 
+    /// <summary><see cref="SaveWork"/>, then a Sync of <paramref name="snapshot"/> whose upload claims the saved Calls (WI-055 D5;
+    /// the test server answers uploads 503, so the claims stay). Later Syncs' claims change nothing, so from here the Unsent files
+    /// stay byte-for-byte the same across downloads.</summary>
+    public async Task<UnsentStore> SaveClaimedWorkAsync(TabletSnapshot snapshot, string rep = "colm")
+    {
+        UnsentStore work = SaveWork(rep);
+        await SyncAsync(snapshot, rep);
+        return work;
+    }
+
     public UnsentStore SaveWork(string rep = "colm")
     {
         UnsentStore work = new(Workspace(rep));

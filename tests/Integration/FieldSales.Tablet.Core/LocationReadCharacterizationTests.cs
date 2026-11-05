@@ -11,7 +11,7 @@ public sealed class LocationReadCharacterizationTests : IDisposable
     {
         var first = Snapshots.Build("colm", 2, 0);
         await tablet.SyncAsync(first);
-        UnsentStore work = tablet.SaveWork();
+        UnsentStore work = await tablet.SaveClaimedWorkAsync(first);
         string fingerprint = work.Fingerprint();
         string bytes = tablet.UnsentFileHash();
         var second = Snapshots.Build("colm", 1, 0, label: "B");

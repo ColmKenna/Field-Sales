@@ -144,6 +144,12 @@ a:focus-visible, button:focus-visible { outline: 3px solid #c77f09; outline-offs
 .review-lines { list-style: none; padding: 0; }
 .review-lines li { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .captured-line-notice { color: var(--alert); font-weight: 600; }
+/* T-5.6.1: a saved Call's page, and Edit Call's Not checked rows. */
+.call-meta { color: var(--muted); margin: 0 0 8px; }
+.call-notes { white-space: pre-wrap; margin: 0; }
+.saved-call-lines { list-style: none; padding: 0; margin: 0; }
+.saved-call-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.saved-call-lines span, .stock-not-checked { color: var(--muted); }
 .quantity-marker { color: var(--alert); font-weight: 600; }
 .order-lines .quantity-marker { grid-column: 1 / -1; }
 .order-lines .captured-line-notice { grid-column: 1 / -1; }
