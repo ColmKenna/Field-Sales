@@ -47,7 +47,7 @@ public sealed partial class CallStore(RepWorkspace workspace, TimeProvider? cloc
             TabletCall call = new(CallContract.Schema, CallContract.CurrentVersion, callId, locationId, workspace.RepSubject,
                 DateOnly.FromDateTime(now.DateTime), now, content.Channel!.Value,
                 new(active.Manifest.Version, active.Manifest.BuiltUtc), content.Notes,
-                content.StockEntries is { Count: > 0 } stock ? [.. stock] : null, followUpOf);
+                content.StockEntries is { Count: > 0 } stock ? [.. stock] : null, followUpOf, content.SavedNotes);
             unsent.Save(new(callId, UnsentKind.Call, time.GetUtcNow(), JsonSerializer.Serialize(call, CallJsonContext.Default.TabletCall)));
             return new(call, null);
         }

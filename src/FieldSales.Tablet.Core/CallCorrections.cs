@@ -21,6 +21,7 @@ public sealed partial class CallStore
     public const string BeingSent = "This call is being sent. Sync again before changing it.";
     public const string NotCorrectable = "This call can't be changed here.";
     public const string AddsContent = "A correction can only change or remove what was recorded. Record a follow-up call to add to it.";
+    public const string NoteLinksFixed = "A correction can't change what a competitor note is linked to.";
 
     /// <summary>The saved Call with this id, unsent or Sent, with its standing; null when this tablet has none or it can't be read
     /// as a Call. Asking never creates the database.</summary>
@@ -54,11 +55,13 @@ public sealed partial class CallStore
             if (unsent.IsClaimed(callId)) return CallResult.Failure(BeingSent);
             if (content.Problem is { } problem) return CallResult.Failure(problem);
             if (AddsTo(saved, content)) return CallResult.Failure(AddsContent);
+            if (RelinksNote(saved, content)) return CallResult.Failure(NoteLinksFixed);
 
             TabletCall corrected = saved with
             {
                 Channel = content.Channel!.Value, PitchNotes = content.Notes,
-                StockEntries = content.StockEntries is { Count: > 0 } stock ? [.. stock] : null
+                StockEntries = content.StockEntries is { Count: > 0 } stock ? [.. stock] : null,
+                CompetitorNotes = content.SavedNotes
             };
             unsent.Save(item with { Json = JsonSerializer.Serialize(corrected, CallJsonContext.Default.TabletCall) });
             return new(corrected, null);
@@ -66,12 +69,22 @@ public sealed partial class CallStore
         finally { gate.Release(); }
     }
 
-    // D2: a correction changes or removes what was recorded and never adds to it.
+    // D2: a correction changes or removes what was recorded and never adds to it. WI-057 D6: no Competitor Note it didn't have.
     private static bool AddsTo(TabletCall saved, CallContent content)
     {
         Dictionary<Guid, CallStockEntry> before = (saved.StockEntries ?? []).ToDictionary(entry => entry.ProductId);
+        HashSet<Guid> notes = [.. (saved.CompetitorNotes ?? []).Select(note => note.Id)];
         return (content.Notes is not null && string.IsNullOrWhiteSpace(saved.PitchNotes))
             || (content.StockEntries ?? []).Any(entry => !before.TryGetValue(entry.ProductId, out CallStockEntry? was)
-                || (was.Count is null) != (entry.Count is null));
+                || (was.Count is null) != (entry.Count is null))
+            || (content.CompetitorNotes ?? []).Any(note => !notes.Contains(note.Id))
+            || (content.CompetitorNotes ?? []).Select(note => note.Id).Distinct().Count() != (content.CompetitorNotes?.Count ?? 0);
+    }
+
+    // WI-057 D6: a Competitor Note's text can change and the note can go, but what it is linked to stays as saved.
+    private static bool RelinksNote(TabletCall saved, CallContent content)
+    {
+        Dictionary<Guid, CallCompetitorNote> before = (saved.CompetitorNotes ?? []).ToDictionary(note => note.Id);
+        return (content.CompetitorNotes ?? []).Any(note => !note.SameLinks(before[note.Id]));
     }
 }
