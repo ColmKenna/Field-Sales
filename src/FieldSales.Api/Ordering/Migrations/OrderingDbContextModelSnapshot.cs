@@ -64,6 +64,58 @@ namespace FieldSales.Api.Ordering.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallCompetitorNote", b =>
+                {
+                    b.Property<Guid>("CallId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LinkTo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<Guid?>("RangeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.HasKey("CallId", "Id");
+
+                    b.ToTable("ReceivedCallCompetitorNotes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ReceivedCallCompetitorNotes_Link", "LEN([Text]) > 0 AND (\n    ([LinkTo] = 'Range' AND [RangeId] IS NOT NULL AND [CategoryId] IS NULL)\n    OR ([LinkTo] = 'Category' AND [CategoryId] IS NOT NULL AND [RangeId] IS NULL)\n    OR ([LinkTo] IN ('None', 'Products') AND [RangeId] IS NULL AND [CategoryId] IS NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallCompetitorNoteProduct", b =>
+                {
+                    b.Property<Guid>("CallId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("CallId", "NoteId", "ProductId");
+
+                    b.ToTable("ReceivedCallCompetitorNoteProducts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ReceivedCallCompetitorNoteProducts_Product", "[ProductId] <> '00000000-0000-0000-0000-000000000000'");
+                        });
+                });
+
             modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallStockEntry", b =>
                 {
                     b.Property<Guid>("CallId")
@@ -200,6 +252,24 @@ namespace FieldSales.Api.Ordering.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallCompetitorNote", b =>
+                {
+                    b.HasOne("FieldSales.Api.Ordering.ReceivedCall", null)
+                        .WithMany("CompetitorNotes")
+                        .HasForeignKey("CallId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallCompetitorNoteProduct", b =>
+                {
+                    b.HasOne("FieldSales.Api.Ordering.ReceivedCallCompetitorNote", null)
+                        .WithMany("Products")
+                        .HasForeignKey("CallId", "NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallStockEntry", b =>
                 {
                     b.HasOne("FieldSales.Api.Ordering.ReceivedCall", null)
@@ -220,7 +290,14 @@ namespace FieldSales.Api.Ordering.Migrations
 
             modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCall", b =>
                 {
+                    b.Navigation("CompetitorNotes");
+
                     b.Navigation("StockEntries");
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Ordering.ReceivedCallCompetitorNote", b =>
+                {
+                    b.Navigation("Products");
                 });
 #pragma warning restore 612, 618
         }

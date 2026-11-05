@@ -159,6 +159,7 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         _ when call.StockEntries is { } stock && !AreStockEntries(stock) => Incomplete("A stock entry is incomplete."),
         _ when call.FollowUpOf is { } original && (original == Guid.Empty || original == call.Id)
             => Incomplete("The call's follow-up link must name another call."),
+        _ when call.CompetitorNotes is { } notes && !AreCompetitorNotes(notes) => Incomplete("A competitor note is incomplete."),
         _ when call.Content.Problem is { } problem => Incomplete($"The call can't be accepted: {problem}."),
         _ => null
     };
@@ -169,6 +170,10 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
         stock.All(entry => entry is not null && entry.ProductId != Guid.Empty && !string.IsNullOrWhiteSpace(entry.ProductCode)
             && !string.IsNullOrWhiteSpace(entry.ProductName) && FieldSales.Quantities.UnitOfMeasureExtensions.TryParse(entry.Unit, out _))
         && stock.Select(entry => entry!.ProductId).Distinct().Count() == stock.Count;
+
+    // T-5.8.1 (WI-057 D8): each note once, carrying exactly the link its type names; its text is judged by CallContent.Problem.
+    private static bool AreCompetitorNotes(IReadOnlyList<CallCompetitorNote?> notes) =>
+        notes.All(note => note is { IsWellFormed: true }) && notes.Select(note => note!.Id).Distinct().Count() == notes.Count;
 
     private static ReceiveResult Incomplete(string detail) => ReceiveResult.Refused(UploadFaults.Incomplete, detail);
 

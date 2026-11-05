@@ -77,13 +77,53 @@ public sealed class ReceivedCall
     /// Sync, or not at all, so it isn't a foreign key.</summary>
     public Guid? FollowUpOf { get; private set; }
     public List<ReceivedCallStockEntry> StockEntries { get; private set; } = [];
+    /// <summary>The Call's Competitor Notes (T-5.8.1), each with its one link type.</summary>
+    public List<ReceivedCallCompetitorNote> CompetitorNotes { get; private set; } = [];
 
     public static ReceivedCall From(TabletCall call, DateTimeOffset receivedUtc) => new()
     {
         Id = call.Id, LocationId = call.LocationId, CapturingRep = call.CapturingRep, CalledOn = call.CalledOn,
         SavedAt = call.SavedAt, Channel = call.Channel, ReceivedUtc = receivedUtc.ToUniversalTime(), FollowUpOf = call.FollowUpOf,
-        StockEntries = [.. (call.StockEntries ?? []).Select(entry => new ReceivedCallStockEntry(call.Id, entry))]
+        StockEntries = [.. (call.StockEntries ?? []).Select(entry => new ReceivedCallStockEntry(call.Id, entry))],
+        CompetitorNotes = [.. (call.CompetitorNotes ?? []).Select(note => new ReceivedCallCompetitorNote(call.Id, note))]
     };
+}
+
+/// <summary>A Competitor Note on a received Call (T-5.8.1): its text and its one link type, with the Range or Category it names, or
+/// its products. The names it was captured with stay in the received body, as a stock entry's do. Linked Ranges and Categories
+/// are kept as sent: a Call is judged as captured.</summary>
+public sealed class ReceivedCallCompetitorNote
+{
+    private ReceivedCallCompetitorNote() { }
+
+    internal ReceivedCallCompetitorNote(Guid callId, CallCompetitorNote note)
+    {
+        CallId = callId; Id = note.Id; Text = note.Text; LinkTo = note.LinkTo; RangeId = note.Range?.Id; CategoryId = note.Category?.Id;
+        Products = [.. (note.Products ?? []).Select(product => new ReceivedCallCompetitorNoteProduct(callId, note.Id, product.ProductId))];
+    }
+
+    public Guid CallId { get; private set; }
+    public Guid Id { get; private set; }
+    public string Text { get; private set; } = "";
+    public CompetitorLinkType LinkTo { get; private set; }
+    public Guid? RangeId { get; private set; }
+    public Guid? CategoryId { get; private set; }
+    public List<ReceivedCallCompetitorNoteProduct> Products { get; private set; } = [];
+}
+
+/// <summary>One of our products a received Competitor Note is linked to.</summary>
+public sealed class ReceivedCallCompetitorNoteProduct
+{
+    private ReceivedCallCompetitorNoteProduct() { }
+
+    internal ReceivedCallCompetitorNoteProduct(Guid callId, Guid noteId, Guid productId)
+    {
+        CallId = callId; NoteId = noteId; ProductId = productId;
+    }
+
+    public Guid CallId { get; private set; }
+    public Guid NoteId { get; private set; }
+    public Guid ProductId { get; private set; }
 }
 
 /// <summary>One product on a received Call: its count in its unit, or Not checked (no count), and the rep's Low mark. On a
