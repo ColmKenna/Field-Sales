@@ -3,12 +3,15 @@ using System.Text.Json;
 using FieldSales.Api.Catalogue;
 using FieldSales.Calls.Contracts;
 using FieldSales.Directory.Contracts;
+using FieldSales.Ordering.Contracts;
 using FieldSales.Snapshot.Contracts;
+using FieldSales.Tablet.Core;
 
 namespace FieldSales.Api.Tests;
 
 /// <summary>WI-053 (T-5.1.5, REP-US-012 S19–S22): the gaps a shop's most recent Call left, sent in snapshot 1.4. Agreed
-/// scenario 10 (server). "Ordered since" is any order at the shop dated on or after the Call's date, whatever its status.</summary>
+/// scenarios 10 (server) and 12 (end to end). "Ordered since" is any order at the shop dated on or after the Call's date, whatever
+/// its status.</summary>
 public sealed partial class SuggestedListTests
 {
     [Fact]
@@ -42,6 +45,38 @@ public sealed partial class SuggestedListTests
             snapshot.LastCallLowLines!);
         Assert.Equal(2, snapshot.Manifest.Counts.LastCallLowLines);
         Assert.Equal("1.4", snapshot.Manifest.Version);
+    }
+
+    // Scenario 12, end to end: a Call marks two products Low and one goes on the Call's order; both are synced, and the next
+    // snapshot carries the other to a later order at the shop with no Call.
+    [Fact]
+    public async Task Should_CarryAGapToALaterOrderWithNoCall_When_ACallWithLowItemsIsSyncedAndTheSnapshotRebuilt()
+    {
+        (Guid murphys, Guid[] product) = await MurphysAsync(products: 3);
+        Assert.True((await SyncAsync()).Completed);
+        ProductSearchIndex morning = new SnapshotStore(Workspace).ReadProductIndex(new DateOnly(2026, 9, 22));
+        CallStockEntry Low(int index)
+        {
+            ProductSearchResult item = morning.Find(product[index])!;
+            return new(item.Id, item.Code, item.Name, item.Unit, 1m, Low: true);
+        }
+        Guid call = Guid.NewGuid();
+        OrderResult added = new OrderStore(Workspace, _clock).AddFromCall(call, murphys, product[0], 12m);
+        Assert.True(added.Succeeded, added.Error);
+        Assert.True(new CallStore(Workspace, _clock).Save(call, murphys, new(CallChannel.InPerson, null, [Low(0), Low(1)])).Succeeded);
+        Assert.True(new OrderStore(Workspace, _clock).MarkReadyToSend(added.Order!.Id).Succeeded);
+
+        Assert.Equal(new UploadSummary(2, 2), (await SyncAsync()).Upload);
+
+        SnapshotStore store = new(Workspace);
+        ProductSearchIndex next = store.ReadProductIndex(new DateOnly(2026, 9, 22));
+        // The server took product 0 off: it is on an order since the Call.
+        LastCallGaps gaps = store.ReadLastCallGaps(next.Generation, murphys)!;
+        Assert.Equal((call, new DateOnly(2026, 9, 22)), (gaps.CallId, gaps.CalledOn));
+        Assert.Equal([product[1]], gaps.ProductIds);
+        CarriedLow carried = CarriedGaps.Read(Workspace, murphys, Guid.NewGuid(), next)!;
+        Assert.Equal((call, new DateOnly(2026, 9, 22)), (carried.CallId, carried.CalledOn));
+        Assert.Equal(["Product 01"], carried.Entries.Select(entry => entry.ProductName));
     }
 
     private async Task<Guid> ReceiveLowCallAsync(Guid location, DateTimeOffset savedAt, CallChannel channel,
