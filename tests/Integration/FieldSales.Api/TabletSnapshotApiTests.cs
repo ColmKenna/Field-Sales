@@ -153,7 +153,7 @@ public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture
 
         await _app.RetireContactAsync(mary);
         TabletSnapshot after = await _app.SyncAsync("colm");
-        Assert.Equal("1.4", after.Manifest.Version);
+        Assert.Equal("1.5", after.Manifest.Version);
         foreach (Guid location in new[] { rathdrum, arklow })
         {
             SnapshotLocation shop = after.Locations.Single(shop => shop.Id == location);
@@ -362,7 +362,7 @@ public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture
         using HttpResponseMessage response = await TabletSnapshotApplication.RequestAsync(client, SnapshotContract.Path, majors);
         Assert.Equal(expected, response.StatusCode);
         if (expected == HttpStatusCode.OK)
-            Assert.Equal("1.4", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
+            Assert.Equal("1.5", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
         if (expected == HttpStatusCode.NotAcceptable)
             Assert.Equal(SnapshotContract.UpdateRequiredTitle, (await response.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
     }

@@ -32,7 +32,7 @@ public sealed class SnapshotAttributeContractTests
     [Fact]
     public void Should_RoundTripAttributesAndKeepOldReadersCompatible_When_UsingVersion11Metadata()
     {
-        Assert.Equal("1.4", SnapshotContract.CurrentVersion); // The explicit 1.1 fixture below remains supported.
+        Assert.Equal("1.5", SnapshotContract.CurrentVersion); // The explicit 1.1 fixture below remains supported.
         Assert.Equal([1], SnapshotContract.ServedMajors);
         TabletSnapshot original = Snapshots.Build("colm", locations: 3, products: 20);
         Guid productId = original.Products[0].Id;

@@ -37,7 +37,13 @@ public sealed partial class SnapshotStore
     internal const int PurgeBatchRows = 2000;
     internal const long MaximumPlainBytes = 1L << 30;
     internal static readonly int[] ReadableMajors = [SnapshotContract.CurrentMajor];
-    private const int SchemaVersion = 4;
+    private const int SchemaVersion = 5;
+    // Format 5 (snapshot 1.5, T-5.1.6): each recent order product's quantity on each recent Accepted Order, newest first.
+    private const string QuantitySchema = """
+        CREATE TABLE recent_order_quantities(generation TEXT NOT NULL REFERENCES generations(id), location_id TEXT NOT NULL,
+            product_id TEXT NOT NULL, position INTEGER NOT NULL CHECK(position >= 0), quantity TEXT NOT NULL, unit TEXT NOT NULL,
+            PRIMARY KEY(generation, location_id, product_id, position));
+        """;
     // Format 4 (snapshot 1.4, T-5.1.5): the Low products a Location's most recent Call left unordered.
     private const string LastCallSchema = """
         CREATE TABLE last_call_low_lines(generation TEXT NOT NULL REFERENCES generations(id), location_id TEXT NOT NULL,
@@ -71,7 +77,7 @@ public sealed partial class SnapshotStore
             effective_from TEXT NOT NULL, amount TEXT NOT NULL, PRIMARY KEY(generation, product_id, effective_from));
         """;
     // Child tables are emptied before the generation row; the active pointer never names a retired generation.
-    private static readonly string[] ChildTables = ["last_call_low_lines", "last_stock_check_lines", "recent_order_lines", "product_attributes", "base_prices",
+    private static readonly string[] ChildTables = ["recent_order_quantities", "last_call_low_lines", "last_stock_check_lines", "recent_order_lines", "product_attributes", "base_prices",
         "products", "categories", "locations"];
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly RepWorkspace workspace;
@@ -100,8 +106,10 @@ public sealed partial class SnapshotStore
             // Older formats step up one at a time, keeping every generation; a new database gets the whole schema at once.
             long current = (long)version.ExecuteScalar()!;
             if (current == 1) { SqliteEngine.EnsureSchema(connection, 2, "", AttributeSchema); current = 2; }
-            if (current == 2) SqliteEngine.EnsureSchema(connection, 3, "", HistorySchema);
-            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema + AttributeSchema + HistorySchema + LastCallSchema, LastCallSchema);
+            if (current == 2) { SqliteEngine.EnsureSchema(connection, 3, "", HistorySchema); current = 3; }
+            if (current == 3) SqliteEngine.EnsureSchema(connection, 4, "", LastCallSchema);
+            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema + AttributeSchema + HistorySchema + LastCallSchema + QuantitySchema,
+                QuantitySchema);
         }
         catch { connection.Dispose(); throw; }
         return connection;
@@ -148,6 +156,7 @@ public sealed partial class SnapshotStore
                 + (SELECT COUNT(*) FROM last_stock_check_lines WHERE generation=g.id)
                 + (SELECT COUNT(*) FROM recent_order_lines WHERE generation=g.id)
                 + (SELECT COUNT(*) FROM last_call_low_lines WHERE generation=g.id)
+                + (SELECT COUNT(*) FROM recent_order_quantities WHERE generation=g.id)
             FROM generations g ORDER BY g.completed, g.id
             """;
         using SqliteDataReader reader = command.ExecuteReader();
@@ -177,7 +186,7 @@ public sealed partial class SnapshotStore
         Dictionary<Guid, SnapshotMainContactReplacement> contactReplacements = [];
         Dictionary<string, int> counts = SnapshotDocumentReader.Families.ToDictionary(family => family, _ => 0);
         SqliteTransaction? batch = null;
-        int rows = 0;
+        int rows = 0, minor = 0;
         try
         {
             using (FileStream file = File.OpenRead(gzipPath))
@@ -188,7 +197,7 @@ public sealed partial class SnapshotStore
                 {
                     new SnapshotDocumentReader(plain).Read(received =>
                     {
-                        Validate(received);
+                        minor = Validate(received);
                         manifest = received;
                         using SqliteCommand create = connection.CreateCommand();
                         create.CommandText = "INSERT INTO generations(id, state, manifest) VALUES($id, 'staged', $manifest)";
@@ -199,7 +208,7 @@ public sealed partial class SnapshotStore
                     {
                         ct.ThrowIfCancellationRequested();
                         batch ??= connection.BeginTransaction();
-                        Insert(connection, batch, generation, family, entity, contactReplacements);
+                        Insert(connection, batch, generation, minor, family, entity, contactReplacements);
                         counts[family]++;
                         if (++rows % BatchRows == 0)
                         {
@@ -289,7 +298,8 @@ public sealed partial class SnapshotStore
         finally { batch?.Dispose(); }
     }
 
-    private void Validate(SnapshotManifest manifest)
+    /// <summary>Checks the manifest and returns the snapshot's minor version.</summary>
+    private int Validate(SnapshotManifest manifest)
     {
         string[] version = (manifest.Version ?? "").Split('.');
         if (manifest.Schema != SnapshotContract.Schema || version.Length != 2
@@ -306,9 +316,10 @@ public sealed partial class SnapshotStore
             || (minor < 3 && (manifest.Counts.LastStockCheckLines != 0 || manifest.Counts.RecentOrderLines != 0))
             || (minor < 4 && manifest.Counts.LastCallLowLines != 0))
             throw new InvalidDataException("The snapshot manifest is invalid.");
+        return minor;
     }
 
-    private static void Insert(SqliteConnection connection, SqliteTransaction transaction, string generation, string family,
+    private static void Insert(SqliteConnection connection, SqliteTransaction transaction, string generation, int minor, string family,
         JsonElement entity, Dictionary<Guid, SnapshotMainContactReplacement> contactReplacements)
     {
         using SqliteCommand insert = connection.CreateCommand();
@@ -388,6 +399,7 @@ public sealed partial class SnapshotStore
                 {
                     throw new InvalidDataException("A stock history row is repeated.", repeated);
                 }
+                if (family == "recentOrderLines") InsertQuantities(connection, transaction, generation, minor, entity, line);
                 return;
             case "lastCallLowLines":
                 if (new[] { "locationId", "callId", "calledOn", "productId" }.Any(field => !entity.TryGetProperty(field, out _)))
@@ -409,6 +421,35 @@ public sealed partial class SnapshotStore
             default: throw new InvalidDataException("Unknown snapshot family.");
         }
         insert.ExecuteNonQuery();
+    }
+
+    // 1.5 (T-5.1.6): a recent order product's quantities, newest first. Required from 1.5 on, refused before it.
+    private static void InsertQuantities(SqliteConnection connection, SqliteTransaction transaction, string generation, int minor,
+        JsonElement entity, SnapshotStockCheckLine line)
+    {
+        bool present = entity.TryGetProperty("quantities", out JsonElement json) && json.ValueKind != JsonValueKind.Null;
+        if (present != (minor >= 5))
+            throw new InvalidDataException(minor >= 5 ? "A recent order row is missing its quantities." : "A recent order row has quantities this version doesn't carry.");
+        if (!present) return;
+        IReadOnlyList<SnapshotOrderedQuantity> quantities = Entity<SnapshotRecentOrderLine>(entity).Quantities ?? [];
+        if (quantities.Count == 0 || quantities.Any(each => each is null || each.Quantity <= 0m || string.IsNullOrWhiteSpace(each.Unit)))
+            throw new InvalidDataException("A recent order row's quantities are invalid.");
+        for (int position = 0; position < quantities.Count; position++)
+        {
+            using SqliteCommand insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO recent_order_quantities(generation, location_id, product_id, position, quantity, unit)
+                VALUES($g, $location, $product, $position, $quantity, $unit)
+                """;
+            insert.Parameters.AddWithValue("$g", generation);
+            insert.Parameters.AddWithValue("$location", line.LocationId.ToString());
+            insert.Parameters.AddWithValue("$product", line.ProductId.ToString());
+            insert.Parameters.AddWithValue("$position", position);
+            insert.Parameters.AddWithValue("$quantity", quantities[position].Quantity.ToString(CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$unit", quantities[position].Unit);
+            insert.ExecuteNonQuery();
+        }
     }
 
     private static T Entity<T>(JsonElement entity) =>

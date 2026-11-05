@@ -16,7 +16,8 @@
 @* T-07 · Order entry: the Order Pad by category (T7.3) and search, and the Low tab (T-5.1.4, T7.1). Review comes later.
    T-5.2.1: the same screen opens a saved order by id; OrderTransitions decides which controls its standing gets.
    T-5.1.4: opened from Record call (the calls/{CallId} routes) it adds for that Call and goes back to it.
-   T-5.1.5: an order with no Call carries the gaps the shop's last Call left, and Record call links the order to a new one. *@
+   T-5.1.5: an order with no Call carries the gaps the shop's last Call left, and Record call links the order to a new one.
+   T-5.1.6: before it goes, a line far above what the shop usually orders reads "Usually about 48 here". It never blocks. *@
 <section class="new-order">
     <nav class="shop-back" aria-label="Order navigation"><a href="@BackHref">@(CallId is null ? "Back to shop" : "Back to call")</a></nav>
     @if (!Ready) { <h1>@Heading</h1><p role="status">Opening order…</p> }
@@ -101,6 +102,8 @@
                             <span class="line-total">@Money(line.Price.Amount * line.Quantity)</span>
                             @if (index is not null && !index.Contains(line.ProductId))
                             { <span class="captured-line-notice">@OrderStore.NoLongerAvailable</span> }
+                            @if (Marker(line) is { } marker)
+                            { <span class="quantity-marker" data-quantity-marker="@marker"><span aria-hidden="true">(!) </span>@marker</span> }
                             @if (editingLine == line.Id) { @ChangeLine(line) }
                             else if (CanChangeLines && confirm is null)
                             {
@@ -190,8 +193,18 @@
     private string? lowRecorded;
     // T-5.1.5: the shop's last Call gaps still open, read for an order with no Call.
     private CarriedLow? carried;
+    // T-5.1.6: each product's quantity on the shop's recent accepted orders, for the out-of-pattern marker.
+    private IReadOnlyDictionary<Guid, IReadOnlyList<OrderedQuantity>> orderedQuantities = NoQuantities;
+    private static readonly IReadOnlyDictionary<Guid, IReadOnlyList<OrderedQuantity>> NoQuantities =
+        new Dictionary<Guid, IReadOnlyList<OrderedQuantity>>();
 
     private string Heading => OrderId is null ? "New order" : "Order";
+
+    /// <summary>T-5.1.6 (D5): the marker while the order can still be changed or reopened — In Progress or Ready to Send. Text
+    /// only: it never blocks Mark Ready to Send and asks for nothing.</summary>
+    private string? Marker(OrderLine line) => Standing is OrderStanding.InProgress or OrderStanding.ReadyToSend
+        && orderedQuantities.TryGetValue(line.ProductId, out IReadOnlyList<OrderedQuantity>? history)
+            ? QuantityMarker.For(line, history, index?.Find(line.ProductId)?.QuantityStep) : null;
 
     private string BackHref => CallId is null ? $"/locations/{LocationId}" : $"/locations/{LocationId}/calls/new";
 
@@ -395,7 +408,7 @@
     protected override void Clear()
     {
         rep = null; detail = null; index = null; order = null; problem = null; readStanding = OrderStanding.New; sentUtc = null;
-        savedCall = null; carried = null; ResetEntry();
+        savedCall = null; carried = null; orderedQuantities = NoQuantities; ResetEntry();
     }
 
     private void ShowPad() { lowTab = false; CloseLow(); }
@@ -482,6 +495,7 @@
             OrderView? readView = null;
             TabletCall? readCall = null;
             CarriedLow? readCarried = null;
+            IReadOnlyDictionary<Guid, IReadOnlyList<OrderedQuantity>> readQuantities = NoQuantities;
             await Task.Run(() =>
             {
                 readDetail = Tablet.ReadLocation(repSubject, shop);
@@ -489,6 +503,8 @@
                 if (!saved && readDetail is not { IsAssigned: true }) return;
                 readIndex = Tablet.ReadProductIndex(repSubject);
                 readView = Tablet.ReadOrderView(repSubject, id);
+                // T-5.1.6: from the downloaded day, so the marker works offline (S18).
+                readQuantities = Tablet.ReadOrderedQuantities(repSubject, shop, readIndex);
                 // T-5.1.4 D4: once the Call is saved, its Low marks come from the saved Call.
                 if ((openedFrom ?? readView?.Order.CallId) is Guid call) readCall = Tablet.ReadCall(repSubject, call);
                 // T-5.1.5: with no Call, the gaps the shop's last Call left, from the same downloaded day as the products.
@@ -496,6 +512,7 @@
             });
             if (!isCurrent()) return;
             rep = repSubject; detail = readDetail; index = readIndex; savedCall = readCall; carried = readCarried;
+            orderedQuantities = readQuantities;
             order = readView?.Order; readStanding = readView?.Standing ?? OrderStanding.New; sentUtc = readView?.SentUtc;
             if (order is not null && order.LocationId != shop) problem = "This order is for a different shop.";
         }

@@ -211,6 +211,11 @@ public sealed class TabletApp : IDisposable
     public CarriedLow? ReadCarriedLow(string rep, Guid locationId, Guid orderId, ProductSearchIndex index) =>
         CarriedGaps.Read(device.Workspace(rep), locationId, orderId, index);
 
+    /// <summary>T-5.1.6: each product's quantity on the shop's recent accepted orders, from the same downloaded day as
+    /// <paramref name="index"/>, for the out-of-pattern marker on Review.</summary>
+    public IReadOnlyDictionary<Guid, IReadOnlyList<OrderedQuantity>> ReadOrderedQuantities(string rep, Guid locationId,
+        ProductSearchIndex index) => new SnapshotStore(device.Workspace(rep), clock).ReadOrderedQuantities(index.Generation, locationId);
+
     // Changing an unsent order before Sync (T-5.2.1); OrderTransitions decides what each standing allows.
     public OrderView? ReadOrderView(string rep, Guid orderId) => new OrderStore(device.Workspace(rep), clock).Read(orderId);
 
