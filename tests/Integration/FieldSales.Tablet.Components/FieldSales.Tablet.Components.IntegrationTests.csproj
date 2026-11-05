@@ -29,6 +29,7 @@
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/LocationDetail.razor" Link="LocationDetail.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/NewOrder.razor" Link="NewOrder.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/RecordCall.razor" Link="RecordCall.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/SavedCall.razor" Link="SavedCall.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Layout/SignOutControl.razor" Link="SignOutControl.razor" />
     <Using Include="Xunit" />
   </ItemGroup>
