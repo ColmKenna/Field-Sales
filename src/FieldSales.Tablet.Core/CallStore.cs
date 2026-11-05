@@ -14,10 +14,10 @@ public sealed record CallResult(TabletCall? Call, string? Error)
 /// <remarks>
 /// A Call is saved once, with the id the screen chose when it opened, so saving again with that id returns the Call
 /// already saved instead of recording a second one. There is no update: a saved Call is a record of what happened, and
-/// corrections (T-5.6.1) arrive as their own operation. The Call is judged as captured, so a shop reassigned since the
+/// corrections (T-5.6.1) are their own operation, <see cref="Correct"/>, which changes or removes and never adds. The Call is judged as captured, so a shop reassigned since the
 /// snapshot doesn't stop it saving; the snapshot it was captured against travels with it.
 /// </remarks>
-public sealed class CallStore(RepWorkspace workspace, TimeProvider? clock = null)
+public sealed partial class CallStore(RepWorkspace workspace, TimeProvider? clock = null)
 {
     public const string NotDownloaded = "Your day hasn't downloaded yet, so this call can't be saved. Sync first.";
 

@@ -51,7 +51,7 @@ public sealed class LocationContactStatusTests : IDisposable
     {
         TabletSnapshot original = Rathdrum();
         await tablet.SyncAsync(original);
-        UnsentStore work = tablet.SaveWork();
+        UnsentStore work = await tablet.SaveClaimedWorkAsync(original);
         string fingerprint = work.Fingerprint();
         string bytes = tablet.UnsentFileHash();
         foreach (bool inactive in new[] { true, false })
@@ -122,7 +122,7 @@ public sealed class LocationContactStatusTests : IDisposable
     {
         TabletSnapshot original = Rathdrum();
         await tablet.SyncAsync(original);
-        UnsentStore work = tablet.SaveWork();
+        UnsentStore work = await tablet.SaveClaimedWorkAsync(original);
         string fingerprint = work.Fingerprint();
         string bytes = tablet.UnsentFileHash();
         string generation = new SnapshotStore(tablet.Workspace()).ReadActive()!.Generation;
