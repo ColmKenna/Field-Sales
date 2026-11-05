@@ -206,7 +206,10 @@
         && orderedQuantities.TryGetValue(line.ProductId, out IReadOnlyList<OrderedQuantity>? history)
             ? QuantityMarker.For(line, history, index?.Find(line.ProductId)?.QuantityStep) : null;
 
-    private string BackHref => CallId is null ? $"/locations/{LocationId}" : $"/locations/{LocationId}/calls/new";
+    // Opened from a follow-up (T-5.7.1), Back to call returns to that follow-up.
+    private string BackHref => CallId is not { } call ? $"/locations/{LocationId}"
+        : rep is not null && Tablet.CallDrafts.OriginalOf(rep, Tablet.SessionVersion, call) is { } original
+            ? $"/locations/{LocationId}/calls/{original}/follow-up" : $"/locations/{LocationId}/calls/new";
 
     /// <summary>T-5.1.5 D5: Record call from the Low tab, for this order; saving the Call links the order to it.</summary>
     private string RecordCallHref => $"/locations/{LocationId}/orders/{orderId}/calls/new";
@@ -214,9 +217,10 @@
     /// <summary>The Call whose Low items the tab lists: the one order entry was opened from, else the one the order is linked to.</summary>
     private Guid? CallFor => CallId ?? order?.CallId;
 
-    /// <summary>That Call's draft while it is being recorded at this shop (the Low marks as they are now, and what was taken off).</summary>
+    /// <summary>That Call's draft while it is being recorded at this shop, new or a follow-up (the Low marks as they are now, and
+    /// what was taken off).</summary>
     private CallDraft? Draft => rep is not null && CallFor is { } call
-        && Tablet.CallDrafts.Read(rep, Tablet.SessionVersion, LocationId) is { } draft && draft.CallId == call ? draft : null;
+        ? Tablet.CallDrafts.ReadCall(rep, Tablet.SessionVersion, LocationId, call) : null;
 
     /// <summary>Each Low item's state, worked out from the Call and the order as it is now (D5).</summary>
     private LowList Low => Draft is { } draft ? draft.Low(order)
@@ -460,7 +464,7 @@
     {
         order = saved;
         if (rep is not null && CallId is not null && Draft is { } draft)
-            Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, LocationId, draft with { AddedToOrder = true });
+            Tablet.CallDrafts.KeepCall(rep, Tablet.SessionVersion, LocationId, draft with { AddedToOrder = true });
     }
 
     // D5: the one fact the order can't tell. A product whose line this screen took off (or whose order it deleted) reads REMOVED
@@ -469,7 +473,7 @@
     {
         if (rep is null || before is null || Draft is not { } draft) return;
         Guid[] gone = [.. before.Lines.Select(line => line.ProductId).Except(after?.Lines.Select(line => line.ProductId) ?? [])];
-        if (gone.Length > 0) Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, LocationId, draft.TakeOff(gone));
+        if (gone.Length > 0) Tablet.CallDrafts.KeepCall(rep, Tablet.SessionVersion, LocationId, draft.TakeOff(gone));
     }
 
     private void Toggle(Guid category) { if (!expanded.Remove(category)) expanded.Add(category); }

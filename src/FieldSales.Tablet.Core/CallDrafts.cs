@@ -130,6 +130,8 @@ public sealed class CallDrafts
     // T-5.6.1 (WI-055 D6): a correction being made to a saved Call, kept apart from a Call being recorded at the same shop.
     private (string Rep, long Version, CallDraft Draft)? editing;
     private (string Rep, long Version, Guid Call)? corrected;
+    // T-5.7.1 (WI-056 D2): a follow-up being recorded, kept apart from a Call being recorded or corrected at the same shop.
+    private (string Rep, long Version, Guid Location, Guid Original, CallDraft Draft)? followingUp;
 
     public CallDraft? Read(string rep, long version, Guid location) =>
         kept is { } draft && draft.Rep == rep && draft.Version == version && draft.Location == location ? draft.Draft : null;
@@ -164,6 +166,39 @@ public sealed class CallDrafts
         editing = null;
         corrected = (rep, version, call);
     }
+
+    /// <summary>The follow-up being recorded to Call <paramref name="original"/> (T-5.7.1), restored when the page is rebuilt.</summary>
+    public CallDraft? ReadFollowUp(string rep, long version, Guid original) =>
+        followingUp is { } next && next.Rep == rep && next.Version == version && next.Original == original ? next.Draft : null;
+
+    public void KeepFollowUp(string rep, long version, Guid location, Guid original, CallDraft? draft) =>
+        followingUp = draft is null ? null : (rep, version, location, original, draft);
+
+    /// <summary>The follow-up at this shop was saved: it goes, and the shop screen says so once. A Call being recorded there stays.</summary>
+    public void FollowedUp(string rep, long version, Guid location)
+    {
+        followingUp = null;
+        saved = (rep, version, location);
+    }
+
+    /// <summary>The draft of Call <paramref name="call"/> being recorded at this shop, new or a follow-up, for order entry opened from it.</summary>
+    public CallDraft? ReadCall(string rep, long version, Guid location, Guid call) =>
+        Read(rep, version, location) is { } draft && draft.CallId == call ? draft
+        : followingUp is { } next && next.Rep == rep && next.Version == version && next.Location == location && next.Draft.CallId == call
+            ? next.Draft : null;
+
+    /// <summary>Keeps <paramref name="draft"/> where it came from: the follow-up's slot when it is that follow-up, else the shop's.</summary>
+    public void KeepCall(string rep, long version, Guid location, CallDraft draft)
+    {
+        if (followingUp is { } next && next.Rep == rep && next.Version == version && next.Location == location
+            && next.Draft.CallId == draft.CallId)
+            followingUp = next with { Draft = draft };
+        else Keep(rep, version, location, draft);
+    }
+
+    /// <summary>The Call that <paramref name="call"/>, a follow-up being recorded, follows up; null for any other Call.</summary>
+    public Guid? OriginalOf(string rep, long version, Guid call) =>
+        followingUp is { } next && next.Rep == rep && next.Version == version && next.Draft.CallId == call ? next.Original : null;
 
     /// <summary>True once after a correction, for the same rep, session and Call.</summary>
     public bool TakeCorrected(string rep, long version, Guid call)

@@ -1,6 +1,7 @@
 @page "/locations/{Id:guid}/calls/new"
 @page "/locations/{Id:guid}/orders/{OrderId:guid}/calls/new"
 @page "/locations/{Id:guid}/calls/{CallId:guid}/edit"
+@page "/locations/{Id:guid}/calls/{FollowUpOf:guid}/follow-up"
 @inherits OfflineCataloguePage
 @using FieldSales.Calls.Contracts
 @using FieldSales.Ordering.Contracts
@@ -14,20 +15,28 @@
    order entry for it; Back returns to the order.
    T-5.6.1 (US-015): the calls/{CallId}/edit route is Edit Call, for a saved Call before Sync. It changes and removes what was
    recorded and never adds: no Add product, catalogue search, Add count, count on a Not checked row, new pitch notes, Add to order or
-   Open order, and no Delete. "Record a follow-up call" stands where adding would be (WI-055 D2, D3). *@
+   Open order, and no Delete. "Record a follow-up call" stands where adding would be (WI-055 D2, D3).
+   T-5.7.1 (US-016): the calls/{FollowUpOf}/follow-up route records a follow-up: a new Call at the shop, linked to the one it follows
+   up, with its own channel (none chosen) and an empty stock section; notes, Add to order and Open order as for a new Call. Its draft
+   is kept apart, so a Call being recorded at the shop isn't lost (WI-056 D2). *@
 <section class="record-call">
     <nav class="shop-back" aria-label="Call navigation">
         <a href="@BackHref" @onclick="BackToShop" @onclick:preventDefault="true">@BackLabel</a>
     </nav>
     @if (!Ready) { <h1>Record call</h1><p role="status">Opening call…</p> }
-    else if (problem is not null) { <h1>@(Editing ? "Edit call unavailable" : "Record call unavailable")</h1><p role="alert">@problem</p> }
+    else if (problem is not null) { <h1>@Unavailable</h1><p role="alert">@problem</p> }
     else if (Editing && original is null) { <h1>Edit call unavailable</h1><p role="alert">@CallStore.NotOnTablet</p> }
-    else if (!Editing && detail is not { IsAssigned: true }) { <h1>Record call unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
+    else if (!Editing && detail is not { IsAssigned: true }) { <h1>@Unavailable</h1><p role="alert">@OrderStore.NotAssigned</p> }
+    else if (FollowingUp && followed is null) { <h1>@Unavailable</h1><p role="alert">@CallStore.FollowUpOfMissing</p> }
     else
     {
         <header class="order-header">
-            <h1>@(Editing ? "Edit call" : "Record call")</h1>
+            <h1>@(Editing ? "Edit call" : FollowingUp ? "Follow-up call" : "Record call")</h1>
             <p class="order-shop">@(detail?.Location.Name ?? "Shop details unavailable")</p>
+            @if (followed is { } earlier)
+            {
+                <p class="call-meta">Following up your call on @earlier.CalledOn.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</p>
+            }
         </header>
         <fieldset class="call-channel">
             <legend>How</legend>
@@ -105,8 +114,18 @@
     [Parameter] public Guid? OrderId { get; set; }
     /// <summary>The saved Call Edit Call corrects (T-5.6.1); absent when recording a new Call.</summary>
     [Parameter] public Guid? CallId { get; set; }
+    /// <summary>The saved Call a follow-up follows up (T-5.7.1); absent otherwise.</summary>
+    [Parameter] public Guid? FollowUpOf { get; set; }
 
     private bool Editing => CallId is not null;
+    private bool FollowingUp => !Editing && FollowUpOf is not null;
+    // T-5.7.1: the Call this follow-up follows up, when this tablet holds it at this shop.
+    private TabletCall? followed;
+
+    private string Unavailable => Editing ? "Edit call unavailable" : FollowingUp ? "Follow-up call unavailable" : "Record call unavailable";
+
+    /// <summary>A follow-up's stock section before anything is added (D2): it is about what was forgotten or done later.</summary>
+    public const string NothingFollowedUp = "Nothing added yet — add the products this follow-up is about";
     // T-5.6.1: the saved Call as it was, what it recorded (which lines had a count, whether it had notes) and whether it can change.
     private TabletCall? original;
     private HashSet<Guid> countedBefore = [];
@@ -146,7 +165,7 @@
     {
         rep = null; detail = null; problem = null; draft = New(); message = null; reviewing = false; leaving = false;
         start = StockCheckStart.Empty; CloseAdding(); filter = ""; filterFound = new([], 0); ++filterRevision;
-        callOrder = null; ordering = null; orderError = null; original = null; countedBefore = []; hadNotes = false;
+        callOrder = null; ordering = null; orderError = null; original = null; countedBefore = []; hadNotes = false; followed = null;
     }
 
     protected override async Task ReadAsync(string repSubject, Func<bool> isCurrent)
@@ -154,17 +173,23 @@
         if (CallId is Guid editing) { await ReadEditAsync(repSubject, isCurrent, editing); return; }
         Guid shop = Id;
         Guid? orderFrom = OrderId;
+        Guid? followUpOf = FollowingUp ? FollowUpOf : null;
         try
         {
             // A resume rebuilds this page; the Call being recorded comes back, with the same id and its stock rows.
-            CallDraft restored = Tablet.CallDrafts.Read(repSubject, Tablet.SessionVersion, shop) ?? New();
+            CallDraft restored = (followUpOf is { } of
+                ? Tablet.CallDrafts.ReadFollowUp(repSubject, Tablet.SessionVersion, of)
+                : Tablet.CallDrafts.Read(repSubject, Tablet.SessionVersion, shop)) ?? New();
             OfflineLocationDetail? read = null;
             StockCheckStart readStart = StockCheckStart.Empty;
             TabletOrder? readOrder = null;
+            TabletCall? readFollowed = null;
             await Task.Run(() =>
             {
                 read = Tablet.ReadLocation(repSubject, shop);
                 if (read is not { IsAssigned: true }) return;
+                if (followUpOf is { } earlier && Tablet.ReadCallView(repSubject, earlier) is { } view && view.Call.LocationId == shop)
+                    readFollowed = view.Call;
                 readStart = Tablet.ReadStockCheckStart(repSubject, shop);
                 // Opened from an order's Low tab, the Call adds to that order (T-5.1.5); otherwise to the one T-5.5.1 picks.
                 readOrder = orderFrom is { } from
@@ -172,10 +197,11 @@
                     : Tablet.ReadCallOrder(repSubject, restored.CallId, shop);
             });
             if (!isCurrent()) return;
-            rep = repSubject; detail = read; start = readStart; callOrder = readOrder;
+            rep = repSubject; detail = read; start = readStart; callOrder = readOrder; followed = readFollowed;
             draft = restored;
+            // A follow-up starts with no rows (D2); a new Call from the shop's Suggested List.
             if (draft.Stock is null)
-                draft = draft with { Stock = [.. start.Suggested.Select(row => new StockLine(row.Product, row.Sources))] };
+                draft = draft with { Stock = followUpOf is not null ? [] : [.. start.Suggested.Select(row => new StockLine(row.Product, row.Sources))] };
         }
         catch (Exception error) when (error is InvalidDataException or IOException or Microsoft.Data.Sqlite.SqliteException)
         {
@@ -227,9 +253,16 @@
     {
         draft = changed;
         message = null;
+        KeepDraft(draft);
+    }
+
+    /// <summary>Keeps the draft in its own slot (Edit Call, a follow-up, or the Call being recorded at the shop); null lets it go.</summary>
+    private void KeepDraft(CallDraft? kept)
+    {
         if (rep is null) return;
-        if (Editing) Tablet.CallDrafts.KeepEdit(rep, Tablet.SessionVersion, draft);
-        else Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, draft);
+        if (Editing) Tablet.CallDrafts.KeepEdit(rep, Tablet.SessionVersion, kept);
+        else if (FollowingUp) Tablet.CallDrafts.KeepFollowUp(rep, Tablet.SessionVersion, Id, FollowUpOf!.Value, kept);
+        else Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, kept);
     }
 
     private void Choose(CallChannel channel) { if (!busy) Change(draft with { Channel = channel }); }
@@ -255,6 +288,7 @@
         CallDraft saving = draft;
         Guid? orderFrom = OrderId;
         bool editing = Editing;
+        Guid? followUpOf = FollowingUp ? FollowUpOf : null;
         long version = Tablet.SessionVersion;
         try
         {
@@ -262,6 +296,8 @@
             CallResult result = await Task.Run(() =>
             {
                 if (editing) return Tablet.CorrectCall(repSubject, saving.CallId, shop, saving.Content);
+                // T-5.7.1: a follow-up saves as a new Call linked to the one it follows up.
+                if (followUpOf is { } earlier) return Tablet.SaveCall(repSubject, saving.CallId, shop, saving.Content, earlier);
                 CallResult saved = Tablet.SaveCall(repSubject, saving.CallId, shop, saving.Content);
                 // T-5.1.5 D5: the order whose Low tab opened this Call is linked to it once the Call is saved.
                 if (saved.Succeeded && orderFrom is { } from) link = Tablet.LinkOrderToCall(repSubject, from, saving.CallId);
@@ -272,6 +308,12 @@
             {
                 Tablet.CallDrafts.Corrected(repSubject, version, saving.CallId);
                 Navigation.NavigateTo($"/locations/{shop}/calls/{saving.CallId}");
+                return;
+            }
+            if (result.Succeeded && followUpOf is not null)
+            {
+                Tablet.CallDrafts.FollowedUp(repSubject, version, shop);
+                Navigation.NavigateTo($"/locations/{shop}");
                 return;
             }
             if (result.Succeeded)
@@ -311,7 +353,7 @@
         </header>
         @if (adding && !draft.Mentioning && !Editing) { @AddProduct }
         @if (draft.Mentioning) { @FilterOrSearch }
-        @if (draft.Lines.Count == 0) { <p class="stock-empty">@SuggestedList.Empty</p> }
+        @if (draft.Lines.Count == 0) { <p class="stock-empty">@(FollowingUp ? NothingFollowedUp : SuggestedList.Empty)</p> }
         else if (Shown.Count > 0)
         {
             <ul class="stock-lines">
@@ -618,7 +660,7 @@
     private void OpenOrder()
     {
         if (busy || rep is null) return;
-        Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, draft);
+        KeepDraft(draft);
         Navigation.NavigateTo(callOrder is { } order
             ? $"/locations/{Id}/calls/{draft.CallId}/orders/{order.Id}"
             : $"/locations/{Id}/calls/{draft.CallId}/orders/new");
@@ -633,17 +675,13 @@
 
     private void Leave()
     {
-        if (rep is not null)
-        {
-            if (Editing) Tablet.CallDrafts.KeepEdit(rep, Tablet.SessionVersion, null);
-            else Tablet.CallDrafts.Keep(rep, Tablet.SessionVersion, Id, null);
-        }
+        KeepDraft(null);
         Navigation.NavigateTo(BackHref);
     }
 
-    // T-5.6.1 (D3): until WI-056 links it, the follow-up is a new Call at the shop.
+    // T-5.6.1 (D3), T-5.7.1 (WI-056 D3): the follow-up for the Call being corrected.
     private RenderFragment FollowUp => @<button type="button" class="secondary" disabled="@busy"
-        @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/new"))">Record a follow-up call</button>;
+        @onclick="@(() => Navigation.NavigateTo($"/locations/{Id}/calls/{CallId}/follow-up"))">Record a follow-up call</button>;
 
     /// <summary>T-5.6.1: the saved Call as Edit Call starts it — its channel, notes and lines, each with what it recorded.</summary>
     private static CallDraft FromCall(TabletCall call, ProductSearchIndex products) => new(call.Id, call.Channel, call.PitchNotes ?? "",

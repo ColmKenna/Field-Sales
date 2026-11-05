@@ -188,6 +188,10 @@ public sealed class TabletApp : IDisposable
     public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content) =>
         new CallStore(device.Workspace(rep), clock).Save(callId, locationId, content);
 
+    /// <summary>T-5.7.1: a follow-up, saved as a new Call linked to the one it follows up.</summary>
+    public CallResult SaveCall(string rep, Guid callId, Guid locationId, CallContent content, Guid followUpOf) =>
+        new CallStore(device.Workspace(rep), clock).Save(callId, locationId, content, followUpOf);
+
     // Adding to the order from a Call (T-5.5.1): the Call's order is found or started under the order gate.
     public TabletOrder? ReadCallOrder(string rep, Guid callId, Guid locationId) =>
         new OrderStore(device.Workspace(rep), clock).FindForCall(callId, locationId);
