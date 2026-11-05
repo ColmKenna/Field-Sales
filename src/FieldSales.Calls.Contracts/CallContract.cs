@@ -83,15 +83,17 @@ public sealed record CallSnapshotRef(string Version, DateTimeOffset BuiltUtc);
 /// none.</param>
 /// <param name="FollowUpOf">The earlier Call at the same Location this one follows up (T-5.7.1): what was forgotten or done later,
 /// recorded as a new Call instead of rewriting the original. Absent on a Call that follows nothing up.</param>
+/// <param name="CompetitorNotes">T-5.8.1 Competitor Notes, each saved separately with one link type. Absent when there are none.</param>
 public sealed record TabletCall(string Schema, int Version, Guid Id, Guid LocationId, string CapturingRep, DateOnly CalledOn,
     DateTimeOffset SavedAt, CallChannel Channel, CallSnapshotRef Snapshot,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? PitchNotes = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<CallStockEntry>? StockEntries = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? FollowUpOf = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? FollowUpOf = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<CallCompetitorNote>? CompetitorNotes = null)
 {
     /// <summary>What the Call records, for the same checks and summary the tablet used before saving.</summary>
     [JsonIgnore]
-    public CallContent Content => new(Channel, PitchNotes, StockEntries);
+    public CallContent Content => new(Channel, PitchNotes, StockEntries, CompetitorNotes);
 }
 
 /// <summary>One product on a Stock Check. Code and name are kept as captured, like an order line, so the entry still reads
@@ -115,9 +117,11 @@ public sealed record CallStockEntry(Guid ProductId, string ProductCode, string P
 
 /// <summary>What a Call records apart from who, where and when: the part the rep fills in on T-06. The tablet checks a
 /// draft with it before saving, and the server checks a received Call with it. Later sections add their parts here.</summary>
-public sealed record CallContent(CallChannel? Channel, string? PitchNotes, IReadOnlyList<CallStockEntry>? StockEntries = null)
+public sealed record CallContent(CallChannel? Channel, string? PitchNotes, IReadOnlyList<CallStockEntry>? StockEntries = null,
+    IReadOnlyList<CallCompetitorNote>? CompetitorNotes = null)
 {
     private IReadOnlyList<CallStockEntry> Stock => StockEntries ?? [];
+    private IReadOnlyList<CallCompetitorNote> Competitor => CompetitorNotes ?? [];
 
     /// <summary>The notes as they are saved: trimmed, and null when blank.</summary>
     public string? Notes => string.IsNullOrWhiteSpace(PitchNotes) ? null : PitchNotes.Trim();
@@ -133,9 +137,12 @@ public sealed record CallContent(CallChannel? Channel, string? PitchNotes, IRead
     /// entirely Not checked records nothing.</summary>
     public bool HasStockCheck => Counted > 0;
 
-    /// <summary>Whether anything was recorded: a Low mark counts on either channel (T-5.3.2 D3). Competitor notes (T-5.8.1)
-    /// will count too.</summary>
-    public bool RecordsSomething => HasPitch || HasStockCheck || Low > 0;
+    /// <summary>The Competitor Notes as they are saved (T-5.8.1): each with its text trimmed; null when there are none.</summary>
+    public IReadOnlyList<CallCompetitorNote>? SavedNotes => Competitor.Count == 0 ? null : [.. Competitor.Select(note => note.Trimmed())];
+
+    /// <summary>Whether anything was recorded: a Low mark counts on either channel (T-5.3.2 D3), and so does a Competitor Note
+    /// (T-5.8.1 D2).</summary>
+    public bool RecordsSomething => HasPitch || HasStockCheck || Low > 0 || Competitor.Count > 0;
 
     /// <summary>Why this can't be saved yet, in the rep's words, or null when it can.</summary>
     public string? Problem =>
@@ -144,24 +151,24 @@ public sealed record CallContent(CallChannel? Channel, string? PitchNotes, IRead
         : Channel == CallChannel.Phone && !Stock.All(entry => entry.Mentioned) ? CallContract.MentionedOnly
         : !RecordsSomething ? CallContract.RecordSomething
         : Notes?.Length > CallContract.MaximumPitchNotesLength ? CallContract.PitchNotesTooLong
-        : null;
+        : Competitor.Select(note => note.Problem).FirstOrDefault(problem => problem is not null);
 
     /// <summary>The save review's one line, e.g. "In person · Pitch notes · 10 counted, 3 not checked · 2 Low", or on Phone
     /// "Phone · 2 marked Low (1 out)". Competitor notes (T-5.8.1) add "1 competitor note" last.</summary>
-    public string Summary => string.Join(" · ", Parts());
+    public string Summary => string.Join(" · ", Parts().Where(part => part.Length > 0));
 
     private IEnumerable<string> Parts()
     {
         if (Channel is { } channel) yield return CallContract.Label(channel);
         if (HasPitch) yield return "Pitch notes";
-        if (Stock.Count == 0) yield break;
-        if (Channel == CallChannel.Phone)
-        {
+        if (Stock.Count > 0 && Channel == CallChannel.Phone)
             yield return MentionedSummary(Low, Out, Stock.Count(entry => entry.Counted && !entry.Low));
-            yield break;
+        else if (Stock.Count > 0)
+        {
+            yield return StockSummary(Counted, NotChecked);
+            if (Low > 0) yield return $"{Low} Low";
         }
-        yield return StockSummary(Counted, NotChecked);
-        if (Low > 0) yield return $"{Low} Low";
+        if (Competitor.Count > 0) yield return CallCompetitorNote.Count(Competitor.Count);
     }
 
     /// <summary>Stock mentioned on a phone Call (T-5.3.2 D4): "2 marked Low (1 out) · 1 counted", leaving out "(… out)" at 0
@@ -185,4 +192,5 @@ public sealed record CallContent(CallChannel? Channel, string? PitchNotes, IRead
 [JsonSerializable(typeof(TabletCall))]
 [JsonSerializable(typeof(CallSnapshotRef))]
 [JsonSerializable(typeof(CallStockEntry))]
+[JsonSerializable(typeof(CallCompetitorNote))]
 public sealed partial class CallJsonContext : JsonSerializerContext;

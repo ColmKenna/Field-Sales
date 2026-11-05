@@ -3,6 +3,17 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-057 competitor notes on a call (2026-11-05, developer, plan approval)
+
+The developer answered the WI-057 questions, replied **Approved** to the plan with D1–D10, then **Apply**. Full text in `WI-057.md`.
+
+- **Notes:** several free-text notes per Call, each with one link type (None, Products, one Range, one Category); links keep their
+  captured name. A note counts as recorded; the save review ends "3 competitor notes".
+- **Picker:** this Call's products with a count or a Low mark come first, then search of everything downloaded.
+- **Range** is offered with nothing to pick ("No ranges on this tablet yet") until E9 brings Ranges.
+- **Edit Call** changes a note's text and removes notes; links stay; nothing is added. This completes US-015 S2.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-056 follow-up calls (2026-11-05, developer, plan approval)
 
 The developer answered the WI-056 questions, replied **Approved** to the plan with D1–D8, then **Apply**. Full text in `WI-056.md`.

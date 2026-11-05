@@ -14,6 +14,7 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
     public DbSet<ReceivedOrder> Orders => Set<ReceivedOrder>();
     public DbSet<ReceivedCall> Calls => Set<ReceivedCall>();
     public DbSet<ReceivedCallStockEntry> CallStockEntries => Set<ReceivedCallStockEntry>();
+    public DbSet<ReceivedCallCompetitorNote> CallCompetitorNotes => Set<ReceivedCallCompetitorNote>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,7 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
         calls.Property(item => item.Channel).HasConversion<string>().HasMaxLength(20).IsUnicode(false);
         calls.HasOne<ReceivedWork>().WithOne().HasForeignKey<ReceivedCall>(item => item.Id).OnDelete(DeleteBehavior.Restrict);
         calls.HasMany(item => item.StockEntries).WithOne().HasForeignKey(entry => entry.CallId).OnDelete(DeleteBehavior.Cascade);
+        calls.HasMany(item => item.CompetitorNotes).WithOne().HasForeignKey(note => note.CallId).OnDelete(DeleteBehavior.Cascade);
         // A Location's last Stock Check is its newest In-person Call with stock entries (T-5.4.1).
         calls.HasIndex(item => new { item.LocationId, item.Channel, item.SavedAt });
 
@@ -64,6 +66,25 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
         entries.HasKey(entry => new { entry.CallId, entry.ProductId });
         entries.Property(entry => entry.Unit).HasMaxLength(20).IsUnicode(false);
         entries.Property(entry => entry.Count).HasPrecision(18, 6);
+
+        // T-5.8.1: one link type per note; a Range or Category note names exactly that, None and Products name neither.
+        var notes = modelBuilder.Entity<ReceivedCallCompetitorNote>();
+        notes.ToTable("ReceivedCallCompetitorNotes", table => table.HasCheckConstraint("CK_ReceivedCallCompetitorNotes_Link", """
+            LEN([Text]) > 0 AND (
+                ([LinkTo] = 'Range' AND [RangeId] IS NOT NULL AND [CategoryId] IS NULL)
+                OR ([LinkTo] = 'Category' AND [CategoryId] IS NOT NULL AND [RangeId] IS NULL)
+                OR ([LinkTo] IN ('None', 'Products') AND [RangeId] IS NULL AND [CategoryId] IS NULL))
+            """.ReplaceLineEndings("\n")));
+        notes.HasKey(note => new { note.CallId, note.Id });
+        notes.Property(note => note.Text).HasMaxLength(FieldSales.Calls.Contracts.CallCompetitorNote.MaximumTextLength);
+        notes.Property(note => note.LinkTo).HasConversion<string>().HasMaxLength(20).IsUnicode(false);
+        notes.HasMany(note => note.Products).WithOne().HasForeignKey(product => new { product.CallId, product.NoteId })
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var linked = modelBuilder.Entity<ReceivedCallCompetitorNoteProduct>();
+        linked.ToTable("ReceivedCallCompetitorNoteProducts", table => table.HasCheckConstraint(
+            "CK_ReceivedCallCompetitorNoteProducts_Product", "[ProductId] <> '00000000-0000-0000-0000-000000000000'"));
+        linked.HasKey(product => new { product.CallId, product.NoteId, product.ProductId });
     }
 }
 
