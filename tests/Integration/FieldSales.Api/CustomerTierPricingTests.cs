@@ -123,14 +123,14 @@ public sealed class CustomerTierPricingTests(TabletSnapshotFixture fixture) : IC
     {
         Shelf shelf = await ShelfAsync();
         (Guid customer, Guid[] locations) = await HickeysAsync(2);
-        (_, Guid deal) = await TiersAsync(customer, shelf);
+        (Guid tierB, _) = await TiersAsync(customer, shelf);
         Guid orderId = await OrderAsync(locations[0], (shelf.Spf30, 10.00m, "Suncare Deal 2027"));
+        using HttpClient client = HeadOffice();
 
-        await using (AsyncServiceScope scope = _app.Api.Services.CreateAsyncScope())
-        {
-            CatalogueDbContext db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
-            Assert.Equal(1, await db.CustomerPriceTiers.Where(link => link.CustomerId == customer && link.PriceTierId == deal).ExecuteDeleteAsync());
-        }
+        // Head office saves the customer's tiers without the deal.
+        using HttpResponseMessage removed = await client.PutAsJsonAsync($"/pricing/customers/{customer}/tiers", new SetCustomerTiersRequest([tierB]));
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Equal([tierB], (await client.GetFromJsonAsync<CustomerTiersDetails>($"/pricing/customers/{customer}/tiers"))!.HeldTierIds);
 
         Assert.Equal((PriceKinds.Tier, "Tier B", 11.50m), Winner(await ResolveAsync(locations[0], shelf.Spf30)));
         await using AsyncServiceScope stored = _app.Api.Services.CreateAsyncScope();
