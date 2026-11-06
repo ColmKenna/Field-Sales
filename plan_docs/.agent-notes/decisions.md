@@ -11,6 +11,17 @@ and its scenarios are assumed approved; Apply and checkpoint triggers are taken 
 after CI (merge commit, branch kept) and local main updated before the next starts. Assumed decisions are marked "(assumed)" in
 each item's notes. Work still stops for CI failures, failing suites, or anything destructive outside an item's own footprint.
 
+## WI-064 customer prices on the tablet (2026-11-06, assumed approval)
+
+Full text in `WI-064.md`.
+
+- **Snapshot 1.6** carries the tiers held by the customers of the rep's assigned Locations, their terms for included products,
+  and each included product's quantity breaks. (A contract change normally reviewed by its owner; assumed approved.)
+- **Every price on the tablet comes from the engine:** the Order Pad (at the smallest orderable quantity), the quantity popover (at
+  the quantity typed) and a new line's captured price and source.
+- **A list-price winner is captured as before** ("Base price"); tier and break winners carry their own source.
+- **Later quantity changes keep the captured price** (WI-059's rule, kept); WI-066's break prompts will need this revisited.
+
 ## WI-063 tiers on a customer (2026-11-06, assumed approval)
 
 Full text in `WI-063.md`.
