@@ -448,6 +448,21 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Pricing.CustomerPriceTier", b =>
+                {
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PriceTierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("CustomerId", "PriceTierId");
+
+                    b.HasIndex("PriceTierId");
+
+                    b.ToTable("CustomerPriceTiers", (string)null);
+                });
+
             modelBuilder.Entity("FieldSales.Api.Pricing.PriceTier", b =>
                 {
                     b.Property<Guid>("Id")
@@ -607,6 +622,15 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.HasOne("FieldSales.Api.Catalogue.RestrictionGroup", null)
                         .WithMany()
                         .HasForeignKey("RestrictionGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Pricing.CustomerPriceTier", b =>
+                {
+                    b.HasOne("FieldSales.Api.Pricing.PriceTier", null)
+                        .WithMany()
+                        .HasForeignKey("PriceTierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

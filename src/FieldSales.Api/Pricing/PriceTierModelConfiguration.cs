@@ -35,5 +35,12 @@ public static class PriceTierModelConfiguration
         overrides.Ignore(entry => entry.Term);
         overrides.HasOne<Product>().WithMany().HasForeignKey(entry => entry.ProductId).OnDelete(DeleteBehavior.Restrict);
         overrides.HasIndex(entry => entry.ProductId);
+
+        // WI-063 D1: which tiers each customer holds. The customer lives in the Directory database, so it has no foreign key here.
+        var held = modelBuilder.Entity<CustomerPriceTier>();
+        held.ToTable("CustomerPriceTiers");
+        held.HasKey(link => new { link.CustomerId, link.PriceTierId });
+        held.HasOne<PriceTier>().WithMany().HasForeignKey(link => link.PriceTierId).OnDelete(DeleteBehavior.Restrict);
+        held.HasIndex(link => link.PriceTierId);
     }
 }
