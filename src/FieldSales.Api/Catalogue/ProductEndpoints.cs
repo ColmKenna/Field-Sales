@@ -31,6 +31,7 @@ public static class ProductEndpoints
             TimeProvider clock, CancellationToken cancellationToken) =>
         {
             Product? product = await db.Products.AsNoTracking().Include(product => product.BasePrices)
+                .Include(product => product.QuantityBreaks)
                 .Include(product => product.AttributeValues).ThenInclude(value => value.AttributeName)
                 .AsSplitQuery()
                 .SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
@@ -60,13 +61,15 @@ public static class ProductEndpoints
                     await ActiveChoicesAsync(db.Brands, cancellationToken),
                     await ActiveChoicesAsync(db.Suppliers, cancellationToken),
                     await ActiveChoicesAsync(db.RestrictionGroups, cancellationToken)),
-                await ActiveChoicesAsync(db.AttributeNames, cancellationToken)));
+                await ActiveChoicesAsync(db.AttributeNames, cancellationToken),
+                QuantityBreakItems(product, price?.Amount)));
         });
 
         products.MapGet("/search", ProductSearchQuery.SearchAsync);
         products.MapPost("/", CreateAsync);
         products.MapPut("/{id:guid}/unit", SetUnitAsync);
         products.MapPost("/{id:guid}/base-prices", AddBasePriceAsync);
+        products.MapPut("/{id:guid}/quantity-breaks", SetQuantityBreaksAsync);
         products.MapPut("/{id:guid}/classification", SetClassificationAsync);
         products.MapPost("/{id:guid}/attributes", AddAttributeAsync);
     }
@@ -161,10 +164,14 @@ public static class ProductEndpoints
     private static async Task<IResult> SetUnitAsync(Guid id, SetProductUnitRequest request,
         CatalogueDbContext db, CancellationToken cancellationToken)
     {
-        Product? product = await db.Products.SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
+        Product? product = await db.Products.Include(product => product.QuantityBreaks)
+            .SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
         if (product is null) return Results.NotFound();
         if (!QuantityRules.TryCreate(request.Unit, request.QuantityStep, request.MinimumQuantity, out var rules, out var errors))
             return Results.ValidationProblem(errors.ToDictionary(error => error.Key, error => error.Value));
+        // WI-062 D5: a break the new rules wouldn't allow must be changed or removed first.
+        if (product.BreaksMisfit(rules) is { } misfit)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["Unit"] = [misfit] });
         // No order records exist in this slice. Order capture must supply actual usage here
         // before unit changes on ordered products can be offered (historical changes: WI-068).
         product.SetQuantityRules(rules, hasOrders: false);
@@ -205,6 +212,36 @@ public static class ProductEndpoints
         return Results.Created($"/catalogue/products/{id}",
             new ProductPriceItem(effectiveFrom, request.BasePrice.Value));
     }
+
+    // WI-062 D2: the whole set at once, replacing the product's breaks; D3's rules, field by field.
+    private static async Task<IResult> SetQuantityBreaksAsync(Guid id, SetProductQuantityBreaksRequest request,
+        CatalogueDbContext db, CancellationToken cancellationToken)
+    {
+        Product? product = await db.Products.Include(product => product.QuantityBreaks)
+            .SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
+        if (product is null) return Results.NotFound();
+        if (request.Breaks is null)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["Breaks"] = ["Send the product's breaks."] });
+        QuantityBreakInput[] breaks = [.. request.Breaks.Select(entry => new QuantityBreakInput(entry?.FromQuantity, entry?.Price))];
+        if (QuantityBreakRules.Validate(product.GetQuantityRules(), breaks) is { Count: > 0 } errors)
+            return Results.ValidationProblem(errors);
+        product.SetQuantityBreaks(breaks);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception is DbUpdateConcurrencyException || SqlServerErrors.IsUniqueViolation(exception))
+        {
+            // Another save of this product's breaks landed first.
+            return Results.Conflict(new ProductSaveError(string.Empty, "These breaks changed while you were saving. Reload them and try again."));
+        }
+        return Results.NoContent();
+    }
+
+    /// <summary>The product's breaks by quantity, each flagged when it will never apply (WI-062 D4).</summary>
+    private static ProductQuantityBreakItem[] QuantityBreakItems(Product product, decimal? basePriceToday) =>
+        [.. product.QuantityBreaks.Select(entry => new ProductQuantityBreakItem(entry.FromQuantity, entry.Price,
+            entry.IsAboveCheaperBreak(product.QuantityBreaks), entry.IsAboveBase(basePriceToday)))];
 
     private static IResult DuplicatePrice(DateOnly effectiveFrom) => Results.Conflict(
         new ProductSaveError("EffectiveFrom",

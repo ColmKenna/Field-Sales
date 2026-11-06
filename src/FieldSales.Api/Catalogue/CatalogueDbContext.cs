@@ -10,6 +10,7 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductBasePrice> ProductBasePrices => Set<ProductBasePrice>();
+    public DbSet<ProductQuantityBreak> ProductQuantityBreaks => Set<ProductQuantityBreak>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<ProductAlternativeBrand> ProductAlternativeBrands => Set<ProductAlternativeBrand>();
     public DbSet<ProductProfile> ProductProfiles => Set<ProductProfile>();
@@ -107,6 +108,20 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
                 .HasForeignKey(price => price.ProductId).OnDelete(DeleteBehavior.Restrict);
             entity.Navigation(product => product.BasePrices).HasField("_basePrices")
                 .UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasMany(product => product.QuantityBreaks).WithOne()
+                .HasForeignKey(entry => entry.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(product => product.QuantityBreaks).HasField("_quantityBreaks")
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        // WI-062 D1: a product's quantity breaks; prices only, never a resolved price.
+        modelBuilder.Entity<ProductQuantityBreak>(entity =>
+        {
+            entity.ToTable("ProductQuantityBreaks", table => table.HasCheckConstraint(
+                "CK_ProductQuantityBreaks_Positive", "[FromQuantity] > 0 AND [Price] > 0"));
+            entity.HasKey(entry => new { entry.ProductId, entry.FromQuantity });
+            entity.Property(entry => entry.FromQuantity).HasPrecision(Quantity.Precision, Quantity.Scale);
+            entity.Property(entry => entry.Price).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<ProductBasePrice>(entity =>

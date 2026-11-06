@@ -277,6 +277,27 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.ToTable("ProductProfiles", (string)null);
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Catalogue.ProductQuantityBreak", b =>
+                {
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("FromQuantity")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("ProductId", "FromQuantity");
+
+                    b.ToTable("ProductQuantityBreaks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductQuantityBreaks_Positive", "[FromQuantity] > 0 AND [Price] > 0");
+                        });
+                });
+
             modelBuilder.Entity("FieldSales.Api.Catalogue.RestrictionGroup", b =>
                 {
                     b.Property<Guid>("Id")
@@ -572,6 +593,15 @@ namespace FieldSales.Api.Catalogue.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Catalogue.ProductQuantityBreak", b =>
+                {
+                    b.HasOne("FieldSales.Api.Catalogue.Product", null)
+                        .WithMany("QuantityBreaks")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FieldSales.Api.Coverage.RestrictionPermission", b =>
                 {
                     b.HasOne("FieldSales.Api.Catalogue.RestrictionGroup", null)
@@ -603,6 +633,8 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.Navigation("AttributeValues");
 
                     b.Navigation("BasePrices");
+
+                    b.Navigation("QuantityBreaks");
                 });
 
             modelBuilder.Entity("FieldSales.Api.Pricing.PriceTier", b =>

@@ -12,6 +12,7 @@ public sealed class Product
     private readonly List<ProductBasePrice> _basePrices = [];
     private readonly List<ProductAlternativeBrand> _alternativeBrands = [];
     private readonly List<ProductAttributeValue> _attributeValues = [];
+    private readonly List<ProductQuantityBreak> _quantityBreaks = [];
 
     // EF Core materializes persisted products through this constructor.
     private Product() { }
@@ -34,6 +35,8 @@ public sealed class Product
     public IReadOnlyList<ProductAttribute> Attributes => _attributeValues.OrderBy(value => value.Position)
         .Select(value => new ProductAttribute(value.AttributeName.Name, value.Value, value.AttributeName.IsArchived)).ToArray();
     public IReadOnlyList<ProductBasePrice> BasePrices => _basePrices.AsReadOnly();
+    /// <summary>The product's quantity breaks, by quantity (WI-062). Readers load them.</summary>
+    public IReadOnlyList<ProductQuantityBreak> QuantityBreaks => _quantityBreaks.OrderBy(entry => entry.FromQuantity).ToArray();
 
     public static Product Create(string code, string name, Guid categoryId,
         decimal basePrice, DateOnly effectiveFrom, QuantityRules? quantityRules = null)
@@ -59,9 +62,38 @@ public sealed class Product
         ArgumentNullException.ThrowIfNull(rules);
         if (hasOrders && Unit != rules.Unit.ToCode())
             throw new InvalidOperationException("This product has orders. Its unit cannot be changed yet.");
+        if (BreaksMisfit(rules) is { } misfit) throw new InvalidOperationException(misfit);
         Unit = rules.Unit.ToCode();
         QuantityStep = rules.Unit == UnitOfMeasure.Each ? null : rules.Step.Amount;
         MinimumQuantity = rules.Unit == UnitOfMeasure.Each ? null : rules.Minimum.Amount;
+    }
+
+    /// <summary>Why <paramref name="rules"/> can't replace the product's quantity rules while its breaks stay as they are, or null
+    /// when every break still fits (WI-062 D5). The caller must load QuantityBreaks.</summary>
+    public string? BreaksMisfit(QuantityRules rules)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        ProductQuantityBreak? misfit = QuantityBreaks.FirstOrDefault(entry => QuantityBreakRules.ThresholdError(rules, entry.FromQuantity) is not null);
+        if (misfit is null) return null;
+        string from = misfit.FromQuantity.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture);
+        return $"Change or remove the quantity breaks first: from {(Unit == "Each" ? from : $"{from} {Unit}")} doesn't fit.";
+    }
+
+    /// <summary>Replaces the product's quantity breaks with <paramref name="breaks"/> (WI-062 D2): a break at a quantity it already
+    /// had takes the new price, one it no longer lists goes, and a new quantity is added. Every break must pass
+    /// <see cref="QuantityBreakRules"/> for the product's current unit. The caller must load QuantityBreaks.</summary>
+    public void SetQuantityBreaks(IReadOnlyList<QuantityBreakInput> breaks)
+    {
+        ArgumentNullException.ThrowIfNull(breaks);
+        if (QuantityBreakRules.Validate(GetQuantityRules(), breaks) is { Count: > 0 } errors)
+            throw new ArgumentException(string.Join(" ", errors.Values.SelectMany(messages => messages)), nameof(breaks));
+        Dictionary<decimal, decimal> wanted = breaks.ToDictionary(entry => entry.FromQuantity!.Value, entry => entry.Price!.Value);
+        _quantityBreaks.RemoveAll(entry => !wanted.ContainsKey(entry.FromQuantity));
+        foreach ((decimal from, decimal price) in wanted)
+        {
+            if (_quantityBreaks.FirstOrDefault(entry => entry.FromQuantity == from) is { } existing) existing.Reprice(price);
+            else _quantityBreaks.Add(new ProductQuantityBreak(Id, from, price));
+        }
     }
 
     public QuantityRules GetQuantityRules()

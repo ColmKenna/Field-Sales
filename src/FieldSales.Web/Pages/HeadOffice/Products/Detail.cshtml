@@ -54,6 +54,69 @@
             </table>
         </div>
     </section>
+    @{
+        // WI-062 (H-22): breaks in the product's unit, sorted by quantity, under the base price they compete with.
+        bool each = Model.Details.Product.Unit == "Each";
+        string unitText = each ? "" : " " + Model.Details.Product.Unit;
+        string quantityStep = each ? "1" : (Model.Details.Product.QuantityStep ?? 0.000001m).ToString("0.######", CultureInfo.InvariantCulture);
+        string Quantity(decimal? amount) => amount?.ToString("0.######", CultureInfo.InvariantCulture) ?? "";
+        string Price(decimal? amount) => amount?.ToString("0.00", CultureInfo.InvariantCulture) ?? "";
+        string Refused(string key) => string.Join(" ", ViewData.ModelState[key]?.Errors.Select(error => error.ErrorMessage) ?? []);
+    }
+    <section aria-labelledby="breaks-heading">
+        <h2 id="breaks-heading">Quantity breaks</h2>
+        <p class="breaks-base">@(Model.Details.CurrentPrice is { } basePrice
+            ? $"Base price {basePrice.Amount.ToString("C2", currency)} {(each ? "each" : "per " + Model.Details.Product.Unit)}"
+            : "No base price in effect.")</p>
+        <form method="post" asp-page-handler="Breaks" class="product-form quantity-breaks-form">
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            @if (Model.Breaks.Count == 0)
+            {
+                <p>No quantity breaks yet. Every quantity is at the base price.</p>
+            }
+            @for (int row = 0; row <= Model.Breaks.Count; row++)
+            {
+                bool adding = row == Model.Breaks.Count;
+                var entry = adding ? new FieldSales.Web.Pages.HeadOffice.Products.QuantityBreakInputRow() : Model.Breaks[row];
+                var saved = adding ? null : Model.SavedBreak(entry);
+                <div class="quantity-break" data-break="@(adding ? "new" : row.ToString(CultureInfo.InvariantCulture))">
+                    @if (adding)
+                    {
+                        <h3>Add a break</h3>
+                    }
+                    <label for="Breaks_@(row)__FromQuantity">From@(unitText)</label>
+                    <input id="Breaks_@(row)__FromQuantity" name="Breaks[@row].FromQuantity" type="number" min="@quantityStep" step="@quantityStep"
+                           value="@(ViewData.ModelState[$"Breaks[{row}].FromQuantity"]?.AttemptedValue ?? Quantity(entry.FromQuantity))" />
+                    @if (Refused($"Breaks[{row}].FromQuantity") is { Length: > 0 } quantityRefused)
+                    {
+                        <span class="field-validation-error" role="alert">@quantityRefused</span>
+                    }
+                    <label for="Breaks_@(row)__Price">Price (€@(each ? "" : " per " + Model.Details.Product.Unit))</label>
+                    <input id="Breaks_@(row)__Price" name="Breaks[@row].Price" type="number" min="0.01" step="0.01"
+                           value="@(ViewData.ModelState[$"Breaks[{row}].Price"]?.AttemptedValue ?? Price(entry.Price))" />
+                    @if (Refused($"Breaks[{row}].Price") is { Length: > 0 } priceRefused)
+                    {
+                        <span class="field-validation-error" role="alert">@priceRefused</span>
+                    }
+                    @if (saved is { AboveCheaperBreak: true })
+                    {
+                        <p class="tier-warning">This break is higher than the one below it and will never apply.</p>
+                    }
+                    @if (saved is { AboveBase: true })
+                    {
+                        <p class="tier-warning">This break is above the base price and will never apply.</p>
+                    }
+                    @if (!adding)
+                    {
+                        <button type="submit" name="remove" value="@row" formnovalidate>Remove</button>
+                    }
+                </div>
+            }
+            <p>Each break prices a line from that quantity upward. Breaks are listed by quantity once saved.</p>
+            <button type="submit" class="button">Save breaks</button>
+            <a asp-page="Detail" asp-route-id="@Model.Details.Product.Id">Cancel</a>
+        </form>
+    </section>
     <section aria-labelledby="unit-heading">
         <h2 id="unit-heading">Unit</h2>
         <form method="post" asp-page-handler="Unit" class="product-form" data-product-unit-form>
