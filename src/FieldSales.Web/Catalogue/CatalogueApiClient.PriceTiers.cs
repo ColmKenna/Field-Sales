@@ -5,7 +5,7 @@ namespace FieldSales.Web.Catalogue;
 public enum PriceTierSaveStatus { Saved, Invalid, Missing, Unavailable }
 public sealed record PriceTierSaveResult(PriceTierSaveStatus Status, IReadOnlyDictionary<string, string[]>? Errors = null, Guid? Id = null);
 
-/// <summary>Head office's percentage tiers (WI-060, H-20), through the Field Sales API's <c>/pricing/tiers</c>.</summary>
+/// <summary>Head office's price tiers (WI-060, WI-061, H-20), through the Field Sales API's <c>/pricing/tiers</c>.</summary>
 public sealed partial class CatalogueApiClient
 {
     private const string TiersPath = "/pricing/tiers";
@@ -16,9 +16,11 @@ public sealed partial class CatalogueApiClient
     public Task<CatalogueReadResult<PriceTierDetails>> ReadPriceTierAsync(Guid id, CancellationToken cancellationToken) =>
         ReadAsync<PriceTierDetails>($"{TiersPath}/{id}", cancellationToken);
 
-    public async Task<PriceTierSaveResult> CreatePriceTierAsync(string? name, decimal? percentOff, CancellationToken cancellationToken)
+    /// <summary>Creates a tier of <paramref name="shape"/> (<see cref="PriceTierShapes"/>); a price list takes no percentage.</summary>
+    public async Task<PriceTierSaveResult> CreatePriceTierAsync(string? name, decimal? percentOff, string shape,
+        CancellationToken cancellationToken)
     {
-        using HttpResponseMessage response = await SendAsync(HttpMethod.Post, TiersPath, new SavePriceTierRequest(name, percentOff),
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Post, TiersPath, new SavePriceTierRequest(name, percentOff, shape),
             cancellationToken);
         if (response.StatusCode == HttpStatusCode.Created)
             return await ReadBodyAsync<PriceTierListItem>(response, cancellationToken) is { } created
@@ -32,6 +34,16 @@ public sealed partial class CatalogueApiClient
     {
         using HttpResponseMessage response = await SendAsync(HttpMethod.Put, $"{TiersPath}/{id}",
             new SavePriceTierRequest(name, percentOff), cancellationToken);
+        return await SavedAsync(response, cancellationToken);
+    }
+
+    /// <summary>Changes the tier to <paramref name="shape"/> (WI-061 D1, D4): a price list takes no percentage, a percentage tier its
+    /// new default.</summary>
+    public async Task<PriceTierSaveResult> ChangePriceTierShapeAsync(Guid id, string shape, decimal? percentOff,
+        CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await SendAsync(HttpMethod.Put, $"{TiersPath}/{id}/shape",
+            new ChangePriceTierShapeRequest(shape, percentOff), cancellationToken);
         return await SavedAsync(response, cancellationToken);
     }
 

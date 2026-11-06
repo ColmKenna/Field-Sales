@@ -131,8 +131,8 @@ public sealed class PriceTierApiTests(TabletSnapshotFixture fixture) : IClassFix
         PriceTierDetails details = (await client.GetFromJsonAsync<PriceTierDetails>($"{Path}/{tier}"))!;
         Assert.Equal(("Tier B", 8m), (details.Name, details.PercentOff));
         // By product name; today's list price and what the tier gives today are worked out on reading (D6).
-        Assert.Equal([new PriceTierOverrideItem(handCream, "HAND-75", "Hand Cream 75ml", "Each", null, 3.50m, 4.00m, 3.50m, Today),
-                new PriceTierOverrideItem(spf30, "SUN-030", "SPF30 Sun Lotion 200ml", "Each", 15m, null, 12.50m, 10.63m, Today)],
+        Assert.Equal([new PriceTierOverrideItem(handCream, "HAND-75", "Hand Cream 75ml", "Each", null, 3.50m, 4.00m, 3.50m, Today, false),
+                new PriceTierOverrideItem(spf30, "SUN-030", "SPF30 Sun Lotion 200ml", "Each", 15m, null, 12.50m, 10.63m, Today, false)],
             details.Overrides);
         Assert.Equal(2, (await client.GetFromJsonAsync<PriceTierListItem[]>(Path))!.Single().OverrideCount);
         Assert.Equal(10.63m, await PriceAsync(tier, spf30));
@@ -166,7 +166,7 @@ public sealed class PriceTierApiTests(TabletSnapshotFixture fixture) : IClassFix
         using HttpResponseMessage changed = await client.PutAsJsonAsync($"{Path}/{tier}", new SavePriceTierRequest(" Tier B Wholesale ", 10m));
 
         Assert.Equal(HttpStatusCode.NoContent, changed.StatusCode);
-        Assert.Equal(new PriceTierListItem(tier, "Tier B Wholesale", 10m, 1), (await client.GetFromJsonAsync<PriceTierListItem[]>(Path))!.Single());
+        Assert.Equal(new PriceTierListItem(tier, "Tier B Wholesale", 10m, 1, PriceTierShapes.Percentage), (await client.GetFromJsonAsync<PriceTierListItem[]>(Path))!.Single());
         Assert.Equal((11.25m, 3.40m), (await PriceAsync(tier, spf30), await PriceAsync(tier, handCream))); // The override is kept.
     }
 
@@ -183,6 +183,8 @@ public sealed class PriceTierApiTests(TabletSnapshotFixture fixture) : IClassFix
             Assert.Equal(HttpStatusCode.Forbidden, (await other.GetAsync(Path)).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await CreateAsync(other, "Tier X", 5m)).StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, (await OverrideAsync(other, tier, spf30, 50m, null)).StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, (await other.PutAsJsonAsync($"{Path}/{tier}/shape",
+                new ChangePriceTierShapeRequest(PriceTierShapes.PriceList, null))).StatusCode);
         }
         using HttpClient anonymous = _app.Anonymous();
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(Path)).StatusCode);
@@ -191,6 +193,6 @@ public sealed class PriceTierApiTests(TabletSnapshotFixture fixture) : IClassFix
         Assert.Equal(HttpStatusCode.NotFound, (await headOffice.PutAsJsonAsync($"{Path}/{Guid.NewGuid()}", new SavePriceTierRequest("Tier Z", 5m))).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await OverrideAsync(headOffice, tier, Guid.NewGuid(), 15m, null)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await OverrideAsync(headOffice, Guid.NewGuid(), spf30, 15m, null)).StatusCode);
-        Assert.Equal(new PriceTierListItem(tier, "Tier B", 8m, 0), (await headOffice.GetFromJsonAsync<PriceTierListItem[]>(Path))!.Single());
+        Assert.Equal(new PriceTierListItem(tier, "Tier B", 8m, 0, PriceTierShapes.Percentage), (await headOffice.GetFromJsonAsync<PriceTierListItem[]>(Path))!.Single());
     }
 }

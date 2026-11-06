@@ -24,6 +24,7 @@ p { line-height: 1.6; }
 #sign-in-progress[hidden] { display: none; }
 [role="alert"] { border-left: 4px solid #ae3d2d; padding: .6rem 1rem; background: #fff2f0; }
 [role="status"] { border-left: 4px solid #20804d; padding: .6rem 1rem; background: #eefaf2; }
+.tier-warning { border-left: 4px solid #b26a00; padding: .3rem .8rem; background: #fff7e6; }
 .access-changed[role="alert"] { max-width: 52rem; padding: 2rem; border: 1px solid #d7dee6; border-left: 4px solid #ae3d2d; border-radius: .6rem; background: #fff; }
 .access-changed h1 { margin-top: 0; }
 .product-form { display: grid; gap: .5rem; max-width: 36rem; padding: 1.5rem; background: #fff; border: 1px solid #d7dee6; border-radius: .6rem; }

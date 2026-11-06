@@ -23,8 +23,9 @@ public sealed class OverrideInput
     [Display(Name = "Value")] public decimal? Value { get; set; }
 }
 
-/// <summary>H-20's tier detail (WI-060): leads with the overrides (H20.1), each with its term, today's list price and what the
-/// tier gives today (D6); adds overrides from a product search (D7); renames or re-percentages the tier (D5).</summary>
+/// <summary>H-20's tier detail (WI-060): leads with the overrides (H20.1), or a price list's listed prices (WI-061 D7), each with
+/// its term, today's list price and what the tier gives today (D6), and a warning on a fixed price above today's list price (WI-061
+/// D3); adds them from a product search (D7); renames or re-percentages the tier (D5); links to changing its shape (WI-061 D2).</summary>
 public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
 {
     /// <summary>The most search matches listed at once.</summary>
@@ -38,6 +39,8 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
     [BindProperty] public OverrideInput? Override { get; set; }
     /// <summary>The product whose override form was refused, so its message shows beside it.</summary>
     public Guid? RefusedProduct { get; private set; }
+
+    public bool IsPriceList => Tier.Shape == PriceTierShapes.PriceList;
 
     public bool HasOverride(Guid productId) => Tier.Overrides.Any(entry => entry.ProductId == productId);
 

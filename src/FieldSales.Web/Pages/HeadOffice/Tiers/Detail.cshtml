@@ -4,9 +4,12 @@
 @using FieldSales.Web.Pages.HeadOffice.Tiers
 @{
     ViewData["Title"] = Model.Tier.Name;
+    // A price list's entries are fixed prices for named products (WI-061 D7); a percentage tier's are overrides.
+    bool priceList = Model.IsPriceList;
+    string entries = priceList ? "Listed prices" : "Overrides";
 }
 @functions {
-    // An override form; the refused one keeps what was entered and shows why.
+    // An override (or listed price) form; the refused one keeps what was entered and shows why. A price list takes a fixed price only.
     private async Task OverrideForm(Guid productId, string label, string kind, decimal? value)
     {
         bool refused = Model.RefusedProduct == productId;
@@ -15,12 +18,21 @@
         <form method="post" asp-page-handler="Override" asp-route-id="@Model.Tier.Id" class="tier-override-form">
             <input type="hidden" name="Override.ProductId" value="@productId" />
             <input type="hidden" name="Find" value="@Model.Find" />
-            <select name="Override.Kind" aria-label="Override type">
-                <option value="@OverrideInput.PercentKind" selected="@(chosen == OverrideInput.PercentKind)">% off base</option>
-                <option value="@OverrideInput.FixedKind" selected="@(chosen == OverrideInput.FixedKind)">Fixed price (€)</option>
-            </select>
-            <input name="Override.Value" type="number" min="0.01" step="0.01" required aria-label="Override value"
-                   value="@(shown?.ToString(CultureInfo.InvariantCulture))" />
+            @if (Model.IsPriceList)
+            {
+                <input type="hidden" name="Override.Kind" value="@OverrideInput.FixedKind" />
+                <input name="Override.Value" type="number" min="0.01" step="0.01" required aria-label="Listed price (€)"
+                       value="@(shown?.ToString(CultureInfo.InvariantCulture))" />
+            }
+            else
+            {
+                <select name="Override.Kind" aria-label="Override type">
+                    <option value="@OverrideInput.PercentKind" selected="@(chosen == OverrideInput.PercentKind)">% off base</option>
+                    <option value="@OverrideInput.FixedKind" selected="@(chosen == OverrideInput.FixedKind)">Fixed price (€)</option>
+                </select>
+                <input name="Override.Value" type="number" min="0.01" step="0.01" required aria-label="Override value"
+                       value="@(shown?.ToString(CultureInfo.InvariantCulture))" />
+            }
             <button type="submit" class="button">@label</button>
             @if (refused)
             {
@@ -32,30 +44,42 @@
 }
 <p><a asp-page="Index">Back to price tiers</a></p>
 <h1>@Model.Tier.Name</h1>
-<p class="tier-default">@TierText.Percent(Model.Tier.PercentOff) off base</p>
+<p class="tier-default">@TierText.Default(Model.Tier.PercentOff) · <a asp-page="Shape" asp-route-id="@Model.Tier.Id">@(priceList ? "Change to a percentage tier…" : "Change to a price list…")</a></p>
 
 <section aria-labelledby="overrides-heading">
-    <h2 id="overrides-heading">Overrides</h2>
+    <h2 id="overrides-heading">@entries</h2>
     @if (Model.Tier.Overrides.Count == 0)
     {
-        <p>No overrides yet. Every product is @TierText.Percent(Model.Tier.PercentOff) off its current base price.</p>
+        @if (Model.Tier.PercentOff is decimal percent)
+        {
+            <p>No overrides yet. Every product is @TierText.Percent(percent) off its current base price.</p>
+        }
+        else
+        {
+            <p>No listed prices yet. Every product is at base price.</p>
+        }
     }
     else
     {
-        <ul class="tier-overrides" aria-label="Overrides">
+        <ul class="tier-overrides" aria-label="@entries">
             @foreach (var entry in Model.Tier.Overrides)
             {
                 <li data-override>
                     <p><strong>@entry.Name</strong> · @TierText.Row(entry)</p>
+                    @if (entry.AboveList)
+                    {
+                        @* WI-061 D3: saved, but Best Price Wins never picks a price above today's list price. *@
+                        <p class="tier-warning">This is above list price and will never apply.</p>
+                    }
                     @{ await OverrideForm(entry.ProductId, "Change", entry.FixedPrice is null ? OverrideInput.PercentKind : OverrideInput.FixedKind, entry.PercentOff ?? entry.FixedPrice); }
                     <form method="post" asp-page-handler="Remove" asp-route-id="@Model.Tier.Id" asp-route-productId="@entry.ProductId">
-                        <button type="submit">Remove override</button>
+                        <button type="submit">@(priceList ? "Remove from list" : "Remove override")</button>
                     </form>
                 </li>
             }
         </ul>
     }
-    <h3>+ Override</h3>
+    <h3>@(priceList ? "+ Listed price" : "+ Override")</h3>
     <form method="get" class="product-search-form">
         <label asp-for="Find">Find a product</label>
         <input asp-for="Find" type="search" placeholder="Code or name" />
@@ -71,11 +95,11 @@
                     <p><strong>@product.Code · @product.Name</strong> · @(product.CurrentPrice is { } price ? "list " + TierText.Money(price.Amount, product.Unit) : "no list price today")</p>
                     @if (Model.HasOverride(product.Id))
                     {
-                        <p>Already has an override on this tier.</p>
+                        <p>@(priceList ? "Already listed on this tier." : "Already has an override on this tier.")</p>
                     }
                     else
                     {
-                        await OverrideForm(product.Id, "Add override", OverrideInput.PercentKind, null);
+                        await OverrideForm(product.Id, priceList ? "Add to list" : "Add override", priceList ? OverrideInput.FixedKind : OverrideInput.PercentKind, null);
                     }
                 </li>
             }
@@ -90,10 +114,17 @@
         <label asp-for="Terms!.Name">Tier name</label>
         <input asp-for="Terms!.Name" maxlength="100" required />
         <span asp-validation-for="Terms!.Name"></span>
-        <label asp-for="Terms!.PercentOff">Percentage off base</label>
-        <input asp-for="Terms!.PercentOff" type="number" min="0.01" max="99.99" step="0.01" required />
-        <span asp-validation-for="Terms!.PercentOff"></span>
-        <p>Products without an override follow this percentage and their base price as it changes.</p>
+        @if (priceList)
+        {
+            <p>Products not on the list stay at base price.</p>
+        }
+        else
+        {
+            <label asp-for="Terms!.PercentOff">Percentage off base</label>
+            <input asp-for="Terms!.PercentOff" type="number" min="0.01" max="99.99" step="0.01" required />
+            <span asp-validation-for="Terms!.PercentOff"></span>
+            <p>Products without an override follow this percentage and their base price as it changes.</p>
+        }
         <button type="submit" class="button">Save tier</button>
     </form>
 </section>

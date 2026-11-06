@@ -3,6 +3,17 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-061 price-list tiers and tier warnings (2026-11-06, developer, plan approval)
+
+The developer answered the WI-061 questions, replied **Approved** to the plan with D1–D9, then **Apply**. Full text in `WI-061.md`.
+
+- **Shape changes** go through a confirm step that says what stops applying; nothing changes until Confirm.
+- **Percentage → price list:** fixed overrides become listed prices; percentage overrides are removed, named in the confirm step.
+- **Price list → percentage:** a new default percentage is entered; listed prices stay as fixed overrides.
+- **Above list price:** a fixed price saves straight away; its row says "This is above list price and will never apply" while it is
+  above today's list price, worked out when read and never stored.
+- **Finish:** as WI-060 if the developer says so at the time.
+
 ## WI-060 percentage price tiers (2026-11-06, developer, plan approval)
 
 The developer answered the WI-060 questions, replied **Approved** to the plan with D1–D11, then `Continue T-6.1.1` (taken as
