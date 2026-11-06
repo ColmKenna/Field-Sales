@@ -1,0 +1,34 @@
+@page
+@model FieldSales.Web.Pages.HeadOffice.Tiers.IndexModel
+@using FieldSales.Web.Pages.HeadOffice.Tiers
+@{
+    ViewData["Title"] = "Price tiers";
+}
+<p><a asp-page="/HeadOffice/Index">Back to catalogue</a></p>
+<h1>Price tiers</h1>
+<p role="status">@Model.Tiers.Count @(Model.Tiers.Count == 1 ? "tier" : "tiers")</p>
+@if (Model.Tiers.Count == 0)
+{
+    <p>No price tiers yet.</p>
+}
+else
+{
+    <ul class="tier-list" aria-label="Price tiers">
+        @foreach (var tier in Model.Tiers)
+        {
+            <li data-tier><a asp-page="Detail" asp-route-id="@tier.Id">@tier.Name</a> · @TierText.Percent(tier.PercentOff) off base · @TierText.Overrides(tier.OverrideCount)</li>
+        }
+    </ul>
+}
+<form method="post" class="product-form">
+    <h2>Create a percentage tier</h2>
+    <p>Every product is priced this far below its current base price. Add overrides for named products afterwards.</p>
+    <div asp-validation-summary="All" role="alert"></div>
+    <label asp-for="Name">Tier name</label>
+    <input asp-for="Name" maxlength="100" required />
+    <span asp-validation-for="Name"></span>
+    <label asp-for="PercentOff">Percentage off base</label>
+    <input asp-for="PercentOff" type="number" min="0.01" max="99.99" step="0.01" required />
+    <span asp-validation-for="PercentOff"></span>
+    <button type="submit" class="button">Create tier</button>
+</form>

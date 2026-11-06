@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using FieldSales.Api.Coverage;
+using FieldSales.Api.Pricing;
 using FieldSales.Quantities;
 
 namespace FieldSales.Api.Catalogue;
@@ -19,6 +20,9 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
     // Coverage's Restriction Permissions are stored beside their groups (WI-029).
     public DbSet<RestrictionPermission> RestrictionPermissions => Set<RestrictionPermission>();
     public DbSet<RestrictionPermissionChange> RestrictionPermissionChanges => Set<RestrictionPermissionChange>();
+    // Pricing's tiers are stored beside the products their overrides name (WI-060 D3).
+    public DbSet<PriceTier> PriceTiers => Set<PriceTier>();
+    public DbSet<PriceTierOverride> PriceTierOverrides => Set<PriceTierOverride>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +33,7 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
         ConfigureReference<Supplier>(modelBuilder, "Suppliers");
         ConfigureReference<RestrictionGroup>(modelBuilder, "RestrictionGroups");
         RestrictionPermissionModelConfiguration.Configure(modelBuilder);
+        PriceTierModelConfiguration.Configure(modelBuilder);
         modelBuilder.Entity<ProductAttributeValue>(entity =>
         {
             entity.ToTable("ProductAttributeValues");

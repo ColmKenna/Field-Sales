@@ -4,6 +4,7 @@ using FieldSales.Api.Catalogue;
 using FieldSales.Api.Directory;
 using FieldSales.Api.Coverage;
 using FieldSales.Api.Ordering;
+using FieldSales.Api.Pricing;
 using FieldSales.Api.TabletSync;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -133,6 +134,11 @@ builder.Services.AddAuthorization(options =>
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.HeadOfficeUser)
         .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
+    // WI-060 D9: price tiers are head office's commercial terms.
+    options.AddPolicy(PriceTierEndpoints.Policy, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(BusinessRoles.HeadOfficeUser)
+        .RequireAssertion(context => context.User.HasScope(StaffApiContract.Scope)));
     options.AddPolicy("HeadOfficeDirectory", policy => policy
         .RequireAuthenticatedUser()
         .RequireRole(BusinessRoles.HeadOfficeUser)
@@ -173,6 +179,7 @@ app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new StaffSessi
     .RequireAuthorization("StaffApi");
 app.MapCatalogueEndpoints();
 app.MapProductEndpoints();
+app.MapPriceTierEndpoints();
 app.MapReferenceListEndpoints();
 app.MapGeographyEndpoints();
 app.MapCustomerEndpoints();

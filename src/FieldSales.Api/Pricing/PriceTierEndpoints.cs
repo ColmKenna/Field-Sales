@@ -1,0 +1,141 @@
+using FieldSales.Api.Catalogue;
+using FieldSales.Pricing;
+using Microsoft.EntityFrameworkCore;
+
+namespace FieldSales.Api.Pricing;
+
+/// <summary>Head office's percentage tiers (WI-060, H-20): list, create, rename or re-percentage, and set or remove a product's
+/// override. Tiers aren't deleted (D5). Head Office Users only (D9).</summary>
+public static class PriceTierEndpoints
+{
+    public const string Policy = "HeadOfficePricing";
+
+    public static void MapPriceTierEndpoints(this WebApplication app)
+    {
+        RouteGroupBuilder tiers = app.MapGroup("/pricing/tiers").RequireAuthorization(Policy);
+        tiers.MapGet("/", ListAsync);
+        tiers.MapPost("/", CreateAsync);
+        tiers.MapGet("/{id:guid}", ReadAsync);
+        tiers.MapPut("/{id:guid}", ChangeAsync);
+        tiers.MapPut("/{id:guid}/overrides/{productId:guid}", SetOverrideAsync);
+        tiers.MapDelete("/{id:guid}/overrides/{productId:guid}", RemoveOverrideAsync);
+    }
+
+    private static async Task<PriceTierListItem[]> ListAsync(CatalogueDbContext db, CancellationToken cancellationToken) =>
+        await db.PriceTiers.AsNoTracking().OrderBy(tier => tier.Name)
+            .Select(tier => new PriceTierListItem(tier.Id, tier.Name, tier.PercentOff, tier.Overrides.Count))
+            .ToArrayAsync(cancellationToken);
+
+    private static async Task<IResult> CreateAsync(SavePriceTierRequest request, CatalogueDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (Invalid(request) is { } errors) return Results.ValidationProblem(errors);
+        string name = request.Name!.Trim();
+        if (await NamedAsync(db, name, null, cancellationToken) is { } taken) return Duplicate(taken);
+        PriceTier tier = PriceTier.CreatePercentage(name, request.PercentOff!.Value);
+        db.PriceTiers.Add(tier);
+        try { await db.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
+        {
+            // The unique index settles two saves of the same name at once.
+            return Duplicate((await NamedAsync(db, name, tier.Id, cancellationToken))!);
+        }
+        return Results.Created($"/pricing/tiers/{tier.Id}", new PriceTierListItem(tier.Id, tier.Name, tier.PercentOff, 0));
+    }
+
+    private static async Task<IResult> ReadAsync(Guid id, CatalogueDbContext db, TimeProvider clock,
+        CancellationToken cancellationToken)
+    {
+        PriceTier? tier = await db.PriceTiers.AsNoTracking().Include(row => row.Overrides)
+            .SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+        if (tier is null) return Results.NotFound();
+        Guid[] productIds = [.. tier.Overrides.Select(entry => entry.ProductId)];
+        Dictionary<Guid, Product> products = await db.Products.AsNoTracking().Include(product => product.BasePrices)
+            .Where(product => productIds.Contains(product.Id)).ToDictionaryAsync(product => product.Id, cancellationToken);
+        DateOnly today = BusinessCalendar.Today(clock.GetUtcNow());
+        FieldSales.Pricing.PriceTier[] engineTier = [tier.ToEngine()];
+        PriceTierOverrideItem[] overrides = [.. tier.Overrides.Select(entry =>
+        {
+            Product product = products[entry.ProductId];
+            PricedProduct priced = product.ToPricedProduct();
+            // What the tier gives today, worked out now and never stored (D6).
+            decimal? tierPrice = TierCandidates.For(priced, engineTier, today).FirstOrDefault()?.Amount;
+            return new PriceTierOverrideItem(product.Id, product.Code, product.Name, product.Unit, entry.PercentOff, entry.FixedPrice,
+                priced.ListPriceOn(today), tierPrice, entry.SetOn);
+        }).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.Code, StringComparer.Ordinal)];
+        return Results.Ok(new PriceTierDetails(tier.Id, tier.Name, tier.PercentOff, overrides));
+    }
+
+    private static async Task<IResult> ChangeAsync(Guid id, SavePriceTierRequest request, CatalogueDbContext db,
+        CancellationToken cancellationToken)
+    {
+        PriceTier? tier = await db.PriceTiers.SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+        if (tier is null) return Results.NotFound();
+        if (Invalid(request) is { } errors) return Results.ValidationProblem(errors);
+        string name = request.Name!.Trim();
+        if (await NamedAsync(db, name, id, cancellationToken) is { } taken) return Duplicate(taken);
+        tier.Change(name, request.PercentOff!.Value);
+        try { await db.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
+        {
+            return Duplicate((await NamedAsync(db, name, id, cancellationToken))!);
+        }
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> SetOverrideAsync(Guid id, Guid productId, SetPriceTierOverrideRequest request,
+        CatalogueDbContext db, TimeProvider clock, CancellationToken cancellationToken)
+    {
+        PriceTier? tier = await db.PriceTiers.Include(row => row.Overrides).SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+        if (tier is null || !await db.Products.AnyAsync(product => product.Id == productId, cancellationToken)) return Results.NotFound();
+        if (Term(request, out TierTerm? term) is { } errors) return Results.ValidationProblem(errors);
+        tier.SetOverride(productId, term!, BusinessCalendar.Today(clock.GetUtcNow()));
+        try { await db.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (SqlServerErrors.IsUniqueViolation(exception))
+        {
+            return Results.Conflict(new ProductSaveError(string.Empty, "This tier changed while you were saving. Reload it and try again."));
+        }
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RemoveOverrideAsync(Guid id, Guid productId, CatalogueDbContext db,
+        CancellationToken cancellationToken)
+    {
+        PriceTier? tier = await db.PriceTiers.Include(row => row.Overrides).SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+        if (tier is null || !tier.RemoveOverride(productId)) return Results.NotFound();
+        await db.SaveChangesAsync(cancellationToken);
+        return Results.NoContent();
+    }
+
+    private static Dictionary<string, string[]>? Invalid(SavePriceTierRequest request)
+    {
+        Dictionary<string, string[]> errors = [];
+        if (!NameRules.IsValid(request.Name, PriceTier.MaximumNameLength)) errors["Name"] = [PriceTier.NameMessage];
+        if (request.PercentOff is not decimal percent || !TierTerms.IsValidPercent(percent)) errors["PercentOff"] = [TierTerms.PercentMessage];
+        return errors.Count == 0 ? null : errors;
+    }
+
+    private static Dictionary<string, string[]>? Term(SetPriceTierOverrideRequest request, out TierTerm? term)
+    {
+        term = null;
+        string? error = (request.PercentOff, request.FixedPrice) switch
+        {
+            (decimal percent, null) when TierTerms.IsValidPercent(percent) => null,
+            (decimal, null) => TierTerms.PercentMessage,
+            (null, decimal price) when TierTerms.IsValidFixedPrice(price) => null,
+            (null, decimal) => TierTerms.FixedPriceMessage,
+            _ => "Enter either a percentage off or a fixed price."
+        };
+        if (error is not null)
+            return new() { [request.FixedPrice is not null && request.PercentOff is null ? "FixedPrice" : "PercentOff"] = [error] };
+        term = request.PercentOff is decimal off ? TierTerm.Percent(off) : TierTerm.Fixed(request.FixedPrice!.Value);
+        return null;
+    }
+
+    private static Task<PriceTier?> NamedAsync(CatalogueDbContext db, string name, Guid? except, CancellationToken cancellationToken) =>
+        // The column's collation ignores case, so "tier b" finds "Tier B".
+        db.PriceTiers.AsNoTracking().FirstOrDefaultAsync(tier => tier.Name == name && tier.Id != except, cancellationToken);
+
+    private static IResult Duplicate(PriceTier taken) =>
+        Results.Conflict(new ProductSaveError("Name", $"A tier called {taken.Name} already exists."));
+}

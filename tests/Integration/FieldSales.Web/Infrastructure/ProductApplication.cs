@@ -107,6 +107,7 @@ public sealed class ProductApplication(CatalogueSqlServerFixture sql) : IAsyncLi
         Roles.SetRoles("niamh", StaffRoles.HeadOfficeUser);
         await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
         CatalogueDbContext db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
+        await ClearTiersAsync(db);
         await db.ProductBasePrices.ExecuteDeleteAsync();
         await db.Products.ExecuteDeleteAsync();
         // Remove deepest categories first to respect the predecessor's restricted parent relationship.
@@ -122,6 +123,19 @@ public sealed class ProductApplication(CatalogueSqlServerFixture sql) : IAsyncLi
         }
         await db.SaveChangesAsync();
         return parent!.Value;
+    }
+
+    /// <summary>Price tiers' overrides name products, so they go before the products do (WI-060).</summary>
+    public async Task ClearTiersAsync()
+    {
+        await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
+        await ClearTiersAsync(scope.ServiceProvider.GetRequiredService<CatalogueDbContext>());
+    }
+
+    private static async Task ClearTiersAsync(CatalogueDbContext db)
+    {
+        await db.PriceTierOverrides.ExecuteDeleteAsync();
+        await db.PriceTiers.ExecuteDeleteAsync();
     }
 
     public async Task<(int Products, int Prices)> CountsAsync()
