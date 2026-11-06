@@ -2,7 +2,8 @@ using System.Globalization;
 
 namespace FieldSales.Web.Pages.HeadOffice.Tiers;
 
-/// <summary>How a tier's terms read on H-20 (WI-060 D6): "8% off base", "fixed €10.50", "€3.40 today (list €4.00)".</summary>
+/// <summary>How a tier's terms read on H-20 (WI-060 D6, WI-061 D7): "8% off base", "price list", "fixed €10.50", "€3.40 today
+/// (list €4.00)", "2 overrides", "20 products".</summary>
 public static class TierText
 {
     private static readonly CultureInfo Currency = CultureInfo.GetCultureInfo("en-IE");
@@ -16,6 +17,18 @@ public static class TierText
         amount.ToString("C2", Currency) + (string.Equals(unit, "Each", StringComparison.OrdinalIgnoreCase) ? "" : " per " + unit);
 
     public static string Overrides(int count) => count == 1 ? "1 override" : $"{count} overrides";
+
+    /// <summary>How many products a tier names: overrides on a percentage tier, listed products on a price list.</summary>
+    public static string Named(int count, string shape) => shape == PriceTierShapes.PriceList
+        ? count == 1 ? "1 product" : $"{count} products"
+        : Overrides(count);
+
+    /// <summary>Product names as a sentence's list: "A", "A and B", "A, B and C".</summary>
+    public static string Names(IEnumerable<string> names)
+    {
+        string[] all = [.. names];
+        return all.Length <= 1 ? string.Concat(all) : string.Join(", ", all[..^1]) + " and " + all[^1];
+    }
 
     /// <summary>One override row: the term, then today's list price, and for a percentage the price it gives today.</summary>
     public static string Row(PriceTierOverrideItem entry)

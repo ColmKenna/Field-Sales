@@ -16,19 +16,25 @@ else
     <ul class="tier-list" aria-label="Price tiers">
         @foreach (var tier in Model.Tiers)
         {
-            <li data-tier><a asp-page="Detail" asp-route-id="@tier.Id">@tier.Name</a> · @TierText.Default(tier.PercentOff) · @TierText.Overrides(tier.OverrideCount)</li>
+            <li data-tier><a asp-page="Detail" asp-route-id="@tier.Id">@tier.Name</a> · @TierText.Default(tier.PercentOff) · @TierText.Named(tier.OverrideCount, tier.Shape)</li>
         }
     </ul>
 }
 <form method="post" class="product-form">
-    <h2>Create a percentage tier</h2>
-    <p>Every product is priced this far below its current base price. Add overrides for named products afterwards.</p>
+    <h2>Create a tier</h2>
     <div asp-validation-summary="All" role="alert"></div>
     <label asp-for="Name">Tier name</label>
     <input asp-for="Name" maxlength="100" required />
     <span asp-validation-for="Name"></span>
-    <label asp-for="PercentOff">Percentage off base</label>
-    <input asp-for="PercentOff" type="number" min="0.01" max="99.99" step="0.01" required />
+    <fieldset>
+        <legend>How the tier prices</legend>
+        <label><input type="radio" asp-for="Shape" value="@PriceTierShapes.Percentage" /> A percentage off base</label>
+        <p>Every product is priced this far below its current base price. Add overrides for named products afterwards.</p>
+        <label><input type="radio" asp-for="Shape" value="@PriceTierShapes.PriceList" /> A price list</label>
+        <p>Only the products you list get a tier price; every other product stays at base price.</p>
+    </fieldset>
+    <label asp-for="PercentOff">Percentage off base (percentage tiers only)</label>
+    <input asp-for="PercentOff" type="number" min="0.01" max="99.99" step="0.01" />
     <span asp-validation-for="PercentOff"></span>
     <button type="submit" class="button">Create tier</button>
 </form>

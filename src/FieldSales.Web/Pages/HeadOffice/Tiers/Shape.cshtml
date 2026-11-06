@@ -1,0 +1,60 @@
+@page "/HeadOffice/Tiers/{id:guid}/Shape"
+@model FieldSales.Web.Pages.HeadOffice.Tiers.ShapeModel
+@using System.Globalization
+@using FieldSales.Web.Pages.HeadOffice.Tiers
+@{
+    string target = Model.ToPriceList ? "a price list" : "a percentage tier";
+    ViewData["Title"] = $"Change {Model.Tier.Name} to {target}";
+}
+<p><a asp-page="Detail" asp-route-id="@Model.Tier.Id">Back to @Model.Tier.Name</a></p>
+<h1>Change @Model.Tier.Name to @target</h1>
+<div asp-validation-summary="ModelOnly" role="alert"></div>
+
+@if (Model.Reviewing)
+{
+    <div class="tier-warning" data-shape-warning>
+        @if (Model.ToPriceList)
+        {
+            <p>@Model.Tier.Name's @TierText.Default(Model.Tier.PercentOff) will no longer apply. Products not listed will revert to base price.</p>
+            @if (Model.Removed.Count > 0)
+            {
+                <p>@(Model.Removed.Count == 1 ? "This percentage override" : $"These {Model.Removed.Count} percentage overrides") will be removed: @TierText.Names(Model.Removed.Select(entry => entry.Name)).</p>
+            }
+            @if (Model.Kept.Count > 0)
+            {
+                <p>Fixed prices stay as listed prices: @TierText.Names(Model.Kept.Select(entry => entry.Name)).</p>
+            }
+        }
+        else
+        {
+            <p>Products not listed will get @TierText.Percent(Model.PercentOff!.Value) off base.</p>
+            @if (Model.Kept.Count > 0)
+            {
+                <p>Listed prices stay as fixed overrides: @TierText.Names(Model.Kept.Select(entry => entry.Name)).</p>
+            }
+        }
+    </div>
+    <form method="post" asp-route-id="@Model.Tier.Id">
+        @if (!Model.ToPriceList)
+        {
+            <input type="hidden" name="PercentOff" value="@Model.PercentOff!.Value.ToString(CultureInfo.InvariantCulture)" />
+        }
+        <button type="submit" class="button">Change to @target</button>
+        <a asp-page="Detail" asp-route-id="@Model.Tier.Id">Cancel</a>
+    </form>
+    @if (!Model.ToPriceList)
+    {
+        <p><a asp-page="Shape" asp-route-id="@Model.Tier.Id">Use a different percentage</a></p>
+    }
+}
+else
+{
+    <form method="get" class="product-form">
+        <p>Every product not listed will get this percentage off its base price, following it as it changes.</p>
+        <label asp-for="PercentOff">Percentage off base</label>
+        <input asp-for="PercentOff" type="number" min="0.01" max="99.99" step="0.01" required />
+        <span asp-validation-for="PercentOff"></span>
+        <button type="submit" class="button">Continue</button>
+        <a asp-page="Detail" asp-route-id="@Model.Tier.Id">Cancel</a>
+    </form>
+}
