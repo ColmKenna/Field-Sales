@@ -181,6 +181,7 @@ app.MapGet("/staff/session", (ClaimsPrincipal user) => Results.Ok(new StaffSessi
 app.MapCatalogueEndpoints();
 app.MapProductEndpoints();
 app.MapPriceTierEndpoints();
+app.MapCustomerTierEndpoints();
 app.MapReferenceListEndpoints();
 app.MapGeographyEndpoints();
 app.MapCustomerEndpoints();
