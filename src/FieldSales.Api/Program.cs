@@ -17,6 +17,7 @@ builder.AddSqlServerDbContext<DirectoryDbContext>("DirectoryDb");
 builder.AddSqlServerDbContext<OrderingDbContext>("OrderingDb");
 builder.Services.AddScoped<GeographyStore>();
 builder.Services.AddScoped<CustomerStore>();
+builder.Services.AddScoped<FieldSales.Api.Pricing.CustomerTierPricing>();
 builder.Services.AddScoped<CoverageReadStore>();
 builder.Services.AddScoped<RepTerritoryReader>();
 builder.Services.AddScoped<LocationCoverageReader>();

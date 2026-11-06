@@ -11,6 +11,7 @@ public sealed class CatalogueDbContext(DbContextOptions<CatalogueDbContext> opti
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductBasePrice> ProductBasePrices => Set<ProductBasePrice>();
     public DbSet<ProductQuantityBreak> ProductQuantityBreaks => Set<ProductQuantityBreak>();
+    public DbSet<CustomerPriceTier> CustomerPriceTiers => Set<CustomerPriceTier>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<ProductAlternativeBrand> ProductAlternativeBrands => Set<ProductAlternativeBrand>();
     public DbSet<ProductProfile> ProductProfiles => Set<ProductProfile>();
