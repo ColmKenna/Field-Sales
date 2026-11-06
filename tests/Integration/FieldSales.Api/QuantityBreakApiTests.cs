@@ -77,6 +77,10 @@ public sealed class QuantityBreakApiTests(TabletSnapshotFixture fixture) : IClas
             .SingleAsync(row => row.Id == lozenges);
         var thirty = PriceResolver.Resolve(product.ToPricedProduct(), [], 30m, Today)!.Winner;
         Assert.Equal(("Break: 10+", 2.00m), (thirty.Label, thirty.Amount)); // The rising break never applies.
+
+        // The set replaces what was there: saving without the 30 break removes it, and 10 takes its new price.
+        await SavedAsync(client, lozenges, (10m, 1.95m));
+        Assert.Equal([new ProductQuantityBreakItem(10m, 1.95m, false, false)], await BreaksAsync(client, lozenges));
     }
 
     [Fact]

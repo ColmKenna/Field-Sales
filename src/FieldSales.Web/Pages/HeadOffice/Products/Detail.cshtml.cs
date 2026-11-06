@@ -6,6 +6,13 @@ using FieldSales.Quantities;
 
 namespace FieldSales.Web.Pages.HeadOffice.Products;
 
+/// <summary>One quantity break row on the product record (WI-062, H-22): either value may be blank while editing.</summary>
+public sealed class QuantityBreakInputRow
+{
+    public decimal? FromQuantity { get; set; }
+    public decimal? Price { get; set; }
+}
+
 public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
 {
     public ProductDetails Details { get; private set; } = null!;
@@ -18,6 +25,8 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
     [BindProperty] public decimal? MinimumQuantity { get; set; }
     [BindProperty] public ProductClassificationInput? Classification { get; set; }
     [BindProperty] public ProductAttributeInput? Attribute { get; set; }
+    /// <summary>The breaks being edited: the saved ones by quantity, or the rows as posted when a save is refused (WI-062 D2).</summary>
+    [BindProperty] public List<QuantityBreakInputRow> Breaks { get; set; } = [];
     public IReadOnlyList<ProductReferenceItem> AttributeNameChoices { get; private set; } = [];
     public IReadOnlyList<ProductReferenceItem> ProfileChoices { get; private set; } = [];
     public IReadOnlyList<ProductReferenceItem> BrandChoices { get; private set; } = [];
@@ -79,6 +88,37 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
         return await ShowAsync(id, populate: true);
     }
 
+    /// <summary>Saves the breaks as a set (WI-062 D2). Blank rows are left out; <paramref name="remove"/> is the row whose Remove
+    /// button was pressed. Refusals come back against the rows as they were on the form.</summary>
+    public async Task<IActionResult> OnPostBreaksAsync(Guid id, int? remove)
+    {
+        foreach (string key in ModelState.Keys.Where(key => !key.StartsWith(nameof(Breaks) + "[", StringComparison.Ordinal)).ToArray())
+            ModelState.Remove(key);
+        if (!ModelState.IsValid) return await ShowAsync(id, populate: true, keepBreaks: true);
+        if (remove is int removed && removed >= 0 && removed < Breaks.Count) Breaks.RemoveAt(removed);
+        // Which form row each sent break came from, so the API's refusals land on the right row.
+        int[] rows = [.. Enumerable.Range(0, Breaks.Count).Where(row => Breaks[row].FromQuantity is not null || Breaks[row].Price is not null)];
+        QuantityBreakRequestItem[] sent = [.. rows.Select(row => new QuantityBreakRequestItem(Breaks[row].FromQuantity, Breaks[row].Price))];
+        SaveQuantityBreaksResult result = await catalogue.SetProductQuantityBreaksAsync(id, sent, HttpContext.RequestAborted);
+        if (result.Status == SaveQuantityBreaksStatus.Saved) return RedirectToPage("Detail", new { id });
+        if (result.Status == SaveQuantityBreaksStatus.Missing) return NotFound();
+        if (result.Status != SaveQuantityBreaksStatus.Invalid || result.Errors is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+        foreach ((string field, string[] messages) in result.Errors)
+        {
+            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(field, @"^Breaks\[(\d+)\]\.(\w+)$");
+            // A refusal that isn't about one row (the breaks changed while saving) goes to the section's summary.
+            string key = match.Success && int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) is int index
+                && index < rows.Length ? $"{nameof(Breaks)}[{rows[index]}].{match.Groups[2].Value}" : string.Empty;
+            foreach (string message in messages) ModelState.AddModelError(key, message);
+        }
+        return await ShowAsync(id, populate: true, keepBreaks: true);
+    }
+
+    /// <summary>The saved break at this row's quantity and price, for its never-applies warnings; null for a row not saved as shown.</summary>
+    public ProductQuantityBreakItem? SavedBreak(QuantityBreakInputRow row) => (Details.QuantityBreaks ?? [])
+        .FirstOrDefault(entry => entry.FromQuantity == row.FromQuantity && entry.Price == row.Price);
+
     public Task<IActionResult> OnPostPreviewUnitAsync(Guid id)
     {
         ProductUnitForm.ValidatePreview(ModelState, Unit);
@@ -102,7 +142,7 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
         return await ShowAsync(id);
     }
 
-    private async Task<IActionResult> ShowAsync(Guid id, bool populate = false)
+    private async Task<IActionResult> ShowAsync(Guid id, bool populate = false, bool keepBreaks = false)
     {
         var read = await catalogue.ProductDetailsAsync(id, HttpContext.RequestAborted);
         if (!read.Found) return read.FailureResult();
@@ -120,6 +160,9 @@ public sealed class DetailModel(CatalogueApiClient catalogue) : PageModel
             new ProductReferenceItem(brand.Id, brand.Name, brand.IsArchived)).ToArray() ?? [],
             Classification.AlternativeBrandIds.Select(id => (Guid?)id).Append(Classification.PrimaryBrandId));
         PriceHistory = details.PriceHistory.OrderByDescending(price => price.EffectiveFrom).ToArray();
+        if (!keepBreaks)
+            Breaks = [.. (details.QuantityBreaks ?? []).OrderBy(entry => entry.FromQuantity)
+                .Select(entry => new QuantityBreakInputRow { FromQuantity = entry.FromQuantity, Price = entry.Price })];
         // CurrentPrice is resolved by the API's business date; the next entry is therefore future.
         UpcomingPrice = PriceHistory.Where(price => details.CurrentPrice is null
                 || price.EffectiveFrom > details.CurrentPrice.EffectiveFrom)

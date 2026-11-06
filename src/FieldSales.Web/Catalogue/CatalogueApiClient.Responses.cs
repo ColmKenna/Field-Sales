@@ -32,7 +32,8 @@ public sealed partial class CatalogueApiClient
             && search.Categories.All(category => category is not null && category.Path is not null)
             && search.Brands.All(brand => brand is not null && brand.Name is not null),
         ProductDetails details => details.Product is not null && details.Product.Name is not null
-            && details.Breadcrumb is not null && details.PriceHistory is not null && details.Attributes is not null,
+            && details.Breadcrumb is not null && details.PriceHistory is not null && details.Attributes is not null
+            && (details.QuantityBreaks is null || details.QuantityBreaks.All(entry => entry is not null)),
         CategoryDetails details => details.Category is not null && details.Category.Name is not null
             && details.Breadcrumb is not null && details.Children is not null && details.Products is not null,
         FieldSales.ReferenceData.ReferenceListViewModel list => list.Items is not null && list.SelectedList is not null && list.AvailableLists is not null,

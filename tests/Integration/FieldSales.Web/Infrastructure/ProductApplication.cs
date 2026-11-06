@@ -108,6 +108,7 @@ public sealed class ProductApplication(CatalogueSqlServerFixture sql) : IAsyncLi
         await using AsyncServiceScope scope = Api.Services.CreateAsyncScope();
         CatalogueDbContext db = scope.ServiceProvider.GetRequiredService<CatalogueDbContext>();
         await ClearTiersAsync(db);
+        await db.ProductQuantityBreaks.ExecuteDeleteAsync(); // WI-062: breaks name their product.
         await db.ProductBasePrices.ExecuteDeleteAsync();
         await db.Products.ExecuteDeleteAsync();
         // Remove deepest categories first to respect the predecessor's restricted parent relationship.
