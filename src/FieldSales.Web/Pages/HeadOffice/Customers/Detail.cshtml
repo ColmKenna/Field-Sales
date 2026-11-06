@@ -1,6 +1,21 @@
 @page "{id:guid}"
 @model FieldSales.Web.Pages.HeadOffice.Customers.DetailModel
+@using FieldSales.Web.Pages.HeadOffice.Tiers
 @{ ViewData["Title"] = Model.Customer.Name; }
+@functions {
+    // One sample row: the product, today's base price, this customer's price and where it comes from.
+    private async Task SampleRow(CustomerPriceSampleRow row)
+    {
+        string Money(decimal? amount) => amount is decimal value ? TierText.Money(value, row.Unit) : "no price today";
+        <tr data-sample-product="@row.ProductId">
+            <th scope="row">@row.Name <span class="product-code">@row.Code</span></th>
+            <td>@Money(row.BasePrice)</td>
+            <td>@Money(row.CustomerPrice)</td>
+            <td>@row.From</td>
+        </tr>
+        await Task.CompletedTask;
+    }
+}
 <p><a asp-page="Index">Back to customers</a></p>
 <h1>@Model.Customer.Name</h1>
 <section aria-labelledby="locations-heading">
@@ -21,4 +36,81 @@
             </tbody>
         </table>
     </div>
+</section>
+
+<section aria-labelledby="pricing-heading">
+    <h2 id="pricing-heading">Pricing</h2>
+    @if (Model.Tiers is null)
+    {
+        <p role="alert">Pricing isn't available right now. Try again in a moment.</p>
+    }
+    else
+    {
+    <p class="customer-tiers">Tiers: @(Model.HeldNames.Count == 0 ? "none — Base Price plus any break" : string.Join(", ", Model.HeldNames))</p>
+    <p>Every Location of @Model.Customer.Name prices against these tiers; the best price wins on each line.</p>
+    <form method="post" asp-route-id="@Model.Customer.Id" class="product-form customer-tiers-form">
+        <div asp-validation-summary="ModelOnly" role="alert"></div>
+        @if (Model.Tiers!.Tiers.Count == 0)
+        {
+            <p>No price tiers yet. <a asp-page="/HeadOffice/Tiers/Index">Create one</a>.</p>
+        }
+        else
+        {
+            <fieldset>
+                <legend>Tiers held</legend>
+                @foreach (var tier in Model.Tiers.Tiers)
+                {
+                    <label><input type="checkbox" name="TierIds" value="@tier.Id" checked="@Model.TierIds.Contains(tier.Id)" /> @tier.Name · @TierText.Default(tier.PercentOff)</label>
+                }
+            </fieldset>
+        }
+        <label asp-for="Find">Check another product</label>
+        <input asp-for="Find" type="search" placeholder="Code or name" />
+        <button type="submit" asp-page-handler="Sample">Update sample</button>
+        <button type="submit" asp-page-handler="Tiers" class="button">Save tiers</button>
+        @if (Model.Unsaved)
+        {
+            <p role="status">The sample shows the ticked tiers. They aren't saved yet.</p>
+        }
+    </form>
+
+    @if (Model.Sample is null)
+    {
+        <p role="alert">The sample isn't available right now. Try again in a moment.</p>
+    }
+    else
+    {
+    <div class="directory-table">
+        <table data-sample="most-ordered">
+            <caption>Sample prices · most-ordered products</caption>
+            <thead><tr><th scope="col">Product</th><th scope="col">Base</th><th scope="col">This customer</th><th scope="col">From</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model.Sample.MostOrdered)
+            {
+                await SampleRow(row);
+            }
+            </tbody>
+        </table>
+        @if (Model.Sample.MostOrdered.Count == 0)
+        {
+            <p>No accepted orders yet. Check a product to see its price.</p>
+        }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Model.Find))
+    {
+        <div class="directory-table">
+            <table data-sample="found">
+                <caption>@Model.Sample.FoundCount @(Model.Sample.FoundCount == 1 ? "product matches" : "products match") “@Model.Find”@(Model.Sample.FoundCount > Model.Sample.Found.Count ? $"; showing the first {Model.Sample.Found.Count}" : "")</caption>
+                <thead><tr><th scope="col">Product</th><th scope="col">Base</th><th scope="col">This customer</th><th scope="col">From</th></tr></thead>
+                <tbody>
+                @foreach (var row in Model.Sample.Found)
+                {
+                    await SampleRow(row);
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    }
+    }
 </section>

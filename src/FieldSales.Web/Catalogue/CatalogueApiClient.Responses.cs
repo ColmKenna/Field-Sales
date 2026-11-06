@@ -41,6 +41,10 @@ public sealed partial class CatalogueApiClient
         PriceTierDetails tier => tier.Name is not null && tier.Overrides is not null && PriceTierShapes.IsKnown(tier.Shape)
             && tier.Overrides.All(entry => entry is not null && entry.Code is not null && entry.Name is not null && entry.Unit is not null),
         IReadOnlyList<PriceTierListItem> tiers => tiers.All(tier => tier is not null && tier.Name is not null && PriceTierShapes.IsKnown(tier.Shape)),
+        CustomerTiersDetails held => held.HeldTierIds is not null && held.Tiers is not null
+            && held.Tiers.All(tier => tier is not null && tier.Name is not null && PriceTierShapes.IsKnown(tier.Shape)),
+        CustomerPriceSample sample => sample.MostOrdered is not null && sample.Found is not null
+            && sample.MostOrdered.Concat(sample.Found).All(row => row is not null && row.Code is not null && row.Name is not null && row.Unit is not null),
         _ => true
     };
 

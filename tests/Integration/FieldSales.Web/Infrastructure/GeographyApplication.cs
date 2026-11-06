@@ -54,6 +54,9 @@ public class GeographyApplication : IAsyncLifetime
         _api = NewApi();
         await using var scope = Api.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DirectoryDbContext>().Database.MigrateAsync();
+        // The customer record's Pricing section (WI-063) reads tiers and orders, so the API has those databases too.
+        await scope.ServiceProvider.GetRequiredService<CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext>().Database.MigrateAsync();
+        await scope.ServiceProvider.GetRequiredService<CatalogueApi::FieldSales.Api.Ordering.OrderingDbContext>().Database.MigrateAsync();
         await InitializeAdditionalAsync();
     }, DisposeAsync);
     protected virtual Task InitializeAdditionalAsync() => Task.CompletedTask;
@@ -77,6 +80,12 @@ public class GeographyApplication : IAsyncLifetime
         {
             services.RemoveAll<DirectoryDbContext>();
             services.AddScoped(_ => new DirectoryDbContext(new DbContextOptionsBuilder<DirectoryDbContext>().UseSqlServer(ConnectionString).Options));
+            services.RemoveAll<CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext>();
+            services.AddScoped(_ => new CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext(
+                new DbContextOptionsBuilder<CatalogueApi::FieldSales.Api.Catalogue.CatalogueDbContext>().UseSqlServer(Beside("_Catalogue")).Options));
+            services.RemoveAll<CatalogueApi::FieldSales.Api.Ordering.OrderingDbContext>();
+            services.AddScoped(_ => new CatalogueApi::FieldSales.Api.Ordering.OrderingDbContext(
+                new DbContextOptionsBuilder<CatalogueApi::FieldSales.Api.Ordering.OrderingDbContext>().UseSqlServer(Beside("_Ordering")).Options));
             services.RemoveAll<IStaffRoleLookup>(); services.AddSingleton<IStaffRoleLookup>(Roles);
             if (UseTestLocationUsage)
             {
@@ -94,6 +103,14 @@ public class GeographyApplication : IAsyncLifetime
         });
     });
     public StaffWebsiteFactory CreateWebsite() => new(Api.Server.CreateHandler(), Token());
+
+    // A database of its own beside the Directory's, on the same server.
+    private string Beside(string suffix)
+    {
+        Microsoft.Data.SqlClient.SqlConnectionStringBuilder builder = new(ConnectionString);
+        builder.InitialCatalog += suffix;
+        return builder.ConnectionString;
+    }
     public HttpClient CreateApiClient()
     {
         var client = Api.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
