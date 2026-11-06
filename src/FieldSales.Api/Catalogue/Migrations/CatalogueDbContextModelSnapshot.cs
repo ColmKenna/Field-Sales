@@ -202,7 +202,6 @@ namespace FieldSales.Api.Catalogue.Migrations
             modelBuilder.Entity("FieldSales.Api.Catalogue.ProductAttributeValue", b =>
                 {
                     b.Property<Guid>("Id")
-                    .ValueGeneratedNever()
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("AttributeNameId")
@@ -428,6 +427,62 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Pricing.PriceTier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("Latin1_General_100_CI_AS");
+
+                    b.Property<decimal>("PercentOff")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PriceTiers_Name");
+
+                    b.ToTable("PriceTiers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PriceTiers_PercentOff", "[PercentOff] > 0 AND [PercentOff] < 100 AND LEN([Name]) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Pricing.PriceTierOverride", b =>
+                {
+                    b.Property<Guid>("PriceTierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("FixedPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("PercentOff")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateOnly>("SetOn")
+                        .HasColumnType("date");
+
+                    b.HasKey("PriceTierId", "ProductId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("PriceTierOverrides", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PriceTierOverrides_Term", "([PercentOff] IS NOT NULL AND [FixedPrice] IS NULL AND [PercentOff] > 0 AND [PercentOff] < 100) OR ([PercentOff] IS NULL AND [FixedPrice] IS NOT NULL AND [FixedPrice] > 0)");
+                        });
+                });
+
             modelBuilder.Entity("FieldSales.Api.Catalogue.Category", b =>
                 {
                     b.HasOne("FieldSales.Api.Catalogue.Category", null)
@@ -520,6 +575,21 @@ namespace FieldSales.Api.Catalogue.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FieldSales.Api.Pricing.PriceTierOverride", b =>
+                {
+                    b.HasOne("FieldSales.Api.Pricing.PriceTier", null)
+                        .WithMany("Overrides")
+                        .HasForeignKey("PriceTierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FieldSales.Api.Catalogue.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FieldSales.Api.Catalogue.Product", b =>
                 {
                     b.Navigation("AlternativeBrands");
@@ -527,6 +597,11 @@ namespace FieldSales.Api.Catalogue.Migrations
                     b.Navigation("AttributeValues");
 
                     b.Navigation("BasePrices");
+                });
+
+            modelBuilder.Entity("FieldSales.Api.Pricing.PriceTier", b =>
+                {
+                    b.Navigation("Overrides");
                 });
 #pragma warning restore 612, 618
         }
