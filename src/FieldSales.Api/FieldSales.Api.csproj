@@ -22,6 +22,7 @@
     <ProjectReference Include="..\FieldSales.ServiceDefaults\FieldSales.ServiceDefaults.csproj" />
     <ProjectReference Include="..\FieldSales.StaffAccess\FieldSales.StaffAccess.csproj" />
     <ProjectReference Include="..\FieldSales.Quantities\FieldSales.Quantities.csproj" />
+    <ProjectReference Include="..\FieldSales.Pricing\FieldSales.Pricing.csproj" />
     <ProjectReference Include="..\FieldSales.ReferenceData\FieldSales.ReferenceData.csproj" />
     <ProjectReference Include="..\FieldSales.Catalogue.Contracts\FieldSales.Catalogue.Contracts.csproj" />
     <ProjectReference Include="..\FieldSales.Directory.Contracts\FieldSales.Directory.Contracts.csproj" />

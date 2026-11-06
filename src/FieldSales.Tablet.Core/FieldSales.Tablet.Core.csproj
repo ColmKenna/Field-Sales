@@ -15,6 +15,7 @@
     <ProjectReference Include="..\FieldSales.Calls.Contracts\FieldSales.Calls.Contracts.csproj" />
     <ProjectReference Include="..\FieldSales.Ordering.Contracts\FieldSales.Ordering.Contracts.csproj" />
     <ProjectReference Include="..\FieldSales.Quantities\FieldSales.Quantities.csproj" />
+    <ProjectReference Include="..\FieldSales.Pricing\FieldSales.Pricing.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="FieldSales.Tablet.Core.IntegrationTests" />

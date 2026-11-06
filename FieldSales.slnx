@@ -11,6 +11,7 @@
         <Project Path="src/FieldSales.Snapshot.Contracts/FieldSales.Snapshot.Contracts.csproj" />
         <Project Path="src/FieldSales.Calls.Contracts/FieldSales.Calls.Contracts.csproj" />
         <Project Path="src/FieldSales.Ordering.Contracts/FieldSales.Ordering.Contracts.csproj" />
+        <Project Path="src/FieldSales.Pricing/FieldSales.Pricing.csproj" />
         <Project Path="src/FieldSales.Quantities/FieldSales.Quantities.csproj" />
         <Project Path="src/FieldSales.ReferenceData/FieldSales.ReferenceData.csproj" />
         <Project Path="src/FieldSales.StaffAccess/FieldSales.StaffAccess.csproj" />
@@ -21,6 +22,7 @@
         <Project Path="tests/Unit/FieldSales.Identity.Admin/FieldSales.Identity.Admin.UnitTests.csproj" />
         <Project Path="tests/Unit/FieldSales.Web/FieldSales.Web.UnitTests.csproj" />
         <Project Path="tests/Unit/FieldSales.Tablet.Core/FieldSales.Tablet.Core.UnitTests.csproj" />
+        <Project Path="tests/Unit/FieldSales.Pricing/FieldSales.Pricing.UnitTests.csproj" />
     </Folder>
     <Folder Name="/tests/Integration/">
         <Project Path="tests/Integration/FieldSales.Api/FieldSales.Api.IntegrationTests.csproj" />
