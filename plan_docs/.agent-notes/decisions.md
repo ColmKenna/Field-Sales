@@ -3,6 +3,24 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## Running items back to back with assumed approval (2026-11-06, developer, after WI-061)
+
+The developer: "yes [open the PR, merge after CI, update local main], and then do the next 3 items, assume approval instead of
+asking". For WI-062, WI-063 and WI-064: each plan, its decisions (the recommended option wherever a question would have been asked)
+and its scenarios are assumed approved; Apply and checkpoint triggers are taken as given; each item finishes with push, PR, merge
+after CI (merge commit, branch kept) and local main updated before the next starts. Assumed decisions are marked "(assumed)" in
+each item's notes. Work still stops for CI failures, failing suites, or anything destructive outside an item's own footprint.
+
+## WI-062 quantity breaks on a product (2026-11-06, assumed approval)
+
+Full text in `WI-062.md`.
+
+- **Breaks belong to the product** and are saved as a set; not dated.
+- **A threshold** is an orderable quantity of the product (whole for Each, a multiple of the step for measures) above the
+  smallest orderable quantity; no two at the same quantity; prices more than €0.00, to the cent.
+- **Never-applies warnings** save anyway: a break above a cheaper break at a smaller quantity, or above today's base price.
+- **Unit changes** that would leave a break off the new rules are refused.
+
 ## WI-061 price-list tiers and tier warnings (2026-11-06, developer, plan approval)
 
 The developer answered the WI-061 questions, replied **Approved** to the plan with D1–D9, then **Apply**. Full text in `WI-061.md`.
