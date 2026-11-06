@@ -1,5 +1,6 @@
 using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
+using FieldSales.Pricing;
 using FieldSales.Snapshot.Contracts;
 using FieldSales.Tablet.Core;
 using Microsoft.Extensions.Logging;
@@ -169,11 +170,11 @@ public sealed class TabletApp : IDisposable
     public OfflineLocationDetail? ReadLocation(string rep, Guid id) => new SnapshotStore(device.Workspace(rep), clock).ReadLocation(id);
 
     // Order entry: products are found offline in the active snapshot, and each added line is saved at once.
-    public ProductSearchIndex ReadProductIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadProductIndex(Today());
+    public ProductSearchIndex ReadProductIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadProductIndex(PriceToday());
 
     /// <summary>T-06's stock check: the downloaded products and the shop's Suggested List (T-5.4.1).</summary>
     public StockCheckStart ReadStockCheckStart(string rep, Guid locationId) =>
-        new SnapshotStore(device.Workspace(rep), clock).ReadStockCheckStart(locationId, Today());
+        new SnapshotStore(device.Workspace(rep), clock).ReadStockCheckStart(locationId, PriceToday());
 
     public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
         new OrderStore(device.Workspace(rep), clock).AddLine(orderId, locationId, productId, quantity);
@@ -266,7 +267,8 @@ public sealed class TabletApp : IDisposable
 
     public int CountWaitingToSend(string rep) => WorkUploader.CountWaiting(device.Workspace(rep));
 
-    private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+    // Prices follow the business day in Ireland, not the tablet's own time zone (WI-059 D1).
+    private DateOnly PriceToday() => BusinessCalendar.Today(clock.GetUtcNow());
 
     private TabletSync Sync(string rep) => new(device.Workspace(rep), endpoints.Api, device.Tokens(rep, endpoints.Identity), space, clock);
 }
