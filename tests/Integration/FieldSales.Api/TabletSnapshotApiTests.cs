@@ -469,6 +469,8 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
     private const string Issuer = "https://staff-issuer.test";
     private static readonly SymmetricSecurityKey SigningKey = new(Encoding.UTF8.GetBytes("test-only-staff-api-signing-key-32bytes"));
     public SnapshotRoleLookup Roles { get; } = new();
+    /// <summary>The API's clock: 30 September 23:30 UTC (1 October in Dublin) unless a test moves it; each reset puts it back.</summary>
+    public SnapshotClock Clock { get; } = new();
     private WebApplicationFactory<Program>? _api;
     private OwnedCatalogReset? _reset;
     public WebApplicationFactory<Program> Api => _api ?? throw new InvalidOperationException("Snapshot application is not initialized.");
@@ -502,7 +504,7 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
                     services.RemoveAll<IStaffRoleLookup>();
                     services.AddSingleton<IStaffRoleLookup>(Roles);
                     services.RemoveAll<TimeProvider>();
-                    services.AddSingleton<TimeProvider>(new SnapshotClock());
+                    services.AddSingleton<TimeProvider>(Clock);
                     services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
                     {
                         OpenIdConnectConfiguration configuration = new() { Issuer = Issuer };
@@ -530,6 +532,7 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
     {
         await (_reset ?? throw new InvalidOperationException("Snapshot schema is not initialized.")).ResetAsync();
         Roles.Reset();
+        Clock.UtcNow = SnapshotClock.Start;
     }
 
     public async Task DisposeAsync()
@@ -779,8 +782,10 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
         }
     }
 
-    private sealed class SnapshotClock : TimeProvider
+    public sealed class SnapshotClock : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => new(2026, 9, 30, 23, 30, 0, TimeSpan.Zero);
+        public static readonly DateTimeOffset Start = new(2026, 9, 30, 23, 30, 0, TimeSpan.Zero);
+        public DateTimeOffset UtcNow { get; set; } = Start;
+        public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 }

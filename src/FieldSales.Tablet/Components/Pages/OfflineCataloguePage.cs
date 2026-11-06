@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Components;
 
 namespace FieldSales.Tablet.Components.Pages;
 
-/// <summary>Offline reads use the current rep and the same 24-hour guard as Home, including after resume.</summary>
+/// <summary>Offline reads use the current rep and the same 24-hour guard as Home, including after resume. A page left open over
+/// midnight in Ireland reads again too, so the prices it shows are the day's (WI-059 D4).</summary>
 public abstract class OfflineCataloguePage : ComponentBase, IDisposable
 {
     [Inject] protected TabletApp Tablet { get; set; } = null!;
@@ -11,7 +12,7 @@ public abstract class OfflineCataloguePage : ComponentBase, IDisposable
     protected bool Ready { get; private set; }
     private int load;
 
-    protected override void OnInitialized() => Tablet.Resumed += OnResumed;
+    protected override void OnInitialized() { Tablet.Resumed += OnResumed; Tablet.PriceDayChanged += OnResumed; }
     protected override Task OnParametersSetAsync() => RefreshAsync();
 
     protected async Task RefreshAsync()
@@ -31,5 +32,5 @@ public abstract class OfflineCataloguePage : ComponentBase, IDisposable
     protected abstract void Clear();
     protected abstract Task ReadAsync(string rep, Func<bool> isCurrent);
     private void OnResumed() => _ = InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); });
-    public void Dispose() { ++load; Tablet.Resumed -= OnResumed; }
+    public void Dispose() { ++load; Tablet.Resumed -= OnResumed; Tablet.PriceDayChanged -= OnResumed; }
 }

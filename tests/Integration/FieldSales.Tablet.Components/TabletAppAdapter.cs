@@ -14,6 +14,9 @@ public sealed class TabletApp
     public bool Connected { get; set; } = true;
     public void ChangeSession() { SessionVersion++; SessionChanged?.Invoke(); }
     public void Resume() => Resumed?.Invoke();
+    public event Action? PriceDayChanged;
+    /// <summary>The business day changes while the page is open (WI-059 D4).</summary>
+    public void ChangePriceDay() => PriceDayChanged?.Invoke();
     public Func<Task<TabletEntry>> Enter { get; set; } = () => Task.FromResult(new TabletEntry(EntryScreen.Home, "colm", ""));
     public Func<string, Guid, OfflineLocationDetail?> Read { get; set; } = (_, _) => null;
     public Task<TabletEntry> EnterAsync() => Enter();

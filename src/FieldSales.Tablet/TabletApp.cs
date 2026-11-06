@@ -19,6 +19,7 @@ public sealed class TabletApp : IDisposable
     private readonly TimeProvider clock;
     private readonly EntryHandOff handOff;
     private readonly TabletSessionMonitor monitor;
+    private readonly PriceDayWatch priceDay;
     private readonly object workGate = new();
     private CancellationTokenSource sessionWork = new();
     private readonly SemaphoreSlim syncGate = new(1, 1);
@@ -33,6 +34,8 @@ public sealed class TabletApp : IDisposable
         device.SessionChanged += OnSessionChanged;
         monitor = new(device, clock, error => logger.LogError(error, "Could not check the tablet session."));
         monitor.Start();
+        priceDay = new(clock, () => PriceDayChanged?.Invoke());
+        priceDay.Start();
     }
 
     public const string SignInNeedsConnection = "Sign-in needs a connection. Try again when you have signal.";
@@ -41,9 +44,12 @@ public sealed class TabletApp : IDisposable
     /// <summary>Raised when the app comes back to the foreground, so the 24-hour rule is checked again.</summary>
     public event Action? Resumed;
     public event Action? SessionChanged;
+    /// <summary>Raised when the business day changes while the app is in the foreground, so open pages show that day's prices
+    /// (WI-059 D4).</summary>
+    public event Action? PriceDayChanged;
     public long SessionVersion => device.SessionVersion;
-    public void NotifyResumed() { monitor.Start(); Resumed?.Invoke(); }
-    public void NotifyStopped() => monitor.Stop();
+    public void NotifyResumed() { monitor.Start(); priceDay.Start(); Resumed?.Invoke(); }
+    public void NotifyStopped() { monitor.Stop(); priceDay.Stop(); }
 
     public bool Connected => Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
 
@@ -147,6 +153,7 @@ public sealed class TabletApp : IDisposable
     {
         device.SessionChanged -= OnSessionChanged;
         monitor.Dispose();
+        priceDay.Dispose();
         lock (workGate) { sessionWork.Cancel(); sessionWork.Dispose(); }
     }
 

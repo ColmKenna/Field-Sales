@@ -12,6 +12,7 @@ public sealed class FutureDatedPriceTests : IDisposable
 {
     private static readonly Guid Category = Guid.Parse("20000000-0000-0000-0000-000000000059");
     private static readonly Guid VitaminD = Guid.Parse("30000000-0000-0000-0000-000000000059");
+    private static readonly Guid VitaminC = Guid.Parse("30000000-0000-0000-0000-000000000060");
     private static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
 
     private readonly TestTablet tablet = new();
@@ -22,7 +23,8 @@ public sealed class FutureDatedPriceTests : IDisposable
     {
         TabletSnapshot snapshot = Snapshots.Build("colm", 1, 0);
         SnapshotCategory[] categories = [new(Category, null, "Vitamins")];
-        SnapshotProduct[] products = [new(VitaminD, "VITD-1000-90", "Vitamin D 1000IU 90s", Category, "Each", null, null, null)];
+        SnapshotProduct[] products = [new(VitaminD, "VITD-1000-90", "Vitamin D 1000IU 90s", Category, "Each", null, null, null),
+            new(VitaminC, "VITC-500", "Vitamin C 500mg", Category, "Each", null, null, null)];
         snapshot = snapshot with
         {
             Categories = categories, Products = products, BasePrices = prices,
@@ -36,7 +38,8 @@ public sealed class FutureDatedPriceTests : IDisposable
         return snapshot.Locations[0].Id;
     }
 
-    private static SnapshotBasePrice Price(int month, int day, decimal amount) => new(VitaminD, new DateOnly(2026, month, day), amount);
+    private static SnapshotBasePrice Price(int month, int day, decimal amount, Guid? product = null) =>
+        new(product ?? VitaminD, new DateOnly(2026, month, day), amount);
 
     // A tablet clock at a UTC instant, set to a time zone of its own.
     private static FakeTimeProvider ClockAt(DateTimeOffset utc, TimeZoneInfo? zone = null)
@@ -96,5 +99,28 @@ public sealed class FutureDatedPriceTests : IDisposable
         FakeTimeProvider setBack = ClockAt(new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero));
 
         Assert.Equal((12.50m, 12.50m), (IndexPrice(setBack), LinePrice(setBack, shop)));
+    }
+
+    [Fact]
+    public async Task Should_KeepTheLineAt1250AndPriceANewLineAt1320_When_AnOrderIsEditedAfterMidnight()
+    {
+        Guid shop = await SyncAsync(new(2026, 10, 31), Price(10, 1, 12.50m), Price(11, 1, 13.20m),
+            Price(10, 1, 12.50m, VitaminC), Price(11, 1, 13.20m, VitaminC));
+        FakeTimeProvider clock = ClockAt(new(2026, 10, 31, 23, 58, 0, TimeSpan.Zero));
+        OrderStore orders = new(tablet.Workspace(), clock);
+        Guid orderId = Guid.NewGuid();
+        OrderLine vitaminD = Assert.Single(orders.AddLine(orderId, shop, VitaminD, 12).Order!.Lines);
+        Assert.Equal(12.50m, vitaminD.Price.Amount);
+
+        clock.Advance(TimeSpan.FromMinutes(4)); // 00:02 on 1 Nov, when both are €13.20.
+        OrderResult changed = orders.ChangeQuantity(orderId, vitaminD.Id, 24);
+        OrderResult added = orders.AddLine(orderId, shop, VitaminC, 6);
+
+        Assert.Null(changed.Error);
+        Assert.Equal((24m, 12.50m), (changed.Order!.Lines.Single(line => line.ProductId == VitaminD).Quantity,
+            changed.Order.Lines.Single(line => line.ProductId == VitaminD).Price.Amount));
+        Assert.Null(added.Error);
+        Assert.Equal([(VitaminD, 24m, 12.50m), (VitaminC, 6m, 13.20m)],
+            added.Order!.Lines.Select(line => (line.ProductId, line.Quantity, line.Price.Amount)));
     }
 }
