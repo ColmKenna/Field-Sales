@@ -11,6 +11,16 @@ and its scenarios are assumed approved; Apply and checkpoint triggers are taken 
 after CI (merge commit, branch kept) and local main updated before the next starts. Assumed decisions are marked "(assumed)" in
 each item's notes. Work still stops for CI failures, failing suites, or anything destructive outside an item's own footprint.
 
+## WI-063 tiers on a customer (2026-11-06, assumed approval)
+
+Full text in `WI-063.md`.
+
+- **The customer–tier link** is stored in the catalogue database beside the tiers; the customer is checked against the Directory.
+- **Every Location prices against its customer's tiers**, through one service the sample (and later the snapshot) uses.
+- **The sample** is the customer's 5 most-ordered products from its last 20 accepted orders, plus a search, priced by the engine
+  with the ticked tiers before saving.
+- **Removing a tier** changes prices from then on only; captured orders keep their prices.
+
 ## WI-062 quantity breaks on a product (2026-11-06, assumed approval)
 
 Full text in `WI-062.md`.
