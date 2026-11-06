@@ -3,6 +3,19 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-060 percentage price tiers (2026-11-06, developer, plan approval)
+
+The developer answered the WI-060 questions, replied **Approved** to the plan with D1–D11, then `Continue T-6.1.1` (taken as
+**Apply**, since the checkpoint hadn't been reached). Full text in `WI-060.md`.
+
+- **Storage holds terms, never prices:** a tier's name and default percentage; an override's product and either a percentage or a
+  fixed price, one per product per tier. Prices are worked out through the engine when needed.
+- **Limits:** percentages more than 0 and less than 100, to 2 decimal places; fixed prices more than €0.00, to the cent; tier names
+  unique ignoring case.
+- **Editing:** rename, change the percentage, add, change and remove overrides; tiers aren't deleted.
+- **Override rows** show the term, the list price and today's price; products are picked by search.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-059 future-dated prices on the tablet (2026-11-06, developer, plan approval)
 
 The developer answered the WI-059 questions, replied **Approved** to the plan with D1–D8, then proceeded (Apply). Full text in
