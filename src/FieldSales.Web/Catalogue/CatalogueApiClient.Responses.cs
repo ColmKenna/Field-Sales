@@ -37,6 +37,9 @@ public sealed partial class CatalogueApiClient
             && details.Breadcrumb is not null && details.Children is not null && details.Products is not null,
         FieldSales.ReferenceData.ReferenceListViewModel list => list.Items is not null && list.SelectedList is not null && list.AvailableLists is not null,
         FieldSales.ReferenceData.ReferenceListItem item => item.Name is not null && item.Usage is not null,
+        PriceTierDetails tier => tier.Name is not null && tier.Overrides is not null
+            && tier.Overrides.All(entry => entry is not null && entry.Code is not null && entry.Name is not null && entry.Unit is not null),
+        IReadOnlyList<PriceTierListItem> tiers => tiers.All(tier => tier is not null && tier.Name is not null),
         _ => true
     };
 
