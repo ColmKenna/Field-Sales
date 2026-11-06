@@ -438,9 +438,15 @@ namespace FieldSales.Api.Catalogue.Migrations
                         .HasColumnType("nvarchar(100)")
                         .UseCollation("Latin1_General_100_CI_AS");
 
-                    b.Property<decimal>("PercentOff")
+                    b.Property<decimal?>("PercentOff")
                         .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("Shape")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
 
                     b.HasKey("Id");
 
@@ -450,7 +456,7 @@ namespace FieldSales.Api.Catalogue.Migrations
 
                     b.ToTable("PriceTiers", null, t =>
                         {
-                            t.HasCheckConstraint("CK_PriceTiers_PercentOff", "[PercentOff] > 0 AND [PercentOff] < 100 AND LEN([Name]) > 0");
+                            t.HasCheckConstraint("CK_PriceTiers_Terms", "LEN([Name]) > 0 AND (([Shape] = 'Percentage' AND [PercentOff] IS NOT NULL AND [PercentOff] > 0 AND [PercentOff] < 100) OR ([Shape] = 'PriceList' AND [PercentOff] IS NULL))");
                         });
                 });
 

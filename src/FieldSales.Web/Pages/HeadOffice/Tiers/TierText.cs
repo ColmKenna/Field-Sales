@@ -9,6 +9,9 @@ public static class TierText
 
     public static string Percent(decimal percent) => percent.ToString("0.##", CultureInfo.InvariantCulture) + "%";
 
+    /// <summary>A tier's own term: "8% off base", or "price list" when it has no default percentage (WI-061).</summary>
+    public static string Default(decimal? percentOff) => percentOff is decimal percent ? Percent(percent) + " off base" : "price list";
+
     public static string Money(decimal amount, string unit) =>
         amount.ToString("C2", Currency) + (string.Equals(unit, "Each", StringComparison.OrdinalIgnoreCase) ? "" : " per " + unit);
 

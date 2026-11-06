@@ -13,3 +13,5 @@ global using PriceTierDetails = FieldSales.Catalogue.Contracts.PriceTierDetails;
 global using PriceTierOverrideItem = FieldSales.Catalogue.Contracts.PriceTierOverrideItem;
 global using SavePriceTierRequest = FieldSales.Catalogue.Contracts.SavePriceTierRequest;
 global using SetPriceTierOverrideRequest = FieldSales.Catalogue.Contracts.SetPriceTierOverrideRequest;
+global using ChangePriceTierShapeRequest = FieldSales.Catalogue.Contracts.ChangePriceTierShapeRequest;
+global using PriceTierShapes = FieldSales.Catalogue.Contracts.PriceTierShapes;

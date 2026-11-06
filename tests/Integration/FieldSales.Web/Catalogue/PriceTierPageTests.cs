@@ -109,16 +109,16 @@ public sealed class PriceTierPageTests
 
         private static readonly PriceTierDetails Details = new(TierB, "Tier B", 8m,
         [
-            new(HandCream, "HAND-75", "Hand Cream 75ml", "Each", 15m, null, 4.00m, 3.40m, new DateOnly(2026, 10, 1)),
-            new(Guid.NewGuid(), "TEA-LOOSE", "Loose Herbal Tea", "kg", null, 4.00m, 4.80m, 4.00m, new DateOnly(2026, 10, 1))
-        ]);
+            new(HandCream, "HAND-75", "Hand Cream 75ml", "Each", 15m, null, 4.00m, 3.40m, new DateOnly(2026, 10, 1), false),
+            new(Guid.NewGuid(), "TEA-LOOSE", "Loose Herbal Tea", "kg", null, 4.00m, 4.80m, 4.00m, new DateOnly(2026, 10, 1), false)
+        ], PriceTierShapes.Percentage);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Assert.Equal("test-access-token", request.Headers.Authorization!.Parameter);
             string path = request.RequestUri!.AbsolutePath;
             if (request.Method == HttpMethod.Get && path == "/pricing/tiers")
-                return Json(new[] { new PriceTierListItem(Guid.NewGuid(), "Suncare Deal", 12.5m, 0), new PriceTierListItem(TierB, "Tier B", 8m, 2) });
+                return Json(new[] { new PriceTierListItem(Guid.NewGuid(), "Suncare Deal", 12.5m, 0, PriceTierShapes.Percentage), new PriceTierListItem(TierB, "Tier B", 8m, 2, PriceTierShapes.Percentage) });
             if (request.Method == HttpMethod.Get && path == $"/pricing/tiers/{TierB}") return Json(Details);
             if (request.Method == HttpMethod.Get && path == "/catalogue/products/search")
             {

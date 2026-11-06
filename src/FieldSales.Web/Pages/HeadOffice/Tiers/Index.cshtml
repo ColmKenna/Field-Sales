@@ -16,7 +16,7 @@ else
     <ul class="tier-list" aria-label="Price tiers">
         @foreach (var tier in Model.Tiers)
         {
-            <li data-tier><a asp-page="Detail" asp-route-id="@tier.Id">@tier.Name</a> · @TierText.Percent(tier.PercentOff) off base · @TierText.Overrides(tier.OverrideCount)</li>
+            <li data-tier><a asp-page="Detail" asp-route-id="@tier.Id">@tier.Name</a> · @TierText.Default(tier.PercentOff) · @TierText.Overrides(tier.OverrideCount)</li>
         }
     </ul>
 }
