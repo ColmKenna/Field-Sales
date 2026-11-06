@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using FieldSales.Pricing;
 using FieldSales.Snapshot.Contracts;
 using Microsoft.Data.Sqlite;
 
@@ -11,15 +12,17 @@ public sealed record OrderableProduct(SnapshotProduct Product, IReadOnlyList<str
 
 public sealed partial class SnapshotStore
 {
-    /// <summary>Reads a product, its breadcrumb and its price in effect on <paramref name="today"/> from one
+    /// <summary>Reads a product, its breadcrumb and its price in effect on <paramref name="today"/> (the business day) from one
     /// active generation, even if Sync activates another during the read. The price is the newest
-    /// <c>EffectiveFrom</c> on or before the day, so a later-dated price is ignored until its day.</summary>
+    /// <c>EffectiveFrom</c> on or before the day, so a later-dated price is ignored until its day; a day before the snapshot was
+    /// built counts as its build day (WI-059 D2).</summary>
     public OrderableProduct? ReadOrderableProduct(Guid id, DateOnly today)
     {
         using SqliteConnection connection = Open();
         using SqliteTransaction transaction = connection.BeginTransaction(deferred: true);
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
+        DateOnly day = PriceDay(command, today);
         command.CommandText = """
             SELECT p.generation, p.code, p.name, p.category_id, p.unit, p.quantity_step, p.minimum_quantity, p.parent_product_id, g.manifest,
                    (SELECT b.amount FROM base_prices b WHERE b.generation=p.generation AND b.product_id=p.id AND b.effective_from <= $today
@@ -27,7 +30,7 @@ public sealed partial class SnapshotStore
             FROM products p JOIN active a ON a.generation=p.generation JOIN generations g ON g.id=p.generation WHERE p.id=$id
             """;
         command.Parameters.AddWithValue("$id", id.ToString());
-        command.Parameters.AddWithValue("$today", today.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$today", day.ToString("O", CultureInfo.InvariantCulture));
         SnapshotProduct product;
         string generation;
         decimal? price;
@@ -44,5 +47,16 @@ public sealed partial class SnapshotStore
         List<string> breadcrumb = ReadBreadcrumb(connection, transaction, generation, product.CategoryId);
         transaction.Commit();
         return new(product, breadcrumb, price, manifest);
+    }
+
+    // The day the active snapshot prices on: today, or its build day when the tablet's clock is set before it (WI-059 D2). Read in
+    // the caller's transaction, so it comes from the same generation as the prices.
+    private static DateOnly PriceDay(SqliteCommand command, DateOnly today)
+    {
+        command.CommandText = "SELECT g.manifest FROM active a JOIN generations g ON g.id=a.generation";
+        return command.ExecuteScalar() is string json
+            && JsonSerializer.Deserialize<SnapshotManifest>(json, SnapshotContract.JsonOptions) is { } manifest
+            ? BusinessCalendar.PriceDay(today, manifest.BuildDate)
+            : today;
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using FieldSales.Pricing;
 using FieldSales.Quantities;
 using System.Globalization;
 
@@ -12,8 +13,6 @@ public sealed record AddProductBasePriceRequest(decimal? BasePrice, DateOnly? Ef
 
 public static class ProductEndpoints
 {
-    private static readonly TimeZoneInfo BusinessTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Dublin");
-
     public static void MapProductEndpoints(this WebApplication app)
     {
         RouteGroupBuilder products = app.MapGroup("/catalogue/products")
@@ -218,6 +217,6 @@ public static class ProductEndpoints
         new(product.Id, product.Code, product.Name, product.CategoryId, product.Unit,
             product.QuantityStep, product.MinimumQuantity);
 
-    internal static DateOnly Today(TimeProvider clock) => DateOnly.FromDateTime(
-        TimeZoneInfo.ConvertTime(clock.GetUtcNow(), BusinessTimeZone).DateTime);
+    /// <summary>The business day (Europe/Dublin), shared with the tablet (WI-059 D1).</summary>
+    internal static DateOnly Today(TimeProvider clock) => BusinessCalendar.Today(clock.GetUtcNow());
 }

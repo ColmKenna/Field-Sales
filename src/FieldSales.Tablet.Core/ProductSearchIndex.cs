@@ -76,13 +76,15 @@ public sealed class ProductSearchIndex
 public sealed partial class SnapshotStore
 {
     /// <summary>Reads the generation, categories, products and today's prices in one transaction, so a
-    /// concurrent Sync cannot mix copies. The price is the newest one on or before <paramref name="today"/>.</summary>
+    /// concurrent Sync cannot mix copies. The price is the newest one on or before <paramref name="today"/> (the business day), or
+    /// on or before the snapshot's build day when the tablet's clock is set before it (WI-059 D2).</summary>
     public ProductSearchIndex ReadProductIndex(DateOnly today)
     {
         using SqliteConnection connection = Open();
         using SqliteTransaction transaction = connection.BeginTransaction(deferred: true);
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
+        DateOnly day = PriceDay(command, today);
         command.CommandText = "SELECT generation FROM active";
         string? generation = command.ExecuteScalar() as string;
         List<ProductSearchResult> products = [];
@@ -117,7 +119,7 @@ public sealed partial class SnapshotStore
                         ORDER BY b.effective_from DESC LIMIT 1), p.quantity_step, p.minimum_quantity
                 FROM products p WHERE p.generation=$g
                 """;
-            command.Parameters.AddWithValue("$today", today.ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$today", day.ToString("O", CultureInfo.InvariantCulture));
             using SqliteDataReader rows = command.ExecuteReader();
             while (rows.Read())
             {

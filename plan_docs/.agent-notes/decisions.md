@@ -3,6 +3,18 @@
 Human decisions that apply beyond the item that raised them. Each entry names who decided, when,
 and where it came up. Don't change an entry without a new human decision; add a dated amendment.
 
+## WI-059 future-dated prices on the tablet (2026-11-06, developer, plan approval)
+
+The developer answered the WI-059 questions, replied **Approved** to the plan with D1–D8, then proceeded (Apply). Full text in
+`WI-059.md`.
+
+- **Business day (MI-53):** "today" for prices is the date in Europe/Dublin, on the tablet and the server alike, from one shared
+  `BusinessCalendar` in `FieldSales.Pricing`. Call and order dates are not changed by this.
+- **Clock:** the tablet trusts its clock but never prices on a day before its snapshot's build date.
+- **Midnight:** open pages refresh their prices when the price day changes, keeping drafts.
+- **Captured lines** keep the price they were added at; a quantity change never re-prices; the server never re-prices.
+- **Finish:** push, PR, merge after CI (merge commit, branch kept), update local main.
+
 ## WI-058 the price engine (2026-11-05, developer, plan approval)
 
 The developer answered the WI-058 questions, replied **Approved** to the plan with D1–D10, then **Apply**. Full text in `WI-058.md`.

@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using FieldSales.Api.Catalogue;
 using FieldSales.Api.Ordering;
 using FieldSales.Calls.Contracts;
 using FieldSales.Directory.Contracts;
+using FieldSales.Ordering.Contracts;
 using FieldSales.StaffAccess;
 using FieldSales.Tablet.Core;
 using Microsoft.EntityFrameworkCore;
@@ -167,6 +169,45 @@ public sealed class TabletUploadEndToEndTests(TabletSnapshotFixture fixture) : I
         ReceivedOrder row = await received.Orders.AsNoTracking().SingleAsync();
         Assert.Equal((id, OrderLifecycleStatus.Pending), (row.Id, row.Status));
         Assert.Equal(ready, (await received.ReceivedWork.AsNoTracking().SingleAsync()).Body);
+    }
+
+    // WI-059 agreed scenario 7 (S2, D5): a line keeps the price it was captured at; the server stores it as received, never re-priced.
+    [Fact]
+    public async Task Should_KeepThe1250LineOnTheServer_When_AnOrderCapturedOn28OctSyncsOn2Nov()
+    {
+        Geography places = await _app.SeedGeographyAsync();
+        Guid byrnes = await _app.CustomerAsync("Byrne's Chemist", places.Arklow.Id);
+        await _app.AssignAsync("colm", TerritoryLevel.Town, places.Arklow.Id);
+        Category vitamins = await _app.CategoryAsync("Vitamins");
+        Guid vitaminD = await _app.ProductAsync("VITD-1000-90", "Vitamin D 1000IU 90s", vitamins.Id, price: 12.50m);
+        await _app.AddPriceAsync(vitaminD, 13.20m, new(2026, 11, 1));
+        DateTimeOffset capturedAt = new(2026, 10, 28, 11, 0, 0, TimeSpan.Zero);
+        _app.Clock.UtcNow = capturedAt.AddHours(-4);
+        _clock.SetUtcNow(capturedAt.AddHours(-4));
+        Assert.Equal(SyncStatus.Completed, (await SyncAsync()).Status); // The morning of 28 Oct.
+
+        _clock.SetUtcNow(capturedAt);
+        OrderStore orders = new(Workspace, _clock);
+        Guid orderId = Guid.NewGuid();
+        Assert.True(orders.AddLine(orderId, byrnes, vitaminD, 12m).Succeeded);
+        Assert.True(orders.MarkReadyToSend(orderId).Succeeded);
+
+        // Next Sync on 2 Nov, when €13.20 is the price in effect on the server too.
+        DateTimeOffset synced = new(2026, 11, 2, 17, 0, 0, TimeSpan.Zero);
+        _app.Clock.UtcNow = synced;
+        _clock.SetUtcNow(synced);
+        SyncOutcome outcome = await SyncAsync();
+
+        Assert.Equal((SyncStatus.Completed, new UploadSummary(1, 1)), (outcome.Status, outcome.Upload));
+        await using AsyncServiceScope scope = _app.Api.Services.CreateAsyncScope();
+        OrderingDbContext ordering = scope.ServiceProvider.GetRequiredService<OrderingDbContext>();
+        ReceivedWork work = await ordering.ReceivedWork.AsNoTracking().SingleAsync(item => item.Id == orderId);
+        TabletOrder received = JsonSerializer.Deserialize(work.Body, OrderJsonContext.Default.TabletOrder)!;
+        Assert.Equal((new DateOnly(2026, 10, 28), 12m, 12.50m),
+            (received.TakenOn, Assert.Single(received.Lines).Quantity, received.Lines[0].Price.Amount));
+        Assert.Equal(new DateOnly(2026, 10, 28), (await ordering.Orders.AsNoTracking().SingleAsync()).TakenOn);
+        // The server has €13.20 in effect: the snapshot downloaded at the same Sync prices a new line at it.
+        Assert.Equal(13.20m, Assert.Single(orders.AddLine(Guid.NewGuid(), byrnes, vitaminD, 1m).Order!.Lines).Price.Amount);
     }
 
     private sealed class FixedToken(string token) : IAccessTokenSource

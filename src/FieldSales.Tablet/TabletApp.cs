@@ -1,5 +1,6 @@
 using FieldSales.Calls.Contracts;
 using FieldSales.Ordering.Contracts;
+using FieldSales.Pricing;
 using FieldSales.Snapshot.Contracts;
 using FieldSales.Tablet.Core;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,7 @@ public sealed class TabletApp : IDisposable
     private readonly TimeProvider clock;
     private readonly EntryHandOff handOff;
     private readonly TabletSessionMonitor monitor;
+    private readonly PriceDayWatch priceDay;
     private readonly object workGate = new();
     private CancellationTokenSource sessionWork = new();
     private readonly SemaphoreSlim syncGate = new(1, 1);
@@ -32,6 +34,8 @@ public sealed class TabletApp : IDisposable
         device.SessionChanged += OnSessionChanged;
         monitor = new(device, clock, error => logger.LogError(error, "Could not check the tablet session."));
         monitor.Start();
+        priceDay = new(clock, () => PriceDayChanged?.Invoke());
+        priceDay.Start();
     }
 
     public const string SignInNeedsConnection = "Sign-in needs a connection. Try again when you have signal.";
@@ -40,9 +44,12 @@ public sealed class TabletApp : IDisposable
     /// <summary>Raised when the app comes back to the foreground, so the 24-hour rule is checked again.</summary>
     public event Action? Resumed;
     public event Action? SessionChanged;
+    /// <summary>Raised when the business day changes while the app is in the foreground, so open pages show that day's prices
+    /// (WI-059 D4).</summary>
+    public event Action? PriceDayChanged;
     public long SessionVersion => device.SessionVersion;
-    public void NotifyResumed() { monitor.Start(); Resumed?.Invoke(); }
-    public void NotifyStopped() => monitor.Stop();
+    public void NotifyResumed() { monitor.Start(); priceDay.Start(); Resumed?.Invoke(); }
+    public void NotifyStopped() { monitor.Stop(); priceDay.Stop(); }
 
     public bool Connected => Connectivity.Current.NetworkAccess == NetworkAccess.Internet;
 
@@ -146,6 +153,7 @@ public sealed class TabletApp : IDisposable
     {
         device.SessionChanged -= OnSessionChanged;
         monitor.Dispose();
+        priceDay.Dispose();
         lock (workGate) { sessionWork.Cancel(); sessionWork.Dispose(); }
     }
 
@@ -169,11 +177,11 @@ public sealed class TabletApp : IDisposable
     public OfflineLocationDetail? ReadLocation(string rep, Guid id) => new SnapshotStore(device.Workspace(rep), clock).ReadLocation(id);
 
     // Order entry: products are found offline in the active snapshot, and each added line is saved at once.
-    public ProductSearchIndex ReadProductIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadProductIndex(Today());
+    public ProductSearchIndex ReadProductIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadProductIndex(PriceToday());
 
     /// <summary>T-06's stock check: the downloaded products and the shop's Suggested List (T-5.4.1).</summary>
     public StockCheckStart ReadStockCheckStart(string rep, Guid locationId) =>
-        new SnapshotStore(device.Workspace(rep), clock).ReadStockCheckStart(locationId, Today());
+        new SnapshotStore(device.Workspace(rep), clock).ReadStockCheckStart(locationId, PriceToday());
 
     public OrderResult AddOrderLine(string rep, Guid orderId, Guid locationId, Guid productId, decimal quantity) =>
         new OrderStore(device.Workspace(rep), clock).AddLine(orderId, locationId, productId, quantity);
@@ -266,7 +274,8 @@ public sealed class TabletApp : IDisposable
 
     public int CountWaitingToSend(string rep) => WorkUploader.CountWaiting(device.Workspace(rep));
 
-    private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+    // Prices follow the business day in Ireland, not the tablet's own time zone (WI-059 D1).
+    private DateOnly PriceToday() => BusinessCalendar.Today(clock.GetUtcNow());
 
     private TabletSync Sync(string rep) => new(device.Workspace(rep), endpoints.Api, device.Tokens(rep, endpoints.Identity), space, clock);
 }

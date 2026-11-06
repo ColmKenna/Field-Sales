@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using FieldSales.Ordering.Contracts;
+using FieldSales.Pricing;
 using FieldSales.Quantities;
 
 namespace FieldSales.Tablet.Core;
@@ -184,7 +185,7 @@ public sealed class OrderStore
         SnapshotStore snapshot = new(workspace, clock);
         if (snapshot.ReadLocation(locationId) is not { IsAssigned: true }) return OrderResult.Failure(NotAssigned);
 
-        OrderableProduct? product = snapshot.ReadOrderableProduct(productId, Today());
+        OrderableProduct? product = snapshot.ReadOrderableProduct(productId, PriceToday());
         if (product is null) return OrderResult.Failure(NotDownloaded);
         if (product.Price is not decimal price) return OrderResult.Failure(NoPrice);
 
@@ -236,7 +237,7 @@ public sealed class OrderStore
         Change(orderId, OrderAction.ChangeQuantity, (saved, order) =>
         {
             if (order.Lines.FirstOrDefault(line => line.Id == lineId) is not { } line) return OrderResult.Failure(NoSuchLine);
-            OrderableProduct? product = new SnapshotStore(workspace, clock).ReadOrderableProduct(line.ProductId, Today());
+            OrderableProduct? product = new SnapshotStore(workspace, clock).ReadOrderableProduct(line.ProductId, PriceToday());
             if (product is null) return OrderResult.Failure(CantChangeMissing);
             if (!QuantityRules.TryCreate(product.Product.Unit, product.Product.QuantityStep, product.Product.MinimumQuantity,
                     out QuantityRules? rules, out _)) return OrderResult.Failure(RulesUnreadable);
@@ -282,7 +283,9 @@ public sealed class OrderStore
     private OrderResult Remove(UnsentItem item) =>
         new UnsentStore(workspace).DeleteUnclaimed(item) ? OrderResult.Gone : OrderResult.Failure(NotChangeable);
 
+    // The order's date is the tablet's own day (unchanged); a line's price follows the business day in Ireland (WI-059 D1, D7).
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+    private DateOnly PriceToday() => BusinessCalendar.Today(clock.GetUtcNow());
 
     private void Save(UnsentStore unsent, TabletOrder order) => unsent.Save(new(order.Id, UnsentKind.Order, clock.GetUtcNow(),
         JsonSerializer.Serialize(order, OrderJsonContext.Default.TabletOrder)));
