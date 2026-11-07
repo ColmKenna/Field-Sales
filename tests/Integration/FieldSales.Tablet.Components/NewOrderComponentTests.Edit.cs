@@ -89,7 +89,7 @@ public sealed partial class NewOrderComponentTests
         string text = screen.Renderer.Text(screen.Id);
         Assert.Contains("Murphy's Pharmacy", text);
         Assert.Contains("Ready to Send. It goes to head office at your next Sync.", text);
-        Assert.Equal(["Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id));
+        Assert.Equal(["(i)", "Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id)); // (i) only explains the line's price (WI-065).
 
         await screen.Click("Reopen");
         await screen.Until(() => screen.Renderer.Buttons(screen.Id).Contains("Mark Ready to Send"));
@@ -158,7 +158,7 @@ public sealed partial class NewOrderComponentTests
         string text = screen.Renderer.Text(screen.Id);
         Assert.Contains("Cold & Flu Relief 16s", text);
         Assert.Contains("It can't be changed on this tablet.", text);
-        Assert.Equal(["Close"], screen.Renderer.Buttons(screen.Id));
+        Assert.Equal(["(i)", "Close"], screen.Renderer.Buttons(screen.Id)); // (i) only explains the line's price (WI-065).
         Assert.DoesNotContain("product-search", screen.Renderer.AttributeValues(screen.Id, "id"));
         Assert.DoesNotContain("Change Cold & Flu Relief 16s", screen.Renderer.AttributeValues(screen.Id, "aria-label"));
     }

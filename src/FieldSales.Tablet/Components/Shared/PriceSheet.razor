@@ -1,0 +1,48 @@
+@namespace FieldSales.Tablet.Components.Shared
+@using FieldSales.Ordering.Contracts
+@using FieldSales.Tablet.Core
+
+@* WI-065 (T-6.4.3, conventions §1): what an order line's (i) opens — the price applied and every other candidate the engine
+   considered, named as the line captured them. Read from the line; nothing is worked out again here. *@
+<section class="price-sheet" role="dialog" aria-modal="true" aria-labelledby="price-sheet-heading">
+    <header class="quantity-popover-header">
+        <h2 id="price-sheet-heading">Price for @Line.ProductName</h2>
+        <button type="button" class="secondary popover-close" aria-label="Close" @onclick="OnClose">✕</button>
+    </header>
+    <h3 class="price-sheet-section">APPLIED</h3>
+    <p class="price-sheet-applied" data-price-applied>
+        <span class="price-sheet-amount">@LinePriceText.Money(Applied.Amount, Line.Unit)</span>
+        <span>@LinePriceText.Name(Applied)</span>
+    </p>
+    <h3 class="price-sheet-section">ALSO CONSIDERED</h3>
+    @if (Others.Count == 0)
+    {
+        <p>Nothing else was considered.</p>
+    }
+    else
+    {
+        <ul class="price-sheet-others">
+            @foreach (OrderPriceCandidate candidate in Others)
+            {
+                <li data-price-considered>
+                    <span class="price-sheet-amount">@LinePriceText.Money(candidate.Amount, Line.Unit)</span>
+                    <span>@LinePriceText.Name(candidate)</span>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    /// <summary>The line whose price is explained.</summary>
+    [Parameter, EditorRequired] public OrderLine Line { get; set; } = default!;
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    // The candidate the line applied; a line from before WI-064 still marks its one candidate as the winner.
+    private OrderPriceCandidate Applied => Line.Price.Candidates.FirstOrDefault(candidate => candidate.IsWinner)
+        ?? new(Line.Price.Kind, Line.Price.Label, Line.Price.Amount, true);
+
+    // Every other candidate, in the order the engine ranked them (cheapest first).
+    private IReadOnlyList<OrderPriceCandidate> Others => [.. Line.Price.Candidates.Where(candidate => !candidate.IsWinner)];
+}

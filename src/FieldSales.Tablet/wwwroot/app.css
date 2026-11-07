@@ -260,4 +260,12 @@ button.danger { background: var(--surface); color: var(--alert); border-color: v
 .popover-recorded { color: var(--muted); }
 .quantity-popover input { min-height: 56px; font: inherit; font-size: 1.2rem; padding: 0 12px; border: 1px solid var(--muted); border-radius: 6px; }
 .quantity-popover .order-actions button { min-height: 56px; }
+/* WI-065: the order line's (i) and the provenance sheet it opens (conventions §1). */
+.price-info { min-width: 56px; min-height: 56px; margin-left: 8px; font-weight: 700; }
+.price-sheet { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 20; max-width: 32rem; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; padding: 20px 24px; background: var(--surface); border: 2px solid var(--brand); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+.price-sheet-section { margin: 8px 0 0; font-size: .95rem; letter-spacing: .04em; color: var(--muted); }
+.price-sheet-applied, .price-sheet-others li { margin: 0; display: flex; gap: 16px; }
+.price-sheet-applied { font-weight: 700; font-size: 1.15rem; }
+.price-sheet-others { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.price-sheet-amount { min-width: 7rem; font-variant-numeric: tabular-nums; }
 .stock-add { margin-bottom: 12px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
