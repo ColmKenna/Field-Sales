@@ -11,6 +11,17 @@ and its scenarios are assumed approved; Apply and checkpoint triggers are taken 
 after CI (merge commit, branch kept) and local main updated before the next starts. Assumed decisions are marked "(assumed)" in
 each item's notes. Work still stops for CI failures, failing suites, or anything destructive outside an item's own footprint.
 
+## WI-065 price source and the provenance sheet (2026-11-07, developer, plan approval)
+
+The developer answered the WI-065 questions, replied **Approved** to the plan with D1–D9, then **Apply**. Full text in `WI-065.md`.
+
+- **MI-54 is decided: the runner-up tier price is on the line**, as the stories say ("€11.00 — Break: 10+ (better than your tier
+  price €11.50)"), not only in the provenance sheet (UX DECISION 1.1 is not followed). It takes the place of the list price note,
+  so a line carries at most one extra price.
+- **The sheet names each candidate as the line captured it** ("Tier B", "Break: 10+", "List price").
+- **The source and (i) are on order lines only**; pad and search rows keep just their price.
+- **Device checks:** the agent runs the demo on the connected tablet and sends screenshots.
+
 ## WI-064 customer prices on the tablet (2026-11-06, assumed approval)
 
 Full text in `WI-064.md`.
