@@ -37,6 +37,8 @@ public sealed partial class NewOrderComponentTests
         public ManualResetEventSlim? Gate { get; set; }
         public IReadOnlyList<ProductSearchResult> Products { get; init; } = Catalogue;
         public TaskCompletionSource? Started { get; set; }
+        /// <summary>WI-065: the price a line captures, when a test needs other than the base price.</summary>
+        public Func<ProductSearchResult, OrderLinePrice>? Captures { get; init; }
 
         public OrderResult Add(string rep, Guid orderId, Guid shop, Guid product, decimal quantity)
         {
@@ -46,7 +48,7 @@ public sealed partial class NewOrderComponentTests
             if (Refuse is not null) return new(null, Refuse);
             ProductSearchResult found = Products.Single(candidate => candidate.Id == product);
             OrderLine line = new(Guid.NewGuid(), found.Id, found.Code, found.Name, quantity, found.Unit,
-                new(found.Price!.Value, "Base", "Base price", [new("Base", "Base price", found.Price.Value, true)]), Snapshot);
+                Captures?.Invoke(found) ?? new(found.Price!.Value, "Base", "Base price", [new("Base", "Base price", found.Price.Value, true)]), Snapshot);
             Order = (Order ?? new TabletOrder(OrderContract.Schema, OrderContract.CurrentVersion, orderId, OrderState.InProgress, shop, shop,
                 rep, new DateOnly(2026, 10, 29), null, Snapshot, [])) with { Lines = [.. Order?.Lines ?? [], line] };
             return new(Order, null);
