@@ -83,8 +83,8 @@
         }
         @if (lowProduct is { } adding && lowEntry is { } marked)
         {
-            <QuantityPopover @key="adding.Id" Product="adding" Recorded="@(lowRecorded ?? LowItem.Recorded(marked))" Busy="busy" Error="@lowError"
-                             OnAdd="AddLowAsync" OnCancel="CloseLow" />
+            <QuantityPopover @key="adding.Id" Product="adding" Prices="prices" Recorded="@(lowRecorded ?? LowItem.Recorded(marked))" Busy="busy"
+                             Error="@lowError" OnAdd="AddLowAsync" OnCancel="CloseLow" />
         }
         <section class="order-lines" aria-labelledby="order-lines-heading">
             <h2 id="order-lines-heading">On this order</h2>
@@ -170,6 +170,8 @@
     private string? rep;
     private OfflineLocationDetail? detail;
     private ProductSearchIndex? index;
+    // WI-064: this shop's tiers and the products' breaks, from the same downloaded day as the index.
+    private LocationPrices prices = LocationPrices.None;
     private TabletOrder? order;
     private string? problem;
     private string query = "";
@@ -327,7 +329,7 @@
             <section class="add-line" aria-labelledby="add-line-heading">
                 <h2 id="add-line-heading">@chosen.Name</h2>
                 <p class="add-line-detail">@chosen.Code · @chosen.Breadcrumb</p>
-                @if (chosen.Price is decimal unitPrice) { <p class="add-line-price">@Money(unitPrice)@PerUnit(chosen.Unit)</p> }
+                @if (Quote(chosen) is decimal unitPrice) { <p class="add-line-price">@Money(unitPrice)@PerUnit(chosen.Unit)</p> }
                 else { <p class="problem" role="status">No price yet — this product can't be ordered.</p> }
                 <label for="line-quantity">Quantity@(chosen.Unit == "Each" ? "" : $" ({chosen.Unit})")</label>
                 <input id="line-quantity" type="text" inputmode="decimal" value="@quantityText" @oninput="QuantityChanged"
@@ -496,6 +498,7 @@
         {
             OfflineLocationDetail? readDetail = null;
             ProductSearchIndex? readIndex = null;
+            LocationPrices readPrices = LocationPrices.None;
             OrderView? readView = null;
             TabletCall? readCall = null;
             CarriedLow? readCarried = null;
@@ -505,7 +508,9 @@
                 readDetail = Tablet.ReadLocation(repSubject, shop);
                 // A new order needs the shop assigned; a saved one opens whatever happened to the shop since (D4).
                 if (!saved && readDetail is not { IsAssigned: true }) return;
-                readIndex = Tablet.ReadProductIndex(repSubject);
+                // WI-064: every product at this shop's price, from the downloaded day.
+                readPrices = Tablet.ReadLocationPrices(repSubject, shop);
+                readIndex = readPrices.Apply(Tablet.ReadProductIndex(repSubject));
                 readView = Tablet.ReadOrderView(repSubject, id);
                 // T-5.1.6: from the downloaded day, so the marker works offline (S18).
                 readQuantities = Tablet.ReadOrderedQuantities(repSubject, shop, readIndex);
@@ -515,7 +520,7 @@
                 else if (readIndex is not null) readCarried = Tablet.ReadCarriedLow(repSubject, shop, id, readIndex);
             });
             if (!isCurrent()) return;
-            rep = repSubject; detail = readDetail; index = readIndex; savedCall = readCall; carried = readCarried;
+            rep = repSubject; detail = readDetail; index = readIndex; prices = readPrices; savedCall = readCall; carried = readCarried;
             orderedQuantities = readQuantities;
             order = readView?.Order; readStanding = readView?.Standing ?? OrderStanding.New; sentUtc = readView?.SentUtc;
             if (order is not null && order.LocationId != shop) problem = "This order is for a different shop.";
@@ -572,6 +577,17 @@
         : null;
 
     private bool ValidMeasure => MeasureValidation is { IsValid: true };
+
+    /// <summary>WI-064 D4: the price at the quantity typed, once the product's rules accept it; before that, at its smallest
+    /// orderable quantity. A product already on the order keeps the price its line captured (D6).</summary>
+    private decimal? Quote(ProductSearchResult product)
+    {
+        if (product.Price is null) return null;
+        if (order?.Lines.FirstOrDefault(line => line.ProductId == product.Id) is { } line) return line.Price.Amount;
+        decimal quantity = SelectedRules is { } rules && ParsedQuantity > 0 && rules.ValidateOrder(ParsedQuantity).IsValid
+            ? ParsedQuantity : LocationPrices.Smallest(product);
+        return prices.Resolve(product, quantity)?.Winner.Amount;
+    }
     private string? MeasureError => selected is { Unit: not "Each" } && quantityText.Length > 0
         ? SelectedRules is null ? "This product's ordering rules couldn't be read." : MeasureValidation?.Error : null;
 

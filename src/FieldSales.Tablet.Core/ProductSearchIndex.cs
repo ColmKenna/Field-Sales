@@ -3,10 +3,13 @@ using Microsoft.Data.Sqlite;
 
 namespace FieldSales.Tablet.Core;
 
-/// <summary>A downloaded product as Order entry lists it: its breadcrumb and the base price in effect today
-/// (null when none is, so it cannot be ordered). <paramref name="CategoryId"/> places it on the Order Pad.</summary>
+/// <summary>A downloaded product as Order entry lists it: its breadcrumb and its price today (null when nothing prices it, so it
+/// cannot be ordered). <paramref name="CategoryId"/> places it on the Order Pad.</summary>
+/// <param name="Price">The base price in effect today; for a shop, the price its customer gets (WI-064, <see cref="LocationPrices.Apply"/>).</param>
+/// <param name="ListPrice">The base price in effect today, kept when <paramref name="Price"/> is a shop's price; null means it is
+/// <paramref name="Price"/>.</param>
 public sealed record ProductSearchResult(Guid Id, string Code, string Name, string Breadcrumb, string Unit, decimal? Price,
-    Guid? CategoryId = null, decimal? QuantityStep = null, decimal? MinimumQuantity = null);
+    Guid? CategoryId = null, decimal? QuantityStep = null, decimal? MinimumQuantity = null, decimal? ListPrice = null);
 
 /// <summary>The first <see cref="ProductSearchIndex.MaximumResults"/> matches, and how many matched in all.</summary>
 public sealed record ProductSearchOutcome(IReadOnlyList<ProductSearchResult> Results, int Total);
@@ -20,6 +23,10 @@ public sealed class ProductSearchIndex
     private readonly Dictionary<Guid, ProductSearchResult> products;
     private readonly IReadOnlyList<PadCategory> categories;
     private OrderPad? pad;
+
+    /// <summary>The same index with each product changed by <paramref name="price"/>: a shop's prices (WI-064).</summary>
+    public ProductSearchIndex WithPrices(Func<ProductSearchResult, ProductSearchResult> price) =>
+        new(Generation, rows.Select(row => price(row.Product)), categories);
 
     public ProductSearchIndex(string? generation, IEnumerable<ProductSearchResult> products, IEnumerable<PadCategory>? categories = null)
     {

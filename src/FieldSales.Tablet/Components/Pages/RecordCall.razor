@@ -74,7 +74,7 @@
         @if (message is not null) { <p class="problem" role="alert">@message</p> }
         @if (ordering is { } product)
         {
-            <QuantityPopover @key="product.Id" Product="product" Recorded="@Recorded(product)" Busy="busy" Error="@orderError"
+            <QuantityPopover @key="product.Id" Product="product" Prices="prices" Recorded="@Recorded(product)" Busy="busy" Error="@orderError"
                              OnAdd="AddToOrderAsync" OnCancel="CloseOrdering" />
         }
         @if (reviewing)
@@ -142,6 +142,7 @@
     private string? rep;
     private OfflineLocationDetail? detail;
     private StockCheckStart start = StockCheckStart.Empty;
+    private LocationPrices prices = LocationPrices.None;
     private bool adding;
     private string query = "";
     private string filter = "";
@@ -191,6 +192,7 @@
                 : Tablet.CallDrafts.Read(repSubject, Tablet.SessionVersion, shop)) ?? New();
             OfflineLocationDetail? read = null;
             StockCheckStart readStart = StockCheckStart.Empty;
+            LocationPrices readPrices = LocationPrices.None;
             TabletOrder? readOrder = null;
             TabletCall? readFollowed = null;
             await Task.Run(() =>
@@ -200,13 +202,14 @@
                 if (followUpOf is { } earlier && Tablet.ReadCallView(repSubject, earlier) is { } view && view.Call.LocationId == shop)
                     readFollowed = view.Call;
                 readStart = Tablet.ReadStockCheckStart(repSubject, shop);
+                readPrices = Tablet.ReadLocationPrices(repSubject, shop); // WI-064: the popover prices for this shop.
                 // Opened from an order's Low tab, the Call adds to that order (T-5.1.5); otherwise to the one T-5.5.1 picks.
                 readOrder = orderFrom is { } from
                     ? Tablet.ReadOrder(repSubject, from) is { } opened && opened.LocationId == shop ? opened : null
                     : Tablet.ReadCallOrder(repSubject, restored.CallId, shop);
             });
             if (!isCurrent()) return;
-            rep = repSubject; detail = read; start = readStart; callOrder = readOrder; followed = readFollowed;
+            rep = repSubject; detail = read; start = readStart; prices = readPrices; callOrder = readOrder; followed = readFollowed;
             draft = restored;
             // A follow-up starts with no rows (D2); a new Call from the shop's Suggested List.
             if (draft.Stock is null)

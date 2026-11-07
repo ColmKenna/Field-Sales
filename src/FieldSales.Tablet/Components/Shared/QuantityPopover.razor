@@ -12,12 +12,12 @@
         <button type="button" class="secondary popover-close" aria-label="Close" disabled="@Busy" @onclick="CancelAsync">✕</button>
     </header>
     @if (Recorded.Length > 0) { <p class="popover-recorded">@Recorded</p> }
-    @if (Product.Price is decimal price) { <p class="popover-price">@PriceText(price, Product.Unit)</p> }
+    @if (Quote is { } quote) { <p class="popover-price">@PriceText(quote.Winner.Amount, Product.Unit, quote.Winner)</p> }
     else { <p class="problem" role="status">@OrderStore.NoPrice</p> }
     @ChildContent
     <label for="popover-quantity">Quantity@(Product.Unit == "Each" ? "" : $" ({Product.Unit})")</label>
     <input id="popover-quantity" type="text" inputmode="decimal" autocomplete="off" value="@text" @oninput="Changed"
-           disabled="@(Busy || Product.Price is null)" aria-describedby="@(Problem is null ? null : "popover-quantity-problem")" />
+           disabled="@(Busy || !Priced)" aria-describedby="@(Problem is null ? null : "popover-quantity-problem")" />
     @if (Problem is { } problem) { <p id="popover-quantity-problem" class="problem" role="alert">@problem</p> }
     @if (Error is not null) { <p class="problem" role="alert">@Error</p> }
     <div class="order-actions">
@@ -35,6 +35,9 @@
     [Parameter] public string Recorded { get; set; } = "";
 
     [Parameter] public bool Busy { get; set; }
+
+    /// <summary>What the shop prices with (WI-064): the popover shows the engine's winner at the quantity typed.</summary>
+    [Parameter] public LocationPrices Prices { get; set; } = LocationPrices.None;
 
     /// <summary>Why the last add was refused, in the rep's words.</summary>
     [Parameter] public string? Error { get; set; }
@@ -55,10 +58,17 @@
         out decimal amount) ? amount : 0m;
 
     /// <summary>Nothing until something is typed; then the product's own message, e.g. "Enter a quantity of 1 or more".</summary>
-    private string? Problem => Product.Price is null || text.Length == 0 ? null
+    private string? Problem => !Priced || text.Length == 0 ? null
         : Rules is { } rules ? rules.ValidateOrder(Amount).Error : OrderStore.RulesUnreadable;
 
-    private bool CanAdd => !Busy && Product.Price is not null && text.Trim().Length > 0 && Problem is null;
+    private bool CanAdd => !Busy && Priced && text.Trim().Length > 0 && Problem is null;
+
+    // WI-064 D4: at the quantity typed once the product's rules accept it; before that, at its smallest orderable quantity.
+    private FieldSales.Pricing.ResolvedPrice? Quote => Prices.Resolve(Product,
+        text.Length > 0 && Rules is { } rules && rules.ValidateOrder(Amount).IsValid ? Amount : LocationPrices.Smallest(Product));
+
+    // Whether anything prices the product for this shop: a list price today or a tier price.
+    private bool Priced => Prices.Resolve(Product, LocationPrices.Smallest(Product)) is not null;
 
     private void Changed(ChangeEventArgs args) => text = args.Value?.ToString() ?? "";
 
@@ -66,7 +76,9 @@
 
     private Task CancelAsync() => Busy ? Task.CompletedTask : OnCancel.InvokeAsync();
 
-    /// <summary>"€8.95 · list price", or "€3.20 per kg · list price" for a measured product.</summary>
-    public static string PriceText(decimal price, string unit) =>
-        "€" + price.ToString("N2", CultureInfo.InvariantCulture) + (unit == "Each" ? "" : $" per {unit}") + " · list price";
+    /// <summary>"€8.95 · list price", or "€3.20 per kg · list price" for a measured product; a tier or break names itself instead,
+    /// "€11.50 · Tier B" (WI-064). Where the price came from in full is T-6.4.3's.</summary>
+    public static string PriceText(decimal price, string unit, FieldSales.Pricing.PriceCandidate? winner = null) =>
+        "€" + price.ToString("N2", CultureInfo.InvariantCulture) + (unit == "Each" ? "" : $" per {unit}")
+        + (winner is null || winner.Kind == FieldSales.Pricing.PriceKinds.List ? " · list price" : $" · {winner.Label}");
 }

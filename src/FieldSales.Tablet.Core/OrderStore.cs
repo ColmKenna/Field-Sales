@@ -187,7 +187,11 @@ public sealed class OrderStore
 
         OrderableProduct? product = snapshot.ReadOrderableProduct(productId, PriceToday());
         if (product is null) return OrderResult.Failure(NotDownloaded);
-        if (product.Price is not decimal price) return OrderResult.Failure(NoPrice);
+        // WI-064 D2: the shop's customer's tiers and the product's breaks, through the engine. Nothing prices it when there is no
+        // list price today and no tier price.
+        LocationPrices prices = snapshot.ReadLocationPrices(locationId, PriceToday());
+        decimal smallest = product.Product.MinimumQuantity ?? 1m;
+        if (prices.Resolve(productId, product.Product.Unit, product.Price, smallest) is null) return OrderResult.Failure(NoPrice);
 
         if (!QuantityRules.TryCreate(product.Product.Unit, product.Product.QuantityStep, product.Product.MinimumQuantity,
                 out QuantityRules? rules, out _))
@@ -206,10 +210,12 @@ public sealed class OrderStore
         if (!sum.IsValid) return OrderResult.Failure(sum.Error!);
 
         OrderSnapshotRef source = new(product.Manifest.Version, product.Manifest.BuiltUtc);
+        // A new line captures the engine's winner at its quantity (D5); adding to a line keeps the price it captured (D6).
+        ResolvedPrice? resolved = current is null ? prices.Resolve(productId, product.Product.Unit, product.Price, total) : null;
+        if (current is null && resolved is null) return OrderResult.Failure(NoPrice);
         IReadOnlyList<OrderLine> lines = current is null
             ? [.. existing?.Lines ?? [], new OrderLine(Guid.NewGuid(), productId, product.Product.Code, product.Product.Name, total, unit,
-                new OrderLinePrice(price, OrderContract.BasePriceKind, OrderContract.BasePriceLabel,
-                    [new OrderPriceCandidate(OrderContract.BasePriceKind, OrderContract.BasePriceLabel, price, true)]), source)]
+                Captured(resolved!), source)]
             : [.. existing!.Lines.Select(line => line.ProductId == productId ? line with { Quantity = total } : line)];
         TabletOrder order = existing is null
             ? new(OrderContract.Schema, OrderContract.CurrentVersion, orderId, OrderState.InProgress, locationId, locationId,
@@ -286,6 +292,21 @@ public sealed class OrderStore
     // The order's date is the tablet's own day (unchanged); a line's price follows the business day in Ireland (WI-059 D1, D7).
     private DateOnly Today() => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
     private DateOnly PriceToday() => BusinessCalendar.Today(clock.GetUtcNow());
+
+    /// <summary>The price a line captures (WI-064 D5): the engine's winner with every candidate considered, the winner first and
+    /// marked. A list price is captured as the base price it always was, so an order at list price reads as before.</summary>
+    internal static OrderLinePrice Captured(ResolvedPrice resolved)
+    {
+        static (string Kind, string Label) Source(PriceCandidate candidate) => candidate.Kind == PriceKinds.List
+            ? (OrderContract.BasePriceKind, OrderContract.BasePriceLabel)
+            : (candidate.Kind, candidate.Label);
+        (string kind, string label) = Source(resolved.Winner);
+        return new(resolved.Winner.Amount, kind, label, [.. resolved.Candidates.Select((candidate, index) =>
+        {
+            (string candidateKind, string candidateLabel) = Source(candidate);
+            return new OrderPriceCandidate(candidateKind, candidateLabel, candidate.Amount, index == 0);
+        })]);
+    }
 
     private void Save(UnsentStore unsent, TabletOrder order) => unsent.Save(new(order.Id, UnsentKind.Order, clock.GetUtcNow(),
         JsonSerializer.Serialize(order, OrderJsonContext.Default.TabletOrder)));
