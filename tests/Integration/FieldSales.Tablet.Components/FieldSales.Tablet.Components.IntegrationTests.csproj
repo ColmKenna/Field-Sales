@@ -26,6 +26,7 @@
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Shared/HomeRecordSection.razor" Link="Shared/HomeRecordSection.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Shared/HomeDayView.razor" Link="Shared/HomeDayView.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Shared/QuantityPopover.razor" Link="Shared/QuantityPopover.razor" />
+    <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Shared/PriceSheet.razor" Link="Shared/PriceSheet.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/LocationDetail.razor" Link="LocationDetail.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/NewOrder.razor" Link="NewOrder.razor" />
     <RazorComponent Include="../../../src/FieldSales.Tablet/Components/Pages/RecordCall.razor" Link="RecordCall.razor" />

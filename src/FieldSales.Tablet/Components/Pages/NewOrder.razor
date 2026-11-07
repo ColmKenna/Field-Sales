@@ -86,6 +86,10 @@
             <QuantityPopover @key="adding.Id" Product="adding" Prices="prices" Recorded="@(lowRecorded ?? LowItem.Recorded(marked))" Busy="busy"
                              Error="@lowError" OnAdd="AddLowAsync" OnCancel="CloseLow" />
         }
+        @if (priceSheet is Guid sheetLine && order?.Lines.FirstOrDefault(line => line.Id == sheetLine) is { } explained)
+        {
+            <PriceSheet @key="explained.Id" Line="explained" OnClose="() => priceSheet = null" />
+        }
         <section class="order-lines" aria-labelledby="order-lines-heading">
             <h2 id="order-lines-heading">On this order</h2>
             @if (order is null || order.Lines.Count == 0) { <p>No products yet.</p> }
@@ -98,7 +102,10 @@
                             <strong>@line.ProductName</strong>
                             <span>@line.ProductCode</span>
                             <span class="line-quantity">@LineQuantity(line)</span>
-                            <span class="line-price">@Money(line.Price.Amount)@PerUnit(line.Unit)</span>
+                            @* WI-065: the price and where it came from, then the list or runner-up tier price; (i) opens the candidates. *@
+                            <span class="line-price">@LinePriceText.Summary(line)</span>
+                            <button type="button" class="secondary price-info" aria-label="@($"Price details for {line.ProductName}")"
+                                    @onclick="() => priceSheet = line.Id">(i)</button>
                             <span class="line-total">@Money(line.Price.Amount * line.Quantity)</span>
                             @if (index is not null && !index.Contains(line.ProductId))
                             { <span class="captured-line-notice">@OrderStore.NoLongerAvailable</span> }
@@ -172,6 +179,8 @@
     private ProductSearchIndex? index;
     // WI-064: this shop's tiers and the products' breaks, from the same downloaded day as the index.
     private LocationPrices prices = LocationPrices.None;
+    // WI-065: the line whose provenance sheet is open.
+    private Guid? priceSheet;
     private TabletOrder? order;
     private string? problem;
     private string query = "";

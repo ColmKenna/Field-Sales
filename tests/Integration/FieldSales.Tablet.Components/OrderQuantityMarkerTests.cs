@@ -61,7 +61,7 @@ public sealed partial class TabletSessionScreenTests
 
         Assert.Equal([order.Id], marked);
         Assert.DoesNotContain("order-confirm-question", screen.Renderer.AttributeValues(screen.Id, "id"));
-        Assert.Equal(["Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id));
+        Assert.Equal(["(i)", "Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id)); // (i) only explains the line's price (WI-065).
         Assert.Equal(["Usually about 24 here"], Markers(screen));
     }
 

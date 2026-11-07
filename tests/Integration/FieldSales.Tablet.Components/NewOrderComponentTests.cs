@@ -37,6 +37,8 @@ public sealed partial class NewOrderComponentTests
         public ManualResetEventSlim? Gate { get; set; }
         public IReadOnlyList<ProductSearchResult> Products { get; init; } = Catalogue;
         public TaskCompletionSource? Started { get; set; }
+        /// <summary>WI-065: the price a line captures, when a test needs other than the base price.</summary>
+        public Func<ProductSearchResult, OrderLinePrice>? Captures { get; init; }
 
         public OrderResult Add(string rep, Guid orderId, Guid shop, Guid product, decimal quantity)
         {
@@ -46,7 +48,7 @@ public sealed partial class NewOrderComponentTests
             if (Refuse is not null) return new(null, Refuse);
             ProductSearchResult found = Products.Single(candidate => candidate.Id == product);
             OrderLine line = new(Guid.NewGuid(), found.Id, found.Code, found.Name, quantity, found.Unit,
-                new(found.Price!.Value, "Base", "Base price", [new("Base", "Base price", found.Price.Value, true)]), Snapshot);
+                Captures?.Invoke(found) ?? new(found.Price!.Value, "Base", "Base price", [new("Base", "Base price", found.Price.Value, true)]), Snapshot);
             Order = (Order ?? new TabletOrder(OrderContract.Schema, OrderContract.CurrentVersion, orderId, OrderState.InProgress, shop, shop,
                 rep, new DateOnly(2026, 10, 29), null, Snapshot, [])) with { Lines = [.. Order?.Lines ?? [], line] };
             return new(Order, null);
@@ -247,13 +249,13 @@ public sealed partial class NewOrderComponentTests
         Assert.Contains("1 line · €150.00", text);
         Assert.DoesNotContain("product-search", screen.Renderer.AttributeValues(screen.Id, "id"));
         // WI-046: no adding or line changes while Ready to Send; Reopen and Delete order are the only changes offered.
-        Assert.Equal(["Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id));
+        Assert.Equal(["(i)", "Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id)); // (i) only explains the line's price (WI-065).
         Assert.Equal(orders.Calls[0].Order, Assert.Single(orders.Marked)); // The same order the lines went to.
         Assert.Equal(OrderState.ReadyToSend, orders.Order!.State);
 
         await screen.Renderer.Dispatcher.InvokeAsync(() => screen.Tablet.Resume());
         await screen.Until(() => screen.Renderer.Text(screen.Id).Contains("Ready to Send. It goes to head office"));
-        Assert.Equal(["Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id));
+        Assert.Equal(["(i)", "Close", "Reopen", "Delete order"], screen.Renderer.Buttons(screen.Id)); // (i) only explains the line's price (WI-065).
         await screen.Click("Close");
         Assert.Equal([$"/locations/{ShopId}"], screen.Navigation.Destinations);
     }
