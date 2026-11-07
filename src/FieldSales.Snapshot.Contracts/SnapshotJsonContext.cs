@@ -16,6 +16,10 @@ namespace FieldSales.Snapshot.Contracts;
 [JsonSerializable(typeof(SnapshotRecentOrderLine))]
 [JsonSerializable(typeof(SnapshotOrderedQuantity))]
 [JsonSerializable(typeof(SnapshotLastCallLowLine))]
+[JsonSerializable(typeof(SnapshotPriceTier))]
+[JsonSerializable(typeof(SnapshotPriceTierTerm))]
+[JsonSerializable(typeof(SnapshotCustomerTier))]
+[JsonSerializable(typeof(SnapshotQuantityBreak))]
 [JsonSerializable(typeof(SnapshotContact))]
 [JsonSerializable(typeof(SnapshotMainContactReplacement))]
 public sealed partial class SnapshotJsonContext : JsonSerializerContext;

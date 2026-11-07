@@ -29,7 +29,7 @@ public sealed partial class SuggestedListTests
         Assert.Equal([new(44m, "Each"), new(50m, "Each"), new(48m, "Each")], quantities[product[0]]); // Newest first.
         Assert.Equal([new(6m, "Each"), new(6m, "Each")], quantities[product[1]]);
         Assert.Equal([new(2.5m, "kg")], quantities[product[2]]);
-        Assert.Equal("1.5", snapshot.Manifest.Version);
+        Assert.Equal("1.6", snapshot.Manifest.Version);
     }
 
     // E1, end to end: three orders taken on the tablet are synced and accepted; the next snapshot lets the tablet mark 480 on a new

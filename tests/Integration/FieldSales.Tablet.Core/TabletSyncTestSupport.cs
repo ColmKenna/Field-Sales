@@ -46,8 +46,10 @@ public static class Snapshots
             new DateOnly(2026, 10, 1), counts ?? new(shops.Length, categories.Length, items.Length, prices.Length));
         int minor = int.Parse(version.Split('.')[1], System.Globalization.CultureInfo.InvariantCulture);
         bool history = minor >= 3;
+        bool pricing = minor >= 6;
         return new(manifest, shops, categories, items, prices, version == "1.0" ? null : [],
-            history ? [] : null, history ? [] : null, minor >= 4 ? [] : null);
+            history ? [] : null, history ? [] : null, minor >= 4 ? [] : null,
+            pricing ? [] : null, pricing ? [] : null, pricing ? [] : null, pricing ? [] : null);
     }
 }
 

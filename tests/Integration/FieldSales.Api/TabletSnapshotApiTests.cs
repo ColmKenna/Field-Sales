@@ -153,7 +153,7 @@ public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture
 
         await _app.RetireContactAsync(mary);
         TabletSnapshot after = await _app.SyncAsync("colm");
-        Assert.Equal("1.5", after.Manifest.Version);
+        Assert.Equal("1.6", after.Manifest.Version);
         foreach (Guid location in new[] { rathdrum, arklow })
         {
             SnapshotLocation shop = after.Locations.Single(shop => shop.Id == location);
@@ -362,7 +362,7 @@ public sealed partial class TabletSnapshotApiTests(TabletSnapshotFixture fixture
         using HttpResponseMessage response = await TabletSnapshotApplication.RequestAsync(client, SnapshotContract.Path, majors);
         Assert.Equal(expected, response.StatusCode);
         if (expected == HttpStatusCode.OK)
-            Assert.Equal("1.5", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
+            Assert.Equal("1.6", (await TabletSnapshotApplication.ReadAsync(response)).Manifest.Version);
         if (expected == HttpStatusCode.NotAcceptable)
             Assert.Equal(SnapshotContract.UpdateRequiredTitle, (await response.Content.ReadFromJsonAsync<ProblemDetails>())!.Title);
     }
@@ -589,7 +589,9 @@ public sealed class TabletSnapshotApplication(string connectionString) : IAsyncL
         Assert.Equal(Header(response, SnapshotContract.VersionHeader), snapshot.Manifest.Version);
         Assert.Equal(new SnapshotCounts(snapshot.Locations.Count, snapshot.Categories.Count, snapshot.Products.Count,
             snapshot.BasePrices.Count, snapshot.ProductAttributes?.Count ?? 0, snapshot.LastStockCheckLines?.Count ?? 0,
-            snapshot.RecentOrderLines?.Count ?? 0, snapshot.LastCallLowLines?.Count ?? 0), snapshot.Manifest.Counts);
+            snapshot.RecentOrderLines?.Count ?? 0, snapshot.LastCallLowLines?.Count ?? 0, snapshot.PriceTiers?.Count ?? 0,
+            snapshot.PriceTierTerms?.Count ?? 0, snapshot.CustomerTiers?.Count ?? 0, snapshot.QuantityBreaks?.Count ?? 0),
+            snapshot.Manifest.Counts);
         return snapshot;
     }
 

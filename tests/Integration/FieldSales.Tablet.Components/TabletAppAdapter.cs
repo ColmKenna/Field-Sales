@@ -83,6 +83,8 @@ public sealed class TabletApp
     }
     public void ResumeCleanup(string rep) { }
     public Func<string, ProductSearchIndex> ReadIndex { get; set; } = _ => new ProductSearchIndex(null, []);
+    public Func<string, Guid, LocationPrices> ReadPrices { get; set; } = (_, _) => LocationPrices.None;
+    public LocationPrices ReadLocationPrices(string rep, Guid locationId) => ReadPrices(rep, locationId);
     public Func<string, Guid, Guid, Guid, decimal, OrderResult> AddWork { get; set; } =
         (_, _, _, _, _) => new OrderResult(null, "Order entry isn't set up in this test.");
     public Func<string, Guid, TabletOrder?> FindOrder { get; set; } = (_, _) => null;

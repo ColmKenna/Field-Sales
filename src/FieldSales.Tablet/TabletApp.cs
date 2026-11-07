@@ -179,6 +179,10 @@ public sealed class TabletApp : IDisposable
     // Order entry: products are found offline in the active snapshot, and each added line is saved at once.
     public ProductSearchIndex ReadProductIndex(string rep) => new SnapshotStore(device.Workspace(rep), clock).ReadProductIndex(PriceToday());
 
+    /// <summary>What the shop prices with offline: its customer's tiers and the products' breaks (WI-064).</summary>
+    public LocationPrices ReadLocationPrices(string rep, Guid locationId) =>
+        new SnapshotStore(device.Workspace(rep), clock).ReadLocationPrices(locationId, PriceToday());
+
     /// <summary>T-06's stock check: the downloaded products and the shop's Suggested List (T-5.4.1).</summary>
     public StockCheckStart ReadStockCheckStart(string rep, Guid locationId) =>
         new SnapshotStore(device.Workspace(rep), clock).ReadStockCheckStart(locationId, PriceToday());
