@@ -111,8 +111,8 @@ public sealed class SnapshotOrderQuantitiesTests : IDisposable
         {
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
-            // Exact predecessor: format 4 had no order quantities table.
-            command.CommandText = "DROP TABLE recent_order_quantities; PRAGMA user_version=4;";
+            // Exact predecessor: format 4 had no order quantities table, nor format 6's pricing tables.
+            command.CommandText = "DROP TABLE recent_order_quantities; DROP TABLE price_tier_terms; DROP TABLE price_tiers; DROP TABLE customer_tiers; DROP TABLE quantity_breaks; PRAGMA user_version=4;";
             command.ExecuteNonQuery();
         }
 
@@ -126,7 +126,7 @@ public sealed class SnapshotOrderQuantitiesTests : IDisposable
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
             command.CommandText = "PRAGMA user_version";
-            Assert.Equal(5L, command.ExecuteScalar());
+            Assert.Equal(6L, command.ExecuteScalar()); // Through format 5 to the current format 6.
         }
         TabletSnapshot next = WithQuantities();
         await tablet.SyncAsync(next);

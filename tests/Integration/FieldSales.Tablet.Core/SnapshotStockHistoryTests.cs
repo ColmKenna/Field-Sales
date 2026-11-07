@@ -105,7 +105,7 @@ public sealed class SnapshotStockHistoryTests : IDisposable
         {
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE last_stock_check_lines; DROP TABLE recent_order_lines; DROP TABLE last_call_low_lines; DROP TABLE recent_order_quantities; "
+            command.CommandText = "DROP TABLE last_stock_check_lines; DROP TABLE recent_order_lines; DROP TABLE last_call_low_lines; DROP TABLE recent_order_quantities; DROP TABLE price_tier_terms; DROP TABLE price_tiers; DROP TABLE customer_tiers; DROP TABLE quantity_breaks; "
                 + "PRAGMA user_version=2;";
             command.ExecuteNonQuery();
         }
@@ -121,7 +121,7 @@ public sealed class SnapshotStockHistoryTests : IDisposable
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
             command.CommandText = "PRAGMA user_version";
-            Assert.Equal(5L, command.ExecuteScalar()); // Through formats 3 and 4 to the current format 5.
+            Assert.Equal(6L, command.ExecuteScalar()); // Through formats 3, 4 and 5 to the current format 6.
         }
         TabletSnapshot next = WithHistory();
         await tablet.SyncAsync(next);

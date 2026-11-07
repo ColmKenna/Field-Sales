@@ -37,7 +37,19 @@ public sealed partial class SnapshotStore
     internal const int PurgeBatchRows = 2000;
     internal const long MaximumPlainBytes = 1L << 30;
     internal static readonly int[] ReadableMajors = [SnapshotContract.CurrentMajor];
-    private const int SchemaVersion = 5;
+    private const int SchemaVersion = 6;
+    // Format 6 (snapshot 1.6, T-6.4.2): the tiers the customers of the rep's Locations hold, their terms, and quantity breaks.
+    private const string PricingSchema = """
+        CREATE TABLE price_tiers(generation TEXT NOT NULL REFERENCES generations(id), id TEXT NOT NULL, name TEXT NOT NULL,
+            shape TEXT NOT NULL CHECK(shape IN ('Percentage','PriceList')), percent_off TEXT, PRIMARY KEY(generation, id));
+        CREATE TABLE price_tier_terms(generation TEXT NOT NULL REFERENCES generations(id), tier_id TEXT NOT NULL,
+            product_id TEXT NOT NULL, percent_off TEXT, fixed_price TEXT, CHECK((percent_off IS NULL) <> (fixed_price IS NULL)),
+            PRIMARY KEY(generation, tier_id, product_id));
+        CREATE TABLE customer_tiers(generation TEXT NOT NULL REFERENCES generations(id), customer_id TEXT NOT NULL,
+            tier_id TEXT NOT NULL, PRIMARY KEY(generation, customer_id, tier_id));
+        CREATE TABLE quantity_breaks(generation TEXT NOT NULL REFERENCES generations(id), product_id TEXT NOT NULL,
+            from_quantity TEXT NOT NULL, price TEXT NOT NULL, PRIMARY KEY(generation, product_id, from_quantity));
+        """;
     // Format 5 (snapshot 1.5, T-5.1.6): each recent order product's quantity on each recent Accepted Order, newest first.
     private const string QuantitySchema = """
         CREATE TABLE recent_order_quantities(generation TEXT NOT NULL REFERENCES generations(id), location_id TEXT NOT NULL,
@@ -77,7 +89,8 @@ public sealed partial class SnapshotStore
             effective_from TEXT NOT NULL, amount TEXT NOT NULL, PRIMARY KEY(generation, product_id, effective_from));
         """;
     // Child tables are emptied before the generation row; the active pointer never names a retired generation.
-    private static readonly string[] ChildTables = ["recent_order_quantities", "last_call_low_lines", "last_stock_check_lines", "recent_order_lines", "product_attributes", "base_prices",
+    private static readonly string[] ChildTables = ["price_tier_terms", "price_tiers", "customer_tiers", "quantity_breaks",
+        "recent_order_quantities", "last_call_low_lines", "last_stock_check_lines", "recent_order_lines", "product_attributes", "base_prices",
         "products", "categories", "locations"];
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> Gates = new(StringComparer.Ordinal);
     private readonly RepWorkspace workspace;
@@ -107,9 +120,10 @@ public sealed partial class SnapshotStore
             long current = (long)version.ExecuteScalar()!;
             if (current == 1) { SqliteEngine.EnsureSchema(connection, 2, "", AttributeSchema); current = 2; }
             if (current == 2) { SqliteEngine.EnsureSchema(connection, 3, "", HistorySchema); current = 3; }
-            if (current == 3) SqliteEngine.EnsureSchema(connection, 4, "", LastCallSchema);
-            SqliteEngine.EnsureSchema(connection, SchemaVersion, Schema + AttributeSchema + HistorySchema + LastCallSchema + QuantitySchema,
-                QuantitySchema);
+            if (current == 3) { SqliteEngine.EnsureSchema(connection, 4, "", LastCallSchema); current = 4; }
+            if (current == 4) SqliteEngine.EnsureSchema(connection, 5, "", QuantitySchema);
+            SqliteEngine.EnsureSchema(connection, SchemaVersion,
+                Schema + AttributeSchema + HistorySchema + LastCallSchema + QuantitySchema + PricingSchema, PricingSchema);
         }
         catch { connection.Dispose(); throw; }
         return connection;
@@ -224,7 +238,8 @@ public sealed partial class SnapshotStore
             }
             SnapshotCounts declared = manifest!.Counts;
             if (declared != new SnapshotCounts(counts["locations"], counts["categories"], counts["products"], counts["basePrices"],
-                    counts["productAttributes"], counts["lastStockCheckLines"], counts["recentOrderLines"], counts["lastCallLowLines"]))
+                    counts["productAttributes"], counts["lastStockCheckLines"], counts["recentOrderLines"], counts["lastCallLowLines"],
+                    counts["priceTiers"], counts["priceTierTerms"], counts["customerTiers"], counts["quantityBreaks"]))
                 throw new InvalidDataException("The downloaded snapshot is incomplete: its counts do not match.");
             using (SqliteCommand references = connection.CreateCommand())
             {
@@ -253,6 +268,21 @@ public sealed partial class SnapshotStore
                     """;
                 if ((long)references.ExecuteScalar()! != 0)
                     throw new InvalidDataException("A Location's last Call gaps name more than one Call.");
+                // 1.6: a term names a tier and a product this snapshot carries; a held tier is one it carries; a break's product too.
+                references.CommandText = """
+                    SELECT EXISTS(SELECT 1 FROM price_tier_terms t
+                        LEFT JOIN price_tiers r ON r.generation=t.generation AND r.id=t.tier_id
+                        LEFT JOIN products p ON p.generation=t.generation AND p.id=t.product_id
+                        WHERE t.generation=$g AND (r.id IS NULL OR p.id IS NULL))
+                    OR EXISTS(SELECT 1 FROM customer_tiers c LEFT JOIN price_tiers r ON r.generation=c.generation AND r.id=c.tier_id
+                        WHERE c.generation=$g AND r.id IS NULL)
+                    OR EXISTS(SELECT 1 FROM quantity_breaks b LEFT JOIN products p ON p.generation=b.generation AND p.id=b.product_id
+                        WHERE b.generation=$g AND p.id IS NULL)
+                    OR EXISTS(SELECT 1 FROM price_tier_terms t JOIN price_tiers r ON r.generation=t.generation AND r.id=t.tier_id
+                        WHERE t.generation=$g AND r.shape='PriceList' AND t.fixed_price IS NULL)
+                    """;
+                if ((long)references.ExecuteScalar()! != 0)
+                    throw new InvalidDataException("A tier, term or break refers to something outside this snapshot.");
             }
             WriteContactReplacements(connection, generation, manifest, contactReplacements);
             // Keep only the old active copy's referenced shop identities before it can be retired.
@@ -314,7 +344,11 @@ public sealed partial class SnapshotStore
             || manifest.Counts.LastStockCheckLines < 0 || manifest.Counts.RecentOrderLines < 0 || manifest.Counts.LastCallLowLines < 0
             || (minor == 0 && manifest.Counts.ProductAttributes != 0)
             || (minor < 3 && (manifest.Counts.LastStockCheckLines != 0 || manifest.Counts.RecentOrderLines != 0))
-            || (minor < 4 && manifest.Counts.LastCallLowLines != 0))
+            || (minor < 4 && manifest.Counts.LastCallLowLines != 0)
+            || manifest.Counts.PriceTiers < 0 || manifest.Counts.PriceTierTerms < 0 || manifest.Counts.CustomerTiers < 0
+            || manifest.Counts.QuantityBreaks < 0
+            || (minor < 6 && (manifest.Counts.PriceTiers != 0 || manifest.Counts.PriceTierTerms != 0 || manifest.Counts.CustomerTiers != 0
+                || manifest.Counts.QuantityBreaks != 0)))
             throw new InvalidDataException("The snapshot manifest is invalid.");
         return minor;
     }
@@ -418,6 +452,39 @@ public sealed partial class SnapshotStore
                     throw new InvalidDataException("A last Call gap row is repeated.", repeated);
                 }
                 return;
+            case "priceTiers":
+                SnapshotPriceTier tier = Entity<SnapshotPriceTier>(entity);
+                bool percentage = tier.Shape == SnapshotTierShapes.Percentage;
+                if (tier.Id == Guid.Empty || string.IsNullOrWhiteSpace(tier.Name)
+                    || !(percentage ? tier.PercentOff is > 0m and < 100m : tier.Shape == SnapshotTierShapes.PriceList && tier.PercentOff is null))
+                    throw new InvalidDataException("A price tier row is invalid.");
+                insert.CommandText = "INSERT INTO price_tiers(generation, id, name, shape, percent_off) VALUES($g, $id, $name, $shape, $percent)";
+                Add("$id", tier.Id.ToString()); Add("$name", tier.Name); Add("$shape", tier.Shape); Add("$percent", Number(tier.PercentOff));
+                break;
+            case "priceTierTerms":
+                SnapshotPriceTierTerm term = Entity<SnapshotPriceTierTerm>(entity);
+                if ((term.PercentOff is null) == (term.FixedPrice is null) || term.PercentOff is <= 0m or >= 100m || term.FixedPrice is <= 0m)
+                    throw new InvalidDataException("A tier term row is invalid.");
+                insert.CommandText = """
+                    INSERT INTO price_tier_terms(generation, tier_id, product_id, percent_off, fixed_price)
+                    VALUES($g, $tier, $product, $percent, $fixed)
+                    """;
+                Add("$tier", term.TierId.ToString()); Add("$product", term.ProductId.ToString());
+                Add("$percent", Number(term.PercentOff)); Add("$fixed", Number(term.FixedPrice));
+                break;
+            case "customerTiers":
+                SnapshotCustomerTier held = Entity<SnapshotCustomerTier>(entity);
+                insert.CommandText = "INSERT INTO customer_tiers(generation, customer_id, tier_id) VALUES($g, $customer, $tier)";
+                Add("$customer", held.CustomerId.ToString()); Add("$tier", held.TierId.ToString());
+                break;
+            case "quantityBreaks":
+                SnapshotQuantityBreak quantityBreak = Entity<SnapshotQuantityBreak>(entity);
+                if (quantityBreak.FromQuantity <= 0m || quantityBreak.Price <= 0m) throw new InvalidDataException("A quantity break row is invalid.");
+                insert.CommandText = "INSERT INTO quantity_breaks(generation, product_id, from_quantity, price) VALUES($g, $product, $from, $price)";
+                Add("$product", quantityBreak.ProductId.ToString());
+                Add("$from", quantityBreak.FromQuantity.ToString("0.############", CultureInfo.InvariantCulture));
+                Add("$price", Number(quantityBreak.Price));
+                break;
             default: throw new InvalidDataException("Unknown snapshot family.");
         }
         insert.ExecuteNonQuery();

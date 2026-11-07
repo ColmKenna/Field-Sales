@@ -118,7 +118,7 @@ public sealed class SnapshotLastCallGapsTests : IDisposable
         {
             connection.Open();
             using SqliteCommand command = connection.CreateCommand();
-            command.CommandText = "DROP TABLE last_call_low_lines; DROP TABLE recent_order_quantities; PRAGMA user_version=3;";
+            command.CommandText = "DROP TABLE last_call_low_lines; DROP TABLE recent_order_quantities; DROP TABLE price_tier_terms; DROP TABLE price_tiers; DROP TABLE customer_tiers; DROP TABLE quantity_breaks; PRAGMA user_version=3;";
             command.ExecuteNonQuery();
         }
 
@@ -128,7 +128,7 @@ public sealed class SnapshotLastCallGapsTests : IDisposable
         Assert.Equal(3, upgraded.ReadLocations().Count);
         Assert.Null(Gaps(old.Locations[0].Id));
         Assert.Equal(unsent, new UnsentStore(tablet.Workspace()).Fingerprint());
-        Assert.Equal(5L, Format()); // Through format 4 to the current format 5.
+        Assert.Equal(6L, Format()); // Through formats 4 and 5 to the current format 6.
         TabletSnapshot next = WithGaps();
         await tablet.SyncAsync(next);
         Assert.Equal(2, Gaps(next.Locations[0].Id)!.ProductIds.Count);

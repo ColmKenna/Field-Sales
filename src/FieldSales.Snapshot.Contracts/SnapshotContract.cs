@@ -13,7 +13,7 @@ public static class SnapshotContract
 {
     public const string Schema = "field-sales-snapshot";
     public const int CurrentMajor = 1;
-    public const int CurrentMinor = 5;
+    public const int CurrentMinor = 6;
     public static string CurrentVersion => $"{CurrentMajor}.{CurrentMinor}";
 
     /// <summary>The majors this server can build, newest first.</summary>
@@ -60,7 +60,8 @@ public sealed record SnapshotManifest(string Schema, string Version, string RepS
     DateOnly BuildDate, SnapshotCounts Counts);
 
 public sealed record SnapshotCounts(int Locations, int Categories, int Products, int BasePrices,
-    int ProductAttributes = 0, int LastStockCheckLines = 0, int RecentOrderLines = 0, int LastCallLowLines = 0);
+    int ProductAttributes = 0, int LastStockCheckLines = 0, int RecentOrderLines = 0, int LastCallLowLines = 0,
+    int PriceTiers = 0, int PriceTierTerms = 0, int CustomerTiers = 0, int QuantityBreaks = 0);
 
 /// <summary>Version 1 of the rep's Morning Snapshot.</summary>
 public sealed record TabletSnapshot(SnapshotManifest Manifest, IReadOnlyList<SnapshotLocation> Locations,
@@ -73,7 +74,15 @@ public sealed record TabletSnapshot(SnapshotManifest Manifest, IReadOnlyList<Sna
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     IReadOnlyList<SnapshotRecentOrderLine>? RecentOrderLines = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<SnapshotLastCallLowLine>? LastCallLowLines = null);
+    IReadOnlyList<SnapshotLastCallLowLine>? LastCallLowLines = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotPriceTier>? PriceTiers = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotPriceTierTerm>? PriceTierTerms = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotCustomerTier>? CustomerTiers = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<SnapshotQuantityBreak>? QuantityBreaks = null);
 
 /// <summary>An assigned Location. Locations hold no address lines yet, so its address is Town and Eircode.</summary>
 public sealed record SnapshotLocation(Guid Id, string Name, Guid CustomerId, string CustomerName, SnapshotTown Town,
@@ -128,3 +137,26 @@ public sealed record SnapshotOrderedQuantity(decimal Quantity, string Unit);
 /// <remarks>Rows name only included products and the rep's own Locations, so restricted products never appear. Every row for
 /// a Location names the same Call.</remarks>
 public sealed record SnapshotLastCallLowLine(Guid LocationId, Guid CallId, DateOnly CalledOn, Guid ProductId);
+
+/// <summary>How a Price Tier is set up, added in 1.6 (T-6.4.2).</summary>
+public static class SnapshotTierShapes
+{
+    /// <summary>A percentage off the list price (<see cref="SnapshotPriceTier.PercentOff"/>), with per-product terms.</summary>
+    public const string Percentage = "Percentage";
+    /// <summary>Fixed prices for the products it lists; every other product gets no price from it.</summary>
+    public const string PriceList = "PriceList";
+}
+
+/// <summary>A Price Tier held by the customer of one of the rep's assigned Locations, added in 1.6 (T-6.4.2). Only tiers a served
+/// customer holds are sent. A percentage tier carries its default <see cref="PercentOff"/>; a price list has none.</summary>
+public sealed record SnapshotPriceTier(Guid Id, string Name, string Shape, decimal? PercentOff);
+
+/// <summary>A tier's own term for an included product, added in 1.6: exactly one of a percentage off or a fixed price. On a price
+/// list it is the product's listed price.</summary>
+public sealed record SnapshotPriceTierTerm(Guid TierId, Guid ProductId, decimal? PercentOff, decimal? FixedPrice);
+
+/// <summary>A tier the customer of an assigned Location holds, added in 1.6: every Location of the customer prices against it.</summary>
+public sealed record SnapshotCustomerTier(Guid CustomerId, Guid TierId);
+
+/// <summary>A price an included product takes from a quantity upward, in its unit, added in 1.6 (Pricing US-004).</summary>
+public sealed record SnapshotQuantityBreak(Guid ProductId, decimal FromQuantity, decimal Price);

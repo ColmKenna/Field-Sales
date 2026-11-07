@@ -20,7 +20,8 @@ namespace FieldSales.Api.TabletSync;
 /// catalogue transaction as the products and their facts.
 /// The directory and catalogue are each read in one serializable transaction. The 1.3 history families (T-5.4.1) and the 1.4
 /// last Call's gaps (T-5.1.5) are read from received work afterwards and keep only the rep's Locations and the products included
-/// here.
+/// here. The 1.6 pricing families (T-6.4.2) are read in a catalogue transaction of their own and keep only the tiers the served
+/// customers hold and the products included here.
 /// </remarks>
 public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, CoverageOwnershipReader ownership,
     CatalogueDbContext catalogue, RestrictionPermissionReader permissions, OrderingDbContext ordering,
@@ -39,11 +40,46 @@ public sealed class TabletSnapshotBuilder(DirectoryDbContext directory, Coverage
         SnapshotStockCheckLine[] lastChecks = await ReadLastStockChecksAsync(shops, included, ct);
         SnapshotRecentOrderLine[] recentOrders = await ReadRecentOrdersAsync(shops, included, ct);
         SnapshotLastCallLowLine[] lastCallGaps = await ReadLastCallLowLinesAsync(shops, included, ct);
+        (SnapshotPriceTier[] tiers, SnapshotPriceTierTerm[] terms, SnapshotCustomerTier[] held, SnapshotQuantityBreak[] breaks) =
+            await ReadPricingAsync([.. locations.Select(location => location.CustomerId).Distinct()], included, ct);
         var manifest = new SnapshotManifest(SnapshotContract.Schema, SnapshotContract.CurrentVersion, repSubject,
             builtUtc, buildDate, new(locations.Length, categories.Length, products.Length, prices.Length, attributes.Length,
-                lastChecks.Length, recentOrders.Length, lastCallGaps.Length));
-        return new(manifest, locations, categories, products, prices, attributes, lastChecks, recentOrders, lastCallGaps);
+                lastChecks.Length, recentOrders.Length, lastCallGaps.Length, tiers.Length, terms.Length, held.Length, breaks.Length));
+        return new(manifest, locations, categories, products, prices, attributes, lastChecks, recentOrders, lastCallGaps,
+            tiers, terms, held, breaks);
     }
+
+    // T-6.4.2 (WI-064 D1): what the tablet prices with — the tiers the customers of the rep's Locations hold (WI-063), those tiers'
+    // terms for the products included here, and those products' quantity breaks (WI-062). Terms only, never a resolved price.
+    private Task<(SnapshotPriceTier[], SnapshotPriceTierTerm[], SnapshotCustomerTier[], SnapshotQuantityBreak[])> ReadPricingAsync(
+        Guid[] customerIds, HashSet<Guid> included, CancellationToken ct) =>
+        CatalogueTransactions.RunAsync(catalogue, IsolationLevel.Serializable, async () =>
+        {
+            SnapshotCustomerTier[] held = [.. (await catalogue.CustomerPriceTiers.AsNoTracking()
+                    .Where(link => customerIds.Contains(link.CustomerId))
+                    .Select(link => new { link.CustomerId, link.PriceTierId }).ToArrayAsync(ct))
+                .Select(link => new SnapshotCustomerTier(link.CustomerId, link.PriceTierId))
+                .OrderBy(link => link.CustomerId).ThenBy(link => link.TierId)];
+            Guid[] tierIds = [.. held.Select(link => link.TierId).Distinct()];
+            SnapshotPriceTier[] tiers = [.. (await catalogue.PriceTiers.AsNoTracking().Where(tier => tierIds.Contains(tier.Id))
+                    .Select(tier => new { tier.Id, tier.Name, tier.Shape, tier.PercentOff }).ToArrayAsync(ct))
+                .Select(tier => new SnapshotPriceTier(tier.Id, tier.Name,
+                    tier.Shape == FieldSales.Api.Pricing.PriceTierShape.PriceList ? SnapshotTierShapes.PriceList : SnapshotTierShapes.Percentage,
+                    tier.PercentOff))
+                .OrderBy(tier => tier.Id)];
+            SnapshotPriceTierTerm[] terms = [.. (await catalogue.PriceTierOverrides.AsNoTracking()
+                    .Where(entry => tierIds.Contains(entry.PriceTierId))
+                    .Select(entry => new { entry.PriceTierId, entry.ProductId, entry.PercentOff, entry.FixedPrice }).ToArrayAsync(ct))
+                .Where(entry => included.Contains(entry.ProductId))
+                .Select(entry => new SnapshotPriceTierTerm(entry.PriceTierId, entry.ProductId, entry.PercentOff, entry.FixedPrice))
+                .OrderBy(entry => entry.TierId).ThenBy(entry => entry.ProductId)];
+            SnapshotQuantityBreak[] breaks = [.. (await catalogue.ProductQuantityBreaks.AsNoTracking()
+                    .Select(entry => new { entry.ProductId, entry.FromQuantity, entry.Price }).ToArrayAsync(ct))
+                .Where(entry => included.Contains(entry.ProductId))
+                .Select(entry => new SnapshotQuantityBreak(entry.ProductId, entry.FromQuantity, entry.Price))
+                .OrderBy(entry => entry.ProductId).ThenBy(entry => entry.FromQuantity)];
+            return (tiers, terms, held, breaks);
+        }, ct);
 
     // The gaps each Location's most recent Call left (T-5.1.5): its Low products minus every product on any order at that
     // Location taken on or after the Call's date, whatever the order's status ("any order since the date", WI-053).
