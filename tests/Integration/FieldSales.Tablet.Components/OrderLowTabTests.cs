@@ -68,10 +68,11 @@ public sealed partial class TabletSessionScreenTests
     /// <summary>Order entry at Murphy's: <paramref name="order"/> opened by id (or a new order), from <paramref name="openedFrom"/>'s
     /// Record call when given, with <paramref name="draft"/> as the Call being recorded.</summary>
     private static async Task<(Screen Screen, ShopOrders Orders)> OrderEntryAsync(CallDraft? draft, TabletOrder? order, Guid? openedFrom,
-        TabletCall? saved = null)
+        TabletCall? saved = null, LocationPrices? prices = null)
     {
         Screen screen = new(typeof(NewOrder));
         screen.Tablet.Read = (_, _) => Murphys();
+        if (prices is not null) screen.Tablet.ReadPrices = (_, _) => prices;
         screen.Tablet.ReadIndex = _ => new ProductSearchIndex("g1", OrderCatalogue);
         screen.Tablet.FindCall = (_, id) => saved is { } call && call.Id == id ? call : null;
         if (draft is not null) screen.Tablet.CallDrafts.Keep("colm", 0, MurphysId, draft);
@@ -191,6 +192,26 @@ public sealed partial class TabletSessionScreenTests
         Assert.Equal(["Cold & Flu Relief 16s: ADDED - 24", "Throat Lozenges 36s: ADDED - 12"], LowRows(screen));
         Assert.Equal("Low (0)", LowTabLabel(screen));
         Assert.True(screen.Tablet.CallDrafts.Read("colm", 0, MurphysId)!.AddedToOrder);
+    }
+
+    // WI-064 agreed scenario 5 (criterion 3): the popover shows the engine's winner at the quantity typed, naming where it comes from.
+    [Fact]
+    public async Task Should_ShowTheWinnerAtTheTypedQuantity_When_AQuantityReachesABreak()
+    {
+        CallDraft draft = Recording((ColdFlu, "3", true), (Lozenges, "1", true));
+        LocationPrices prices = new(new DateOnly(2026, 9, 22), [new FieldSales.Pricing.PercentageTier("Tier B", 8m)],
+            new Dictionary<Guid, IReadOnlyList<FieldSales.Pricing.QuantityBreak>> { [Lozenges.Id] = [new(10m, 2.50m)] });
+        (Screen screen, _) = await OrderEntryAsync(draft, null, draft.CallId, prices: prices);
+        await using Screen disposing = screen;
+        await OpenLowTabAsync(screen);
+
+        await screen.ClickLabelled($"Add {Lozenges.Name} to order");
+        Assert.Contains("€2.76 · Tier B", screen.Renderer.Text(screen.Id)); // At 1: 8% off €3.00.
+        await screen.Type("popover-quantity", "9");
+        Assert.Contains("€2.76 · Tier B", screen.Renderer.Text(screen.Id));
+        await screen.Type("popover-quantity", "12");
+        Assert.Contains("€2.50 · Break: 10+", screen.Renderer.Text(screen.Id));
+        Assert.DoesNotContain("list price", screen.Renderer.Text(screen.Id));
     }
 
     // Scenario 6.
