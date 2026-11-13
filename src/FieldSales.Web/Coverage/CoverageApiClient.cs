@@ -174,48 +174,51 @@ public sealed class CoverageApiClient(HttpClient client, IHttpContextAccessor co
                 return new(response.StatusCode);
             }
             var result = await response.Content.ReadFromJsonAsync<T>(ct);
-            bool valid = result switch
-            {
-                UnassignedCoveragePage unassigned => ValidUnassigned(unassigned),
-                LocationCoverageActions actions => ValidLocationActions(actions),
-                LocationCoveragePage location => ValidLocation(location),
-                LocationCoverageHistoryPage history => ValidLocationHistory(history),
-                RepTerritoryPage territory => ValidTerritory(territory),
-                TransferReview review => ValidTransferReview(review),
-                TransferSourceOptions sources => ValidChoice(sources.ReceivingRep) && sources.GivingReps is not null
-                    && sources.GivingReps.All(row => ValidChoice(row) && row.Subject != sources.ReceivingRep.Subject)
-                    && sources.GivingReps.Select(row => row.Subject).Distinct(StringComparer.Ordinal).Count() == sources.GivingReps.Count,
-                ReportingLinesPage page => page.Reps is not null && page.Managers is not null && page.Lines is not null
-                    && page.Reps.All(ValidChoice) && page.Managers.All(ValidChoice)
-                    && page.Lines.All(row => row is not null && ValidLine(row.Line) && !string.IsNullOrWhiteSpace(row.RepName)
-                        && !string.IsNullOrWhiteSpace(row.ManagerName)),
-                RepReportingLineDetails line => ValidLine(line),
-                PermissionRepChoice[] reps => reps.All(row => row is not null && ValidChoice(row.Rep))
-                    && reps.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == reps.Length,
-                RepPermissionsPage permissions => ValidPermissions(permissions),
-                PermissionGroupChoice[] groups => groups.All(ValidPermissionGroup)
-                    && groups.Select(row => row.RestrictionGroupId).Distinct().Count() == groups.Length,
-                GroupPermissionsPage permissions => ValidGroupPermissions(permissions),
-                CohortPermissionGrantResult granted => ValidCohortChanges(granted.RestrictionGroupId, granted.Changes, RestrictionPermissionChangeKind.Granted),
-                CohortPermissionRemovalResult removed => ValidCohortChanges(removed.RestrictionGroupId, removed.Changes, RestrictionPermissionChangeKind.Removed),
-                RestrictionPermissionChangeDetails change => ValidPermissionChange(change),
-                AssignmentImpactDetails preview => ValidPreview(preview),
-                AssignmentReviewOptions options => options.Reps is not null && options.Targets is not null && options.Assignments is not null
-                    && options.Reps.All(ValidChoice) && options.Targets.All(row => row is not null && row.Target is not null
-                        && Enum.IsDefined(row.Target.Level) && row.Target.UnitId != Guid.Empty && !string.IsNullOrWhiteSpace(row.Name)
-                        && !string.IsNullOrWhiteSpace(row.Label) && (row.Holder is null || row.Holder.AssignmentId != Guid.Empty && ValidChoice(row.Holder.Rep)))
-                    && options.Targets.Select(row => row.Target).Distinct().Count() == options.Targets.Count
-                    && options.Assignments.All(row => row is not null && row.Assignment is not null
-                        && row.Assignment.Id != Guid.Empty && !string.IsNullOrWhiteSpace(row.Name) && !string.IsNullOrWhiteSpace(row.Assignment.Version)),
-                _ => false
-            };
-            return valid ? new(response.StatusCode, result) : new(HttpStatusCode.ServiceUnavailable);
+            return IsUsable(result) ? new(response.StatusCode, result) : new(HttpStatusCode.ServiceUnavailable);
         }
         catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException
             or HttpRequestException or Polly.Timeout.TimeoutRejectedException or Polly.CircuitBreaker.BrokenCircuitException)
         { return new(HttpStatusCode.ServiceUnavailable); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return new(HttpStatusCode.ServiceUnavailable); }
     }
+
+    /// <summary>Whether a reply is complete and consistent enough to show. A reply type with no checks is refused.</summary>
+    private static bool IsUsable(object? value) => value switch
+    {
+        UnassignedCoveragePage unassigned => ValidUnassigned(unassigned),
+        LocationCoverageActions actions => ValidLocationActions(actions),
+        LocationCoveragePage location => ValidLocation(location),
+        LocationCoverageHistoryPage history => ValidLocationHistory(history),
+        RepTerritoryPage territory => ValidTerritory(territory),
+        TransferReview review => ValidTransferReview(review),
+        TransferSourceOptions sources => ValidChoice(sources.ReceivingRep) && sources.GivingReps is not null
+            && sources.GivingReps.All(row => ValidChoice(row) && row.Subject != sources.ReceivingRep.Subject)
+            && sources.GivingReps.Select(row => row.Subject).Distinct(StringComparer.Ordinal).Count() == sources.GivingReps.Count,
+        ReportingLinesPage page => page.Reps is not null && page.Managers is not null && page.Lines is not null
+            && page.Reps.All(ValidChoice) && page.Managers.All(ValidChoice)
+            && page.Lines.All(row => row is not null && ValidLine(row.Line) && !string.IsNullOrWhiteSpace(row.RepName)
+                && !string.IsNullOrWhiteSpace(row.ManagerName)),
+        RepReportingLineDetails line => ValidLine(line),
+        PermissionRepChoice[] reps => reps.All(row => row is not null && ValidChoice(row.Rep))
+            && reps.Select(row => row.Rep.Subject).Distinct(StringComparer.Ordinal).Count() == reps.Length,
+        RepPermissionsPage permissions => ValidPermissions(permissions),
+        PermissionGroupChoice[] groups => groups.All(ValidPermissionGroup)
+            && groups.Select(row => row.RestrictionGroupId).Distinct().Count() == groups.Length,
+        GroupPermissionsPage permissions => ValidGroupPermissions(permissions),
+        CohortPermissionGrantResult granted => ValidCohortChanges(granted.RestrictionGroupId, granted.Changes, RestrictionPermissionChangeKind.Granted),
+        CohortPermissionRemovalResult removed => ValidCohortChanges(removed.RestrictionGroupId, removed.Changes, RestrictionPermissionChangeKind.Removed),
+        RestrictionPermissionChangeDetails change => ValidPermissionChange(change),
+        AssignmentImpactDetails preview => ValidPreview(preview),
+        AssignmentReviewOptions options => options.Reps is not null && options.Targets is not null && options.Assignments is not null
+            && options.Reps.All(ValidChoice) && options.Targets.All(row => row is not null && row.Target is not null
+                && Enum.IsDefined(row.Target.Level) && row.Target.UnitId != Guid.Empty && !string.IsNullOrWhiteSpace(row.Name)
+                && !string.IsNullOrWhiteSpace(row.Label) && (row.Holder is null || row.Holder.AssignmentId != Guid.Empty && ValidChoice(row.Holder.Rep)))
+            && options.Targets.Select(row => row.Target).Distinct().Count() == options.Targets.Count
+            && options.Assignments.All(row => row is not null && row.Assignment is not null
+                && row.Assignment.Id != Guid.Empty && !string.IsNullOrWhiteSpace(row.Name) && !string.IsNullOrWhiteSpace(row.Assignment.Version)),
+        _ => false
+    };
+
     private static bool ValidPreview(AssignmentImpactDetails value) => !string.IsNullOrWhiteSpace(value.Proof)
         && value.Action is "Add" or "Remove" or "Transfer" && !string.IsNullOrWhiteSpace(value.TargetName) && !string.IsNullOrWhiteSpace(value.RepName)
         && (value.Action != "Transfer" || value.TransferNotices is not null && value.TransferNotices.All(row => !string.IsNullOrWhiteSpace(row))

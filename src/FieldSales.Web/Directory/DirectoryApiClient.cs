@@ -106,64 +106,63 @@ public sealed class DirectoryApiClient(HttpClient client, IHttpContextAccessor c
         try
         {
             using HttpResponseMessage response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict)
-                {
-                    var error = await response.Content.ReadFromJsonAsync<ApiError>(ct);
-                    return new(response.StatusCode, Error: error?.Error ?? "This change could not be saved.",
-                        Field: error?.Field, RequiresDuplicateConfirmation: error?.RequiresDuplicateConfirmation == true,
-                        Confirmation: error?.Confirmation is { } confirmation && ValidContact(confirmation.Outgoing)
-                            && ValidContact(confirmation.Proposed) && confirmation.LocationVersion is not null ? confirmation : null);
-                }
-                return new(response.StatusCode);
-            }
+            if (!response.IsSuccessStatusCode) return await FailureAsync<T>(response, ct);
             T? value = await response.Content.ReadFromJsonAsync<T>(ct);
-            bool valid = value switch
-            {
-                null => false,
-                GeographyPage page => page.Path is not null && page.Items is not null && page.Level is "regions" or "counties" or "towns"
-                    && page.Items.All(item => item is not null && item.Name is not null && item.Version is not null && item.Usage is not null)
-                    && page.Path.All(item => item is not null && item.Name is not null),
-                GeographyItem item => item.Name is not null && item.Version is not null,
-                GeographyMutationResult result => result.Saved,
-                DirectoryTypeMutationResult result => result.Saved,
-                DirectoryTypeChoice[] types => types.All(ValidType),
-                DirectoryTypeChoice type => ValidType(type),
-                ReferenceListViewModel list => list.SelectedList is not null && list.AvailableLists is not null && list.Items is not null
-                    && list.Items.All(item => item is not null && item.Name is not null && item.Version is not null && item.Usage is not null),
-                ReferenceListItem item => item.Name is not null && item.Version is not null && item.Usage is not null,
-                CustomerSummary[] customers => customers.All(item => item is not null && item.Name is not null && item.LocationCount >= 1),
-                CustomerDetails customer => customer.Name is not null && customer.Version is not null && customer.Locations is { Count: > 0 }
-                    && customer.Locations.All(item => item is not null && item.Name is not null && item.Version is not null && ValidTown(item.Town)
-                        && (item.Type is null || ValidType(item.Type))),
-                LocationDetails location => location.Name is not null && location.CustomerName is not null && location.CustomerId != Guid.Empty
-                    && location.Version is not null && ValidTown(location.Town) && (location.Type is null || ValidType(location.Type)),
-                ContactChoice[] contacts => contacts.All(ValidContact),
-                ContactDetails contact => contact.Id != Guid.Empty && contact.Name is not null && ValidType(contact.Type)
-                    && Enum.IsDefined(contact.Status) && contact.Version is not null && contact.Locations is not null
-                    && contact.Locations.All(link => link is not null && link.LocationId != Guid.Empty && link.Name is not null
-                        && link.CustomerId != Guid.Empty && link.CustomerName is not null && ValidTown(link.Town) && link.LocationVersion is not null),
-                ContactLocationChoice[] locations => locations.All(item => item is not null && item.Id != Guid.Empty
-                    && item.Name is not null && item.CustomerName is not null && item.TownName is not null),
-                LocationContactsPage page => page.LocationId != Guid.Empty && page.LocationName is not null && page.LocationVersion is not null
-                    && page.InactiveCount >= 0 && page.Contacts is not null && page.Contacts.All(item => item is not null && ValidContact(item.Contact))
-                    && (page.MainContact is null || ValidContact(page.MainContact)),
-                ContactMutationResult mutation => mutation.ContactId != Guid.Empty,
-                TownChoice[] towns => towns.All(ValidTown),
-                TownChoice town => ValidTown(town),
-                _ => true
-            };
-            return valid ? new(response.StatusCode, value) : new(HttpStatusCode.ServiceUnavailable);
+            return IsUsable(value) ? new(response.StatusCode, value) : new(HttpStatusCode.ServiceUnavailable);
         }
-        catch (JsonException) { return new(HttpStatusCode.ServiceUnavailable); }
-        catch (ArgumentException) { return new(HttpStatusCode.ServiceUnavailable); }
-        catch (NotSupportedException) { return new(HttpStatusCode.ServiceUnavailable); }
-        catch (HttpRequestException) { return new(HttpStatusCode.ServiceUnavailable); }
-        catch (Polly.Timeout.TimeoutRejectedException) { return new(HttpStatusCode.ServiceUnavailable); }
-        catch (Polly.CircuitBreaker.BrokenCircuitException) { return new(HttpStatusCode.ServiceUnavailable); }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException
+            or HttpRequestException or Polly.Timeout.TimeoutRejectedException or Polly.CircuitBreaker.BrokenCircuitException)
+        { return new(HttpStatusCode.ServiceUnavailable); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return new(HttpStatusCode.ServiceUnavailable); }
     }
+
+    /// <summary>A refusal (400 or 409) carries the API's message; any other failure carries only its status.</summary>
+    private static async Task<DirectoryResult<T>> FailureAsync<T>(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.StatusCode is not (HttpStatusCode.BadRequest or HttpStatusCode.Conflict)) return new(response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiError>(ct);
+        return new(response.StatusCode, Error: error?.Error ?? "This change could not be saved.",
+            Field: error?.Field, RequiresDuplicateConfirmation: error?.RequiresDuplicateConfirmation == true,
+            Confirmation: error?.Confirmation is { } confirmation && ValidContact(confirmation.Outgoing)
+                && ValidContact(confirmation.Proposed) && confirmation.LocationVersion is not null ? confirmation : null);
+    }
+
+    /// <summary>Whether a reply has everything the pages read from it. A reply type with no checks is accepted as it is.</summary>
+    private static bool IsUsable(object? value) => value switch
+    {
+        null => false,
+        GeographyPage page => page.Path is not null && page.Items is not null && page.Level is "regions" or "counties" or "towns"
+            && page.Items.All(item => item is not null && item.Name is not null && item.Version is not null && item.Usage is not null)
+            && page.Path.All(item => item is not null && item.Name is not null),
+        GeographyItem item => item.Name is not null && item.Version is not null,
+        GeographyMutationResult result => result.Saved,
+        DirectoryTypeMutationResult result => result.Saved,
+        DirectoryTypeChoice[] types => types.All(ValidType),
+        DirectoryTypeChoice type => ValidType(type),
+        ReferenceListViewModel list => list.SelectedList is not null && list.AvailableLists is not null && list.Items is not null
+            && list.Items.All(item => item is not null && item.Name is not null && item.Version is not null && item.Usage is not null),
+        ReferenceListItem item => item.Name is not null && item.Version is not null && item.Usage is not null,
+        CustomerSummary[] customers => customers.All(item => item is not null && item.Name is not null && item.LocationCount >= 1),
+        CustomerDetails customer => customer.Name is not null && customer.Version is not null && customer.Locations is { Count: > 0 }
+            && customer.Locations.All(item => item is not null && item.Name is not null && item.Version is not null && ValidTown(item.Town)
+                && (item.Type is null || ValidType(item.Type))),
+        LocationDetails location => location.Name is not null && location.CustomerName is not null && location.CustomerId != Guid.Empty
+            && location.Version is not null && ValidTown(location.Town) && (location.Type is null || ValidType(location.Type)),
+        ContactChoice[] contacts => contacts.All(ValidContact),
+        ContactDetails contact => contact.Id != Guid.Empty && contact.Name is not null && ValidType(contact.Type)
+            && Enum.IsDefined(contact.Status) && contact.Version is not null && contact.Locations is not null
+            && contact.Locations.All(link => link is not null && link.LocationId != Guid.Empty && link.Name is not null
+                && link.CustomerId != Guid.Empty && link.CustomerName is not null && ValidTown(link.Town) && link.LocationVersion is not null),
+        ContactLocationChoice[] locations => locations.All(item => item is not null && item.Id != Guid.Empty
+            && item.Name is not null && item.CustomerName is not null && item.TownName is not null),
+        LocationContactsPage page => page.LocationId != Guid.Empty && page.LocationName is not null && page.LocationVersion is not null
+            && page.InactiveCount >= 0 && page.Contacts is not null && page.Contacts.All(item => item is not null && ValidContact(item.Contact))
+            && (page.MainContact is null || ValidContact(page.MainContact)),
+        ContactMutationResult mutation => mutation.ContactId != Guid.Empty,
+        TownChoice[] towns => towns.All(ValidTown),
+        TownChoice town => ValidTown(town),
+        _ => true
+    };
 
     private static bool ValidTown(TownChoice? town) => town is not null && town.Id != Guid.Empty
         && town.Name is not null && town.Label is not null && town.CountyName is not null && town.RegionName is not null;
