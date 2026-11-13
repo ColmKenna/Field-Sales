@@ -6,7 +6,7 @@ namespace FieldSales.Tablet.Core;
 /// </summary>
 public sealed class EntryHandOff(TimeProvider clock, TimeSpan window)
 {
-    private readonly object gate = new();
+    private readonly Lock gate = new();
     private TabletEntry? offered;
     private long offeredAt;
 

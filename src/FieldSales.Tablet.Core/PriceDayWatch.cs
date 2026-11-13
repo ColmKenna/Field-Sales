@@ -13,7 +13,7 @@ public sealed class PriceDayWatch : IDisposable
     private readonly TimeProvider clock;
     private readonly Action changed;
     private readonly ITimer timer;
-    private readonly object gate = new();
+    private readonly Lock gate = new();
     private DateOnly day;
     private bool disposed;
 
