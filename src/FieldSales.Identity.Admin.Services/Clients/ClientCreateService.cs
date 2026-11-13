@@ -101,62 +101,7 @@ public sealed partial class ClientCreateService(
         if (clientIdIsInUse)
             return await DenyClientIdInUseAsync(clientId!, clientName!, cancellationToken);
 
-        var clonedClient = new Client
-        {
-            ClientId = clientId!,
-            ClientName = clientName!,
-            Description = description,
-            Enabled = sourceClient.Enabled,
-            ProtocolType = sourceClient.ProtocolType,
-            RequireClientSecret = sourceClient.RequireClientSecret,
-            RequireConsent = sourceClient.RequireConsent,
-            AllowRememberConsent = sourceClient.AllowRememberConsent,
-            AlwaysIncludeUserClaimsInIdToken = sourceClient.AlwaysIncludeUserClaimsInIdToken,
-            RequirePkce = sourceClient.RequirePkce,
-            AllowPlainTextPkce = sourceClient.AllowPlainTextPkce,
-            RequireRequestObject = sourceClient.RequireRequestObject,
-            AllowAccessTokensViaBrowser = sourceClient.AllowAccessTokensViaBrowser,
-            FrontChannelLogoutUri = sourceClient.FrontChannelLogoutUri,
-            FrontChannelLogoutSessionRequired = sourceClient.FrontChannelLogoutSessionRequired,
-            BackChannelLogoutUri = sourceClient.BackChannelLogoutUri,
-            BackChannelLogoutSessionRequired = sourceClient.BackChannelLogoutSessionRequired,
-            AllowOfflineAccess = sourceClient.AllowOfflineAccess,
-            IdentityTokenLifetime = sourceClient.IdentityTokenLifetime,
-            AllowedIdentityTokenSigningAlgorithms = sourceClient.AllowedIdentityTokenSigningAlgorithms,
-            AccessTokenLifetime = sourceClient.AccessTokenLifetime,
-            AuthorizationCodeLifetime = sourceClient.AuthorizationCodeLifetime,
-            ConsentLifetime = sourceClient.ConsentLifetime,
-            AbsoluteRefreshTokenLifetime = sourceClient.AbsoluteRefreshTokenLifetime,
-            SlidingRefreshTokenLifetime = sourceClient.SlidingRefreshTokenLifetime,
-            RefreshTokenUsage = sourceClient.RefreshTokenUsage,
-            UpdateAccessTokenClaimsOnRefresh = sourceClient.UpdateAccessTokenClaimsOnRefresh,
-            RefreshTokenExpiration = sourceClient.RefreshTokenExpiration,
-            AccessTokenType = sourceClient.AccessTokenType,
-            EnableLocalLogin = sourceClient.EnableLocalLogin,
-            IncludeJwtId = sourceClient.IncludeJwtId,
-            AlwaysSendClientClaims = sourceClient.AlwaysSendClientClaims,
-            ClientClaimsPrefix = sourceClient.ClientClaimsPrefix,
-            PairWiseSubjectSalt = sourceClient.PairWiseSubjectSalt,
-            UserSsoLifetime = sourceClient.UserSsoLifetime,
-            UserCodeType = sourceClient.UserCodeType,
-            DeviceCodeLifetime = sourceClient.DeviceCodeLifetime,
-            CibaLifetime = sourceClient.CibaLifetime,
-            PollingInterval = sourceClient.PollingInterval,
-            CoordinateLifetimeWithUserSession = sourceClient.CoordinateLifetimeWithUserSession,
-
-            AllowedGrantTypes = sourceClient.AllowedGrantTypes
-                .Select(g => new ClientGrantType { GrantType = g.GrantType }).ToList(),
-            RedirectUris = sourceClient.RedirectUris.Select(u => new ClientRedirectUri { RedirectUri = u.RedirectUri })
-                .ToList(),
-            PostLogoutRedirectUris = sourceClient.PostLogoutRedirectUris.Select(u => new ClientPostLogoutRedirectUri
-            { PostLogoutRedirectUri = u.PostLogoutRedirectUri }).ToList(),
-            AllowedCorsOrigins = sourceClient.AllowedCorsOrigins.Select(c => new ClientCorsOrigin { Origin = c.Origin })
-                .ToList(),
-            AllowedScopes = sourceClient.AllowedScopes.Select(s => new ClientScope { Scope = s.Scope }).ToList(),
-            Properties = sourceClient.Properties.Select(p => new ClientProperty { Key = p.Key, Value = p.Value })
-                .ToList(),
-            ClientSecrets = []
-        };
+        Client clonedClient = CopyOf(sourceClient, clientId!, clientName!, description);
 
         string? plaintextSecret = null;
         if (clonedClient.RequireClientSecret)
@@ -170,6 +115,64 @@ public sealed partial class ClientCreateService(
         return await PersistClientAsync(clonedClient, plaintextSecret, $"Cloned client '{clientName}' from '{sourceClientId}'", cancellationToken);
     }
 
+    /// <summary>A new client with the source's settings, grant types, URIs, scopes and properties, and no secrets.</summary>
+    private static Client CopyOf(Client sourceClient, string clientId, string clientName, string? description) => new()
+    {
+        ClientId = clientId,
+        ClientName = clientName,
+        Description = description,
+        Enabled = sourceClient.Enabled,
+        ProtocolType = sourceClient.ProtocolType,
+        RequireClientSecret = sourceClient.RequireClientSecret,
+        RequireConsent = sourceClient.RequireConsent,
+        AllowRememberConsent = sourceClient.AllowRememberConsent,
+        AlwaysIncludeUserClaimsInIdToken = sourceClient.AlwaysIncludeUserClaimsInIdToken,
+        RequirePkce = sourceClient.RequirePkce,
+        AllowPlainTextPkce = sourceClient.AllowPlainTextPkce,
+        RequireRequestObject = sourceClient.RequireRequestObject,
+        AllowAccessTokensViaBrowser = sourceClient.AllowAccessTokensViaBrowser,
+        FrontChannelLogoutUri = sourceClient.FrontChannelLogoutUri,
+        FrontChannelLogoutSessionRequired = sourceClient.FrontChannelLogoutSessionRequired,
+        BackChannelLogoutUri = sourceClient.BackChannelLogoutUri,
+        BackChannelLogoutSessionRequired = sourceClient.BackChannelLogoutSessionRequired,
+        AllowOfflineAccess = sourceClient.AllowOfflineAccess,
+        IdentityTokenLifetime = sourceClient.IdentityTokenLifetime,
+        AllowedIdentityTokenSigningAlgorithms = sourceClient.AllowedIdentityTokenSigningAlgorithms,
+        AccessTokenLifetime = sourceClient.AccessTokenLifetime,
+        AuthorizationCodeLifetime = sourceClient.AuthorizationCodeLifetime,
+        ConsentLifetime = sourceClient.ConsentLifetime,
+        AbsoluteRefreshTokenLifetime = sourceClient.AbsoluteRefreshTokenLifetime,
+        SlidingRefreshTokenLifetime = sourceClient.SlidingRefreshTokenLifetime,
+        RefreshTokenUsage = sourceClient.RefreshTokenUsage,
+        UpdateAccessTokenClaimsOnRefresh = sourceClient.UpdateAccessTokenClaimsOnRefresh,
+        RefreshTokenExpiration = sourceClient.RefreshTokenExpiration,
+        AccessTokenType = sourceClient.AccessTokenType,
+        EnableLocalLogin = sourceClient.EnableLocalLogin,
+        IncludeJwtId = sourceClient.IncludeJwtId,
+        AlwaysSendClientClaims = sourceClient.AlwaysSendClientClaims,
+        ClientClaimsPrefix = sourceClient.ClientClaimsPrefix,
+        PairWiseSubjectSalt = sourceClient.PairWiseSubjectSalt,
+        UserSsoLifetime = sourceClient.UserSsoLifetime,
+        UserCodeType = sourceClient.UserCodeType,
+        DeviceCodeLifetime = sourceClient.DeviceCodeLifetime,
+        CibaLifetime = sourceClient.CibaLifetime,
+        PollingInterval = sourceClient.PollingInterval,
+        CoordinateLifetimeWithUserSession = sourceClient.CoordinateLifetimeWithUserSession,
+
+        AllowedGrantTypes = sourceClient.AllowedGrantTypes
+            .Select(g => new ClientGrantType { GrantType = g.GrantType }).ToList(),
+        RedirectUris = sourceClient.RedirectUris.Select(u => new ClientRedirectUri { RedirectUri = u.RedirectUri })
+            .ToList(),
+        PostLogoutRedirectUris = sourceClient.PostLogoutRedirectUris.Select(u => new ClientPostLogoutRedirectUri
+        { PostLogoutRedirectUri = u.PostLogoutRedirectUri }).ToList(),
+        AllowedCorsOrigins = sourceClient.AllowedCorsOrigins.Select(c => new ClientCorsOrigin { Origin = c.Origin })
+            .ToList(),
+        AllowedScopes = sourceClient.AllowedScopes.Select(s => new ClientScope { Scope = s.Scope }).ToList(),
+        Properties = sourceClient.Properties.Select(p => new ClientProperty { Key = p.Key, Value = p.Value })
+            .ToList(),
+        ClientSecrets = []
+    };
+
     private async Task<ClientCreateResult> CreateClientCoreAsync(ClientCreateInputModel input,
         AuditOperation audit, CancellationToken cancellationToken = default)
     {
@@ -177,101 +180,16 @@ public sealed partial class ClientCreateService(
             throw new ArgumentNullException(nameof(input));
 
         var errors = new ValidationErrorDictionary();
-
-        string? clientId = input.ClientId?.Trim();
-        if (string.IsNullOrWhiteSpace(clientId))
-            errors.AddError("ClientId", "Client ID is required.");
-        else if (clientId.Length > ValidationConstants.MaxClientIdLength)
-            errors.AddError("ClientId", $"Client ID cannot exceed {ValidationConstants.MaxClientIdLength} characters.");
-
-        string? clientName = input.ClientName?.Trim();
-        if (string.IsNullOrWhiteSpace(clientName))
-            errors.AddError("ClientName", "Client Name is required.");
-        else if (clientName.Length > ValidationConstants.MaxNameLength)
-            errors.AddError("ClientName", $"Client Name cannot exceed {ValidationConstants.MaxNameLength} characters.");
-
-        string? description = input.Description?.Trim();
-        if (description is not null && description.Length > ValidationConstants.MaxDescriptionLength)
-            errors.AddError("Description",
-                $"Description cannot exceed {ValidationConstants.MaxDescriptionLength} characters.");
-
-        List<string> redirectUris = input.RedirectUris?
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .Select(u => u.Trim())
-            .Distinct()
-            .ToList() ?? [];
-
-        foreach (string uri in redirectUris)
-            if (!UriValidationHelper.IsValidHttpOrHttpsUri(uri, ValidationConstants.MaxClientRedirectUriLength))
-            {
-                errors.AddError("RedirectUris", $"Redirect URI '{uri}' must be an absolute HTTP or HTTPS URL.");
-                break;
-            }
-
-        List<string> postLogoutUris = input.PostLogoutRedirectUris?
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .Select(u => u.Trim())
-            .Distinct()
-            .ToList() ?? [];
-
-        foreach (string uri in postLogoutUris)
-            if (!UriValidationHelper.IsValidHttpOrHttpsUri(uri,
-                    ValidationConstants.MaxClientPostLogoutRedirectUriLength))
-            {
-                errors.AddError("PostLogoutRedirectUris",
-                    $"Post-logout redirect URI '{uri}' must be an absolute HTTP or HTTPS URL.");
-                break;
-            }
-
-        List<string> rawCorsOrigins = input.CorsOrigins?
-            .Where(o => !string.IsNullOrWhiteSpace(o))
-            .Select(o => o.Trim())
-            .ToList() ?? [];
-        var corsOrigins = new List<string>();
-        foreach (string origin in rawCorsOrigins)
-        {
-            if (!UriValidationHelper.TryNormalizeCorsOrigin(origin, ValidationConstants.MaxClientCorsOriginLength,
-                    out string normalizedOrigin))
-            {
-                errors.AddError("CorsOrigins",
-                    $"CORS origin '{origin}' must contain only an HTTP or HTTPS scheme, host, and optional port.");
-                break;
-            }
-
-            if (!corsOrigins.Contains(normalizedOrigin, StringComparer.OrdinalIgnoreCase))
-                corsOrigins.Add(normalizedOrigin);
-        }
-
-        List<string> grantTypes = input.GrantTypes?
-            .Where(grantType => !string.IsNullOrWhiteSpace(grantType))
-            .Select(grantType => grantType.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
-        if (grantTypes.Any(grantType => grantType.Length > ValidationConstants.MaxGrantTypeLength))
-            errors.AddError("GrantTypes",
-                $"Grant types cannot exceed {ValidationConstants.MaxGrantTypeLength} characters.");
+        ClientDraft draft = ReadDraft(input, errors);
+        string? clientId = draft.ClientId;
+        string? clientName = draft.ClientName;
+        List<string> scopes = draft.Scopes;
 
         // Validate scopes against the durable resource sets. Never invent fallback scopes:
         // a name absent from both stores must be rejected rather than becoming active later.
         var validSystemScopes =
             new HashSet<string>(await GetAvailableScopesAsync(cancellationToken), StringComparer.Ordinal);
-
-        List<string> scopes = input.AllowedScopes?
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
-
-        if (scopes.Any(scope => scope.Length > ValidationConstants.MaxScopeNameLength))
-            errors.AddError("AllowedScopes",
-                $"Scopes cannot exceed {ValidationConstants.MaxScopeNameLength} characters.");
-        else
-        {
-            string? unknownScope = scopes.FirstOrDefault(scope => !validSystemScopes.Contains(scope));
-            if (unknownScope is not null)
-                errors.AddError("AllowedScopes",
-                    $"Scope '{unknownScope}' is not a valid API scope or identity resource.");
-        }
+        ValidateScopes(scopes, validSystemScopes, errors);
 
         if (errors.HasErrors)
             return await DenyClientCreationValidationFailureAsync(clientId, clientName, errors, cancellationToken);
@@ -283,46 +201,7 @@ public sealed partial class ClientCreateService(
         if (clientIdIsInUse)
             return await DenyClientIdInUseAsync(clientId!, clientName!, cancellationToken);
 
-        var client = new Client
-        {
-            ClientId = clientId!,
-            ClientName = clientName!,
-            Description = description,
-            Enabled = true,
-            RequirePkce = input.RequirePkce,
-            RequireClientSecret = input.RequireClientSecret,
-            AccessTokenLifetime = 3600,
-            IdentityTokenLifetime = 300,
-            AllowedGrantTypes = [],
-            RedirectUris = [],
-            PostLogoutRedirectUris = [],
-            AllowedCorsOrigins = [],
-            AllowedScopes = [],
-            ClientSecrets = [],
-            Properties = []
-        };
-
-        if (!string.IsNullOrWhiteSpace(input.SelectedPreset))
-            client.Properties.Add(new ClientProperty
-            {
-                Key = PresetPropertyKey,
-                Value = input.SelectedPreset
-            });
-
-        if (grantTypes.Count == 0)
-            grantTypes = input.SelectedPreset == ClientPresetIds.MachineToMachine
-                ? [Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials]
-                : [Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode];
-
-        foreach (string grantType in grantTypes)
-            client.AllowedGrantTypes.Add(new ClientGrantType { GrantType = grantType });
-
-        foreach (string uri in redirectUris) client.RedirectUris.Add(new ClientRedirectUri { RedirectUri = uri });
-
-        foreach (string uri in postLogoutUris)
-            client.PostLogoutRedirectUris.Add(new ClientPostLogoutRedirectUri { PostLogoutRedirectUri = uri });
-
-        foreach (string origin in corsOrigins) client.AllowedCorsOrigins.Add(new ClientCorsOrigin { Origin = origin });
+        Client client = NewClient(input, draft);
 
         if (scopes.Count == 0 && input.SelectedPreset != ClientPresetIds.MachineToMachine)
         {
@@ -345,6 +224,147 @@ public sealed partial class ClientCreateService(
 
         audit.TargetName = clientName ?? clientId ?? string.Empty;
         return await PersistClientAsync(client, plaintextSecret, $"Created client '{clientName}'", cancellationToken);
+    }
+
+    /// <summary>What the admin entered, trimmed and de-duplicated.</summary>
+    private sealed record ClientDraft(string? ClientId, string? ClientName, string? Description, List<string> RedirectUris,
+        List<string> PostLogoutUris, List<string> CorsOrigins, List<string> GrantTypes, List<string> Scopes);
+
+    /// <summary>Tidies the input and records every rule it breaks, except whether its scopes exist.</summary>
+    private static ClientDraft ReadDraft(ClientCreateInputModel input, ValidationErrorDictionary errors)
+    {
+        string? clientId = input.ClientId?.Trim();
+        if (string.IsNullOrWhiteSpace(clientId))
+            errors.AddError("ClientId", "Client ID is required.");
+        else if (clientId.Length > ValidationConstants.MaxClientIdLength)
+            errors.AddError("ClientId", $"Client ID cannot exceed {ValidationConstants.MaxClientIdLength} characters.");
+
+        string? clientName = input.ClientName?.Trim();
+        if (string.IsNullOrWhiteSpace(clientName))
+            errors.AddError("ClientName", "Client Name is required.");
+        else if (clientName.Length > ValidationConstants.MaxNameLength)
+            errors.AddError("ClientName", $"Client Name cannot exceed {ValidationConstants.MaxNameLength} characters.");
+
+        string? description = input.Description?.Trim();
+        if (description is not null && description.Length > ValidationConstants.MaxDescriptionLength)
+            errors.AddError("Description",
+                $"Description cannot exceed {ValidationConstants.MaxDescriptionLength} characters.");
+
+        List<string> redirectUris = TrimmedDistinct(input.RedirectUris);
+        if (FirstInvalidUri(redirectUris, ValidationConstants.MaxClientRedirectUriLength) is { } redirectUri)
+            errors.AddError("RedirectUris", $"Redirect URI '{redirectUri}' must be an absolute HTTP or HTTPS URL.");
+
+        List<string> postLogoutUris = TrimmedDistinct(input.PostLogoutRedirectUris);
+        if (FirstInvalidUri(postLogoutUris, ValidationConstants.MaxClientPostLogoutRedirectUriLength) is { } postLogoutUri)
+            errors.AddError("PostLogoutRedirectUris",
+                $"Post-logout redirect URI '{postLogoutUri}' must be an absolute HTTP or HTTPS URL.");
+
+        List<string> corsOrigins = ReadCorsOrigins(input, errors);
+
+        List<string> grantTypes = TrimmedDistinct(input.GrantTypes);
+        if (grantTypes.Any(grantType => grantType.Length > ValidationConstants.MaxGrantTypeLength))
+            errors.AddError("GrantTypes",
+                $"Grant types cannot exceed {ValidationConstants.MaxGrantTypeLength} characters.");
+
+        return new(clientId, clientName, description, redirectUris, postLogoutUris, corsOrigins, grantTypes,
+            TrimmedDistinct(input.AllowedScopes));
+    }
+
+    private static List<string> TrimmedDistinct(IEnumerable<string>? values) => values?
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value.Trim())
+        .Distinct(StringComparer.Ordinal)
+        .ToList() ?? [];
+
+    private static string? FirstInvalidUri(List<string> uris, int maxLength) =>
+        uris.FirstOrDefault(uri => !UriValidationHelper.IsValidHttpOrHttpsUri(uri, maxLength));
+
+    /// <summary>Normalises each origin and drops repeats, ignoring case. Stops at the first origin that is not valid.</summary>
+    private static List<string> ReadCorsOrigins(ClientCreateInputModel input, ValidationErrorDictionary errors)
+    {
+        List<string> rawCorsOrigins = input.CorsOrigins?
+            .Where(o => !string.IsNullOrWhiteSpace(o))
+            .Select(o => o.Trim())
+            .ToList() ?? [];
+        var corsOrigins = new List<string>();
+        foreach (string origin in rawCorsOrigins)
+        {
+            if (!UriValidationHelper.TryNormalizeCorsOrigin(origin, ValidationConstants.MaxClientCorsOriginLength,
+                    out string normalizedOrigin))
+            {
+                errors.AddError("CorsOrigins",
+                    $"CORS origin '{origin}' must contain only an HTTP or HTTPS scheme, host, and optional port.");
+                break;
+            }
+
+            if (!corsOrigins.Contains(normalizedOrigin, StringComparer.OrdinalIgnoreCase))
+                corsOrigins.Add(normalizedOrigin);
+        }
+
+        return corsOrigins;
+    }
+
+    private static void ValidateScopes(List<string> scopes, HashSet<string> validSystemScopes, ValidationErrorDictionary errors)
+    {
+        if (scopes.Any(scope => scope.Length > ValidationConstants.MaxScopeNameLength))
+        {
+            errors.AddError("AllowedScopes",
+                $"Scopes cannot exceed {ValidationConstants.MaxScopeNameLength} characters.");
+            return;
+        }
+
+        string? unknownScope = scopes.FirstOrDefault(scope => !validSystemScopes.Contains(scope));
+        if (unknownScope is not null)
+            errors.AddError("AllowedScopes",
+                $"Scope '{unknownScope}' is not a valid API scope or identity resource.");
+    }
+
+    /// <summary>The new client with its preset, grant types and URIs. Scopes and the secret are added by the caller.</summary>
+    private static Client NewClient(ClientCreateInputModel input, ClientDraft draft)
+    {
+        var client = new Client
+        {
+            ClientId = draft.ClientId!,
+            ClientName = draft.ClientName!,
+            Description = draft.Description,
+            Enabled = true,
+            RequirePkce = input.RequirePkce,
+            RequireClientSecret = input.RequireClientSecret,
+            AccessTokenLifetime = 3600,
+            IdentityTokenLifetime = 300,
+            AllowedGrantTypes = [],
+            RedirectUris = [],
+            PostLogoutRedirectUris = [],
+            AllowedCorsOrigins = [],
+            AllowedScopes = [],
+            ClientSecrets = [],
+            Properties = []
+        };
+
+        if (!string.IsNullOrWhiteSpace(input.SelectedPreset))
+            client.Properties.Add(new ClientProperty
+            {
+                Key = PresetPropertyKey,
+                Value = input.SelectedPreset
+            });
+
+        List<string> grantTypes = draft.GrantTypes;
+        if (grantTypes.Count == 0)
+            grantTypes = input.SelectedPreset == ClientPresetIds.MachineToMachine
+                ? [Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials]
+                : [Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode];
+
+        foreach (string grantType in grantTypes)
+            client.AllowedGrantTypes.Add(new ClientGrantType { GrantType = grantType });
+
+        foreach (string uri in draft.RedirectUris) client.RedirectUris.Add(new ClientRedirectUri { RedirectUri = uri });
+
+        foreach (string uri in draft.PostLogoutUris)
+            client.PostLogoutRedirectUris.Add(new ClientPostLogoutRedirectUri { PostLogoutRedirectUri = uri });
+
+        foreach (string origin in draft.CorsOrigins) client.AllowedCorsOrigins.Add(new ClientCorsOrigin { Origin = origin });
+
+        return client;
     }
 
     private async Task<ClientCreateResult> PersistClientAsync(Client client, string? plaintextSecret,
