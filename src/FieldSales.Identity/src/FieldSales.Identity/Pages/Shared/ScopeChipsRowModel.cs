@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Pages.Shared;
 
-public class ScopeChipsRowModel
+public sealed class ScopeChipsRowModel
 {
     public IReadOnlyList<ScopeChipItem> Items { get; }
     public string EmptyStateText { get; }

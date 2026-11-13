@@ -7,15 +7,15 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.ApiScopes;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
-    private readonly IApiScopeListService _apiScopeListService;
-    private readonly AdminConsoleOptions _options;
+    private readonly IApiScopeListService apiScopeListService;
+    private readonly AdminConsoleOptions options;
 
     public IndexModel(IApiScopeListService apiScopeListService, IOptions<AdminConsoleOptions> options)
     {
-        _apiScopeListService = apiScopeListService;
-        _options = options.Value;
+        this.apiScopeListService = apiScopeListService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
@@ -28,10 +28,10 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        ListQuery query = _options.CreateListQuery(Filter, PageNumber, out int pageNumber);
+        ListQuery query = options.CreateListQuery(Filter, PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
-        ApiScopes = await _apiScopeListService.GetApiScopesAsync(query, cancellationToken);
+        ApiScopes = await apiScopeListService.GetApiScopesAsync(query, cancellationToken);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(string name, CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class IndexModel : PageModel
         if (string.IsNullOrWhiteSpace(name))
             return NotFound();
 
-        ApiScopeDeleteResult result = await _apiScopeListService.DeleteApiScopeAsync(name, cancellationToken);
+        ApiScopeDeleteResult result = await apiScopeListService.DeleteApiScopeAsync(name, cancellationToken);
 
         switch (result)
         {

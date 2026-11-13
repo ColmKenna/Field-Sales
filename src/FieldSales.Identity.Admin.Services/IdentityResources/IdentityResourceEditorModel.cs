@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Services.IdentityResources;
 
-public class IdentityResourceEditorModel
+public sealed class IdentityResourceEditorModel
 {
     public string Name { get; set; } = string.Empty;
     public string? DisplayName { get; set; }

@@ -2,27 +2,27 @@ using FieldSales.Identity.Services.AuditLogs;
 
 namespace FieldSales.Identity.Services.Users;
 
-public class UserCreateService(
+public sealed class UserCreateService(
     IIdentityUserAdministrationStore store,
     IAuditWriter auditWriter) : IUserCreateService
 {
-    private readonly IAuditWriter _auditWriter = auditWriter;
-    private readonly IIdentityUserAdministrationStore _store = store;
+    private readonly IAuditWriter auditWriter = auditWriter;
+    private readonly IIdentityUserAdministrationStore store = store;
 
     public async Task<UserCreateResult> CreateUserAsync(UserCreateInputModel input,
         CancellationToken cancellationToken = default)
     {
         string userName = input.UserName?.Trim() ?? string.Empty;
 
-        return await AuditOperation.RunAsync(_auditWriter, AuditCategory.User, AuditAction.Create, userName, userName, async audit =>
+        return await AuditOperation.RunAsync(auditWriter, AuditCategory.User, AuditAction.Create, userName, userName, async audit =>
         {
-            UserCreateOutcome outcome = await _store.CreateUserAsync(input, cancellationToken);
+            UserCreateOutcome outcome = await store.CreateUserAsync(input, cancellationToken);
             UserCreateResult result = outcome.Result;
             AuditReasonCode reasonCode = outcome.ReasonCode;
 
             if (!result.Success)
             {
-                await _auditWriter.WriteAsync(new AdminAuditEvent(
+                await auditWriter.WriteAsync(new AdminAuditEvent(
                     AuditCategory.User, AuditAction.Create, AuditOutcome.Denied, reasonCode,
                     userName, userName,
                     Details: "User creation validation failed."), cancellationToken);
@@ -30,7 +30,7 @@ public class UserCreateService(
                 return result;
             }
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
+            await auditWriter.WriteAsync(new AdminAuditEvent(
                 AuditCategory.User, AuditAction.Create, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
                 result.UserId, userName,
                 Details: $"Created user '{userName}'"), cancellationToken);

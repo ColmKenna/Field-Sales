@@ -10,27 +10,27 @@ using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public partial class ClientCreateService(
+public sealed partial class ClientCreateService(
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter,
     IClientConfigurationValidator clientConfigurationValidator,
     TimeProvider? timeProvider = null) : IClientCreateService
 {
-    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
     public const string PresetPropertyKey = "admin:preset";
-    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.Client);
-    private readonly IClientConfigurationValidator _clientConfigurationValidator = clientConfigurationValidator;
+    private readonly CategoryAudit audit = AuditOperation.For(auditWriter, AuditCategory.Client);
+    private readonly IClientConfigurationValidator clientConfigurationValidator = clientConfigurationValidator;
 
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
 
     public async Task<List<string>> GetAvailableScopesAsync(CancellationToken cancellationToken = default)
     {
-        List<string> identityScopes = await _configurationDbContext.IdentityResources
+        List<string> identityScopes = await configurationDbContext.IdentityResources
             .AsNoTracking()
             .Select(i => i.Name)
             .ToListAsync(cancellationToken);
 
-        List<string> apiScopes = await _configurationDbContext.ApiScopes
+        List<string> apiScopes = await configurationDbContext.ApiScopes
             .AsNoTracking()
             .Select(a => a.Name)
             .ToListAsync(cancellationToken);
@@ -49,7 +49,7 @@ public partial class ClientCreateService(
     {
         string targetId = input?.ClientId?.Trim() ?? string.Empty;
         string targetName = input?.ClientName?.Trim() ?? targetId;
-        return _audit.RunAsync(
+        return this.audit.RunAsync(
             AuditAction.Create,
             targetId,
             targetName,
@@ -62,7 +62,7 @@ public partial class ClientCreateService(
     {
         string targetId = input?.ClientId?.Trim() ?? string.Empty;
         string targetName = input?.ClientName?.Trim() ?? targetId;
-        return _audit.RunAsync(
+        return this.audit.RunAsync(
             AuditAction.Create,
             targetId,
             targetName,
@@ -76,7 +76,7 @@ public partial class ClientCreateService(
         if (input is null)
             throw new ArgumentNullException(nameof(input));
 
-        Client? sourceClient = await _configurationDbContext.Clients
+        Client? sourceClient = await configurationDbContext.Clients
             .AsNoTracking()
             .AsSplitQuery()
             .Include(c => c.AllowedGrantTypes)
@@ -94,74 +94,19 @@ public partial class ClientCreateService(
         string? clientName = input.ClientName?.Trim();
         string? description = input.Description?.Trim();
 
-        bool clientIdIsInUse = await _configurationDbContext.Clients
+        bool clientIdIsInUse = await configurationDbContext.Clients
             .AsNoTracking()
             .AnyAsync(c => c.ClientId == clientId, cancellationToken);
 
         if (clientIdIsInUse)
             return await DenyClientIdInUseAsync(clientId!, clientName!, cancellationToken);
 
-        var clonedClient = new Client
-        {
-            ClientId = clientId!,
-            ClientName = clientName!,
-            Description = description,
-            Enabled = sourceClient.Enabled,
-            ProtocolType = sourceClient.ProtocolType,
-            RequireClientSecret = sourceClient.RequireClientSecret,
-            RequireConsent = sourceClient.RequireConsent,
-            AllowRememberConsent = sourceClient.AllowRememberConsent,
-            AlwaysIncludeUserClaimsInIdToken = sourceClient.AlwaysIncludeUserClaimsInIdToken,
-            RequirePkce = sourceClient.RequirePkce,
-            AllowPlainTextPkce = sourceClient.AllowPlainTextPkce,
-            RequireRequestObject = sourceClient.RequireRequestObject,
-            AllowAccessTokensViaBrowser = sourceClient.AllowAccessTokensViaBrowser,
-            FrontChannelLogoutUri = sourceClient.FrontChannelLogoutUri,
-            FrontChannelLogoutSessionRequired = sourceClient.FrontChannelLogoutSessionRequired,
-            BackChannelLogoutUri = sourceClient.BackChannelLogoutUri,
-            BackChannelLogoutSessionRequired = sourceClient.BackChannelLogoutSessionRequired,
-            AllowOfflineAccess = sourceClient.AllowOfflineAccess,
-            IdentityTokenLifetime = sourceClient.IdentityTokenLifetime,
-            AllowedIdentityTokenSigningAlgorithms = sourceClient.AllowedIdentityTokenSigningAlgorithms,
-            AccessTokenLifetime = sourceClient.AccessTokenLifetime,
-            AuthorizationCodeLifetime = sourceClient.AuthorizationCodeLifetime,
-            ConsentLifetime = sourceClient.ConsentLifetime,
-            AbsoluteRefreshTokenLifetime = sourceClient.AbsoluteRefreshTokenLifetime,
-            SlidingRefreshTokenLifetime = sourceClient.SlidingRefreshTokenLifetime,
-            RefreshTokenUsage = sourceClient.RefreshTokenUsage,
-            UpdateAccessTokenClaimsOnRefresh = sourceClient.UpdateAccessTokenClaimsOnRefresh,
-            RefreshTokenExpiration = sourceClient.RefreshTokenExpiration,
-            AccessTokenType = sourceClient.AccessTokenType,
-            EnableLocalLogin = sourceClient.EnableLocalLogin,
-            IncludeJwtId = sourceClient.IncludeJwtId,
-            AlwaysSendClientClaims = sourceClient.AlwaysSendClientClaims,
-            ClientClaimsPrefix = sourceClient.ClientClaimsPrefix,
-            PairWiseSubjectSalt = sourceClient.PairWiseSubjectSalt,
-            UserSsoLifetime = sourceClient.UserSsoLifetime,
-            UserCodeType = sourceClient.UserCodeType,
-            DeviceCodeLifetime = sourceClient.DeviceCodeLifetime,
-            CibaLifetime = sourceClient.CibaLifetime,
-            PollingInterval = sourceClient.PollingInterval,
-            CoordinateLifetimeWithUserSession = sourceClient.CoordinateLifetimeWithUserSession,
-
-            AllowedGrantTypes = sourceClient.AllowedGrantTypes
-                .Select(g => new ClientGrantType { GrantType = g.GrantType }).ToList(),
-            RedirectUris = sourceClient.RedirectUris.Select(u => new ClientRedirectUri { RedirectUri = u.RedirectUri })
-                .ToList(),
-            PostLogoutRedirectUris = sourceClient.PostLogoutRedirectUris.Select(u => new ClientPostLogoutRedirectUri
-            { PostLogoutRedirectUri = u.PostLogoutRedirectUri }).ToList(),
-            AllowedCorsOrigins = sourceClient.AllowedCorsOrigins.Select(c => new ClientCorsOrigin { Origin = c.Origin })
-                .ToList(),
-            AllowedScopes = sourceClient.AllowedScopes.Select(s => new ClientScope { Scope = s.Scope }).ToList(),
-            Properties = sourceClient.Properties.Select(p => new ClientProperty { Key = p.Key, Value = p.Value })
-                .ToList(),
-            ClientSecrets = []
-        };
+        Client clonedClient = CopyOf(sourceClient, clientId!, clientName!, description);
 
         string? plaintextSecret = null;
         if (clonedClient.RequireClientSecret)
         {
-            GeneratedClientSecret generated = ClientSecretFactory.Create(_timeProvider, "Initial client secret (cloned)");
+            GeneratedClientSecret generated = ClientSecretFactory.Create(timeProvider, "Initial client secret (cloned)");
             plaintextSecret = generated.Plaintext;
             clonedClient.ClientSecrets.Add(generated.Secret);
         }
@@ -170,6 +115,64 @@ public partial class ClientCreateService(
         return await PersistClientAsync(clonedClient, plaintextSecret, $"Cloned client '{clientName}' from '{sourceClientId}'", cancellationToken);
     }
 
+    /// <summary>A new client with the source's settings, grant types, URIs, scopes and properties, and no secrets.</summary>
+    private static Client CopyOf(Client sourceClient, string clientId, string clientName, string? description) => new()
+    {
+        ClientId = clientId,
+        ClientName = clientName,
+        Description = description,
+        Enabled = sourceClient.Enabled,
+        ProtocolType = sourceClient.ProtocolType,
+        RequireClientSecret = sourceClient.RequireClientSecret,
+        RequireConsent = sourceClient.RequireConsent,
+        AllowRememberConsent = sourceClient.AllowRememberConsent,
+        AlwaysIncludeUserClaimsInIdToken = sourceClient.AlwaysIncludeUserClaimsInIdToken,
+        RequirePkce = sourceClient.RequirePkce,
+        AllowPlainTextPkce = sourceClient.AllowPlainTextPkce,
+        RequireRequestObject = sourceClient.RequireRequestObject,
+        AllowAccessTokensViaBrowser = sourceClient.AllowAccessTokensViaBrowser,
+        FrontChannelLogoutUri = sourceClient.FrontChannelLogoutUri,
+        FrontChannelLogoutSessionRequired = sourceClient.FrontChannelLogoutSessionRequired,
+        BackChannelLogoutUri = sourceClient.BackChannelLogoutUri,
+        BackChannelLogoutSessionRequired = sourceClient.BackChannelLogoutSessionRequired,
+        AllowOfflineAccess = sourceClient.AllowOfflineAccess,
+        IdentityTokenLifetime = sourceClient.IdentityTokenLifetime,
+        AllowedIdentityTokenSigningAlgorithms = sourceClient.AllowedIdentityTokenSigningAlgorithms,
+        AccessTokenLifetime = sourceClient.AccessTokenLifetime,
+        AuthorizationCodeLifetime = sourceClient.AuthorizationCodeLifetime,
+        ConsentLifetime = sourceClient.ConsentLifetime,
+        AbsoluteRefreshTokenLifetime = sourceClient.AbsoluteRefreshTokenLifetime,
+        SlidingRefreshTokenLifetime = sourceClient.SlidingRefreshTokenLifetime,
+        RefreshTokenUsage = sourceClient.RefreshTokenUsage,
+        UpdateAccessTokenClaimsOnRefresh = sourceClient.UpdateAccessTokenClaimsOnRefresh,
+        RefreshTokenExpiration = sourceClient.RefreshTokenExpiration,
+        AccessTokenType = sourceClient.AccessTokenType,
+        EnableLocalLogin = sourceClient.EnableLocalLogin,
+        IncludeJwtId = sourceClient.IncludeJwtId,
+        AlwaysSendClientClaims = sourceClient.AlwaysSendClientClaims,
+        ClientClaimsPrefix = sourceClient.ClientClaimsPrefix,
+        PairWiseSubjectSalt = sourceClient.PairWiseSubjectSalt,
+        UserSsoLifetime = sourceClient.UserSsoLifetime,
+        UserCodeType = sourceClient.UserCodeType,
+        DeviceCodeLifetime = sourceClient.DeviceCodeLifetime,
+        CibaLifetime = sourceClient.CibaLifetime,
+        PollingInterval = sourceClient.PollingInterval,
+        CoordinateLifetimeWithUserSession = sourceClient.CoordinateLifetimeWithUserSession,
+
+        AllowedGrantTypes = sourceClient.AllowedGrantTypes
+            .Select(g => new ClientGrantType { GrantType = g.GrantType }).ToList(),
+        RedirectUris = sourceClient.RedirectUris.Select(u => new ClientRedirectUri { RedirectUri = u.RedirectUri })
+            .ToList(),
+        PostLogoutRedirectUris = sourceClient.PostLogoutRedirectUris.Select(u => new ClientPostLogoutRedirectUri
+        { PostLogoutRedirectUri = u.PostLogoutRedirectUri }).ToList(),
+        AllowedCorsOrigins = sourceClient.AllowedCorsOrigins.Select(c => new ClientCorsOrigin { Origin = c.Origin })
+            .ToList(),
+        AllowedScopes = sourceClient.AllowedScopes.Select(s => new ClientScope { Scope = s.Scope }).ToList(),
+        Properties = sourceClient.Properties.Select(p => new ClientProperty { Key = p.Key, Value = p.Value })
+            .ToList(),
+        ClientSecrets = []
+    };
+
     private async Task<ClientCreateResult> CreateClientCoreAsync(ClientCreateInputModel input,
         AuditOperation audit, CancellationToken cancellationToken = default)
     {
@@ -177,7 +180,59 @@ public partial class ClientCreateService(
             throw new ArgumentNullException(nameof(input));
 
         var errors = new ValidationErrorDictionary();
+        ClientDraft draft = ReadDraft(input, errors);
+        string? clientId = draft.ClientId;
+        string? clientName = draft.ClientName;
+        List<string> scopes = draft.Scopes;
 
+        // Validate scopes against the durable resource sets. Never invent fallback scopes:
+        // a name absent from both stores must be rejected rather than becoming active later.
+        var validSystemScopes =
+            new HashSet<string>(await GetAvailableScopesAsync(cancellationToken), StringComparer.Ordinal);
+        ValidateScopes(scopes, validSystemScopes, errors);
+
+        if (errors.HasErrors)
+            return await DenyClientCreationValidationFailureAsync(clientId, clientName, errors, cancellationToken);
+
+        bool clientIdIsInUse = await configurationDbContext.Clients
+            .AsNoTracking()
+            .AnyAsync(c => c.ClientId == clientId, cancellationToken);
+
+        if (clientIdIsInUse)
+            return await DenyClientIdInUseAsync(clientId!, clientName!, cancellationToken);
+
+        Client client = NewClient(input, draft);
+
+        if (scopes.Count == 0 && input.SelectedPreset != ClientPresetIds.MachineToMachine)
+        {
+            if (!validSystemScopes.Contains("openid"))
+                return await DenyMissingOpenIdAsync(clientId!, clientName!, cancellationToken);
+
+            scopes.Add("openid");
+            if (validSystemScopes.Contains("profile")) scopes.Add("profile");
+        }
+
+        foreach (string scope in scopes) client.AllowedScopes.Add(new ClientScope { Scope = scope });
+
+        string? plaintextSecret = null;
+        if (input.RequireClientSecret)
+        {
+            GeneratedClientSecret generated = ClientSecretFactory.Create(timeProvider, "Initial client secret");
+            plaintextSecret = generated.Plaintext;
+            client.ClientSecrets.Add(generated.Secret);
+        }
+
+        audit.TargetName = clientName ?? clientId ?? string.Empty;
+        return await PersistClientAsync(client, plaintextSecret, $"Created client '{clientName}'", cancellationToken);
+    }
+
+    /// <summary>What the admin entered, trimmed and de-duplicated.</summary>
+    private sealed record ClientDraft(string? ClientId, string? ClientName, string? Description, List<string> RedirectUris,
+        List<string> PostLogoutUris, List<string> CorsOrigins, List<string> GrantTypes, List<string> Scopes);
+
+    /// <summary>Tidies the input and records every rule it breaks, except whether its scopes exist.</summary>
+    private static ClientDraft ReadDraft(ClientCreateInputModel input, ValidationErrorDictionary errors)
+    {
         string? clientId = input.ClientId?.Trim();
         if (string.IsNullOrWhiteSpace(clientId))
             errors.AddError("ClientId", "Client ID is required.");
@@ -195,34 +250,38 @@ public partial class ClientCreateService(
             errors.AddError("Description",
                 $"Description cannot exceed {ValidationConstants.MaxDescriptionLength} characters.");
 
-        List<string> redirectUris = input.RedirectUris?
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .Select(u => u.Trim())
-            .Distinct()
-            .ToList() ?? [];
+        List<string> redirectUris = TrimmedDistinct(input.RedirectUris);
+        if (FirstInvalidUri(redirectUris, ValidationConstants.MaxClientRedirectUriLength) is { } redirectUri)
+            errors.AddError("RedirectUris", $"Redirect URI '{redirectUri}' must be an absolute HTTP or HTTPS URL.");
 
-        foreach (string uri in redirectUris)
-            if (!UriValidationHelper.IsValidHttpOrHttpsUri(uri, ValidationConstants.MaxClientRedirectUriLength))
-            {
-                errors.AddError("RedirectUris", $"Redirect URI '{uri}' must be an absolute HTTP or HTTPS URL.");
-                break;
-            }
+        List<string> postLogoutUris = TrimmedDistinct(input.PostLogoutRedirectUris);
+        if (FirstInvalidUri(postLogoutUris, ValidationConstants.MaxClientPostLogoutRedirectUriLength) is { } postLogoutUri)
+            errors.AddError("PostLogoutRedirectUris",
+                $"Post-logout redirect URI '{postLogoutUri}' must be an absolute HTTP or HTTPS URL.");
 
-        List<string> postLogoutUris = input.PostLogoutRedirectUris?
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .Select(u => u.Trim())
-            .Distinct()
-            .ToList() ?? [];
+        List<string> corsOrigins = ReadCorsOrigins(input, errors);
 
-        foreach (string uri in postLogoutUris)
-            if (!UriValidationHelper.IsValidHttpOrHttpsUri(uri,
-                    ValidationConstants.MaxClientPostLogoutRedirectUriLength))
-            {
-                errors.AddError("PostLogoutRedirectUris",
-                    $"Post-logout redirect URI '{uri}' must be an absolute HTTP or HTTPS URL.");
-                break;
-            }
+        List<string> grantTypes = TrimmedDistinct(input.GrantTypes);
+        if (grantTypes.Any(grantType => grantType.Length > ValidationConstants.MaxGrantTypeLength))
+            errors.AddError("GrantTypes",
+                $"Grant types cannot exceed {ValidationConstants.MaxGrantTypeLength} characters.");
 
+        return new(clientId, clientName, description, redirectUris, postLogoutUris, corsOrigins, grantTypes,
+            TrimmedDistinct(input.AllowedScopes));
+    }
+
+    private static List<string> TrimmedDistinct(IEnumerable<string>? values) => values?
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(value => value.Trim())
+        .Distinct(StringComparer.Ordinal)
+        .ToList() ?? [];
+
+    private static string? FirstInvalidUri(List<string> uris, int maxLength) =>
+        uris.FirstOrDefault(uri => !UriValidationHelper.IsValidHttpOrHttpsUri(uri, maxLength));
+
+    /// <summary>Normalises each origin and drops repeats, ignoring case. Stops at the first origin that is not valid.</summary>
+    private static List<string> ReadCorsOrigins(ClientCreateInputModel input, ValidationErrorDictionary errors)
+    {
         List<string> rawCorsOrigins = input.CorsOrigins?
             .Where(o => !string.IsNullOrWhiteSpace(o))
             .Select(o => o.Trim())
@@ -242,52 +301,32 @@ public partial class ClientCreateService(
                 corsOrigins.Add(normalizedOrigin);
         }
 
-        List<string> grantTypes = input.GrantTypes?
-            .Where(grantType => !string.IsNullOrWhiteSpace(grantType))
-            .Select(grantType => grantType.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
-        if (grantTypes.Any(grantType => grantType.Length > ValidationConstants.MaxGrantTypeLength))
-            errors.AddError("GrantTypes",
-                $"Grant types cannot exceed {ValidationConstants.MaxGrantTypeLength} characters.");
+        return corsOrigins;
+    }
 
-        // Validate scopes against the durable resource sets. Never invent fallback scopes:
-        // a name absent from both stores must be rejected rather than becoming active later.
-        var validSystemScopes =
-            new HashSet<string>(await GetAvailableScopesAsync(cancellationToken), StringComparer.Ordinal);
-
-        List<string> scopes = input.AllowedScopes?
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Select(s => s.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToList() ?? [];
-
+    private static void ValidateScopes(List<string> scopes, HashSet<string> validSystemScopes, ValidationErrorDictionary errors)
+    {
         if (scopes.Any(scope => scope.Length > ValidationConstants.MaxScopeNameLength))
+        {
             errors.AddError("AllowedScopes",
                 $"Scopes cannot exceed {ValidationConstants.MaxScopeNameLength} characters.");
-        else
-        {
-            string? unknownScope = scopes.FirstOrDefault(scope => !validSystemScopes.Contains(scope));
-            if (unknownScope is not null)
-                errors.AddError("AllowedScopes",
-                    $"Scope '{unknownScope}' is not a valid API scope or identity resource.");
+            return;
         }
 
-        if (errors.HasErrors)
-            return await DenyClientCreationValidationFailureAsync(clientId, clientName, errors, cancellationToken);
+        string? unknownScope = scopes.FirstOrDefault(scope => !validSystemScopes.Contains(scope));
+        if (unknownScope is not null)
+            errors.AddError("AllowedScopes",
+                $"Scope '{unknownScope}' is not a valid API scope or identity resource.");
+    }
 
-        bool clientIdIsInUse = await _configurationDbContext.Clients
-            .AsNoTracking()
-            .AnyAsync(c => c.ClientId == clientId, cancellationToken);
-
-        if (clientIdIsInUse)
-            return await DenyClientIdInUseAsync(clientId!, clientName!, cancellationToken);
-
+    /// <summary>The new client with its preset, grant types and URIs. Scopes and the secret are added by the caller.</summary>
+    private static Client NewClient(ClientCreateInputModel input, ClientDraft draft)
+    {
         var client = new Client
         {
-            ClientId = clientId!,
-            ClientName = clientName!,
-            Description = description,
+            ClientId = draft.ClientId!,
+            ClientName = draft.ClientName!,
+            Description = draft.Description,
             Enabled = true,
             RequirePkce = input.RequirePkce,
             RequireClientSecret = input.RequireClientSecret,
@@ -309,6 +348,7 @@ public partial class ClientCreateService(
                 Value = input.SelectedPreset
             });
 
+        List<string> grantTypes = draft.GrantTypes;
         if (grantTypes.Count == 0)
             grantTypes = input.SelectedPreset == ClientPresetIds.MachineToMachine
                 ? [Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials]
@@ -317,49 +357,29 @@ public partial class ClientCreateService(
         foreach (string grantType in grantTypes)
             client.AllowedGrantTypes.Add(new ClientGrantType { GrantType = grantType });
 
-        foreach (string uri in redirectUris) client.RedirectUris.Add(new ClientRedirectUri { RedirectUri = uri });
+        foreach (string uri in draft.RedirectUris) client.RedirectUris.Add(new ClientRedirectUri { RedirectUri = uri });
 
-        foreach (string uri in postLogoutUris)
+        foreach (string uri in draft.PostLogoutUris)
             client.PostLogoutRedirectUris.Add(new ClientPostLogoutRedirectUri { PostLogoutRedirectUri = uri });
 
-        foreach (string origin in corsOrigins) client.AllowedCorsOrigins.Add(new ClientCorsOrigin { Origin = origin });
+        foreach (string origin in draft.CorsOrigins) client.AllowedCorsOrigins.Add(new ClientCorsOrigin { Origin = origin });
 
-        if (scopes.Count == 0 && input.SelectedPreset != ClientPresetIds.MachineToMachine)
-        {
-            if (!validSystemScopes.Contains("openid"))
-                return await DenyMissingOpenIdAsync(clientId!, clientName!, cancellationToken);
-
-            scopes.Add("openid");
-            if (validSystemScopes.Contains("profile")) scopes.Add("profile");
-        }
-
-        foreach (string scope in scopes) client.AllowedScopes.Add(new ClientScope { Scope = scope });
-
-        string? plaintextSecret = null;
-        if (input.RequireClientSecret)
-        {
-            GeneratedClientSecret generated = ClientSecretFactory.Create(_timeProvider, "Initial client secret");
-            plaintextSecret = generated.Plaintext;
-            client.ClientSecrets.Add(generated.Secret);
-        }
-
-        audit.TargetName = clientName ?? clientId ?? string.Empty;
-        return await PersistClientAsync(client, plaintextSecret, $"Created client '{clientName}'", cancellationToken);
+        return client;
     }
 
     private async Task<ClientCreateResult> PersistClientAsync(Client client, string? plaintextSecret,
         string details, CancellationToken cancellationToken)
     {
         var validationContext = new ClientConfigurationValidationContext(client.ToModel());
-        await _clientConfigurationValidator.ValidateAsync(validationContext, cancellationToken);
+        await clientConfigurationValidator.ValidateAsync(validationContext, cancellationToken);
         if (!validationContext.IsValid)
             return await DenyInvalidClientConfigurationAsync(client.ClientId, client.ClientName,
                 validationContext.ErrorMessage, cancellationToken);
         try
         {
-            _configurationDbContext.Clients.Add(client);
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
-            await _audit.SucceededAsync(AuditAction.Create, client.ClientId, client.ClientName, details, cancellationToken);
+            configurationDbContext.Clients.Add(client);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
+            await audit.SucceededAsync(AuditAction.Create, client.ClientId, client.ClientName, details, cancellationToken);
             return ClientCreateResult.Succeeded(client.ClientId, plaintextSecret);
         }
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
@@ -371,14 +391,14 @@ public partial class ClientCreateService(
     private async Task<ClientCreateResult> DenySourceClientNotFoundAsync(
         string sourceClientId, string? clientId, string? clientName, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NotFound, clientId ?? string.Empty, clientName ?? string.Empty,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NotFound, clientId ?? string.Empty, clientName ?? string.Empty,
             $"Source client '{sourceClientId}' was not found.", cancellationToken);
         return ClientCreateResult.Failed("Source client not found.");
     }
 
     private async Task<ClientCreateResult> DenyClientIdInUseAsync(string clientId, string clientName, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NameCollision, clientId, clientName,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NameCollision, clientId, clientName,
             $"A client with ID '{clientId}' already exists.", cancellationToken);
         return ClientCreateResult.Failed("ClientId", $"A client with ID '{clientId}' already exists.",
             AdminMutationStatus.Conflict);
@@ -387,7 +407,7 @@ public partial class ClientCreateService(
     private async Task<ClientCreateResult> DenyInvalidClientConfigurationAsync(
         string clientId, string clientName, string? errorMessage, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId, clientName,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId, clientName,
             errorMessage ?? "Invalid client configuration.", cancellationToken);
         return ClientCreateResult.Failed(errorMessage ?? "Invalid client configuration.");
     }
@@ -395,14 +415,14 @@ public partial class ClientCreateService(
     private async Task<ClientCreateResult> DenyClientCreationValidationFailureAsync(
         string? clientId, string? clientName, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId ?? string.Empty, clientName ?? string.Empty,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId ?? string.Empty, clientName ?? string.Empty,
             "Client creation validation failed.", cancellationToken);
         return ClientCreateResult.Failed(errors);
     }
 
     private async Task<ClientCreateResult> DenyMissingOpenIdAsync(string clientId, string clientName, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId, clientName,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, clientId, clientName,
             "Client creation requires the 'openid' identity resource.", cancellationToken);
         return ClientCreateResult.Failed(
             "AllowedScopes",

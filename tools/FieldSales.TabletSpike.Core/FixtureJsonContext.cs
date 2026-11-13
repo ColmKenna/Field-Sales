@@ -6,4 +6,4 @@ namespace FieldSales.TabletSpike.Core;
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, WriteIndented = true)]
 [JsonSerializable(typeof(FixtureManifest))]
 [JsonSerializable(typeof(SpikeReport))]
-internal partial class FixtureJsonContext : JsonSerializerContext;
+internal sealed partial class FixtureJsonContext : JsonSerializerContext;

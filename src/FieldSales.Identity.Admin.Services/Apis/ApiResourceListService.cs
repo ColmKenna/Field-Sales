@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public class ApiResourceListService(ConfigurationDbContext configurationDbContext) : IApiResourceListService
+public sealed class ApiResourceListService(ConfigurationDbContext configurationDbContext) : IApiResourceListService
 {
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
 
     public async Task<ListResult<ApiResourceListItem>> GetApiResourcesAsync(
         ListQuery query,
@@ -15,7 +15,7 @@ public class ApiResourceListService(ConfigurationDbContext configurationDbContex
         Pagination pagination = query.Pagination.Normalize();
 
         IQueryable<ApiResource> dbQuery =
-            ApplyFilter(_configurationDbContext.ApiResources.AsNoTracking(), query.Filter);
+            ApplyFilter(configurationDbContext.ApiResources.AsNoTracking(), query.Filter);
 
         int totalCount = await dbQuery.CountAsync(cancellationToken);
 

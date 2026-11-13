@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class AuthenticationInputModel
+public sealed class AuthenticationInputModel
 {
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
@@ -35,7 +35,7 @@ public class AuthenticationInputModel
     public bool BackChannelLogoutSessionRequired { get; set; }
 }
 
-public class AuthenticationModel(IClientAuthenticationService clientAuthenticationService) : PageModel
+public sealed class AuthenticationModel(IClientAuthenticationService clientAuthenticationService) : PageModel
 {
     private static readonly string[] SecondTabPrefixes =
     [
@@ -46,7 +46,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
         "Input.CorsOrigins"
     ];
 
-    private readonly IClientAuthenticationService _clientAuthenticationService = clientAuthenticationService;
+    private readonly IClientAuthenticationService clientAuthenticationService = clientAuthenticationService;
 
     [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
 
@@ -63,7 +63,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
             return NotFound();
 
         ClientAuthenticationModel? authentication =
-            await _clientAuthenticationService.GetClientAuthenticationAsync(clientId, cancellationToken);
+            await clientAuthenticationService.GetClientAuthenticationAsync(clientId, cancellationToken);
         if (authentication is null)
             return NotFound();
 
@@ -101,7 +101,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
         };
 
         AdminMutationResult result =
-            await _clientAuthenticationService.UpdateClientAuthenticationAsync(clientId, input, cancellationToken);
+            await clientAuthenticationService.UpdateClientAuthenticationAsync(clientId, input, cancellationToken);
         if (result.Status == AdminMutationStatus.NotFound)
             return NotFound();
 
@@ -183,7 +183,7 @@ public class AuthenticationModel(IClientAuthenticationService clientAuthenticati
     private async Task<IActionResult> ReloadPageAsync(ClientId clientId, CancellationToken cancellationToken)
     {
         ClientAuthenticationModel? authentication =
-            await _clientAuthenticationService.GetClientAuthenticationAsync(clientId, cancellationToken);
+            await clientAuthenticationService.GetClientAuthenticationAsync(clientId, cancellationToken);
         if (authentication is null)
             return NotFound();
 

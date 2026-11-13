@@ -1,20 +1,20 @@
 namespace FieldSales.Identity.Services.Roles;
 
-public class RoleListItem
+public sealed class RoleListItem
 {
     public required RoleId Id { get; set; }
     public required string Name { get; set; }
     public bool IsProtected { get; set; }
 }
 
-public class RoleDetailsModel
+public sealed class RoleDetailsModel
 {
     public required RoleId Id { get; set; }
     public required string Name { get; set; }
     public bool IsProtected { get; set; }
 }
 
-public class RoleCreateInputModel
+public sealed class RoleCreateInputModel
 {
     public required string Name { get; set; }
 }

@@ -6,11 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     public Task<AdminMutationResult> SetEnabledAsync(ScopeName name, bool enabled,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.SetEnabled,
             name.Value,
             name.Value,
@@ -22,23 +22,23 @@ public partial class ApiResourceEditorService
     {
         name = name?.Trim() ?? string.Empty;
         ApiResource? entity =
-            await _configurationDbContext.ApiResources.FirstOrDefaultAsync(r => r.Name == name, cancellationToken);
+            await configurationDbContext.ApiResources.FirstOrDefaultAsync(r => r.Name == name, cancellationToken);
         if (entity is null)
             return await DenyResourceNotFoundAsync(AuditAction.SetEnabled, name, cancellationToken);
 
         audit.TargetName = name;
 
         entity.Enabled = enabled;
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.SetEnabled, name, name,
+        await this.audit.SucceededAsync(AuditAction.SetEnabled, name, name,
             $"Set API Resource enabled status to {enabled}", cancellationToken);
 
         return AdminMutationResult.Success();
     }
 
     public Task<AdminMutationResult> DeleteAsync(ScopeName name, CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.Delete,
             name.Value,
             name.Value,
@@ -49,16 +49,16 @@ public partial class ApiResourceEditorService
     {
         name = name?.Trim() ?? string.Empty;
         ApiResource? entity =
-            await _configurationDbContext.ApiResources.FirstOrDefaultAsync(r => r.Name == name, cancellationToken);
+            await configurationDbContext.ApiResources.FirstOrDefaultAsync(r => r.Name == name, cancellationToken);
         if (entity is null)
             return await DenyResourceNotFoundAsync(AuditAction.Delete, name, cancellationToken);
 
         audit.TargetName = name;
 
-        _configurationDbContext.ApiResources.Remove(entity);
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        configurationDbContext.ApiResources.Remove(entity);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.Delete, name, name,
+        await this.audit.SucceededAsync(AuditAction.Delete, name, name,
             $"Deleted API Resource '{name}'", cancellationToken);
 
         return AdminMutationResult.Success();

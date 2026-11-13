@@ -7,12 +7,12 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Consent;
 
-public class IndexModel(
+public sealed class IndexModel(
     IIdentityServerInteractionService interaction,
     IEventService events) : PageModel
 {
-    private readonly IEventService _events = events;
-    private readonly IIdentityServerInteractionService _interaction = interaction;
+    private readonly IEventService events = events;
+    private readonly IIdentityServerInteractionService interaction = interaction;
 
     public string? ReturnUrl { get; set; }
     public string? ClientName { get; set; }
@@ -21,7 +21,7 @@ public class IndexModel(
     public async Task<IActionResult> OnGetAsync(string returnUrl)
     {
         AuthorizationRequest? request =
-            await _interaction.GetAuthorizationContextAsync(returnUrl, HttpContext.RequestAborted);
+            await interaction.GetAuthorizationContextAsync(returnUrl, HttpContext.RequestAborted);
         if (request is null) return RedirectToPage("/Error");
 
         ReturnUrl = returnUrl;
@@ -37,7 +37,7 @@ public class IndexModel(
     public async Task<IActionResult> OnPostAsync(string returnUrl, bool consented)
     {
         AuthorizationRequest? request =
-            await _interaction.GetAuthorizationContextAsync(returnUrl, HttpContext.RequestAborted);
+            await interaction.GetAuthorizationContextAsync(returnUrl, HttpContext.RequestAborted);
         if (request is null) return RedirectToPage("/Error");
 
         ConsentResponse grantedConsent = consented
@@ -48,11 +48,11 @@ public class IndexModel(
             }
             : new ConsentResponse { Error = InteractionError.AccessDenied };
 
-        await _interaction.GrantConsentAsync(request, grantedConsent, HttpContext.RequestAborted);
+        await interaction.GrantConsentAsync(request, grantedConsent, HttpContext.RequestAborted);
 
         string[] requestedScopes = request.ValidatedResources.ParsedScopes.Select(scope => scope.RawValue).ToArray();
         if (consented)
-            await _events.RaiseAsync(
+            await events.RaiseAsync(
                 new ConsentGrantedEvent(
                     User.GetSubjectId(),
                     request.Client.ClientId,
@@ -61,12 +61,12 @@ public class IndexModel(
                     grantedConsent.RememberConsent),
                 HttpContext.RequestAborted);
         else
-            await _events.RaiseAsync(
+            await events.RaiseAsync(
                 new ConsentDeniedEvent(User.GetSubjectId(), request.Client.ClientId, requestedScopes),
                 HttpContext.RequestAborted);
 
         return Redirect(returnUrl);
     }
 
-    public record ScopeViewModel(string Value, string? DisplayName);
+    public sealed record ScopeViewModel(string Value, string? DisplayName);
 }

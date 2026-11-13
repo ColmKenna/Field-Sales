@@ -7,13 +7,13 @@ namespace FieldSales.Identity.Services.Scopes;
 /// </summary>
 public sealed class ScopeSet : IReadOnlyCollection<ScopeName>
 {
-    private readonly ScopeName[] _scopes;
+    private readonly ScopeName[] scopes;
 
     public ScopeSet(IEnumerable<ScopeName> scopes)
     {
         ArgumentNullException.ThrowIfNull(scopes);
 
-        _scopes = scopes
+        this.scopes = scopes
             .Where(scope => !scope.IsEmpty)
             .Distinct()
             .OrderBy(scope => scope)
@@ -22,15 +22,15 @@ public sealed class ScopeSet : IReadOnlyCollection<ScopeName>
 
     public static ScopeSet Empty { get; } = new(Array.Empty<ScopeName>());
 
-    public int Count => _scopes.Length;
+    public int Count => scopes.Length;
 
-    public IEnumerator<ScopeName> GetEnumerator() => ((IEnumerable<ScopeName>)_scopes).GetEnumerator();
+    public IEnumerator<ScopeName> GetEnumerator() => ((IEnumerable<ScopeName>)scopes).GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    public bool Contains(ScopeName scope) => Array.BinarySearch(_scopes, scope) >= 0;
+    public bool Contains(ScopeName scope) => Array.BinarySearch(scopes, scope) >= 0;
 
-    public IReadOnlyList<string> ToValues() => _scopes.Select(scope => scope.Value).ToArray();
+    public IReadOnlyList<string> ToValues() => scopes.Select(scope => scope.Value).ToArray();
 
     public static ScopeSet FromStrings(IEnumerable<string>? scopes) =>
         scopes is null ? Empty : new ScopeSet(scopes.Select(ScopeName.Create));

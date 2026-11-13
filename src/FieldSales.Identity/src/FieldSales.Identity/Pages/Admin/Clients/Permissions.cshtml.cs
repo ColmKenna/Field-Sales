@@ -7,14 +7,14 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class PermissionsInputModel
+public sealed class PermissionsInputModel
 {
     public List<string> AllowedScopes { get; set; } = new();
 }
 
-public class PermissionsModel(IClientPermissionsService clientPermissionsService) : PageModel
+public sealed class PermissionsModel(IClientPermissionsService clientPermissionsService) : PageModel
 {
-    private readonly IClientPermissionsService _clientPermissionsService = clientPermissionsService;
+    private readonly IClientPermissionsService clientPermissionsService = clientPermissionsService;
 
     [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
 
@@ -31,7 +31,7 @@ public class PermissionsModel(IClientPermissionsService clientPermissionsService
             return NotFound();
 
         ClientPermissionsModel? permissions =
-            await _clientPermissionsService.GetClientPermissionsAsync(clientId, cancellationToken);
+            await clientPermissionsService.GetClientPermissionsAsync(clientId, cancellationToken);
         if (permissions is null)
             return NotFound();
 
@@ -45,7 +45,7 @@ public class PermissionsModel(IClientPermissionsService clientPermissionsService
         if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
-        AdminMutationResult result = await _clientPermissionsService.UpdateClientPermissionsAsync(
+        AdminMutationResult result = await clientPermissionsService.UpdateClientPermissionsAsync(
             clientId, ScopeSet.FromStrings(Input.AllowedScopes), cancellationToken);
         if (result.Status == AdminMutationStatus.NotFound)
             return NotFound();
@@ -68,7 +68,7 @@ public class PermissionsModel(IClientPermissionsService clientPermissionsService
     private async Task<IActionResult> ReloadPageAsync(ClientId clientId, CancellationToken cancellationToken)
     {
         ClientPermissionsModel? permissions =
-            await _clientPermissionsService.GetClientPermissionsAsync(clientId, cancellationToken);
+            await clientPermissionsService.GetClientPermissionsAsync(clientId, cancellationToken);
         if (permissions is null)
             return NotFound();
 

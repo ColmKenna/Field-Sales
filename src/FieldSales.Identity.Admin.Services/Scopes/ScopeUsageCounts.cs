@@ -6,13 +6,13 @@ namespace FieldSales.Identity.Services.Scopes;
 /// </summary>
 public sealed class ScopeUsageCounts
 {
-    private readonly IReadOnlyDictionary<ScopeName, int> _counts;
+    private readonly IReadOnlyDictionary<ScopeName, int> counts;
 
     public ScopeUsageCounts(IEnumerable<KeyValuePair<ScopeName, int>> counts)
     {
         ArgumentNullException.ThrowIfNull(counts);
-        _counts = counts.ToDictionary(pair => pair.Key, pair => pair.Value);
+        this.counts = counts.ToDictionary(pair => pair.Key, pair => pair.Value);
     }
 
-    public int this[ScopeName scope] => _counts.TryGetValue(scope, out int count) ? count : 0;
+    public int this[ScopeName scope] => counts.TryGetValue(scope, out int count) ? count : 0;
 }

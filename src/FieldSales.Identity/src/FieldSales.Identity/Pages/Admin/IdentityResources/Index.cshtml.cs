@@ -7,15 +7,15 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.IdentityResources;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
-    private readonly IIdentityResourceListService _identityResourceListService;
-    private readonly AdminConsoleOptions _options;
+    private readonly IIdentityResourceListService identityResourceListService;
+    private readonly AdminConsoleOptions options;
 
     public IndexModel(IIdentityResourceListService identityResourceListService, IOptions<AdminConsoleOptions> options)
     {
-        _identityResourceListService = identityResourceListService;
-        _options = options.Value;
+        this.identityResourceListService = identityResourceListService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
@@ -28,11 +28,11 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        ListQuery query = _options.CreateListQuery(Filter, PageNumber, out int pageNumber);
+        ListQuery query = options.CreateListQuery(Filter, PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
         IdentityResources =
-            await _identityResourceListService.GetIdentityResourcesAsync(query,
+            await identityResourceListService.GetIdentityResourcesAsync(query,
                 cancellationToken);
     }
 
@@ -42,7 +42,7 @@ public class IndexModel : PageModel
             return NotFound();
 
         IdentityResourceDeleteResult result =
-            await _identityResourceListService.DeleteIdentityResourceAsync(name, cancellationToken);
+            await identityResourceListService.DeleteIdentityResourceAsync(name, cancellationToken);
 
         switch (result)
         {

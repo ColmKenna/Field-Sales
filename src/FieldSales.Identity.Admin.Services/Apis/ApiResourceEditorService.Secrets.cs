@@ -8,12 +8,12 @@ using static Duende.IdentityServer.Models.HashExtensions;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     public Task<ApiResourceAddSecretResult> AddSecretAsync(
         CreateSecretCommand command,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.GenerateSecret,
             command?.TargetId ?? string.Empty,
             command?.TargetId ?? string.Empty,
@@ -43,12 +43,12 @@ public partial class ApiResourceEditorService
             errors.AddError("Secret.Description",
                 $"Description cannot exceed {ValidationConstants.MaxSecretDescriptionLength} characters.");
 
-        if (expiration.HasValue && expiration.Value <= _timeProvider.GetUtcNow().UtcDateTime)
+        if (expiration.HasValue && expiration.Value <= timeProvider.GetUtcNow().UtcDateTime)
             errors.AddError("Secret.Expiration", "Secret expiration date must be in the future.");
 
         if (errors.HasErrors)
         {
-            await _audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.ValidationFailed, name, name,
+            await this.audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.ValidationFailed, name, name,
                 "API Resource secret validation failed.", cancellationToken);
             return ApiResourceAddSecretResult.ValidationFailure(errors);
         }
@@ -56,7 +56,7 @@ public partial class ApiResourceEditorService
         ApiResource? entity = await LoadResourceAsync(name, false, cancellationToken);
         if (entity is null)
         {
-            await _audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.NotFound, name, name,
+            await this.audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.NotFound, name, name,
                 $"API Resource '{name}' was not found.", cancellationToken);
             return ApiResourceAddSecretResult.NotFound;
         }
@@ -71,12 +71,12 @@ public partial class ApiResourceEditorService
             Value = plaintextSecret.Sha256(),
             Type = SecretType.SharedSecret.ToSecretTypeValue(),
             Expiration = expiration,
-            Created = _timeProvider.GetUtcNow().UtcDateTime
+            Created = timeProvider.GetUtcNow().UtcDateTime
         });
 
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.GenerateSecret, name, name,
+        await this.audit.SucceededAsync(AuditAction.GenerateSecret, name, name,
             "Added secret to API Resource", cancellationToken);
 
         return ApiResourceAddSecretResult.Succeeded(plaintextSecret);
@@ -84,7 +84,7 @@ public partial class ApiResourceEditorService
 
     public Task<AdminMutationResult> RevokeSecretAsync(ScopeName name, int secretId,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.RevokeSecret,
             name.Value,
             name.Value,
@@ -103,9 +103,9 @@ public partial class ApiResourceEditorService
         audit.TargetName = name;
 
         entity.Secrets.Remove(secret);
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.RevokeSecret, name, name,
+        await this.audit.SucceededAsync(AuditAction.RevokeSecret, name, name,
             "Revoked secret from API Resource", cancellationToken);
 
         return AdminMutationResult.Success();
@@ -113,7 +113,7 @@ public partial class ApiResourceEditorService
 
     private async Task<AdminMutationResult> DenyRevokeSecretNotFoundAsync(string name, int secretId, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.RevokeSecret, AuditReasonCode.NotFound, name, name,
+        await audit.DeniedAsync(AuditAction.RevokeSecret, AuditReasonCode.NotFound, name, name,
             $"API Resource '{name}' or secret {secretId} was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }

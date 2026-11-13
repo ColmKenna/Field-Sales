@@ -7,15 +7,15 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.Users;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
-    private readonly AdminConsoleOptions _options;
-    private readonly IUserListService _userListService;
+    private readonly AdminConsoleOptions options;
+    private readonly IUserListService userListService;
 
     public IndexModel(IUserListService userListService, IOptions<AdminConsoleOptions> options)
     {
-        _userListService = userListService;
-        _options = options.Value;
+        this.userListService = userListService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public string? Filter { get; set; }
@@ -28,10 +28,10 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        ListQuery query = _options.CreateListQuery(Filter, PageNumber, out int pageNumber);
+        ListQuery query = options.CreateListQuery(Filter, PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
-        Users = await _userListService.GetUsersAsync(query, cancellationToken);
+        Users = await userListService.GetUsersAsync(query, cancellationToken);
     }
 
     public async Task<IActionResult> OnPostUnlockAsync(string id, CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class IndexModel : PageModel
         if (string.IsNullOrWhiteSpace(id))
             return NotFound();
 
-        UserUnlockResult result = await _userListService.UnlockUserAsync(UserId.Create(id), cancellationToken);
+        UserUnlockResult result = await userListService.UnlockUserAsync(UserId.Create(id), cancellationToken);
         if (result.Status == UserUnlockStatus.NotFound)
             return NotFound();
 

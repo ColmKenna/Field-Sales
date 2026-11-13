@@ -4,7 +4,7 @@ using FieldSales.Identity.Services;
 
 namespace FieldSales.Identity.Pages.Shared;
 
-public class PaginationModel
+public sealed class PaginationModel
 {
     public int CurrentCount { get; }
     public int TotalCount { get; }

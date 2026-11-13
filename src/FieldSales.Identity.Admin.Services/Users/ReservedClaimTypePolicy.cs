@@ -61,7 +61,7 @@ public sealed class ReservedClaimTypePolicy
         "auth_time"
     };
 
-    private readonly HashSet<string> _reservedTypes;
+    private readonly HashSet<string> reservedTypes;
 
     public ReservedClaimTypePolicy(IOptions<IdentityOptions> identityOptions)
     {
@@ -71,14 +71,14 @@ public sealed class ReservedClaimTypePolicy
         // EmailClaimType are deliberately excluded: Duende sets the former to "name", which
         // SeedData writes onto every user as an ordinary profile claim, and blocking display
         // claims buys no security while breaking an established convention.
-        _reservedTypes = new HashSet<string>(WellKnownReservedTypes, StringComparer.OrdinalIgnoreCase)
+        reservedTypes = new HashSet<string>(WellKnownReservedTypes, StringComparer.OrdinalIgnoreCase)
         {
             claimsIdentity.RoleClaimType,
             claimsIdentity.UserIdClaimType,
             claimsIdentity.SecurityStampClaimType
         };
 
-        ReservedTypes = _reservedTypes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+        ReservedTypes = reservedTypes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>
@@ -96,7 +96,7 @@ public sealed class ReservedClaimTypePolicy
         if (normalized.Length == 0)
             return false;
 
-        return _reservedTypes.Contains(normalized)
+        return reservedTypes.Contains(normalized)
                || normalized.StartsWith(AspNetIdentityPrefix, StringComparison.OrdinalIgnoreCase);
     }
 

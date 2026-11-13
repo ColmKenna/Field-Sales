@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public class ClientListService(ConfigurationDbContext configurationDbContext) : IClientListService
+public sealed class ClientListService(ConfigurationDbContext configurationDbContext) : IClientListService
 {
     private const string GrantTypeAuthorizationCode = Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode;
     private const string GrantTypeClientCredentials = Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials;
@@ -13,7 +13,7 @@ public class ClientListService(ConfigurationDbContext configurationDbContext) : 
     private const string GrantTypeImplicit = "implicit";
     private const string GrantTypeDeviceCode = "urn:ietf:params:oauth:grant-type:device_code";
 
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
 
     public async Task<ListResult<ClientListItem>> GetClientsAsync(
         ListQuery query,
@@ -21,7 +21,7 @@ public class ClientListService(ConfigurationDbContext configurationDbContext) : 
     {
         Pagination pagination = query.Pagination.Normalize();
 
-        IQueryable<Client> dbQuery = ApplyFilter(_configurationDbContext.Clients.AsNoTracking(), query.Filter);
+        IQueryable<Client> dbQuery = ApplyFilter(configurationDbContext.Clients.AsNoTracking(), query.Filter);
 
         int totalCount = await dbQuery.CountAsync(cancellationToken);
 

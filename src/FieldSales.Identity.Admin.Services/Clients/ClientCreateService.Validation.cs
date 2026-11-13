@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public partial class ClientCreateService
+public sealed partial class ClientCreateService
 {
     private static bool IsUniqueConstraintViolation(DbUpdateException exception)
     {

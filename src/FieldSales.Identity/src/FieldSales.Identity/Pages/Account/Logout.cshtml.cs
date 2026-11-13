@@ -13,14 +13,14 @@ namespace FieldSales.Identity.Pages.Account;
 
 // Reachable before sign-in by definition; exempt from the fallback policy.
 [AllowAnonymous]
-public class LogoutModel(
+public sealed class LogoutModel(
     SignInManager<ApplicationUser> signInManager,
     IIdentityServerInteractionService interaction,
     IEventService events) : PageModel
 {
-    private readonly IEventService _events = events;
-    private readonly IIdentityServerInteractionService _interaction = interaction;
-    private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
+    private readonly IEventService events = events;
+    private readonly IIdentityServerInteractionService interaction = interaction;
+    private readonly SignInManager<ApplicationUser> signInManager = signInManager;
 
     [BindProperty] public string? LogoutId { get; set; }
 
@@ -38,7 +38,7 @@ public class LogoutModel(
         if (logoutId is not null)
         {
             LogoutRequest? logoutContext =
-                await _interaction.GetLogoutContextAsync(logoutId, HttpContext.RequestAborted);
+                await interaction.GetLogoutContextAsync(logoutId, HttpContext.RequestAborted);
             if (logoutContext?.ShowSignoutPrompt == false) return await OnPostAsync();
         }
 
@@ -56,16 +56,16 @@ public class LogoutModel(
     {
         if (User?.Identity?.IsAuthenticated == true)
         {
-            await _events.RaiseAsync(
+            await events.RaiseAsync(
                 new UserLogoutSuccessEvent(User.GetSubjectId(), User.GetDisplayName()),
                 HttpContext.RequestAborted);
-            await _signInManager.SignOutAsync();
+            await signInManager.SignOutAsync();
         }
 
         if (LogoutId is not null)
         {
             LogoutRequest? logoutContext =
-                await _interaction.GetLogoutContextAsync(LogoutId, HttpContext.RequestAborted);
+                await interaction.GetLogoutContextAsync(LogoutId, HttpContext.RequestAborted);
             PostLogoutRedirectUri = logoutContext?.PostLogoutRedirectUri;
             SignOutIFrameUrl = logoutContext?.SignOutIFrameUrl;
             ReturnToStaff = logoutContext?.ClientId == Config.StaffWebClientId;

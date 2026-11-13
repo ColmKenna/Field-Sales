@@ -3,7 +3,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Users;
 
-public class UserClaimSummary
+public sealed class UserClaimSummary
 {
     public required string Type { get; set; }
     public required string Value { get; set; }
@@ -16,7 +16,7 @@ public class UserClaimSummary
     public bool IsReserved { get; set; }
 }
 
-public class UserDetailsModel
+public sealed class UserDetailsModel
 {
     public required string Id { get; set; }
     public required string UserName { get; set; }
@@ -35,7 +35,7 @@ public class UserDetailsModel
     public bool IsCurrentUser { get; set; }
 }
 
-public class RoleChangeResult
+public sealed class RoleChangeResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; }
@@ -60,7 +60,7 @@ public class RoleChangeResult
         };
 }
 
-public class ClaimChangeResult
+public sealed class ClaimChangeResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
@@ -72,7 +72,7 @@ public class ClaimChangeResult
         new() { Status = status, ErrorMessage = errorMessage };
 }
 
-public class UserAccessRevokeResult
+public sealed class UserAccessRevokeResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
@@ -156,7 +156,7 @@ public interface IUserDetailsService
     Task<UserDeleteResult> DeleteUserAsync(UserActionContext context, CancellationToken cancellationToken = default);
 }
 
-public class PasswordResetResult
+public sealed class PasswordResetResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
@@ -168,7 +168,7 @@ public class PasswordResetResult
         new() { Status = status, ErrorMessage = errorMessage };
 }
 
-public class UserSuspendResult
+public sealed class UserSuspendResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;
@@ -180,7 +180,7 @@ public class UserSuspendResult
         new() { Status = status, ErrorMessage = errorMessage };
 }
 
-public class UserDeleteResult
+public sealed class UserDeleteResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; } = AdminMutationStatus.Denied;

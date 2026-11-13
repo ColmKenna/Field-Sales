@@ -5,11 +5,11 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     public Task<AdminMutationResult> AddClaimAsync(AddApiResourceClaimCommand command,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.AddClaim,
             command?.ResourceName.Value ?? string.Empty,
             command?.ResourceName.Value ?? string.Empty,
@@ -40,9 +40,9 @@ public partial class ApiResourceEditorService
         {
             audit.TargetName = name;
             entity.UserClaims.Add(new ApiResourceClaim { Type = claimType });
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            await _audit.SucceededAsync(AuditAction.AddClaim, name, name,
+            await this.audit.SucceededAsync(AuditAction.AddClaim, name, name,
                 $"Added claim '{claimType}' to API Resource", cancellationToken);
         }
 
@@ -52,14 +52,14 @@ public partial class ApiResourceEditorService
     private async Task<AdminMutationResult> DenyClaimValidationFailureAsync(
         string name, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, name, name,
+        await audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, name, name,
             "API Resource claim validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
 
     public Task<AdminMutationResult> RemoveClaimAsync(ScopeName name, ClaimType claimType,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.RemoveClaim,
             name.Value,
             name.Value,
@@ -80,9 +80,9 @@ public partial class ApiResourceEditorService
         audit.TargetName = name;
 
         entity.UserClaims.Remove(claim);
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.RemoveClaim, name, name,
+        await this.audit.SucceededAsync(AuditAction.RemoveClaim, name, name,
             $"Removed claim '{claimType}' from API Resource", cancellationToken);
 
         return AdminMutationResult.Success();
@@ -90,7 +90,7 @@ public partial class ApiResourceEditorService
 
     private async Task<AdminMutationResult> DenyRemoveClaimNotFoundAsync(string name, string claimType, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.NotFound, name, name,
+        await audit.DeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.NotFound, name, name,
             $"API Resource '{name}' or claim '{claimType}' was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }

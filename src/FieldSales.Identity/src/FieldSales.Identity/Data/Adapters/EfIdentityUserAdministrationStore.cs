@@ -22,10 +22,10 @@ public sealed class EfIdentityUserAdministrationStore(
     UserManager<ApplicationUser> userManager,
     RoleManager<IdentityRole> roleManager, TimeProvider? timeProvider = null) : IIdentityUserAdministrationStore
 {
-    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private readonly ApplicationDbContext _dbContext = dbContext;
-    private readonly RoleManager<IdentityRole> _roleManager = roleManager;
-    private readonly UserManager<ApplicationUser> _userManager = userManager;
+    private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly ApplicationDbContext dbContext = dbContext;
+    private readonly RoleManager<IdentityRole> roleManager = roleManager;
+    private readonly UserManager<ApplicationUser> userManager = userManager;
 
     public async Task<ListResult<UserListItem>> GetUsersAsync(
         ListQuery query,
@@ -33,11 +33,11 @@ public sealed class EfIdentityUserAdministrationStore(
     {
         Pagination pagination = query.Pagination.Normalize();
 
-        IQueryable<ApplicationUser> dbQuery = ApplyFilter(_dbContext.Users.AsNoTracking(), query.Filter);
+        IQueryable<ApplicationUser> dbQuery = ApplyFilter(dbContext.Users.AsNoTracking(), query.Filter);
 
         int totalCount = await dbQuery.CountAsync(cancellationToken);
 
-        DateTimeOffset now = _timeProvider.GetUtcNow();
+        DateTimeOffset now = timeProvider.GetUtcNow();
 
         List<UserListItem> items = await dbQuery
             .OrderBy(u => u.UserName)
@@ -61,15 +61,15 @@ public sealed class EfIdentityUserAdministrationStore(
         UserId userId, CancellationToken cancellationToken = default)
     {
         string userIdStr = userId.Value ?? string.Empty;
-        ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+        ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
         if (user is null) return new UserUnlockOutcome(UserUnlockResult.NotFound, userIdStr);
 
         string targetName = user.UserName ?? user.Id;
 
-        IdentityResult lockoutResult = await _userManager.SetLockoutEndDateAsync(user, null);
+        IdentityResult lockoutResult = await userManager.SetLockoutEndDateAsync(user, null);
         if (!lockoutResult.Succeeded) return new UserUnlockOutcome(UserUnlockResult.Failed(lockoutResult), targetName);
 
-        IdentityResult resetResult = await _userManager.ResetAccessFailedCountAsync(user);
+        IdentityResult resetResult = await userManager.ResetAccessFailedCountAsync(user);
         if (!resetResult.Succeeded) return new UserUnlockOutcome(UserUnlockResult.Failed(resetResult), targetName);
 
         return new UserUnlockOutcome(UserUnlockResult.Succeeded, targetName);
@@ -87,7 +87,7 @@ public sealed class EfIdentityUserAdministrationStore(
             EmailConfirmed = true
         };
 
-        IdentityResult result = await _userManager.CreateAsync(user, input.Password);
+        IdentityResult result = await userManager.CreateAsync(user, input.Password);
         if (!result.Succeeded)
         {
             AuditReasonCode reasonCode =
@@ -105,13 +105,13 @@ public sealed class EfIdentityUserAdministrationStore(
         CancellationToken cancellationToken = default)
     {
         string userIdStr = userId.Value ?? string.Empty;
-        ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+        ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
         if (user is null) return null;
 
-        var assignedRoles = (await _userManager.GetRolesAsync(user)).OrderBy(r => r).ToList();
+        var assignedRoles = (await userManager.GetRolesAsync(user)).OrderBy(r => r).ToList();
         List<string> allRoles =
-            await _roleManager.Roles.Select(r => r.Name!).OrderBy(r => r).ToListAsync(cancellationToken);
-        var claims = (await _userManager.GetClaimsAsync(user))
+            await roleManager.Roles.Select(r => r.Name!).OrderBy(r => r).ToListAsync(cancellationToken);
+        var claims = (await userManager.GetClaimsAsync(user))
             .Select(c => new UserClaim(c.Type, c.Value))
             .ToList();
 
@@ -120,7 +120,7 @@ public sealed class EfIdentityUserAdministrationStore(
             user.UserName ?? user.Id,
             user.Email,
             user.FullName,
-            user.LockoutEnd.HasValue && user.LockoutEnd.Value > _timeProvider.GetUtcNow(),
+            user.LockoutEnd.HasValue && user.LockoutEnd.Value > timeProvider.GetUtcNow(),
             user.LockoutEnd,
             assignedRoles,
             allRoles,
@@ -131,27 +131,27 @@ public sealed class EfIdentityUserAdministrationStore(
         CancellationToken cancellationToken = default)
     {
         string userIdStr = userId.Value ?? string.Empty;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return await IdentityTransactions.RetryAsync(dbContext, async () =>
         {
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+            ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
             if (user is null) return new RoleAdditionOutcome(RoleAdditionStatus.UserNotFound, userIdStr, null);
 
             string targetName = user.UserName ?? user.Id;
 
-            if (!await _roleManager.RoleExistsAsync(role))
+            if (!await roleManager.RoleExistsAsync(role))
             {
                 return new RoleAdditionOutcome(RoleAdditionStatus.RoleNotFound, targetName, null);
             }
 
-            if (await _userManager.IsInRoleAsync(user, role))
+            if (await userManager.IsInRoleAsync(user, role))
             {
                 return new RoleAdditionOutcome(RoleAdditionStatus.AlreadyMember, targetName, null);
             }
 
             await using IDbContextTransaction transaction =
-                await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-            IdentityResult result = await _userManager.AddToRoleAsync(user, role);
+            IdentityResult result = await userManager.AddToRoleAsync(user, role);
             return await CompleteIdentityMutationAsync(
                 transaction,
                 result,
@@ -170,12 +170,12 @@ public sealed class EfIdentityUserAdministrationStore(
     {
         string userIdStr = userId.Value ?? string.Empty;
         string? actingUserIdStr = actingUserId?.Value;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return await IdentityTransactions.RetryAsync(dbContext, async () =>
         {
-            await using IDbContextTransaction transaction = await _dbContext.Database.BeginTransactionAsync(
+            await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable, cancellationToken);
 
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+            ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
             if (user is null)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -183,14 +183,14 @@ public sealed class EfIdentityUserAdministrationStore(
             }
 
             string targetName = user.UserName ?? user.Id;
-            IdentityRole? roleEntity = await _roleManager.FindByNameAsync(role);
+            IdentityRole? roleEntity = await roleManager.FindByNameAsync(role);
             if (roleEntity is null)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return new RoleRemovalOutcome(RoleRemovalStatus.RoleNotFound, targetName, false, null);
             }
 
-            bool isMember = await _dbContext.UserRoles.AnyAsync(
+            bool isMember = await dbContext.UserRoles.AnyAsync(
                 ur => ur.UserId == user.Id && ur.RoleId == roleEntity.Id, cancellationToken);
             if (!isMember)
             {
@@ -208,7 +208,7 @@ public sealed class EfIdentityUserAdministrationStore(
 
             if (isProtectedRole)
             {
-                int protectedMemberCount = await _dbContext.UserRoles
+                int protectedMemberCount = await dbContext.UserRoles
                     .CountAsync(ur => ur.RoleId == roleEntity.Id, cancellationToken);
                 if (protectedMemberCount <= 1)
                 {
@@ -218,7 +218,7 @@ public sealed class EfIdentityUserAdministrationStore(
                 }
             }
 
-            IdentityResult result = await _userManager.RemoveFromRoleAsync(user, roleEntity.Name!);
+            IdentityResult result = await userManager.RemoveFromRoleAsync(user, roleEntity.Name!);
             return await CompleteIdentityMutationAsync(
                 transaction,
                 result,
@@ -234,18 +234,18 @@ public sealed class EfIdentityUserAdministrationStore(
         string claimType = claim.Type ?? string.Empty;
         string claimValue = claim.Value ?? string.Empty;
         string userIdStr = userId.Value ?? string.Empty;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return await IdentityTransactions.RetryAsync(dbContext, async () =>
         {
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+            ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
             if (user is null) return new ClaimMutationOutcome(ClaimMutationStatus.UserNotFound, userIdStr, null);
 
             string targetName = user.UserName ?? user.Id;
 
-            await using IDbContextTransaction transaction = await _dbContext.Database.BeginTransactionAsync(
+            await using IDbContextTransaction transaction = await dbContext.Database.BeginTransactionAsync(
                 IsolationLevel.Serializable,
                 cancellationToken);
 
-            bool alreadyExists = await _dbContext.UserClaims.AnyAsync(
+            bool alreadyExists = await dbContext.UserClaims.AnyAsync(
                 claim => claim.UserId == userIdStr
                          && claim.ClaimType == claimType
                          && claim.ClaimValue == claimValue,
@@ -257,7 +257,7 @@ public sealed class EfIdentityUserAdministrationStore(
                 return new ClaimMutationOutcome(ClaimMutationStatus.AlreadyExists, targetName, null);
             }
 
-            IdentityResult result = await _userManager.AddClaimAsync(user, new Claim(claimType, claimValue));
+            IdentityResult result = await userManager.AddClaimAsync(user, new Claim(claimType, claimValue));
             return await CompleteIdentityMutationAsync(
                 transaction,
                 result,
@@ -273,17 +273,17 @@ public sealed class EfIdentityUserAdministrationStore(
         string claimType = claim.Type ?? string.Empty;
         string claimValue = claim.Value ?? string.Empty;
         string userIdStr = userId.Value ?? string.Empty;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return await IdentityTransactions.RetryAsync(dbContext, async () =>
         {
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+            ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
             if (user is null) return new ClaimMutationOutcome(ClaimMutationStatus.UserNotFound, userIdStr, null);
 
             string targetName = user.UserName ?? user.Id;
 
             await using IDbContextTransaction transaction =
-                await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-            IdentityResult result = await _userManager.RemoveClaimAsync(user, new Claim(claimType, claimValue));
+            IdentityResult result = await userManager.RemoveClaimAsync(user, new Claim(claimType, claimValue));
             return await CompleteIdentityMutationAsync(
                 transaction,
                 result,
@@ -299,11 +299,11 @@ public sealed class EfIdentityUserAdministrationStore(
         UserId userId = context.Target;
         string userIdStr = userId.Value ?? string.Empty;
         string? actingUserIdStr = context.ActingUser?.Value;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return await IdentityTransactions.RetryAsync(dbContext, async () =>
         {
             await using IDbContextTransaction transaction =
-                await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+                await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
             if (user is null)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -317,7 +317,7 @@ public sealed class EfIdentityUserAdministrationStore(
                 return new SecurityStampRotationOutcome(SecurityStampRotationStatus.SelfActionBlocked, targetName);
             }
 
-            IdentityResult stampResult = await _userManager.UpdateSecurityStampAsync(user);
+            IdentityResult stampResult = await userManager.UpdateSecurityStampAsync(user);
             if (!stampResult.Succeeded)
                 throw new InvalidOperationException("The user's security stamp could not be updated.");
 
@@ -330,18 +330,18 @@ public sealed class EfIdentityUserAdministrationStore(
         UserId userId, string newPassword, CancellationToken cancellationToken = default)
     {
         string userIdStr = userId.Value ?? string.Empty;
-        return await IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return await IdentityTransactions.RetryAsync(dbContext, async () =>
         {
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+            ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
             if (user is null) return new PasswordResetOutcome(PasswordResetStatus.UserNotFound, userIdStr, null);
 
             string targetName = user.UserName ?? user.Id;
 
             await using IDbContextTransaction transaction =
-                await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-            string token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            IdentityResult result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+            string token = await userManager.GeneratePasswordResetTokenAsync(user);
+            IdentityResult result = await userManager.ResetPasswordAsync(user, token, newPassword);
 
             return await CompleteIdentityMutationAsync(
                 transaction,
@@ -356,7 +356,7 @@ public sealed class EfIdentityUserAdministrationStore(
         UserActionContext context, CancellationToken cancellationToken = default) =>
         ExecuteSelfGuardedMutationAsync(
             context,
-            user => _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue),
+            user => userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue),
             userIdStr => new UserSuspendOutcome(UserSuspendStatus.UserNotFound, userIdStr),
             targetName => new UserSuspendOutcome(UserSuspendStatus.SelfActionBlocked, targetName),
             targetName => new UserSuspendOutcome(UserSuspendStatus.ValidationFailed, targetName),
@@ -369,7 +369,7 @@ public sealed class EfIdentityUserAdministrationStore(
         // ensure DB is saved.
         ExecuteSelfGuardedMutationAsync(
             context,
-            _userManager.DeleteAsync,
+            userManager.DeleteAsync,
             userIdStr => new UserDeleteOutcome(UserDeleteStatus.UserNotFound, userIdStr),
             targetName => new UserDeleteOutcome(UserDeleteStatus.SelfActionBlocked, targetName),
             targetName => new UserDeleteOutcome(UserDeleteStatus.ValidationFailed, targetName),
@@ -387,16 +387,16 @@ public sealed class EfIdentityUserAdministrationStore(
     {
         string userIdStr = context.Target.Value ?? string.Empty;
         string? actingUserIdStr = context.ActingUser?.Value;
-        return IdentityTransactions.RetryAsync(_dbContext, async () =>
+        return IdentityTransactions.RetryAsync(dbContext, async () =>
         {
-            ApplicationUser? user = await _userManager.FindByIdAsync(userIdStr);
+            ApplicationUser? user = await userManager.FindByIdAsync(userIdStr);
             if (user is null) return onNotFound(userIdStr);
 
             string targetName = user.UserName ?? user.Id;
             if (UserActionPolicy.IsSelf(actingUserIdStr, user.Id)) return onSelfBlocked(targetName);
 
             await using IDbContextTransaction transaction =
-                await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
             IdentityResult result = await mutateAsync(user);
             return await CompleteIdentityMutationAsync(
@@ -421,7 +421,7 @@ public sealed class EfIdentityUserAdministrationStore(
             return onFailure(result.Describe());
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return onSuccess();
     }

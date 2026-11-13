@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.IdentityResources;
 
-public class CreateInputModel
+public sealed class CreateInputModel
 {
     [Required(ErrorMessage = "Resource name is required")]
     [StringLength(ValidationConstants.MaxNameLength, ErrorMessage = "Resource name must not exceed 200 characters")]
@@ -32,9 +32,9 @@ public class CreateInputModel
     public List<string> UserClaims { get; set; } = new();
 }
 
-public class CreateModel(IIdentityResourceEditorService identityResourceEditorService) : PageModel
+public sealed class CreateModel(IIdentityResourceEditorService identityResourceEditorService) : PageModel
 {
-    private readonly IIdentityResourceEditorService _identityResourceEditorService = identityResourceEditorService;
+    private readonly IIdentityResourceEditorService identityResourceEditorService = identityResourceEditorService;
 
     [BindProperty] public CreateInputModel Input { get; set; } = new();
 
@@ -47,7 +47,7 @@ public class CreateModel(IIdentityResourceEditorService identityResourceEditorSe
         if (!ModelState.IsValid)
             return Page();
 
-        AdminMutationResult result = await _identityResourceEditorService.CreateAsync(
+        AdminMutationResult result = await identityResourceEditorService.CreateAsync(
             new CreateIdentityResourceCommand(
                 ScopeName.Create(Input.Name),
                 Input.DisplayName,

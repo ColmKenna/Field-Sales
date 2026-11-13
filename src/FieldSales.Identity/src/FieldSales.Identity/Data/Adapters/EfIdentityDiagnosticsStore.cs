@@ -9,14 +9,14 @@ namespace FieldSales.Identity.Data.Adapters;
 /// </summary>
 public sealed class EfIdentityDiagnosticsStore(ApplicationDbContext dbContext) : IIdentityDiagnosticsStore
 {
-    private readonly ApplicationDbContext _dbContext = dbContext;
+    private readonly ApplicationDbContext dbContext = dbContext;
 
     public Task<bool> CanConnectAsync(CancellationToken cancellationToken = default) =>
-        _dbContext.Database.CanConnectAsync(cancellationToken);
+        dbContext.Database.CanConnectAsync(cancellationToken);
 
     public async Task<IReadOnlyList<string>> GetDistinctUserClaimTypesAsync(
         CancellationToken cancellationToken = default) =>
-        await _dbContext.UserClaims
+        await dbContext.UserClaims
             .AsNoTracking()
             .Where(c => c.ClaimType != null)
             .Select(c => c.ClaimType!)
@@ -30,8 +30,8 @@ public sealed class EfIdentityDiagnosticsStore(ApplicationDbContext dbContext) :
         // Projects into an anonymous, DB-translatable shape first: UserId's explicit string
         // conversion cannot be translated to SQL, so the typed wrapping happens client-side below.
         var rows = await (
-            from claim in _dbContext.UserClaims.AsNoTracking()
-            join user in _dbContext.Users.AsNoTracking() on claim.UserId equals user.Id
+            from claim in dbContext.UserClaims.AsNoTracking()
+            join user in dbContext.Users.AsNoTracking() on claim.UserId equals user.Id
             where claim.ClaimType != null && claimTypes.Contains(claim.ClaimType)
             orderby user.UserName, claim.ClaimType
             select new

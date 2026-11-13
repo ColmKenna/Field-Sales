@@ -10,7 +10,7 @@ using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public partial class ClientDetailsService
+public sealed partial class ClientDetailsService
 {
     public async Task<ClientPermissionsModel?> GetClientPermissionsAsync(ClientId clientId,
         CancellationToken cancellationToken = default)
@@ -18,7 +18,7 @@ public partial class ClientDetailsService
         if (clientId.IsEmpty)
             return null;
 
-        Client? client = await _configurationDbContext.Clients
+        Client? client = await configurationDbContext.Clients
             .AsNoTracking()
             .AsSplitQuery()
             .Include(c => c.AllowedGrantTypes)
@@ -30,13 +30,13 @@ public partial class ClientDetailsService
 
         bool isInteractive = IsInteractiveClient(client);
 
-        List<string> identityScopes = await _configurationDbContext.IdentityResources
+        List<string> identityScopes = await configurationDbContext.IdentityResources
             .AsNoTracking()
             .Select(i => i.Name)
             .OrderBy(n => n)
             .ToListAsync(cancellationToken);
 
-        List<string> apiScopes = await _configurationDbContext.ApiScopes
+        List<string> apiScopes = await configurationDbContext.ApiScopes
             .AsNoTracking()
             .Select(a => a.Name)
             .OrderBy(n => n)
@@ -55,7 +55,7 @@ public partial class ClientDetailsService
 
     public Task<AdminMutationResult> UpdateClientPermissionsAsync(ClientId clientId, ScopeSet allowedScopes,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.UpdatePermissions,
             clientId.Value,
             clientId.Value,
@@ -76,7 +76,7 @@ public partial class ClientDetailsService
         string targetName = clientId;
         audit.TargetName = targetName;
 
-        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
+        var outcome = await IdentityTransactions.RunAsync(configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
             Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
             if (client is null)
@@ -89,11 +89,11 @@ public partial class ClientDetailsService
 
             audit.TargetName = targetName;
             var identityScopeSet = new HashSet<string>(
-                await _configurationDbContext.IdentityResources.AsNoTracking()
+                await configurationDbContext.IdentityResources.AsNoTracking()
                     .Select(resource => resource.Name).ToListAsync(cancellationToken),
                 StringComparer.Ordinal);
             var apiScopeSet = new HashSet<string>(
-                await _configurationDbContext.ApiScopes.AsNoTracking()
+                await configurationDbContext.ApiScopes.AsNoTracking()
                     .Select(scope => scope.Name).ToListAsync(cancellationToken),
                 StringComparer.Ordinal);
             var unknownScopes = requestedScopes
@@ -129,7 +129,7 @@ public partial class ClientDetailsService
             }
 
             ReplaceCollection(client.AllowedScopes, finalScopes, scope => new ClientScope { Scope = scope });
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return AdminMutationResult.Success();
         }, cancellationToken);
@@ -137,21 +137,21 @@ public partial class ClientDetailsService
         if (!outcome.Succeeded)
             return await DenyPermissionsFailedAsync(clientId, targetName, outcome, cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.UpdatePermissions, clientId, targetName,
+        await this.audit.SucceededAsync(AuditAction.UpdatePermissions, clientId, targetName,
             "Updated allowed scopes", cancellationToken);
         return outcome;
     }
 
     private async Task<AdminMutationResult> DenyPermissionsClientIdRequiredAsync(string clientId, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client permissions validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure("Id", "Client ID is required.");
     }
 
     private async Task<AdminMutationResult> DenyPermissionsScopeTooLongAsync(string clientId, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.UpdatePermissions, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client permissions validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(
             "Input.AllowedScopes",
@@ -164,7 +164,7 @@ public partial class ClientDetailsService
         AuditReasonCode reason = outcome.Status == AdminMutationStatus.NotFound
             ? AuditReasonCode.NotFound
             : AuditReasonCode.ValidationFailed;
-        await _audit.DeniedAsync(AuditAction.UpdatePermissions, reason, clientId, targetName,
+        await audit.DeniedAsync(AuditAction.UpdatePermissions, reason, clientId, targetName,
             outcome.ErrorMessage ?? "Client permissions validation failed.", cancellationToken);
         return outcome;
     }

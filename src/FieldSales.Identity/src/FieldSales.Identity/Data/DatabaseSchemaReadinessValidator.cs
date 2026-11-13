@@ -18,17 +18,17 @@ public sealed class DatabaseSchemaReadinessValidator(
     PersistedGrantDbContext operationalDb,
     ILogger<DatabaseSchemaReadinessValidator> logger) : IDatabaseSchemaReadinessValidator
 {
-    private readonly ApplicationDbContext _applicationDb = applicationDb;
-    private readonly ConfigurationDbContext _configurationDb = configurationDb;
-    private readonly ILogger<DatabaseSchemaReadinessValidator> _logger = logger;
-    private readonly PersistedGrantDbContext _operationalDb = operationalDb;
+    private readonly ApplicationDbContext applicationDb = applicationDb;
+    private readonly ConfigurationDbContext configurationDb = configurationDb;
+    private readonly ILogger<DatabaseSchemaReadinessValidator> logger = logger;
+    private readonly PersistedGrantDbContext operationalDb = operationalDb;
 
     public async Task EnsureReadyAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureContextReadyAsync(_applicationDb, nameof(ApplicationDbContext), "identity", cancellationToken);
-        await EnsureContextReadyAsync(_configurationDb, nameof(ConfigurationDbContext), "configuration",
+        await EnsureContextReadyAsync(applicationDb, nameof(ApplicationDbContext), "identity", cancellationToken);
+        await EnsureContextReadyAsync(configurationDb, nameof(ConfigurationDbContext), "configuration",
             cancellationToken);
-        await EnsureContextReadyAsync(_operationalDb, nameof(PersistedGrantDbContext), "operational",
+        await EnsureContextReadyAsync(operationalDb, nameof(PersistedGrantDbContext), "operational",
             cancellationToken);
     }
 
@@ -45,7 +45,7 @@ public sealed class DatabaseSchemaReadinessValidator(
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(
+            logger.LogCritical(
                 "Unable to verify the migration state for {DbContext} ({ExceptionType}).",
                 contextName,
                 ex.GetType().Name);
@@ -57,7 +57,7 @@ public sealed class DatabaseSchemaReadinessValidator(
 
         if (pending.Count == 0) return;
 
-        _logger.LogCritical(
+        logger.LogCritical(
             "Startup aborted because {DbContext} has {PendingMigrationCount} pending migration(s).",
             contextName,
             pending.Count);

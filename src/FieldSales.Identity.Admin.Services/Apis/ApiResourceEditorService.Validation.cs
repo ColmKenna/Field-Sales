@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     private static string? NormalizeNullableString(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

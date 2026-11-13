@@ -3,7 +3,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public class ClientDetailsModel
+public sealed class ClientDetailsModel
 {
     public required ClientId ClientId { get; set; }
     public required string ClientName { get; set; }
@@ -25,7 +25,7 @@ public class ClientDetailsModel
     public string? DeleteBlockReason { get; set; }
 }
 
-public class ClientDeleteResult
+public sealed class ClientDeleteResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; }
@@ -50,7 +50,7 @@ public class ClientDeleteResult
         };
 }
 
-public class ClientBasicsModel
+public sealed class ClientBasicsModel
 {
     public required ClientId ClientId { get; set; }
     public required string ClientName { get; set; }
@@ -60,7 +60,7 @@ public class ClientBasicsModel
     public string? LogoUri { get; set; }
 }
 
-public class ClientBasicsInputModel
+public sealed class ClientBasicsInputModel
 {
     public required string ClientName { get; set; }
     public string? Description { get; set; }
@@ -76,7 +76,7 @@ public sealed record ClientBasicsAuditValue(
     string? ClientUri,
     string? LogoUri) : IAuditValue;
 
-public class ClientAuthenticationModel
+public sealed class ClientAuthenticationModel
 {
     public required ClientId ClientId { get; set; }
     public required string ClientName { get; set; }
@@ -131,7 +131,7 @@ public class ClientAuthenticationModel
     public string? DriftDetails { get; set; }
 }
 
-public class ClientAuthenticationInputModel
+public sealed class ClientAuthenticationInputModel
 {
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
@@ -193,7 +193,7 @@ public sealed record ClientAuthenticationAuditValue(
     string? BackChannelLogoutUri,
     bool BackChannelLogoutSessionRequired) : IAuditValue;
 
-public class ClientPermissionsModel
+public sealed class ClientPermissionsModel
 {
     public required ClientId ClientId { get; set; }
     public required string ClientName { get; set; }
@@ -203,7 +203,7 @@ public class ClientPermissionsModel
     public List<string> AvailableApiScopes { get; set; } = new();
 }
 
-public class ClientSecretSummary
+public sealed class ClientSecretSummary
 {
     public int Id { get; set; }
     public string? Description { get; set; }
@@ -211,7 +211,7 @@ public class ClientSecretSummary
     public DateTime? Expiration { get; set; }
 }
 
-public class ClientSecretsModel
+public sealed class ClientSecretsModel
 {
     public required ClientId ClientId { get; set; }
     public required string ClientName { get; set; }
@@ -219,7 +219,7 @@ public class ClientSecretsModel
     public List<ClientSecretSummary> Secrets { get; set; } = new();
 }
 
-public class ClientSecretGenerateResult
+public sealed class ClientSecretGenerateResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; }
@@ -249,7 +249,7 @@ public class ClientSecretGenerateResult
         };
 }
 
-public class ClientSecretRevokeResult
+public sealed class ClientSecretRevokeResult
 {
     public bool Success => Status == AdminMutationStatus.Succeeded;
     public AdminMutationStatus Status { get; set; }
@@ -274,7 +274,7 @@ public class ClientSecretRevokeResult
         };
 }
 
-public class ClientTokenSettingsModel
+public sealed class ClientTokenSettingsModel
 {
     public required ClientId ClientId { get; set; }
     public required string ClientName { get; set; }
@@ -285,7 +285,7 @@ public class ClientTokenSettingsModel
     public RefreshTokenSettings RefreshToken { get; set; } = new();
 }
 
-public class ClientTokenSettingsInputModel
+public sealed class ClientTokenSettingsInputModel
 {
     public TokenLifetime AccessTokenLifetime { get; set; }
     public TokenLifetime IdentityTokenLifetime { get; set; }

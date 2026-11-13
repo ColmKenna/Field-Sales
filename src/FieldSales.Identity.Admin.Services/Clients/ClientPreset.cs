@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Services.Clients;
 
-public record ClientPreset(
+public sealed record ClientPreset(
     string Id,
     string Name,
     string Description,

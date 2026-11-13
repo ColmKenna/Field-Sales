@@ -14,7 +14,7 @@ namespace FieldSales.Identity.Data.Adapters;
 /// </summary>
 public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecretRevealStore
 {
-    private readonly ApplicationDbContext _dbContext = dbContext;
+    private readonly ApplicationDbContext dbContext = dbContext;
 
     public async Task<SecretRevealInsertStatus> TryInsertAsync(
         byte[] handleDigest,
@@ -25,7 +25,7 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
         CancellationToken cancellationToken = default)
     {
         string actorSubjectIdStr = securityContext.ActorSubjectId.Value ?? string.Empty;
-        _dbContext.SecretRevealRecords.Add(new SecretRevealRecord
+        dbContext.SecretRevealRecords.Add(new SecretRevealRecord
         {
             HandleDigest = handleDigest,
             ActorSubjectId = actorSubjectIdStr,
@@ -38,12 +38,12 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
 
         try
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
             return SecretRevealInsertStatus.Inserted;
         }
         catch (DbUpdateException ex) when (IsDigestCollision(ex))
         {
-            _dbContext.ChangeTracker.Clear();
+            dbContext.ChangeTracker.Clear();
             return SecretRevealInsertStatus.DigestCollision;
         }
     }
@@ -57,7 +57,7 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
         string actorSubjectIdStr = securityContext.ActorSubjectId.Value ?? string.Empty;
         string purposeStr = securityContext.Purpose.ToString();
         string targetId = securityContext.TargetId;
-        return await IdentityTransactions.RunAsync(_dbContext, IsolationLevel.Serializable, async transaction =>
+        return await IdentityTransactions.RunAsync(dbContext, IsolationLevel.Serializable, async transaction =>
         {
             SecretRevealRecord? record = await LoadForConsumeAsync(handleDigest, cancellationToken);
             if (record is null)
@@ -76,15 +76,15 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
 
             if (record.ExpiresUtc <= now)
             {
-                _dbContext.SecretRevealRecords.Remove(record);
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                dbContext.SecretRevealRecords.Remove(record);
+                await dbContext.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return SecretRevealLookup.Expired();
             }
 
             var revealed = SecretRevealLookup.Revealed(record.ProtectedPayload);
-            _dbContext.SecretRevealRecords.Remove(record);
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.SecretRevealRecords.Remove(record);
+            await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return revealed;
         }, cancellationToken);
@@ -96,7 +96,7 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
         if (batchSize <= 0) throw new ArgumentOutOfRangeException(nameof(batchSize), "Batch size must be positive.");
 
         // Deleting in bounded chunks limits log-flush and locking pressure on SQL Server.
-        List<long> expiredIds = await _dbContext.SecretRevealRecords
+        List<long> expiredIds = await dbContext.SecretRevealRecords
             .Where(r => r.ExpiresUtc <= now)
             .OrderBy(r => r.ExpiresUtc)
             .Select(r => r.Id)
@@ -105,7 +105,7 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
 
         if (expiredIds.Count == 0) return;
 
-        await _dbContext.SecretRevealRecords
+        await dbContext.SecretRevealRecords
             .Where(r => expiredIds.Contains(r.Id))
             .ExecuteDeleteAsync(cancellationToken);
     }
@@ -115,13 +115,13 @@ public sealed class EfSecretRevealStore(ApplicationDbContext dbContext) : ISecre
     {
         // On SQL Server, take an exclusive row-level lock so concurrent consumers serialize behind
         // the first transaction. On SQLite/in-memory test providers, fall back to standard LINQ.
-        if (_dbContext.Database.IsSqlServer())
-            return await _dbContext.SecretRevealRecords
+        if (dbContext.Database.IsSqlServer())
+            return await dbContext.SecretRevealRecords
                 .FromSqlInterpolated(
                     $"SELECT * FROM dbo.SecretRevealRecords WITH (UPDLOCK, ROWLOCK) WHERE HandleDigest = {handleDigest}")
                 .SingleOrDefaultAsync(cancellationToken);
 
-        return await _dbContext.SecretRevealRecords
+        return await dbContext.SecretRevealRecords
             .SingleOrDefaultAsync(r => r.HandleDigest == handleDigest, cancellationToken);
     }
 

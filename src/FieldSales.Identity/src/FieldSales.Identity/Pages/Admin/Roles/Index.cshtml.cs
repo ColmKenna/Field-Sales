@@ -8,15 +8,15 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.Roles;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
-    private readonly AdminConsoleOptions _options;
-    private readonly IRoleService _roleService;
+    private readonly AdminConsoleOptions options;
+    private readonly IRoleService roleService;
 
     public IndexModel(IRoleService roleService, IOptions<AdminConsoleOptions> options)
     {
-        _roleService = roleService;
-        _options = options.Value;
+        this.roleService = roleService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public string? Filter { get; set; }
@@ -31,15 +31,15 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        ListQuery query = _options.CreateListQuery(Filter, PageNumber, out int pageNumber);
+        ListQuery query = options.CreateListQuery(Filter, PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
-        Roles = await _roleService.GetRolesAsync(query, cancellationToken);
+        Roles = await roleService.GetRolesAsync(query, cancellationToken);
     }
 
     public async Task<IActionResult> OnPostDeleteAsync(string id, CancellationToken cancellationToken)
     {
-        AdminMutationResult result = await _roleService.DeleteRoleAsync(RoleId.Create(id), cancellationToken);
+        AdminMutationResult result = await roleService.DeleteRoleAsync(RoleId.Create(id), cancellationToken);
         if (!result.Succeeded)
         {
             ErrorMessage = result.ErrorMessage;

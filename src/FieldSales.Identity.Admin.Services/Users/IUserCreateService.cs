@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FieldSales.Identity.Services.Users;
 
-public class UserCreateInputModel
+public sealed class UserCreateInputModel
 {
     [Required(ErrorMessage = "Username is required")]
     public string UserName { get; set; } = string.Empty;
@@ -21,7 +21,7 @@ public class UserCreateInputModel
     public string ConfirmPassword { get; set; } = string.Empty;
 }
 
-public class UserCreateResult
+public sealed class UserCreateResult
 {
     public bool Success { get; set; }
     public string? UserId { get; set; }

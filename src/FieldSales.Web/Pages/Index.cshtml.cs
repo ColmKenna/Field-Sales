@@ -6,11 +6,11 @@ using FieldSales.Web.Security;
 namespace FieldSales.Web.Pages;
 
 [AllowAnonymous]
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
-    private readonly StaffAreaService _areas;
+    private readonly StaffAreaService areas;
 
-    public IndexModel(StaffAreaService areas) => _areas = areas;
+    public IndexModel(StaffAreaService areas) => this.areas = areas;
 
     public bool SignInFailed { get; private set; }
     public bool SignedOut { get; private set; }
@@ -26,7 +26,7 @@ public class IndexModel : PageModel
                 return RedirectToPage("/AccessDenied");
             }
 
-            StaffLanding landing = await _areas.ResolveLandingAsync(User, HttpContext.RequestAborted);
+            StaffLanding landing = await areas.ResolveLandingAsync(User, HttpContext.RequestAborted);
             if (landing.Status == StaffLandingStatus.Direct) return LocalRedirect(landing.Route!);
             if (landing.Status == StaffLandingStatus.Choose) return RedirectToPage("/Staff/Index");
             return RedirectToPage("/AccessDenied");

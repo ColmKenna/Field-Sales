@@ -9,7 +9,7 @@ using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public partial class ClientDetailsService
+public sealed partial class ClientDetailsService
 {
     public async Task<ClientAuthenticationModel?> GetClientAuthenticationAsync(ClientId clientId,
         CancellationToken cancellationToken = default)
@@ -17,7 +17,7 @@ public partial class ClientDetailsService
         if (clientId.IsEmpty)
             return null;
 
-        Client? client = await _configurationDbContext.Clients
+        Client? client = await configurationDbContext.Clients
             .AsNoTracking()
             .AsSplitQuery()
             .Include(c => c.AllowedGrantTypes)
@@ -56,7 +56,7 @@ public partial class ClientDetailsService
 
     public Task<AdminMutationResult> UpdateClientAuthenticationAsync(ClientId clientId,
         ClientAuthenticationInputModel input, CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.UpdateAuthentication,
             clientId.Value,
             clientId.Value,
@@ -76,6 +76,56 @@ public partial class ClientDetailsService
             input = new ClientAuthenticationInputModel();
         }
 
+        AuthenticationLists lists = ReadAuthenticationLists(input, errors);
+
+        if (errors.HasErrors)
+            return await DenyAuthenticationValidationFailureAsync(clientId, errors, cancellationToken);
+
+        string targetName = clientId;
+        audit.TargetName = targetName;
+
+        var outcome = await IdentityTransactions.RunAsync(configurationDbContext, IsolationLevel.Serializable, async transaction =>
+        {
+            Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
+            if (client is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return AdminMutationResult.NotFoundResult();
+            }
+
+            targetName = client.ClientName ?? clientId;
+
+            audit.TargetName = targetName;
+            Duende.IdentityServer.Models.Client proposed = client.ToModel();
+            Propose(proposed, input, lists);
+            string? validationError = await ValidateClientAsync(proposed, cancellationToken);
+            if (validationError is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return AdminMutationResult.ValidationFailure("Input.GrantTypes", validationError);
+            }
+
+            Apply(client, input, lists);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return AdminMutationResult.Success();
+        }, cancellationToken);
+
+        if (!outcome.Succeeded)
+            return await DenyAuthenticationFailedAsync(clientId, targetName, outcome, cancellationToken);
+
+        await this.audit.SucceededAsync(AuditAction.UpdateAuthentication, clientId, targetName,
+            "Updated authentication settings", cancellationToken);
+        return outcome;
+    }
+
+    /// <summary>The lists an admin entered, trimmed and de-duplicated.</summary>
+    private sealed record AuthenticationLists(List<string> GrantTypes, List<string> RedirectUris,
+        List<string> PostLogoutUris, List<string> CorsOrigins);
+
+    /// <summary>Tidies the entered lists and records every rule the input breaks.</summary>
+    private static AuthenticationLists ReadAuthenticationLists(ClientAuthenticationInputModel input, ValidationErrorDictionary errors)
+    {
         List<string> grantTypes = input.GrantTypes?
             .Where(grantType => !string.IsNullOrWhiteSpace(grantType))
             .Select(grantType => grantType.Trim())
@@ -141,73 +191,46 @@ public partial class ClientDetailsService
             errors.AddError("Input.BackChannelLogoutUri",
                 "Back-channel logout URI must be an absolute HTTP or HTTPS URL within the configured length limit.");
 
-        if (errors.HasErrors)
-            return await DenyAuthenticationValidationFailureAsync(clientId, errors, cancellationToken);
+        return new(grantTypes, redirectUris, postLogoutUris, corsOrigins);
+    }
 
-        string targetName = clientId;
-        audit.TargetName = targetName;
+    private static void Propose(Duende.IdentityServer.Models.Client proposed, ClientAuthenticationInputModel input,
+        AuthenticationLists lists)
+    {
+        proposed.RequirePkce = input.RequirePkce;
+        proposed.RequireClientSecret = input.RequireClientSecret;
+        proposed.AllowedGrantTypes = lists.GrantTypes;
+        proposed.RedirectUris = lists.RedirectUris;
+        proposed.PostLogoutRedirectUris = lists.PostLogoutUris;
+        proposed.AllowedCorsOrigins = lists.CorsOrigins;
+        proposed.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
+        proposed.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
+        proposed.BackChannelLogoutUri = input.BackChannelLogoutUri;
+        proposed.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
+    }
 
-        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
-        {
-            Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
-            if (client is null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return AdminMutationResult.NotFoundResult();
-            }
-
-            targetName = client.ClientName ?? clientId;
-
-            audit.TargetName = targetName;
-            Duende.IdentityServer.Models.Client proposed = client.ToModel();
-            proposed.RequirePkce = input.RequirePkce;
-            proposed.RequireClientSecret = input.RequireClientSecret;
-            proposed.AllowedGrantTypes = grantTypes;
-            proposed.RedirectUris = redirectUris;
-            proposed.PostLogoutRedirectUris = postLogoutUris;
-            proposed.AllowedCorsOrigins = corsOrigins;
-            proposed.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
-            proposed.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
-            proposed.BackChannelLogoutUri = input.BackChannelLogoutUri;
-            proposed.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
-            string? validationError = await ValidateClientAsync(proposed, cancellationToken);
-            if (validationError is not null)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return AdminMutationResult.ValidationFailure("Input.GrantTypes", validationError);
-            }
-
-            client.RequirePkce = input.RequirePkce;
-            client.RequireClientSecret = input.RequireClientSecret;
-            ReplaceCollection(client.AllowedGrantTypes, grantTypes,
-                grantType => new ClientGrantType { GrantType = grantType });
-            ReplaceCollection(client.RedirectUris, redirectUris,
-                uri => new ClientRedirectUri { RedirectUri = uri });
-            ReplaceCollection(client.PostLogoutRedirectUris, postLogoutUris,
-                uri => new ClientPostLogoutRedirectUri { PostLogoutRedirectUri = uri });
-            ReplaceCollection(client.AllowedCorsOrigins, corsOrigins,
-                origin => new ClientCorsOrigin { Origin = origin });
-            client.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
-            client.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
-            client.BackChannelLogoutUri = input.BackChannelLogoutUri;
-            client.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return AdminMutationResult.Success();
-        }, cancellationToken);
-
-        if (!outcome.Succeeded)
-            return await DenyAuthenticationFailedAsync(clientId, targetName, outcome, cancellationToken);
-
-        await _audit.SucceededAsync(AuditAction.UpdateAuthentication, clientId, targetName,
-            "Updated authentication settings", cancellationToken);
-        return outcome;
+    private static void Apply(Client client, ClientAuthenticationInputModel input, AuthenticationLists lists)
+    {
+        client.RequirePkce = input.RequirePkce;
+        client.RequireClientSecret = input.RequireClientSecret;
+        ReplaceCollection(client.AllowedGrantTypes, lists.GrantTypes,
+            grantType => new ClientGrantType { GrantType = grantType });
+        ReplaceCollection(client.RedirectUris, lists.RedirectUris,
+            uri => new ClientRedirectUri { RedirectUri = uri });
+        ReplaceCollection(client.PostLogoutRedirectUris, lists.PostLogoutUris,
+            uri => new ClientPostLogoutRedirectUri { PostLogoutRedirectUri = uri });
+        ReplaceCollection(client.AllowedCorsOrigins, lists.CorsOrigins,
+            origin => new ClientCorsOrigin { Origin = origin });
+        client.FrontChannelLogoutUri = input.FrontChannelLogoutUri;
+        client.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
+        client.BackChannelLogoutUri = input.BackChannelLogoutUri;
+        client.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
     }
 
     private async Task<AdminMutationResult> DenyAuthenticationValidationFailureAsync(
         string clientId, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.UpdateAuthentication, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.UpdateAuthentication, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client authentication validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
@@ -218,7 +241,7 @@ public partial class ClientDetailsService
         AuditReasonCode reason = outcome.Status == AdminMutationStatus.NotFound
             ? AuditReasonCode.NotFound
             : AuditReasonCode.ValidationFailed;
-        await _audit.DeniedAsync(AuditAction.UpdateAuthentication, reason, clientId, targetName,
+        await audit.DeniedAsync(AuditAction.UpdateAuthentication, reason, clientId, targetName,
             outcome.ErrorMessage ?? "Client authentication validation failed.", cancellationToken);
         return outcome;
     }

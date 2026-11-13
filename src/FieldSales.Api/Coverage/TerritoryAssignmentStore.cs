@@ -221,7 +221,7 @@ public sealed class TerritoryAssignmentStore(DirectoryDbContext db, CoverageRead
     internal static byte[] Version(string? value)
     {
         try { var bytes = Convert.FromBase64String(value ?? ""); if (bytes.Length == 8) return bytes; }
-        catch (FormatException) { }
+        catch (FormatException) { } // Not base64: refused below, like a version of the wrong length.
         throw new CoverageValidationException("Version", "Reload this page before saving.");
     }
     private static void ValidateReason(string? reason)

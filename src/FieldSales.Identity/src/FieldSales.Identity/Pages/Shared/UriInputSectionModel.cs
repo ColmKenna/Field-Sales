@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Pages.Shared;
 
-public class UriInputSectionModel
+public sealed class UriInputSectionModel
 {
     public string Label { get; }
     public string InputName { get; }

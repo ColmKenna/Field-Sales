@@ -18,9 +18,9 @@ public sealed record DashboardCard(
 
 public sealed record DashboardCardGroup(string Label, IReadOnlyList<DashboardCard> Cards);
 
-public class IndexModel(IDiagnosticsService diagnosticsService) : PageModel
+public sealed class IndexModel(IDiagnosticsService diagnosticsService) : PageModel
 {
-    private readonly IDiagnosticsService _diagnosticsService = diagnosticsService;
+    private readonly IDiagnosticsService diagnosticsService = diagnosticsService;
 
     public bool HasIssues { get; private set; }
 
@@ -34,7 +34,7 @@ public class IndexModel(IDiagnosticsService diagnosticsService) : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        DiagnosticsModel diagnostics = await _diagnosticsService.GetDiagnosticsAsync(cancellationToken);
+        DiagnosticsModel diagnostics = await diagnosticsService.GetDiagnosticsAsync(cancellationToken);
 
         var issues = new List<string>();
 

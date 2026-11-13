@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Users;
 
-public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
+public sealed class DetailsModel(IUserDetailsService userDetailsService) : PageModel
 {
-    private readonly IUserDetailsService _userDetailsService = userDetailsService;
+    private readonly IUserDetailsService userDetailsService = userDetailsService;
 
     [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
 
@@ -49,7 +49,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        UserDetailsModel? user = await _userDetailsService.GetUserDetailsAsync(Context, cancellationToken);
+        UserDetailsModel? user = await userDetailsService.GetUserDetailsAsync(Context, cancellationToken);
         if (user is null)
             return NotFound();
 
@@ -63,7 +63,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        UserUnlockResult result = await _userDetailsService.UnlockUserAsync(TargetUserId, cancellationToken);
+        UserUnlockResult result = await userDetailsService.UnlockUserAsync(TargetUserId, cancellationToken);
         if (result.Status == UserUnlockStatus.NotFound)
             return NotFound();
 
@@ -84,7 +84,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        RoleChangeResult result = await _userDetailsService.AddRoleAsync(TargetUserId, role, cancellationToken);
+        RoleChangeResult result = await userDetailsService.AddRoleAsync(TargetUserId, role, cancellationToken);
         if (!result.Success)
         {
             if (result.Status == AdminMutationStatus.NotFound)
@@ -103,7 +103,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        RoleChangeResult result = await _userDetailsService.RemoveRoleAsync(TargetUserId, role, cancellationToken);
+        RoleChangeResult result = await userDetailsService.RemoveRoleAsync(TargetUserId, role, cancellationToken);
         if (!result.Success)
         {
             if (result.Status == AdminMutationStatus.NotFound)
@@ -124,7 +124,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
             return NotFound();
 
         ClaimChangeResult result =
-            await _userDetailsService.AddClaimAsync(TargetUserId, new UserClaim(claimType, claimValue),
+            await userDetailsService.AddClaimAsync(TargetUserId, new UserClaim(claimType, claimValue),
                 cancellationToken);
         if (!result.Success)
         {
@@ -145,7 +145,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        ClaimChangeResult result = await _userDetailsService.RemoveClaimAsync(TargetUserId,
+        ClaimChangeResult result = await userDetailsService.RemoveClaimAsync(TargetUserId,
             new UserClaim(claimType, claimValue), cancellationToken);
         if (!result.Success)
         {
@@ -165,7 +165,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        UserAccessRevokeResult result = await _userDetailsService.RevokeUserAccessAsync(Context, cancellationToken);
+        UserAccessRevokeResult result = await userDetailsService.RevokeUserAccessAsync(Context, cancellationToken);
         if (!result.Success)
         {
             if (result.Status == AdminMutationStatus.NotFound)
@@ -189,7 +189,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
         if (!HasUserId)
             return NotFound();
 
-        UserSuspendResult result = await _userDetailsService.SuspendUserAsync(Context, cancellationToken);
+        UserSuspendResult result = await userDetailsService.SuspendUserAsync(Context, cancellationToken);
         if (!result.Success)
         {
             if (result.Status == AdminMutationStatus.NotFound)
@@ -213,7 +213,7 @@ public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
             return RedirectToUserTab("danger");
         }
 
-        UserDeleteResult result = await _userDetailsService.DeleteUserAsync(Context, cancellationToken);
+        UserDeleteResult result = await userDetailsService.DeleteUserAsync(Context, cancellationToken);
         if (!result.Success)
         {
             if (result.Status == AdminMutationStatus.NotFound)

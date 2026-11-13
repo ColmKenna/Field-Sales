@@ -7,15 +7,15 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
-    private readonly IClientListService _clientListService;
-    private readonly AdminConsoleOptions _options;
+    private readonly IClientListService clientListService;
+    private readonly AdminConsoleOptions options;
 
     public IndexModel(IClientListService clientListService, IOptions<AdminConsoleOptions> options)
     {
-        _clientListService = clientListService;
-        _options = options.Value;
+        this.clientListService = clientListService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
@@ -26,9 +26,9 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        ListQuery query = _options.CreateListQuery(Filter, PageNumber, out int pageNumber);
+        ListQuery query = options.CreateListQuery(Filter, PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
-        Clients = await _clientListService.GetClientsAsync(query, cancellationToken);
+        Clients = await clientListService.GetClientsAsync(query, cancellationToken);
     }
 }

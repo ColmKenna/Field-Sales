@@ -2,14 +2,14 @@ using FieldSales.Identity.Services.Users;
 
 namespace FieldSales.Identity.Services.Diagnostics;
 
-public class StoreHealthStatus
+public sealed class StoreHealthStatus
 {
     public required string Name { get; set; }
     public bool IsHealthy { get; set; }
     public string? Detail { get; set; }
 }
 
-public class SigningKeySummary
+public sealed class SigningKeySummary
 {
     public required string KeyId { get; set; }
     public required string Algorithm { get; set; }
@@ -21,7 +21,7 @@ public class SigningKeySummary
 ///     copied onto the signed-in principal verbatim, so a role-typed one grants privilege that no
 ///     role-based check — including the Last-Admin Guard — can see.
 /// </summary>
-public class ReservedClaimHolder
+public sealed class ReservedClaimHolder
 {
     public required UserId UserId { get; set; }
     public required string UserName { get; set; }
@@ -29,7 +29,7 @@ public class ReservedClaimHolder
     public required string ClaimValue { get; set; }
 }
 
-public class DiagnosticsModel
+public sealed class DiagnosticsModel
 {
     public List<StoreHealthStatus> StoreHealth { get; set; } = new();
     public string? SigningKeyId { get; set; }

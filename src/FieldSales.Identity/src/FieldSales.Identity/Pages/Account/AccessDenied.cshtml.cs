@@ -5,7 +5,7 @@ namespace FieldSales.Identity.Pages.Account;
 
 // Reachable before sign-in by definition; exempt from the fallback policy.
 [AllowAnonymous]
-public class AccessDeniedModel : PageModel
+public sealed class AccessDeniedModel : PageModel
 {
     private const string ConsoleRoot = "/Admin";
 

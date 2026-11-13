@@ -8,25 +8,25 @@ namespace FieldSales.Identity.Services.Validation;
 /// </summary>
 public sealed class ValidationErrorDictionary : IReadOnlyDictionary<string, string[]>
 {
-    private readonly Dictionary<string, List<string>> _errors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<string>> errors = new(StringComparer.Ordinal);
 
     public static ValidationErrorDictionary Empty => new();
 
-    public bool HasErrors => _errors.Count > 0;
-    public bool IsEmpty => _errors.Count == 0;
-    public int Count => _errors.Count;
+    public bool HasErrors => errors.Count > 0;
+    public bool IsEmpty => errors.Count == 0;
+    public int Count => errors.Count;
 
-    public string[] this[string key] => _errors[key].ToArray();
+    public string[] this[string key] => errors[key].ToArray();
 
-    public IEnumerable<string> Keys => _errors.Keys;
+    public IEnumerable<string> Keys => errors.Keys;
 
-    public IEnumerable<string[]> Values => _errors.Values.Select(v => v.ToArray());
+    public IEnumerable<string[]> Values => errors.Values.Select(v => v.ToArray());
 
-    public bool ContainsKey(string key) => _errors.ContainsKey(key);
+    public bool ContainsKey(string key) => errors.ContainsKey(key);
 
     public bool TryGetValue(string key, out string[] value)
     {
-        if (_errors.TryGetValue(key, out List<string>? list))
+        if (errors.TryGetValue(key, out List<string>? list))
         {
             value = list.ToArray();
             return true;
@@ -37,17 +37,17 @@ public sealed class ValidationErrorDictionary : IReadOnlyDictionary<string, stri
     }
 
     public IEnumerator<KeyValuePair<string, string[]>> GetEnumerator() =>
-        _errors.Select(kvp => new KeyValuePair<string, string[]>(kvp.Key, kvp.Value.ToArray())).GetEnumerator();
+        errors.Select(kvp => new KeyValuePair<string, string[]>(kvp.Key, kvp.Value.ToArray())).GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public ValidationErrorDictionary AddError(string field, string message)
     {
         string key = field ?? string.Empty;
-        if (!_errors.TryGetValue(key, out List<string>? list))
+        if (!errors.TryGetValue(key, out List<string>? list))
         {
             list = [];
-            _errors[key] = list;
+            errors[key] = list;
         }
 
         list.Add(message);
@@ -57,10 +57,10 @@ public sealed class ValidationErrorDictionary : IReadOnlyDictionary<string, stri
     public ValidationErrorDictionary AddErrors(string field, IEnumerable<string> messages)
     {
         string key = field ?? string.Empty;
-        if (!_errors.TryGetValue(key, out List<string>? list))
+        if (!errors.TryGetValue(key, out List<string>? list))
         {
             list = [];
-            _errors[key] = list;
+            errors[key] = list;
         }
 
         list.AddRange(messages);
@@ -68,5 +68,5 @@ public sealed class ValidationErrorDictionary : IReadOnlyDictionary<string, stri
     }
 
     public IReadOnlyDictionary<string, string[]> ToDictionary() =>
-        _errors.ToDictionary(k => k.Key, v => v.Value.ToArray(), StringComparer.Ordinal);
+        errors.ToDictionary(k => k.Key, v => v.Value.ToArray(), StringComparer.Ordinal);
 }

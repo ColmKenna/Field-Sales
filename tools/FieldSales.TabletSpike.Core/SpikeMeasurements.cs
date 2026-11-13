@@ -84,7 +84,7 @@ public sealed class SpikeReport
             ProcessWorkingSetBytes = process.WorkingSet64;
             MemoryMetric = "Process.WorkingSet64 bytes; one end-of-run sample (not peak RSS)";
         }
-        catch (PlatformNotSupportedException) { }
+        catch (PlatformNotSupportedException) { } // The memory sample is optional; the report goes out without it.
     }
     public string ToJson() => JsonSerializer.Serialize(this, FixtureManifest.JsonOptions);
 }

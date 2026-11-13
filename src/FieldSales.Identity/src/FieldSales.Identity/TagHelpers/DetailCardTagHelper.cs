@@ -34,9 +34,9 @@ internal sealed class DetailCardContext
 ///     </example>
 /// </remarks>
 [HtmlTargetElement("detail-card")]
-public class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
+public sealed class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
 {
-    private readonly IHtmlHelper _htmlHelper = htmlHelper;
+    private readonly IHtmlHelper htmlHelper = htmlHelper;
 
     [HtmlAttributeNotBound]
     [ViewContext]
@@ -60,8 +60,8 @@ public class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
         context.Items[typeof(DetailCardContext)] = cardContext;
         TagHelperContent body = await output.GetChildContentAsync();
 
-        ((IViewContextAware)_htmlHelper).Contextualize(ViewContext);
-        IHtmlContent icon = await _htmlHelper.PartialAsync("_AdminIcon", (Icon, "card-icon"));
+        ((IViewContextAware)htmlHelper).Contextualize(ViewContext);
+        IHtmlContent icon = await htmlHelper.PartialAsync("_AdminIcon", (Icon, "card-icon"));
 
         output.TagName = "div";
         output.TagMode = TagMode.StartTagAndEndTag;
@@ -91,7 +91,7 @@ public class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
 ///     the parent &lt;detail-card&gt;.
 /// </summary>
 [HtmlTargetElement("card-action", ParentTag = "detail-card")]
-public class CardActionTagHelper : TagHelper
+public sealed class CardActionTagHelper : TagHelper
 {
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {

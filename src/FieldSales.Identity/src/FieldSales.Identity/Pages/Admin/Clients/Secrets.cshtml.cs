@@ -8,12 +8,12 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class SecretsModel(
+public sealed class SecretsModel(
     IClientSecretsService clientSecretsService,
     ISecretRevealService secretRevealService) : PageModel
 {
-    private readonly IClientSecretsService _clientSecretsService = clientSecretsService;
-    private readonly ISecretRevealService _secretRevealService = secretRevealService;
+    private readonly IClientSecretsService clientSecretsService = clientSecretsService;
+    private readonly ISecretRevealService secretRevealService = secretRevealService;
 
     [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
 
@@ -40,7 +40,7 @@ public class SecretsModel(
         if (!FormPresentation.TryGetClientId(Id, out ClientId clientId))
             return NotFound();
 
-        GeneratedSecret = await _secretRevealService.TryRevealAsync(
+        GeneratedSecret = await secretRevealService.TryRevealAsync(
             new SecretRevealTarget(SecretRevealPurpose.ClientSecretGenerated, Id), SecretRevealHandle, cancellationToken);
 
         return await LoadPageAsync(clientId, cancellationToken);
@@ -55,7 +55,7 @@ public class SecretsModel(
             return await LoadPageAsync(clientId, cancellationToken);
 
         ClientSecretGenerateResult result =
-            await _clientSecretsService.GenerateClientSecretAsync(clientId, Description, Expiration,
+            await clientSecretsService.GenerateClientSecretAsync(clientId, Description, Expiration,
                 cancellationToken);
         if (!result.Success)
         {
@@ -69,7 +69,7 @@ public class SecretsModel(
 
         if (!string.IsNullOrEmpty(result.PlaintextSecret))
         {
-            SecretRevealHandle = await _secretRevealService.IssueHandleAsync(
+            SecretRevealHandle = await secretRevealService.IssueHandleAsync(
                 new SecretRevealTarget(SecretRevealPurpose.ClientSecretGenerated, Id),
                 result.PlaintextSecret,
                 cancellationToken);
@@ -84,7 +84,7 @@ public class SecretsModel(
             return NotFound();
 
         ClientSecretRevokeResult result =
-            await _clientSecretsService.RevokeClientSecretAsync(clientId, secretId, cancellationToken);
+            await clientSecretsService.RevokeClientSecretAsync(clientId, secretId, cancellationToken);
         if (!result.Success)
         {
             if (result.Status == AdminMutationStatus.NotFound)
@@ -99,7 +99,7 @@ public class SecretsModel(
     private async Task<IActionResult> LoadPageAsync(ClientId clientId, CancellationToken cancellationToken)
     {
         ClientSecretsModel? secrets =
-            await _clientSecretsService.GetClientSecretsAsync(clientId, cancellationToken);
+            await clientSecretsService.GetClientSecretsAsync(clientId, cancellationToken);
         if (secrets is null)
             return NotFound();
 

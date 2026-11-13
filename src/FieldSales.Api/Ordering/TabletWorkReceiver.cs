@@ -103,7 +103,7 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
                 if (document.RootElement.ValueKind == JsonValueKind.Object)
                     order = JsonSerializer.Deserialize(body, OrderJsonContext.Default.TabletOrder);
         }
-        catch (JsonException) { }
+        catch (JsonException) { } // Unreadable JSON is refused as corrupt below.
         if (order is null) refused = ReceiveResult.Refused(UploadFaults.Corrupt, "The order couldn't be read.");
         else refused = StructureFault(id, order);
         return refused is null ? order : null;
@@ -140,7 +140,7 @@ public sealed class TabletWorkReceiver(OrderingDbContext db, TimeProvider clock)
                     call = JsonSerializer.Deserialize(body, CallJsonContext.Default.TabletCall);
                 }
         }
-        catch (JsonException) { }
+        catch (JsonException) { } // Unreadable JSON is refused as corrupt below.
         refused = call is null ? ReceiveResult.Refused(UploadFaults.Corrupt, "The call couldn't be read.") : CallFault(id, call, hasChannel);
         return refused is null ? call : null;
     }
