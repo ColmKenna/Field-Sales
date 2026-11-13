@@ -34,7 +34,7 @@ internal sealed class DetailCardContext
 ///     </example>
 /// </remarks>
 [HtmlTargetElement("detail-card")]
-public class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
+public sealed class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
 {
     private readonly IHtmlHelper htmlHelper = htmlHelper;
 
@@ -91,7 +91,7 @@ public class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
 ///     the parent &lt;detail-card&gt;.
 /// </summary>
 [HtmlTargetElement("card-action", ParentTag = "detail-card")]
-public class CardActionTagHelper : TagHelper
+public sealed class CardActionTagHelper : TagHelper
 {
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {

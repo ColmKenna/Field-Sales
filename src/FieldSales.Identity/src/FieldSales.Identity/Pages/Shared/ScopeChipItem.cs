@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Pages.Shared;
 
-public class ScopeChipItem
+public sealed class ScopeChipItem
 {
     public string Text { get; }
     public bool IsLocked { get; }

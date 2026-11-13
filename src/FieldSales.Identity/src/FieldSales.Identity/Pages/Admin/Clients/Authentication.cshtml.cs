@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class AuthenticationInputModel
+public sealed class AuthenticationInputModel
 {
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
@@ -35,7 +35,7 @@ public class AuthenticationInputModel
     public bool BackChannelLogoutSessionRequired { get; set; }
 }
 
-public class AuthenticationModel(IClientAuthenticationService clientAuthenticationService) : PageModel
+public sealed class AuthenticationModel(IClientAuthenticationService clientAuthenticationService) : PageModel
 {
     private static readonly string[] SecondTabPrefixes =
     [

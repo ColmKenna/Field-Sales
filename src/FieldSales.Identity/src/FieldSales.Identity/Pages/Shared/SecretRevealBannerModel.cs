@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Pages.Shared;
 
-public class SecretRevealBannerModel
+public sealed class SecretRevealBannerModel
 {
     public string? SecretValue { get; }
     public string? ClientId { get; }

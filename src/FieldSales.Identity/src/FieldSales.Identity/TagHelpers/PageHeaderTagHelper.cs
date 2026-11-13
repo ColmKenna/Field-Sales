@@ -35,7 +35,7 @@ internal sealed class PageHeaderContext
 ///     </example>
 /// </remarks>
 [HtmlTargetElement("page-header")]
-public class PageHeaderTagHelper : TagHelper
+public sealed class PageHeaderTagHelper : TagHelper
 {
     /// <summary>Heading text. Encoded — pass model values directly.</summary>
     public string Title { get; set; } = string.Empty;
@@ -91,7 +91,7 @@ public class PageHeaderTagHelper : TagHelper
 ///     Renders nothing itself; its content is placed by the parent &lt;page-header&gt;.
 /// </summary>
 [HtmlTargetElement("page-sub", ParentTag = "page-header")]
-public class PageSubTagHelper : TagHelper
+public sealed class PageSubTagHelper : TagHelper
 {
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {

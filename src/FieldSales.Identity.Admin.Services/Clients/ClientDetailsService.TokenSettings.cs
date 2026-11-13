@@ -7,7 +7,7 @@ using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public partial class ClientDetailsService
+public sealed partial class ClientDetailsService
 {
     public async Task<ClientTokenSettingsModel?> GetClientTokenSettingsAsync(ClientId clientId,
         CancellationToken cancellationToken = default)

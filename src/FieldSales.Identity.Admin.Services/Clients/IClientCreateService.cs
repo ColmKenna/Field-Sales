@@ -3,7 +3,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public class ClientCreateInputModel
+public sealed class ClientCreateInputModel
 {
     [Required(ErrorMessage = "Client ID is required")]
     [StringLength(ValidationConstants.MaxClientIdLength, ErrorMessage = "Client ID cannot exceed 200 characters")]
@@ -26,7 +26,7 @@ public class ClientCreateInputModel
     public List<string> AllowedScopes { get; set; } = new();
 }
 
-public class ClientCreateResult
+public sealed class ClientCreateResult
 {
     public required AdminMutationStatus Status { get; init; }
     public bool Success => Status == AdminMutationStatus.Succeeded;

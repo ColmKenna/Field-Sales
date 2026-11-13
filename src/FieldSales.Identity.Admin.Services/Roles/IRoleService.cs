@@ -2,7 +2,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Roles;
 
-public class RoleCreateResult
+public sealed class RoleCreateResult
 {
     public bool Success { get; set; }
     public RoleId? RoleId { get; set; }

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
     private readonly IClientListService clientListService;
     private readonly AdminConsoleOptions options;

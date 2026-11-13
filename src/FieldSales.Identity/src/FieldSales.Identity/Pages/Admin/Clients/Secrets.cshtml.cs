@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class SecretsModel(
+public sealed class SecretsModel(
     IClientSecretsService clientSecretsService,
     ISecretRevealService secretRevealService) : PageModel
 {

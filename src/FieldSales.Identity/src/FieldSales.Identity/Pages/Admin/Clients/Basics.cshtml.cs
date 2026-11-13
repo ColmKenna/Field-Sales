@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class BasicsInputModel
+public sealed class BasicsInputModel
 {
     [Required(ErrorMessage = "Client Name is required")]
     [StringLength(ValidationConstants.MaxNameLength)]
@@ -19,7 +19,7 @@ public class BasicsInputModel
     public string? Description { get; set; }
 }
 
-public class BasicsModel(IClientOverviewService clientOverviewService) : PageModel
+public sealed class BasicsModel(IClientOverviewService clientOverviewService) : PageModel
 {
     private readonly IClientOverviewService clientOverviewService = clientOverviewService;
 

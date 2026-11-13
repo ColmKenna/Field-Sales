@@ -5,7 +5,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     public Task<AdminMutationResult> AddClaimAsync(AddApiResourceClaimCommand command,
         CancellationToken cancellationToken = default) =>

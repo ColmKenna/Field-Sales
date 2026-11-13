@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.ApiScopes;
 
-public class ApiScopeListService(
+public sealed class ApiScopeListService(
     ConfigurationDbContext configurationDbContext,
     IScopeUsageService scopeUsageService,
     IAuditWriter auditWriter) : IApiScopeListService

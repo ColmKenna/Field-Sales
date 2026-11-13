@@ -4,7 +4,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Roles;
 
-public class RoleService(
+public sealed class RoleService(
     IRoleAdministrationStore store,
     IAuditWriter auditWriter) : IRoleService
 {

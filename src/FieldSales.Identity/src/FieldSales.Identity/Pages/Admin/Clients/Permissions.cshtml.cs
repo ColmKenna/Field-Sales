@@ -7,12 +7,12 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class PermissionsInputModel
+public sealed class PermissionsInputModel
 {
     public List<string> AllowedScopes { get; set; } = new();
 }
 
-public class PermissionsModel(IClientPermissionsService clientPermissionsService) : PageModel
+public sealed class PermissionsModel(IClientPermissionsService clientPermissionsService) : PageModel
 {
     private readonly IClientPermissionsService clientPermissionsService = clientPermissionsService;
 

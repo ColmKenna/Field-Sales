@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.ApiScopes;
 
-public class EditInputModel
+public sealed class EditInputModel
 {
     [StringLength(ValidationConstants.MaxDisplayNameLength)]
     [Display(Name = "Display Name")]
@@ -25,7 +25,7 @@ public class EditInputModel
     public bool ShowInDiscoveryDocument { get; set; } = true;
 }
 
-public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
+public sealed class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
 {
     private readonly IApiScopeEditorService apiScopeEditorService = apiScopeEditorService;
 

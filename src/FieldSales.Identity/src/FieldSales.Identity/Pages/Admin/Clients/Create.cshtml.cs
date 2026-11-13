@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class CreateModel(
+public sealed class CreateModel(
     IClientCreateService clientCreateService,
     IClientPresetService clientPresetService,
     ISecretRevealService secretRevealService) : PageModel

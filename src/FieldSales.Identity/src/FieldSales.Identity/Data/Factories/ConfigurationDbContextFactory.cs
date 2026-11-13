@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace FieldSales.Identity.Data.Factories;
 
-public class ConfigurationDbContextFactory : IDesignTimeDbContextFactory<ConfigurationDbContext>
+public sealed class ConfigurationDbContextFactory : IDesignTimeDbContextFactory<ConfigurationDbContext>
 {
     public ConfigurationDbContext CreateDbContext(string[] args)
     {

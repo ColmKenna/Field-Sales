@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Consent;
 
-public class IndexModel(
+public sealed class IndexModel(
     IIdentityServerInteractionService interaction,
     IEventService events) : PageModel
 {
@@ -68,5 +68,5 @@ public class IndexModel(
         return Redirect(returnUrl);
     }
 
-    public record ScopeViewModel(string Value, string? DisplayName);
+    public sealed record ScopeViewModel(string Value, string? DisplayName);
 }

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.ApiScopes;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
     private readonly IApiScopeListService apiScopeListService;
     private readonly AdminConsoleOptions options;

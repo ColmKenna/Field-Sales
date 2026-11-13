@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Users;
 
-public partial class UserDetailsService
+public sealed partial class UserDetailsService
 {
     public async Task<UserDetailsModel?> GetUserDetailsAsync(UserActionContext context,
         CancellationToken cancellationToken = default)

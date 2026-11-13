@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.IdentityResources;
 
-public class IdentityResourceListService(
+public sealed class IdentityResourceListService(
     ConfigurationDbContext configurationDbContext,
     IScopeUsageService scopeUsageService,
     IAuditWriter auditWriter) : IIdentityResourceListService

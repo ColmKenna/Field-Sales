@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class CloneModel(
+public sealed class CloneModel(
     IClientCreateService clientCreateService,
     IClientOverviewService clientOverviewService,
     ISecretRevealService secretRevealService) : PageModel

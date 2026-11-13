@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Pages.Shared;
 
-public class BackLinkModel
+public sealed class BackLinkModel
 {
     public string Page { get; }
     public string Text { get; }

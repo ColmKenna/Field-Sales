@@ -9,7 +9,7 @@ namespace FieldSales.Identity.Pages.Shared;
 ///     plus a hidden input and a required marker, because it cannot be deselected. Folding that
 ///     branch in would make this partial answer a question it should not know about.
 /// </remarks>
-public class ScopeCheckboxGridModel
+public sealed class ScopeCheckboxGridModel
 {
     public IEnumerable<string> Scopes { get; }
     public ICollection<string> Selected { get; }

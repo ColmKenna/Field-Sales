@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Users;
 
-public class DetailsModel(IUserDetailsService userDetailsService) : PageModel
+public sealed class DetailsModel(IUserDetailsService userDetailsService) : PageModel
 {
     private readonly IUserDetailsService userDetailsService = userDetailsService;
 

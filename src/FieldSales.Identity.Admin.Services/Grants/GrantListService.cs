@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Grants;
 
-public class GrantListService(
+public sealed class GrantListService(
     PersistedGrantDbContext persistedGrantDbContext,
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter, TimeProvider? timeProvider = null) : IGrantListService

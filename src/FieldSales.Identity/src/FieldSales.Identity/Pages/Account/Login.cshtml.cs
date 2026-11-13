@@ -14,7 +14,7 @@ namespace FieldSales.Identity.Pages.Account;
 
 // Reachable before sign-in by definition; exempt from the fallback policy.
 [AllowAnonymous]
-public class LoginModel(
+public sealed class LoginModel(
     SignInManager<ApplicationUser> signInManager,
     IIdentityServerInteractionService interaction,
     IEventService events) : PageModel
@@ -72,7 +72,7 @@ public class LoginModel(
         return Page();
     }
 
-    public class InputModel
+    public sealed class InputModel
     {
         [Required] public string Username { get; set; } = string.Empty;
 

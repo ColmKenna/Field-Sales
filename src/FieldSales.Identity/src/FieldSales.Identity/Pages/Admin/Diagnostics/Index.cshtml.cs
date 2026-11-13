@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Diagnostics;
 
-public class IndexModel(IDiagnosticsService diagnosticsService) : PageModel
+public sealed class IndexModel(IDiagnosticsService diagnosticsService) : PageModel
 {
     private readonly IDiagnosticsService diagnosticsService = diagnosticsService;
 

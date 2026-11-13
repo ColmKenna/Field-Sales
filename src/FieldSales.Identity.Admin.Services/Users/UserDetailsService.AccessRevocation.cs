@@ -7,7 +7,7 @@ using PersistedGrant = Duende.IdentityServer.EntityFramework.Entities.PersistedG
 
 namespace FieldSales.Identity.Services.Users;
 
-public partial class UserDetailsService
+public sealed partial class UserDetailsService
 {
     public Task<UserAccessRevokeResult> RevokeUserAccessAsync(UserActionContext context,
         CancellationToken cancellationToken = default) =>

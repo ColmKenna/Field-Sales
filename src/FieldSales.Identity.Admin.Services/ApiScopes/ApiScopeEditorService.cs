@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.ApiScopes;
 
-public class ApiScopeEditorService(
+public sealed class ApiScopeEditorService(
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter) : IApiScopeEditorService
 {

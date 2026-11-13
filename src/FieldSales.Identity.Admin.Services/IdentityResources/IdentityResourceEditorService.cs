@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.IdentityResources;
 
-public class IdentityResourceEditorService(
+public sealed class IdentityResourceEditorService(
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter) : IIdentityResourceEditorService
 {

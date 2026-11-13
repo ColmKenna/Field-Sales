@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Users;
 
-public class CreateModel(IUserCreateService userCreateService) : PageModel
+public sealed class CreateModel(IUserCreateService userCreateService) : PageModel
 {
     private readonly IUserCreateService userCreateService = userCreateService;
 

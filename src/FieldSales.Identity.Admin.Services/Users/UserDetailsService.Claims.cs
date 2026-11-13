@@ -3,7 +3,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Users;
 
-public partial class UserDetailsService
+public sealed partial class UserDetailsService
 {
     public Task<ClaimChangeResult> AddClaimAsync(UserId userId, UserClaim claim,
         CancellationToken cancellationToken = default) =>

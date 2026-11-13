@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     public Task<AdminMutationResult> AttachScopeAsync(ScopeName name, ScopeName scopeName,
         CancellationToken cancellationToken = default) =>

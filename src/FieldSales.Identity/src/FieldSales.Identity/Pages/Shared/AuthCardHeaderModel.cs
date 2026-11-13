@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Pages.Shared;
 
-public class AuthCardHeaderModel
+public sealed class AuthCardHeaderModel
 {
     public string BrandSubtitle { get; }
     public string Title { get; }

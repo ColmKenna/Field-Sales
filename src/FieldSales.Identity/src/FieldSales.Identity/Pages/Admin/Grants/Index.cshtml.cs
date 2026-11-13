@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.Grants;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
     private readonly IGrantListService grantListService;
     private readonly AdminConsoleOptions options;

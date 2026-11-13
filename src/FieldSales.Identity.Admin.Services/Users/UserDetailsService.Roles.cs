@@ -3,7 +3,7 @@ using FieldSales.Identity.Services.Validation;
 
 namespace FieldSales.Identity.Services.Users;
 
-public partial class UserDetailsService
+public sealed partial class UserDetailsService
 {
     public Task<RoleChangeResult> AddRoleAsync(UserId userId, string role,
         CancellationToken cancellationToken = default) =>

@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Scopes;
 
-public class ScopeUsageService(ConfigurationDbContext configurationDbContext) : IScopeUsageService
+public sealed class ScopeUsageService(ConfigurationDbContext configurationDbContext) : IScopeUsageService
 {
     private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
 

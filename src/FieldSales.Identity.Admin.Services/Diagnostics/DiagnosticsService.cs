@@ -7,7 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace FieldSales.Identity.Services.Diagnostics;
 
-public class DiagnosticsService(
+public sealed class DiagnosticsService(
     IIdentityDiagnosticsStore identityStore,
     ConfigurationDbContext configurationDbContext,
     PersistedGrantDbContext persistedGrantDbContext,

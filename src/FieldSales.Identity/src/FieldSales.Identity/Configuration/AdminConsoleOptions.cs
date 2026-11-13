@@ -2,7 +2,7 @@ using FieldSales.Identity.Services;
 
 namespace FieldSales.Identity.Configuration;
 
-public class AdminConsoleOptions
+public sealed class AdminConsoleOptions
 {
     public const int MinPageSize = Pagination.MinPageSize;
     public const int MaxPageSize = Pagination.MaxPageSize;

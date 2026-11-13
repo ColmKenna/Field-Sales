@@ -6,7 +6,7 @@ using Client = Duende.IdentityServer.EntityFramework.Entities.Client;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public partial class ClientDetailsService(
+public sealed partial class ClientDetailsService(
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter,
     IClientConfigurationValidator clientConfigurationValidator,

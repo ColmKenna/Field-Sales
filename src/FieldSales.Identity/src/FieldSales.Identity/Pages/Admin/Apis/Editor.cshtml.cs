@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Apis;
 
-public class EditorModel : PageModel
+public sealed class EditorModel : PageModel
 {
     private readonly IApiResourceEditorService apiResourceEditorService;
     private readonly ISecretRevealService secretRevealService;
@@ -351,7 +351,7 @@ public class EditorModel : PageModel
     private static bool HasConfirmation(string? confirmation, string expected) =>
         FormPresentation.MatchesConfirmation(confirmation, expected);
 
-    public class BasicsInputModel
+    public sealed class BasicsInputModel
     {
         [StringLength(ValidationConstants.MaxNameLength)]
         public string Name { get; set; } = string.Empty;
@@ -363,7 +363,7 @@ public class EditorModel : PageModel
         public string? Description { get; set; }
     }
 
-    public class SecretInputModel
+    public sealed class SecretInputModel
     {
         [StringLength(ValidationConstants.MaxSecretDescriptionLength)]
         public string? Description { get; set; }
@@ -371,12 +371,12 @@ public class EditorModel : PageModel
         public DateTime? Expiration { get; set; }
     }
 
-    public class AttachScopeInputModel
+    public sealed class AttachScopeInputModel
     {
         public string ScopeName { get; set; } = string.Empty;
     }
 
-    public class CreateScopeInputModel
+    public sealed class CreateScopeInputModel
     {
         [StringLength(ValidationConstants.MaxScopeNameLength)]
         public string ScopeName { get; set; } = string.Empty;
@@ -385,7 +385,7 @@ public class EditorModel : PageModel
         public string? ScopeDisplayName { get; set; }
     }
 
-    public class ClaimInputModel
+    public sealed class ClaimInputModel
     {
         [StringLength(ValidationConstants.MaxClaimTypeLength)]
         public string ClaimType { get; set; } = string.Empty;

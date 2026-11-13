@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class DetailsModel(IClientOverviewService clientOverviewService) : PageModel
+public sealed class DetailsModel(IClientOverviewService clientOverviewService) : PageModel
 {
     private readonly IClientOverviewService clientOverviewService = clientOverviewService;
 

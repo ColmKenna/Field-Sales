@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.AuditLogs;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
     private readonly IAuditLogListService auditLogListService;
     private readonly AdminConsoleOptions options;

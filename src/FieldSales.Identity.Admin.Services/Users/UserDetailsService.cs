@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace FieldSales.Identity.Services.Users;
 
-public partial class UserDetailsService(
+public sealed partial class UserDetailsService(
     IIdentityUserAdministrationStore store,
     PersistedGrantDbContext persistedGrantDbContext,
     ReservedClaimTypePolicy reservedClaimTypes,

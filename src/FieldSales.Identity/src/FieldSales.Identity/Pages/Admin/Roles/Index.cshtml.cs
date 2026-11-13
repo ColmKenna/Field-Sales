@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.Roles;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
     private readonly AdminConsoleOptions options;
     private readonly IRoleService roleService;

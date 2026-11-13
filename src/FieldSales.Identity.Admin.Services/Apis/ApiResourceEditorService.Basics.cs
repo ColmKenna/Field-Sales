@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     public async Task<ApiResourceEditorModel?> GetForEditAsync(ScopeName name,
         CancellationToken cancellationToken = default)

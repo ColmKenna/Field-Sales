@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Clients;
 
-public class ClientListService(ConfigurationDbContext configurationDbContext) : IClientListService
+public sealed class ClientListService(ConfigurationDbContext configurationDbContext) : IClientListService
 {
     private const string GrantTypeAuthorizationCode = Duende.IdentityModel.OidcConstants.GrantTypes.AuthorizationCode;
     private const string GrantTypeClientCredentials = Duende.IdentityModel.OidcConstants.GrantTypes.ClientCredentials;

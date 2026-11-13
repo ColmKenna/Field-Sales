@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FieldSales.Identity.Services.AuditLogs;
 
-public class AuditWriter(
+public sealed class AuditWriter(
     IServiceScopeFactory scopeFactory,
     ILogger<AuditWriter> logger,
     IHttpContextAccessor httpContextAccessor,

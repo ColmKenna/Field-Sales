@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService : IApiResourceEditorService
+public sealed partial class ApiResourceEditorService : IApiResourceEditorService
 {
     private readonly CategoryAudit audit;
     private readonly ConfigurationDbContext configurationDbContext;

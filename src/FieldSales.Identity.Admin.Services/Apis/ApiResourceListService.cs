@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public class ApiResourceListService(ConfigurationDbContext configurationDbContext) : IApiResourceListService
+public sealed class ApiResourceListService(ConfigurationDbContext configurationDbContext) : IApiResourceListService
 {
     private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
 

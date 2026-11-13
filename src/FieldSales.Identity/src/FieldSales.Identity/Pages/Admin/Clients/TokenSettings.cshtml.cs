@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Clients;
 
-public class TokenSettingsInputModel
+public sealed class TokenSettingsInputModel
 {
     [Range(ValidationConstants.MinAccessTokenLifetime, ValidationConstants.MaxAccessTokenLifetime,
         ErrorMessage = "Access Token Lifetime must be between 60 and 86400 seconds (1 minute to 24 hours).")]
@@ -38,7 +38,7 @@ public class TokenSettingsInputModel
     public int SlidingRefreshTokenLifetime { get; set; }
 }
 
-public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsService) : PageModel
+public sealed class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsService) : PageModel
 {
     private static readonly string[] SecondTabPrefixes = ["Input.RequireConsent", "Input.AllowOfflineAccess"];
     private readonly IClientTokenSettingsService clientTokenSettingsService = clientTokenSettingsService;

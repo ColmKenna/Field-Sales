@@ -13,7 +13,7 @@ namespace FieldSales.Identity.Pages.Account;
 
 // Reachable before sign-in by definition; exempt from the fallback policy.
 [AllowAnonymous]
-public class LogoutModel(
+public sealed class LogoutModel(
     SignInManager<ApplicationUser> signInManager,
     IIdentityServerInteractionService interaction,
     IEventService events) : PageModel

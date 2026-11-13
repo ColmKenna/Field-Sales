@@ -18,7 +18,7 @@ public sealed record DashboardCard(
 
 public sealed record DashboardCardGroup(string Label, IReadOnlyList<DashboardCard> Cards);
 
-public class IndexModel(IDiagnosticsService diagnosticsService) : PageModel
+public sealed class IndexModel(IDiagnosticsService diagnosticsService) : PageModel
 {
     private readonly IDiagnosticsService diagnosticsService = diagnosticsService;
 

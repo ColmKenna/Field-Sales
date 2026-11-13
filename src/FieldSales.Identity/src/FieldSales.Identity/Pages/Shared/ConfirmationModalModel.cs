@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Pages.Shared;
 
-public class ConfirmationModalModel
+public sealed class ConfirmationModalModel
 {
     public string DialogId { get; }
     public string Title { get; }

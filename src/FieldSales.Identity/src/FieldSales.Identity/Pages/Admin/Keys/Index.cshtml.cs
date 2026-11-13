@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Keys;
 
-public class IndexModel(IKeyMaterialService keyMaterialService) : PageModel
+public sealed class IndexModel(IKeyMaterialService keyMaterialService) : PageModel
 {
     private readonly IKeyMaterialService keyMaterialService = keyMaterialService;
 

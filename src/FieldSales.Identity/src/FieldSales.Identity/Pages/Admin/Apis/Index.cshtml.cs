@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace FieldSales.Identity.Pages.Admin.Apis;
 
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
     private readonly IApiResourceListService apiResourceListService;
     private readonly AdminConsoleOptions options;

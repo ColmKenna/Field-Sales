@@ -2,7 +2,7 @@ using FieldSales.Identity.Services.AuditLogs;
 
 namespace FieldSales.Identity.Services.Users;
 
-public class UserCreateService(
+public sealed class UserCreateService(
     IIdentityUserAdministrationStore store,
     IAuditWriter auditWriter) : IUserCreateService
 {

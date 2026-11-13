@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FieldSales.Identity.Services.Apis;
 
-public partial class ApiResourceEditorService
+public sealed partial class ApiResourceEditorService
 {
     public Task<AdminMutationResult> SetEnabledAsync(ScopeName name, bool enabled,
         CancellationToken cancellationToken = default) =>

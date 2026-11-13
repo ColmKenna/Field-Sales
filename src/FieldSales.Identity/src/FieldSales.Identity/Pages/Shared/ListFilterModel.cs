@@ -4,7 +4,7 @@ namespace FieldSales.Identity.Pages.Shared;
 ///     The single-input filter form on a list page. Clear renders only while a filter is
 ///     active, matching the two multi-field filters that already behaved this way.
 /// </summary>
-public class ListFilterModel
+public sealed class ListFilterModel
 {
     public string InputId { get; }
     public string LabelText { get; }

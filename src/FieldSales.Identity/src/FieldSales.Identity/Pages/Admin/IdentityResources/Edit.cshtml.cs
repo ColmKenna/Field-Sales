@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.IdentityResources;
 
-public class EditInputModel
+public sealed class EditInputModel
 {
     [StringLength(ValidationConstants.MaxDisplayNameLength)]
     [Display(Name = "Display Name")]
@@ -26,7 +26,7 @@ public class EditInputModel
     public bool ShowInDiscoveryDocument { get; set; }
 }
 
-public class EditModel(IIdentityResourceEditorService editorService) : PageModel
+public sealed class EditModel(IIdentityResourceEditorService editorService) : PageModel
 {
     private readonly IIdentityResourceEditorService editorService = editorService;
 

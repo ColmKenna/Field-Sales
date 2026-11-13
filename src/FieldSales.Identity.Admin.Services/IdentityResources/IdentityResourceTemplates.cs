@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Services.IdentityResources;
 
-public class IdentityResourceTemplate
+public sealed class IdentityResourceTemplate
 {
     public string Name { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;

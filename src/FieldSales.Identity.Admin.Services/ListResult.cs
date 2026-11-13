@@ -4,7 +4,7 @@ namespace FieldSales.Identity.Services;
 ///     A generic single page of <typeparamref name="T" /> results, along with enough
 ///     information for the caller to render pagination controls.
 /// </summary>
-public class ListResult<T>
+public sealed class ListResult<T>
 {
     public required IReadOnlyList<T> Items { get; init; }
 

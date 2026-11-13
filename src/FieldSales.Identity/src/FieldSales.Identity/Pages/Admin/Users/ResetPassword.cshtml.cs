@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.Users;
 
-public class ResetPasswordInputModel
+public sealed class ResetPasswordInputModel
 {
     [Required]
     [DataType(DataType.Password)]
@@ -19,7 +19,7 @@ public class ResetPasswordInputModel
     public string ConfirmPassword { get; set; } = string.Empty;
 }
 
-public class ResetPasswordModel(IUserDetailsService userDetailsService) : PageModel
+public sealed class ResetPasswordModel(IUserDetailsService userDetailsService) : PageModel
 {
     private readonly IUserDetailsService userDetailsService = userDetailsService;
 

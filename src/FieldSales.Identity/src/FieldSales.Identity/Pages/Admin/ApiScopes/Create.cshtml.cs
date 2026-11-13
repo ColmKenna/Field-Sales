@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace FieldSales.Identity.Pages.Admin.ApiScopes;
 
-public class CreateInputModel
+public sealed class CreateInputModel
 {
     [Required(ErrorMessage = "Scope name is required")]
     [StringLength(ValidationConstants.MaxScopeNameLength, ErrorMessage = "Scope name must not exceed 200 characters")]
@@ -22,7 +22,7 @@ public class CreateInputModel
     public string? Description { get; set; }
 }
 
-public class CreateModel(IApiScopeEditorService apiScopeEditorService) : PageModel
+public sealed class CreateModel(IApiScopeEditorService apiScopeEditorService) : PageModel
 {
     private readonly IApiScopeEditorService apiScopeEditorService = apiScopeEditorService;
 

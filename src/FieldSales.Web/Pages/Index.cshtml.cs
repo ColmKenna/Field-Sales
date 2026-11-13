@@ -6,7 +6,7 @@ using FieldSales.Web.Security;
 namespace FieldSales.Web.Pages;
 
 [AllowAnonymous]
-public class IndexModel : PageModel
+public sealed class IndexModel : PageModel
 {
     private readonly StaffAreaService areas;
 

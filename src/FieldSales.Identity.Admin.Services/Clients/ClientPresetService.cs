@@ -1,6 +1,6 @@
 namespace FieldSales.Identity.Services.Clients;
 
-public class ClientPresetService : IClientPresetService
+public sealed class ClientPresetService : IClientPresetService
 {
     private static readonly List<ClientPreset> Presets = new()
     {
