@@ -191,9 +191,7 @@ public sealed partial class SnapshotStore
 
     private ActiveSnapshot Apply(string gzipPath, ExpectedSnapshot expected, SnapshotHooks hooks, CancellationToken ct)
     {
-        using (FileStream compressed = File.OpenRead(gzipPath))
-            if (Convert.ToHexStringLower(SHA256.HashData(compressed)) != expected.GzipSha256)
-                throw new InvalidDataException("The downloaded snapshot does not match its hash.");
+        VerifyDownloadHash(gzipPath, expected.GzipSha256);
         using SqliteConnection connection = Open();
         string generation = Guid.NewGuid().ToString("N");
         SnapshotManifest? manifest = null;
@@ -236,54 +234,8 @@ public sealed partial class SnapshotStore
                 if (plain.FinishHash() != expected.PlainSha256)
                     throw new InvalidDataException("The downloaded snapshot does not match its content hash.");
             }
-            SnapshotCounts declared = manifest!.Counts;
-            if (declared != new SnapshotCounts(counts["locations"], counts["categories"], counts["products"], counts["basePrices"],
-                    counts["productAttributes"], counts["lastStockCheckLines"], counts["recentOrderLines"], counts["lastCallLowLines"],
-                    counts["priceTiers"], counts["priceTierTerms"], counts["customerTiers"], counts["quantityBreaks"]))
-                throw new InvalidDataException("The downloaded snapshot is incomplete: its counts do not match.");
-            using (SqliteCommand references = connection.CreateCommand())
-            {
-                references.CommandText = """
-                    SELECT EXISTS(SELECT 1 FROM product_attributes v LEFT JOIN products p
-                        ON p.generation=v.generation AND p.id=v.product_id WHERE v.generation=$g AND p.id IS NULL)
-                    """;
-                references.Parameters.AddWithValue("$g", generation);
-                if ((long)references.ExecuteScalar()! != 0)
-                    throw new InvalidDataException("An attribute refers to a product outside this snapshot.");
-                // History rows (1.3) and the last Call's gaps (1.4) must name a Location and a product this snapshot carries.
-                foreach (string table in (string[])["last_stock_check_lines", "recent_order_lines", "last_call_low_lines"])
-                {
-                    references.CommandText = $"""
-                        SELECT EXISTS(SELECT 1 FROM {table} h
-                            LEFT JOIN products p ON p.generation=h.generation AND p.id=h.product_id
-                            LEFT JOIN locations l ON l.generation=h.generation AND l.id=h.location_id
-                            WHERE h.generation=$g AND (p.id IS NULL OR l.id IS NULL))
-                        """;
-                    if ((long)references.ExecuteScalar()! != 0)
-                        throw new InvalidDataException("A stock history row refers to a Location or product outside this snapshot.");
-                }
-                references.CommandText = """
-                    SELECT EXISTS(SELECT 1 FROM last_call_low_lines WHERE generation=$g
-                        GROUP BY location_id HAVING COUNT(DISTINCT call_id) > 1 OR COUNT(DISTINCT called_on) > 1)
-                    """;
-                if ((long)references.ExecuteScalar()! != 0)
-                    throw new InvalidDataException("A Location's last Call gaps name more than one Call.");
-                // 1.6: a term names a tier and a product this snapshot carries; a held tier is one it carries; a break's product too.
-                references.CommandText = """
-                    SELECT EXISTS(SELECT 1 FROM price_tier_terms t
-                        LEFT JOIN price_tiers r ON r.generation=t.generation AND r.id=t.tier_id
-                        LEFT JOIN products p ON p.generation=t.generation AND p.id=t.product_id
-                        WHERE t.generation=$g AND (r.id IS NULL OR p.id IS NULL))
-                    OR EXISTS(SELECT 1 FROM customer_tiers c LEFT JOIN price_tiers r ON r.generation=c.generation AND r.id=c.tier_id
-                        WHERE c.generation=$g AND r.id IS NULL)
-                    OR EXISTS(SELECT 1 FROM quantity_breaks b LEFT JOIN products p ON p.generation=b.generation AND p.id=b.product_id
-                        WHERE b.generation=$g AND p.id IS NULL)
-                    OR EXISTS(SELECT 1 FROM price_tier_terms t JOIN price_tiers r ON r.generation=t.generation AND r.id=t.tier_id
-                        WHERE t.generation=$g AND r.shape='PriceList' AND t.fixed_price IS NULL)
-                    """;
-                if ((long)references.ExecuteScalar()! != 0)
-                    throw new InvalidDataException("A tier, term or break refers to something outside this snapshot.");
-            }
+            VerifyCounts(manifest!.Counts, counts);
+            VerifyReferences(connection, generation);
             WriteContactReplacements(connection, generation, manifest, contactReplacements);
             // Keep only the old active copy's referenced shop identities before it can be retired.
             // The separate Unsent database is read, never rewritten, by a snapshot replacement.
@@ -291,22 +243,7 @@ public sealed partial class SnapshotStore
             hooks.AtBoundary?.Invoke("before-activation");
             ct.ThrowIfCancellationRequested();
             DateTimeOffset completed = clock.GetUtcNow();
-            using (SqliteTransaction activation = connection.BeginTransaction())
-            using (SqliteCommand activate = connection.CreateCommand())
-            {
-                activate.Transaction = activation;
-                activate.CommandText = $"""
-                    UPDATE generations SET state='complete', completed=$when WHERE id=$g;
-                    INSERT INTO active(singleton, generation) VALUES(1, $g)
-                        ON CONFLICT(singleton) DO UPDATE SET generation=excluded.generation;
-                    UPDATE generations SET state='retired' WHERE state='complete' AND id NOT IN
-                        (SELECT id FROM generations WHERE state='complete' ORDER BY completed DESC, id DESC LIMIT {RetainedGenerations});
-                    """;
-                activate.Parameters.AddWithValue("$g", generation);
-                activate.Parameters.AddWithValue("$when", completed.ToString("O", CultureInfo.InvariantCulture));
-                activate.ExecuteNonQuery();
-                activation.Commit();
-            }
+            Activate(connection, generation, completed);
             hooks.AtBoundary?.Invoke("after-activation");
             return new(generation, completed, manifest);
         }
@@ -315,17 +252,122 @@ public sealed partial class SnapshotStore
             batch?.Dispose(); batch = null;
             // Never usable; deleted with the other retired generations. If storage itself failed, the next
             // open retires it instead, so the original error is never hidden.
-            try
-            {
-                using SqliteCommand retire = connection.CreateCommand();
-                retire.CommandText = "UPDATE generations SET state='retired' WHERE id=$g AND state='staged'";
-                retire.Parameters.AddWithValue("$g", generation);
-                retire.ExecuteNonQuery();
-            }
-            catch (SqliteException) { }
+            TryRetireStaged(connection, generation);
             throw;
         }
         finally { batch?.Dispose(); }
+    }
+
+    private static void VerifyDownloadHash(string gzipPath, string expectedSha256)
+    {
+        using FileStream compressed = File.OpenRead(gzipPath);
+        if (Convert.ToHexStringLower(SHA256.HashData(compressed)) != expectedSha256)
+            throw new InvalidDataException("The downloaded snapshot does not match its hash.");
+    }
+
+    private static void VerifyCounts(SnapshotCounts declared, Dictionary<string, int> counts)
+    {
+        if (declared != new SnapshotCounts(counts["locations"], counts["categories"], counts["products"], counts["basePrices"],
+                counts["productAttributes"], counts["lastStockCheckLines"], counts["recentOrderLines"], counts["lastCallLowLines"],
+                counts["priceTiers"], counts["priceTierTerms"], counts["customerTiers"], counts["quantityBreaks"]))
+            throw new InvalidDataException("The downloaded snapshot is incomplete: its counts do not match.");
+    }
+
+    /// <summary>Refuses a staged generation whose rows name a product, Location or tier it does not carry.</summary>
+    private static void VerifyReferences(SqliteConnection connection, string generation)
+    {
+        using (SqliteCommand references = connection.CreateCommand())
+        {
+            references.CommandText = """
+                SELECT EXISTS(SELECT 1 FROM product_attributes v LEFT JOIN products p
+                    ON p.generation=v.generation AND p.id=v.product_id WHERE v.generation=$g AND p.id IS NULL)
+                """;
+            references.Parameters.AddWithValue("$g", generation);
+            if ((long)references.ExecuteScalar()! != 0)
+                throw new InvalidDataException("An attribute refers to a product outside this snapshot.");
+            // History rows (1.3) and the last Call's gaps (1.4) must name a Location and a product this snapshot carries.
+            foreach (string table in (string[])["last_stock_check_lines", "recent_order_lines", "last_call_low_lines"])
+            {
+                references.CommandText = $"""
+                    SELECT EXISTS(SELECT 1 FROM {table} h
+                        LEFT JOIN products p ON p.generation=h.generation AND p.id=h.product_id
+                        LEFT JOIN locations l ON l.generation=h.generation AND l.id=h.location_id
+                        WHERE h.generation=$g AND (p.id IS NULL OR l.id IS NULL))
+                    """;
+                if ((long)references.ExecuteScalar()! != 0)
+                    throw new InvalidDataException("A stock history row refers to a Location or product outside this snapshot.");
+            }
+            references.CommandText = """
+                SELECT EXISTS(SELECT 1 FROM last_call_low_lines WHERE generation=$g
+                    GROUP BY location_id HAVING COUNT(DISTINCT call_id) > 1 OR COUNT(DISTINCT called_on) > 1)
+                """;
+            if ((long)references.ExecuteScalar()! != 0)
+                throw new InvalidDataException("A Location's last Call gaps name more than one Call.");
+            // 1.6: a term names a tier and a product this snapshot carries; a held tier is one it carries; a break's product too.
+            references.CommandText = """
+                SELECT EXISTS(SELECT 1 FROM price_tier_terms t
+                    LEFT JOIN price_tiers r ON r.generation=t.generation AND r.id=t.tier_id
+                    LEFT JOIN products p ON p.generation=t.generation AND p.id=t.product_id
+                    WHERE t.generation=$g AND (r.id IS NULL OR p.id IS NULL))
+                OR EXISTS(SELECT 1 FROM customer_tiers c LEFT JOIN price_tiers r ON r.generation=c.generation AND r.id=c.tier_id
+                    WHERE c.generation=$g AND r.id IS NULL)
+                OR EXISTS(SELECT 1 FROM quantity_breaks b LEFT JOIN products p ON p.generation=b.generation AND p.id=b.product_id
+                    WHERE b.generation=$g AND p.id IS NULL)
+                OR EXISTS(SELECT 1 FROM price_tier_terms t JOIN price_tiers r ON r.generation=t.generation AND r.id=t.tier_id
+                    WHERE t.generation=$g AND r.shape='PriceList' AND t.fixed_price IS NULL)
+                """;
+            if ((long)references.ExecuteScalar()! != 0)
+                throw new InvalidDataException("A tier, term or break refers to something outside this snapshot.");
+        }
+    }
+
+    /// <summary>Makes the staged generation the active one and retires all but the newest complete generations.</summary>
+    private static void Activate(SqliteConnection connection, string generation, DateTimeOffset completed)
+    {
+        using (SqliteTransaction activation = connection.BeginTransaction())
+        using (SqliteCommand activate = connection.CreateCommand())
+        {
+            activate.Transaction = activation;
+            activate.CommandText = $"""
+                UPDATE generations SET state='complete', completed=$when WHERE id=$g;
+                INSERT INTO active(singleton, generation) VALUES(1, $g)
+                    ON CONFLICT(singleton) DO UPDATE SET generation=excluded.generation;
+                UPDATE generations SET state='retired' WHERE state='complete' AND id NOT IN
+                    (SELECT id FROM generations WHERE state='complete' ORDER BY completed DESC, id DESC LIMIT {RetainedGenerations});
+                """;
+            activate.Parameters.AddWithValue("$g", generation);
+            activate.Parameters.AddWithValue("$when", completed.ToString("O", CultureInfo.InvariantCulture));
+            activate.ExecuteNonQuery();
+            activation.Commit();
+        }
+    }
+
+    /// <summary>Marks a failed import's generation retired. A storage failure here is left for the next open to tidy up.</summary>
+    private static void TryRetireStaged(SqliteConnection connection, string generation)
+    {
+        try
+        {
+            using SqliteCommand retire = connection.CreateCommand();
+            retire.CommandText = "UPDATE generations SET state='retired' WHERE id=$g AND state='staged'";
+            retire.Parameters.AddWithValue("$g", generation);
+            retire.ExecuteNonQuery();
+        }
+        catch (SqliteException) { }
+    }
+
+    /// <summary>Checks a Location's main-contact replacement and records it. A Location may carry at most one.</summary>
+    private static void RegisterContactReplacement(JsonElement entity, SnapshotLocation location,
+        Dictionary<Guid, SnapshotMainContactReplacement> contactReplacements)
+    {
+        if (location.MainContactReplacement is not { } replacement) return;
+        if (!entity.TryGetProperty("mainContactReplacement", out JsonElement replacementJson)
+            || replacementJson.ValueKind != JsonValueKind.Object
+            || !replacementJson.TryGetProperty("isInactive", out JsonElement status)
+            || status.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
+            || location.MainContact is not null || replacement.ContactId == Guid.Empty || string.IsNullOrWhiteSpace(replacement.Name))
+            throw new InvalidDataException("A main-contact replacement must identify an outgoing contact and no active Main.");
+        if (!contactReplacements.TryAdd(location.Id, replacement))
+            throw new InvalidDataException("A main-contact replacement Location is repeated.");
     }
 
     /// <summary>Checks the manifest and returns the snapshot's minor version.</summary>
@@ -365,17 +407,7 @@ public sealed partial class SnapshotStore
         {
             case "locations":
                 SnapshotLocation location = Entity<SnapshotLocation>(entity);
-                if (location.MainContactReplacement is { } replacement)
-                {
-                    if (!entity.TryGetProperty("mainContactReplacement", out JsonElement replacementJson)
-                        || replacementJson.ValueKind != JsonValueKind.Object
-                        || !replacementJson.TryGetProperty("isInactive", out JsonElement status)
-                        || status.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
-                        || location.MainContact is not null || replacement.ContactId == Guid.Empty || string.IsNullOrWhiteSpace(replacement.Name))
-                        throw new InvalidDataException("A main-contact replacement must identify an outgoing contact and no active Main.");
-                    if (!contactReplacements.TryAdd(location.Id, replacement))
-                        throw new InvalidDataException("A main-contact replacement Location is repeated.");
-                }
+                RegisterContactReplacement(entity, location, contactReplacements);
                 insert.CommandText = """
                     INSERT INTO locations(generation, id, name, customer_id, customer_name, town_id, town_name, county_name, eircode, main_contact)
                     VALUES($g, $id, $name, $customer, $customerName, $town, $townName, $county, $eircode, $contact)
