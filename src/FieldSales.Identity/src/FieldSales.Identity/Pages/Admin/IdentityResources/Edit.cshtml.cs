@@ -28,7 +28,7 @@ public class EditInputModel
 
 public class EditModel(IIdentityResourceEditorService editorService) : PageModel
 {
-    private readonly IIdentityResourceEditorService _editorService = editorService;
+    private readonly IIdentityResourceEditorService editorService = editorService;
 
     [FromQuery] public string Name { get; set; } = string.Empty;
 
@@ -98,7 +98,7 @@ public class EditModel(IIdentityResourceEditorService editorService) : PageModel
             return NotFound();
 
         IdentityResourceEditorModel? editor =
-            await _editorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
+            await editorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
         if (editor is null)
             return NotFound();
 
@@ -116,14 +116,14 @@ public class EditModel(IIdentityResourceEditorService editorService) : PageModel
         if (!ModelState.IsValid)
         {
             IdentityResourceEditorModel? editor =
-                await _editorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
+                await editorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
             if (editor is null)
                 return NotFound();
             Editor = editor;
             return Page();
         }
 
-        IdentityResourceEditResult result = await _editorService.UpdateBasicsAsync(
+        IdentityResourceEditResult result = await editorService.UpdateBasicsAsync(
             new UpdateIdentityResourceBasicsCommand(
                 ScopeName.Create(Name),
                 Input.DisplayName,
@@ -142,7 +142,7 @@ public class EditModel(IIdentityResourceEditorService editorService) : PageModel
     {
         if (string.IsNullOrWhiteSpace(name)) return NotFound();
 
-        IdentityResourceEditResult result = await _editorService.AddClaimAsync(ScopeName.Create(name),
+        IdentityResourceEditResult result = await editorService.AddClaimAsync(ScopeName.Create(name),
             ClaimType.Create(claimType), cancellationToken);
         return await RenderOutcomeAsync(result, name, cancellationToken);
     }
@@ -152,7 +152,7 @@ public class EditModel(IIdentityResourceEditorService editorService) : PageModel
     {
         if (string.IsNullOrWhiteSpace(name)) return NotFound();
 
-        IdentityResourceEditResult result = await _editorService.RemoveClaimAsync(ScopeName.Create(name),
+        IdentityResourceEditResult result = await editorService.RemoveClaimAsync(ScopeName.Create(name),
             ClaimType.Create(claimType), cancellationToken);
         return await RenderOutcomeAsync(result, name, cancellationToken);
     }
@@ -172,7 +172,7 @@ public class EditModel(IIdentityResourceEditorService editorService) : PageModel
 
             case IdentityResourceEditOutcome.Protected:
                 IdentityResourceEditorModel? editor =
-                    await _editorService.GetForEditAsync(ScopeName.Create(name), cancellationToken);
+                    await editorService.GetForEditAsync(ScopeName.Create(name), cancellationToken);
                 if (editor is null)
                     return NotFound();
 

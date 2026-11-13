@@ -5,14 +5,14 @@ namespace FieldSales.Identity.Services.Scopes;
 
 public class ScopeUsageService(ConfigurationDbContext configurationDbContext) : IScopeUsageService
 {
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
 
     public async Task<ScopeUsageCounts> GetClientReferenceCountsAsync(ScopeSet scopeNames,
         CancellationToken cancellationToken = default)
     {
         IReadOnlyList<string> names = scopeNames.ToValues();
 
-        Dictionary<string, int> counts = await _configurationDbContext.Clients
+        Dictionary<string, int> counts = await configurationDbContext.Clients
             .SelectMany(c => c.AllowedScopes)
             .Where(cs => names.Contains(cs.Scope))
             .GroupBy(cs => cs.Scope)

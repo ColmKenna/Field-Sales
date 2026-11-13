@@ -2,7 +2,7 @@ namespace FieldSales.Identity.Services.Clients;
 
 public class ClientPresetService : IClientPresetService
 {
-    private static readonly List<ClientPreset> _presets = new()
+    private static readonly List<ClientPreset> Presets = new()
     {
         new ClientPreset(
             ClientPresetIds.Web,
@@ -45,7 +45,7 @@ public class ClientPresetService : IClientPresetService
             [])
     };
 
-    public IReadOnlyList<ClientPreset> GetAvailablePresets() => _presets;
+    public IReadOnlyList<ClientPreset> GetAvailablePresets() => Presets;
 
-    public ClientPreset? GetPreset(string id) => _presets.FirstOrDefault(p => p.Id == id);
+    public ClientPreset? GetPreset(string id) => Presets.FirstOrDefault(p => p.Id == id);
 }

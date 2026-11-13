@@ -21,7 +21,7 @@ public class ResetPasswordInputModel
 
 public class ResetPasswordModel(IUserDetailsService userDetailsService) : PageModel
 {
-    private readonly IUserDetailsService _userDetailsService = userDetailsService;
+    private readonly IUserDetailsService userDetailsService = userDetailsService;
 
     [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
 
@@ -46,7 +46,7 @@ public class ResetPasswordModel(IUserDetailsService userDetailsService) : PageMo
             return await LoadPageAsync(cancellationToken);
 
         PasswordResetResult result =
-            await _userDetailsService.ResetPasswordAsync(UserId.Create(Id), Input.NewPassword, cancellationToken);
+            await userDetailsService.ResetPasswordAsync(UserId.Create(Id), Input.NewPassword, cancellationToken);
 
         if (result.Status == AdminMutationStatus.NotFound) return NotFound();
 
@@ -63,7 +63,7 @@ public class ResetPasswordModel(IUserDetailsService userDetailsService) : PageMo
     private async Task<IActionResult> LoadPageAsync(CancellationToken cancellationToken)
     {
         UserDetailsModel? account =
-            await _userDetailsService.GetUserDetailsAsync(new UserActionContext(UserId.Create(Id), null),
+            await userDetailsService.GetUserDetailsAsync(new UserActionContext(UserId.Create(Id), null),
                 cancellationToken);
         if (account is null)
             return NotFound();

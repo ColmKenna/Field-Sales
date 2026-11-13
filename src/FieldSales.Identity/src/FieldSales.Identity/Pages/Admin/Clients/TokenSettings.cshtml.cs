@@ -41,7 +41,7 @@ public class TokenSettingsInputModel
 public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsService) : PageModel
 {
     private static readonly string[] SecondTabPrefixes = ["Input.RequireConsent", "Input.AllowOfflineAccess"];
-    private readonly IClientTokenSettingsService _clientTokenSettingsService = clientTokenSettingsService;
+    private readonly IClientTokenSettingsService clientTokenSettingsService = clientTokenSettingsService;
 
     [BindProperty(SupportsGet = true)] public string Id { get; set; } = string.Empty;
 
@@ -56,7 +56,7 @@ public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsS
             return NotFound();
 
         ClientTokenSettingsModel? settings =
-            await _clientTokenSettingsService.GetClientTokenSettingsAsync(clientId, cancellationToken);
+            await clientTokenSettingsService.GetClientTokenSettingsAsync(clientId, cancellationToken);
         if (settings is null)
             return NotFound();
 
@@ -92,7 +92,7 @@ public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsS
         };
 
         AdminMutationResult result =
-            await _clientTokenSettingsService.UpdateClientTokenSettingsAsync(clientId, input, cancellationToken);
+            await clientTokenSettingsService.UpdateClientTokenSettingsAsync(clientId, input, cancellationToken);
         if (result.Status == AdminMutationStatus.NotFound)
             return NotFound();
 
@@ -123,7 +123,7 @@ public class TokenSettingsModel(IClientTokenSettingsService clientTokenSettingsS
     private async Task<IActionResult> ReloadPageAsync(ClientId clientId, CancellationToken cancellationToken)
     {
         ClientTokenSettingsModel? settings =
-            await _clientTokenSettingsService.GetClientTokenSettingsAsync(clientId, cancellationToken);
+            await clientTokenSettingsService.GetClientTokenSettingsAsync(clientId, cancellationToken);
         if (settings is null)
             return NotFound();
 

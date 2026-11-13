@@ -12,9 +12,9 @@ public class CreateModel(
     IClientPresetService clientPresetService,
     ISecretRevealService secretRevealService) : PageModel
 {
-    private readonly IClientCreateService _clientCreateService = clientCreateService;
-    private readonly IClientPresetService _clientPresetService = clientPresetService;
-    private readonly ISecretRevealService _secretRevealService = secretRevealService;
+    private readonly IClientCreateService clientCreateService = clientCreateService;
+    private readonly IClientPresetService clientPresetService = clientPresetService;
+    private readonly ISecretRevealService secretRevealService = secretRevealService;
 
     public static readonly JsonSerializerOptions PresetJsonOptions = new()
     {
@@ -37,10 +37,10 @@ public class CreateModel(
 
     public async Task OnGetAsync(string? clientId, CancellationToken cancellationToken)
     {
-        AvailablePresets = _clientPresetService.GetAvailablePresets();
+        AvailablePresets = clientPresetService.GetAvailablePresets();
         await LoadAvailableScopesAsync(cancellationToken);
 
-        CreatedSecret = await _secretRevealService.TryRevealAsync(
+        CreatedSecret = await secretRevealService.TryRevealAsync(
             new SecretRevealTarget(SecretRevealPurpose.ClientCreated, clientId ?? string.Empty), SecretRevealHandle, cancellationToken);
 
         CreatedClientId = clientId;
@@ -53,26 +53,26 @@ public class CreateModel(
     {
         if (!ModelState.IsValid)
         {
-            AvailablePresets = _clientPresetService.GetAvailablePresets();
+            AvailablePresets = clientPresetService.GetAvailablePresets();
             await LoadAvailableScopesAsync(cancellationToken);
             return Page();
         }
 
-        ClientCreateResult result = await _clientCreateService.CreateClientAsync(Input, cancellationToken);
+        ClientCreateResult result = await clientCreateService.CreateClientAsync(Input, cancellationToken);
         if (!result.Success)
         {
             ModelState.AddErrors(result.Errors, "Input");
 
             if (result.Errors.Count == 0)
                 ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Failed to create client.");
-            AvailablePresets = _clientPresetService.GetAvailablePresets();
+            AvailablePresets = clientPresetService.GetAvailablePresets();
             await LoadAvailableScopesAsync(cancellationToken);
             return Page();
         }
 
         if (!string.IsNullOrEmpty(result.PlaintextSecret))
         {
-            SecretRevealHandle = await _secretRevealService.IssueHandleAsync(
+            SecretRevealHandle = await secretRevealService.IssueHandleAsync(
                 new SecretRevealTarget(SecretRevealPurpose.ClientCreated, result.ClientId!),
                 result.PlaintextSecret,
                 cancellationToken);
@@ -84,7 +84,7 @@ public class CreateModel(
     private void ApplyPresetDefaults(string presetId)
     {
         Input.SelectedPreset = presetId;
-        ClientPreset? preset = _clientPresetService.GetPreset(presetId) ?? _clientPresetService.GetPreset(ClientPresetIds.Web);
+        ClientPreset? preset = clientPresetService.GetPreset(presetId) ?? clientPresetService.GetPreset(ClientPresetIds.Web);
 
         if (preset is not null)
         {
@@ -96,5 +96,5 @@ public class CreateModel(
     }
 
     private async Task LoadAvailableScopesAsync(CancellationToken cancellationToken) =>
-        AvailableScopes = await _clientCreateService.GetAvailableScopesAsync(cancellationToken);
+        AvailableScopes = await clientCreateService.GetAvailableScopesAsync(cancellationToken);
 }

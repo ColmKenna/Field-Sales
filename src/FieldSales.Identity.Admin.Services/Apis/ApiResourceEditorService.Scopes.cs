@@ -11,7 +11,7 @@ public partial class ApiResourceEditorService
 {
     public Task<AdminMutationResult> AttachScopeAsync(ScopeName name, ScopeName scopeName,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.AttachScope,
             name.Value,
             name.Value,
@@ -34,7 +34,7 @@ public partial class ApiResourceEditorService
         if (entity is null)
             return await DenyResourceNotFoundAsync(AuditAction.AttachScope, name, cancellationToken);
 
-        bool scopeExists = await _configurationDbContext.ApiScopes
+        bool scopeExists = await configurationDbContext.ApiScopes
             .AsNoTracking()
             .AnyAsync(s => s.Name == scopeNameStr, cancellationToken);
         if (!scopeExists)
@@ -44,9 +44,9 @@ public partial class ApiResourceEditorService
         {
             audit.TargetName = name;
             entity.Scopes.Add(new ApiResourceScope { Scope = scopeNameStr });
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            await _audit.SucceededAsync(AuditAction.AttachScope, name, name,
+            await this.audit.SucceededAsync(AuditAction.AttachScope, name, name,
                 $"Attached scope '{scopeNameStr}' to API Resource", cancellationToken);
         }
 
@@ -56,14 +56,14 @@ public partial class ApiResourceEditorService
     private async Task<AdminMutationResult> DenyScopeAttachmentValidationFailureAsync(
         string name, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.AttachScope, AuditReasonCode.ValidationFailed, name, name,
+        await audit.DeniedAsync(AuditAction.AttachScope, AuditReasonCode.ValidationFailed, name, name,
             "Scope attachment validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
 
     private async Task<AdminMutationResult> DenyAttachScopeNotFoundAsync(string name, string scopeNameStr, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.AttachScope, AuditReasonCode.NotFound, name, name,
+        await audit.DeniedAsync(AuditAction.AttachScope, AuditReasonCode.NotFound, name, name,
             $"API Scope '{scopeNameStr}' was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }
@@ -71,7 +71,7 @@ public partial class ApiResourceEditorService
     public Task<AdminMutationResult> CreateScopeAsync(
         CreateApiResourceScopeCommand command,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.CreateScope,
             command?.ResourceName.Value ?? string.Empty,
             command?.ResourceName.Value ?? string.Empty,
@@ -109,27 +109,27 @@ public partial class ApiResourceEditorService
         if (entity is null)
             return await DenyResourceNotFoundAsync(AuditAction.CreateScope, name, cancellationToken);
 
-        bool scopeCollision = await _configurationDbContext.ApiScopes.AsNoTracking()
+        bool scopeCollision = await configurationDbContext.ApiScopes.AsNoTracking()
             .AnyAsync(s => s.Name == scopeName, cancellationToken);
-        bool identityResourceCollision = await _configurationDbContext.IdentityResources.AsNoTracking()
+        bool identityResourceCollision = await configurationDbContext.IdentityResources.AsNoTracking()
             .AnyAsync(r => r.Name == scopeName, cancellationToken);
         if (scopeCollision || identityResourceCollision)
             return await DenyScopeNameCollisionAsync(name, scopeName, cancellationToken);
 
-        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, null, async transaction =>
+        var outcome = await IdentityTransactions.RunAsync(configurationDbContext, null, async transaction =>
         {
             ApiResource? current = await LoadResourceAsync(name, false, cancellationToken);
             if (current is null) return AdminMutationResult.NotFoundResult();
             try
             {
-                _configurationDbContext.ApiScopes.Add(new ApiScope
+                configurationDbContext.ApiScopes.Add(new ApiScope
                 {
                     Name = scopeName,
                     DisplayName = scopeDisplayName,
                     Enabled = true
                 });
                 current.Scopes.Add(new ApiResourceScope { Scope = scopeName });
-                await _configurationDbContext.SaveChangesAsync(cancellationToken);
+                await configurationDbContext.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return AdminMutationResult.Success();
             }
@@ -144,7 +144,7 @@ public partial class ApiResourceEditorService
             return await DenyResourceNotFoundAsync(AuditAction.CreateScope, name, cancellationToken);
         if (outcome.Status == AdminMutationStatus.Conflict)
             return await DenyScopeNameCollisionAsync(name, scopeName, cancellationToken);
-        await _audit.SucceededAsync(AuditAction.CreateScope, name, name,
+        await this.audit.SucceededAsync(AuditAction.CreateScope, name, name,
             $"Created and attached new scope '{scopeName}' to API Resource", cancellationToken);
         return outcome;
     }
@@ -152,14 +152,14 @@ public partial class ApiResourceEditorService
     private async Task<AdminMutationResult> DenyScopeCreationValidationFailureAsync(
         string name, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.CreateScope, AuditReasonCode.ValidationFailed, name, name,
+        await audit.DeniedAsync(AuditAction.CreateScope, AuditReasonCode.ValidationFailed, name, name,
             "Scope creation validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
 
     private async Task<AdminMutationResult> DenyScopeNameCollisionAsync(string name, string scopeName, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.CreateScope, AuditReasonCode.NameCollision, name, name,
+        await audit.DeniedAsync(AuditAction.CreateScope, AuditReasonCode.NameCollision, name, name,
             $"A scope or identity resource named '{scopeName}' already exists.", cancellationToken);
         return AdminMutationResult.ConflictResult("CreateScope.ScopeName",
             $"A scope or identity resource named '{scopeName}' already exists.");
@@ -167,7 +167,7 @@ public partial class ApiResourceEditorService
 
     public Task<AdminMutationResult> DetachScopeAsync(ScopeName name, ScopeName scopeName,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.DetachScope,
             name.Value,
             name.Value,
@@ -188,9 +188,9 @@ public partial class ApiResourceEditorService
         audit.TargetName = name;
 
         entity.Scopes.Remove(scope);
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.DetachScope, name, name,
+        await this.audit.SucceededAsync(AuditAction.DetachScope, name, name,
             $"Detached scope '{scopeNameStr}' from API Resource", cancellationToken);
 
         return AdminMutationResult.Success();
@@ -198,7 +198,7 @@ public partial class ApiResourceEditorService
 
     private async Task<AdminMutationResult> DenyDetachScopeNotFoundAsync(string name, string scopeNameStr, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.DetachScope, AuditReasonCode.NotFound, name, name,
+        await audit.DeniedAsync(AuditAction.DetachScope, AuditReasonCode.NotFound, name, name,
             $"API Resource '{name}' or scope '{scopeNameStr}' was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }

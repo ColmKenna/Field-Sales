@@ -9,13 +9,13 @@ namespace FieldSales.Identity.Pages.Admin.Apis;
 
 public class IndexModel : PageModel
 {
-    private readonly IApiResourceListService _apiResourceListService;
-    private readonly AdminConsoleOptions _options;
+    private readonly IApiResourceListService apiResourceListService;
+    private readonly AdminConsoleOptions options;
 
     public IndexModel(IApiResourceListService apiResourceListService, IOptions<AdminConsoleOptions> options)
     {
-        _apiResourceListService = apiResourceListService;
-        _options = options.Value;
+        this.apiResourceListService = apiResourceListService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public string? Filter { get; set; }
@@ -26,10 +26,10 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        ListQuery query = _options.CreateListQuery(Filter, PageNumber, out int pageNumber);
+        ListQuery query = options.CreateListQuery(Filter, PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
         ApiResources =
-            await _apiResourceListService.GetApiResourcesAsync(query, cancellationToken);
+            await apiResourceListService.GetApiResourcesAsync(query, cancellationToken);
     }
 }

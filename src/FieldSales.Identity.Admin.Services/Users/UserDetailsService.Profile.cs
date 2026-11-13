@@ -12,7 +12,7 @@ public partial class UserDetailsService
         if (userId.IsEmpty)
             return null;
 
-        UserAccountDetails? account = await _store.FindUserDetailsAsync(userId, cancellationToken);
+        UserAccountDetails? account = await store.FindUserDetailsAsync(userId, cancellationToken);
         if (account is null)
             return null;
 
@@ -21,12 +21,12 @@ public partial class UserDetailsService
             {
                 Type = c.Type,
                 Value = c.Value,
-                IsReserved = _reservedClaimTypes.IsReserved(c.Type)
+                IsReserved = reservedClaimTypes.IsReserved(c.Type)
             })
             .OrderBy(c => c.Type).ThenBy(c => c.Value)
             .ToList();
 
-        int persistedGrantCount = await _persistedGrantDbContext.PersistedGrants
+        int persistedGrantCount = await persistedGrantDbContext.PersistedGrants
             .AsNoTracking()
             .CountAsync(g => g.SubjectId == userId.Value, cancellationToken);
 

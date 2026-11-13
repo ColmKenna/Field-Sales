@@ -9,13 +9,13 @@ namespace FieldSales.Identity.Pages.Admin.AuditLogs;
 
 public class IndexModel : PageModel
 {
-    private readonly IAuditLogListService _auditLogListService;
-    private readonly AdminConsoleOptions _options;
+    private readonly IAuditLogListService auditLogListService;
+    private readonly AdminConsoleOptions options;
 
     public IndexModel(IAuditLogListService auditLogListService, IOptions<AdminConsoleOptions> options)
     {
-        _auditLogListService = auditLogListService;
-        _options = options.Value;
+        this.auditLogListService = auditLogListService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public AuditLogFilter Filter { get; set; } = new();
@@ -26,10 +26,10 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        Pagination pagination = _options.CreatePagination(PageNumber, out int pageNumber);
+        Pagination pagination = options.CreatePagination(PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
-        AuditLogEntries = await _auditLogListService.GetAuditLogEntriesAsync(Filter, pagination, cancellationToken);
+        AuditLogEntries = await auditLogListService.GetAuditLogEntriesAsync(Filter, pagination, cancellationToken);
     }
 
     public Dictionary<string, string?> GetRouteValues() => new()

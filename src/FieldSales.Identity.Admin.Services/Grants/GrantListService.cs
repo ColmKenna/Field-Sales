@@ -12,10 +12,10 @@ public class GrantListService(
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter, TimeProvider? timeProvider = null) : IGrantListService
 {
-    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.Grant);
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
-    private readonly PersistedGrantDbContext _persistedGrantDbContext = persistedGrantDbContext;
+    private readonly TimeProvider timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly CategoryAudit audit = AuditOperation.For(auditWriter, AuditCategory.Grant);
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
+    private readonly PersistedGrantDbContext persistedGrantDbContext = persistedGrantDbContext;
 
     public async Task<ListResult<GrantListItem>> GetGrantsAsync(
         GrantFilter? filter = null,
@@ -24,7 +24,7 @@ public class GrantListService(
     {
         pagination = pagination.Normalize();
 
-        IQueryable<PersistedGrant> query = _persistedGrantDbContext.PersistedGrants.AsNoTracking();
+        IQueryable<PersistedGrant> query = persistedGrantDbContext.PersistedGrants.AsNoTracking();
 
         string? subjectIdStr = filter?.SubjectId?.Value;
         if (!string.IsNullOrWhiteSpace(subjectIdStr))
@@ -71,12 +71,12 @@ public class GrantListService(
 
         var clientNames = new Dictionary<string, string?>();
         if (clientIdsOnPage.Count > 0)
-            clientNames = await _configurationDbContext.Clients
+            clientNames = await configurationDbContext.Clients
                 .AsNoTracking()
                 .Where(c => clientIdsOnPage.Contains(c.ClientId))
                 .ToDictionaryAsync(c => c.ClientId, c => (string?)c.ClientName, cancellationToken);
 
-        DateTime currentUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        DateTime currentUtc = timeProvider.GetUtcNow().UtcDateTime;
 
         var items = grantsOnPage.Select(g => new GrantListItem
         {
@@ -125,7 +125,7 @@ public class GrantListService(
     }
 
     public Task<RevokeGrantResult> RevokeGrantAsync(GrantKey key, CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.Revoke,
             key.Value ?? string.Empty,
             key.Value ?? string.Empty,
@@ -136,28 +136,28 @@ public class GrantListService(
         CancellationToken cancellationToken = default)
     {
         string keyStr = key.Value ?? string.Empty;
-        PersistedGrant? grant = await _persistedGrantDbContext.PersistedGrants
+        PersistedGrant? grant = await persistedGrantDbContext.PersistedGrants
             .FirstOrDefaultAsync(g => g.Key == keyStr, cancellationToken);
 
         if (grant is null)
         {
-            await _audit.DeniedAsync(AuditAction.Revoke, AuditReasonCode.NotFound,
+            await this.audit.DeniedAsync(AuditAction.Revoke, AuditReasonCode.NotFound,
                 keyStr, keyStr, "Grant not found.", cancellationToken);
             return RevokeGrantResult.NotFound;
         }
 
         audit.TargetName = grant.SubjectId ?? keyStr;
-        _persistedGrantDbContext.PersistedGrants.Remove(grant);
-        await _persistedGrantDbContext.SaveChangesAsync(cancellationToken);
+        persistedGrantDbContext.PersistedGrants.Remove(grant);
+        await persistedGrantDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.Revoke, keyStr, grant.SubjectId ?? keyStr,
+        await this.audit.SucceededAsync(AuditAction.Revoke, keyStr, grant.SubjectId ?? keyStr,
             $"Revoked grant for client '{grant.ClientId}'", cancellationToken);
 
         return RevokeGrantResult.Revoked;
     }
 
     public Task<int> RevokeGrantsBySubjectAsync(UserId subjectId, CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.BulkRevoke,
             subjectId.Value ?? string.Empty,
             subjectId.Value ?? string.Empty,
@@ -172,11 +172,11 @@ public class GrantListService(
             // Internal misuse guard, not a real admin action attempt - nothing to audit.
             return 0;
 
-        int revokedCount = await _persistedGrantDbContext.PersistedGrants
+        int revokedCount = await persistedGrantDbContext.PersistedGrants
             .Where(g => g.SubjectId == subjectIdStr)
             .ExecuteDeleteAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.BulkRevoke, subjectIdStr, subjectIdStr,
+        await this.audit.SucceededAsync(AuditAction.BulkRevoke, subjectIdStr, subjectIdStr,
             $"Revoked {revokedCount} persisted grant(s) for subject '{subjectIdStr}'", cancellationToken);
 
         return revokedCount;

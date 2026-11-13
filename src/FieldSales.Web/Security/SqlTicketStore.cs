@@ -14,7 +14,7 @@ public sealed class SqlTicketStore(
     IDataProtectionProvider protectionProvider,
     TimeProvider timeProvider) : ITicketStore
 {
-    private readonly IDataProtector _protector = protectionProvider.CreateProtector("StaffTicket.v1");
+    private readonly IDataProtector protector = protectionProvider.CreateProtector("StaffTicket.v1");
 
     public Task<string> StoreAsync(AuthenticationTicket ticket) => StoreAsync(ticket, CancellationToken.None);
     public Task RenewAsync(string key, AuthenticationTicket ticket) => RenewAsync(key, ticket, CancellationToken.None);
@@ -29,7 +29,7 @@ public sealed class SqlTicketStore(
         db.Tickets.Add(new StoredTicket
         {
             Key = key,
-            ProtectedValue = _protector.Protect(TicketSerializer.Default.Serialize(ticket)),
+            ProtectedValue = protector.Protect(TicketSerializer.Default.Serialize(ticket)),
             ExpiresUtc = Expiry(ticket, scope.ServiceProvider)
         });
         await db.SaveChangesAsync(cancellationToken);
@@ -42,7 +42,7 @@ public sealed class SqlTicketStore(
         StaffWebDbContext db = scope.ServiceProvider.GetRequiredService<StaffWebDbContext>();
         StoredTicket? stored = await db.Tickets.FindAsync([key], cancellationToken);
         if (stored is null) return;
-        stored.ProtectedValue = _protector.Protect(TicketSerializer.Default.Serialize(ticket));
+        stored.ProtectedValue = protector.Protect(TicketSerializer.Default.Serialize(ticket));
         stored.ExpiresUtc = Expiry(ticket, scope.ServiceProvider);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -64,7 +64,7 @@ public sealed class SqlTicketStore(
             await db.SaveChangesAsync(cancellationToken);
             return null;
         }
-        return TicketSerializer.Default.Deserialize(_protector.Unprotect(stored.ProtectedValue));
+        return TicketSerializer.Default.Deserialize(protector.Unprotect(stored.ProtectedValue));
     }
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken)

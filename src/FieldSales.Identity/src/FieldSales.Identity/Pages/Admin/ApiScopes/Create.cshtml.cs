@@ -24,7 +24,7 @@ public class CreateInputModel
 
 public class CreateModel(IApiScopeEditorService apiScopeEditorService) : PageModel
 {
-    private readonly IApiScopeEditorService _apiScopeEditorService = apiScopeEditorService;
+    private readonly IApiScopeEditorService apiScopeEditorService = apiScopeEditorService;
 
     [BindProperty] public CreateInputModel Input { get; set; } = new();
 
@@ -43,7 +43,7 @@ public class CreateModel(IApiScopeEditorService apiScopeEditorService) : PageMod
             return Page();
         }
 
-        AdminMutationResult result = await _apiScopeEditorService.CreateAsync(
+        AdminMutationResult result = await apiScopeEditorService.CreateAsync(
             new CreateApiScopeCommand(
                 ScopeName.Create(Input.Name),
                 Input.DisplayName,

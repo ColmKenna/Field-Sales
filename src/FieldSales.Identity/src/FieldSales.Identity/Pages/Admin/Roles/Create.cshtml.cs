@@ -8,7 +8,7 @@ namespace FieldSales.Identity.Pages.Admin.Roles;
 
 public class CreateModel(IRoleService roleService) : PageModel
 {
-    private readonly IRoleService _roleService = roleService;
+    private readonly IRoleService roleService = roleService;
 
     [BindProperty] public InputModel Input { get; set; } = new();
 
@@ -21,7 +21,7 @@ public class CreateModel(IRoleService roleService) : PageModel
         if (!ModelState.IsValid)
             return Page();
 
-        RoleCreateResult result = await _roleService.CreateRoleAsync(new RoleCreateInputModel
+        RoleCreateResult result = await roleService.CreateRoleAsync(new RoleCreateInputModel
         {
             Name = Input.Name
         }, cancellationToken);

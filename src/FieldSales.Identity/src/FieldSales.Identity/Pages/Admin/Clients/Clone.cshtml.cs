@@ -11,9 +11,9 @@ public class CloneModel(
     IClientOverviewService clientOverviewService,
     ISecretRevealService secretRevealService) : PageModel
 {
-    private readonly IClientCreateService _clientCreateService = clientCreateService;
-    private readonly IClientOverviewService _clientOverviewService = clientOverviewService;
-    private readonly ISecretRevealService _secretRevealService = secretRevealService;
+    private readonly IClientCreateService clientCreateService = clientCreateService;
+    private readonly IClientOverviewService clientOverviewService = clientOverviewService;
+    private readonly ISecretRevealService secretRevealService = secretRevealService;
 
     [BindProperty(SupportsGet = true)] public string SourceClientId { get; set; } = string.Empty;
 
@@ -52,7 +52,7 @@ public class CloneModel(
             return Page();
 
         ClientCreateResult result =
-            await _clientCreateService.CloneClientAsync(SourceClientId, Input, cancellationToken);
+            await clientCreateService.CloneClientAsync(SourceClientId, Input, cancellationToken);
         if (!result.Success)
         {
             AddErrorsToModelState(result.Errors);
@@ -64,7 +64,7 @@ public class CloneModel(
 
         if (!string.IsNullOrEmpty(result.PlaintextSecret))
         {
-            TempData[SecretRevealPresentation.HandleKey] = await _secretRevealService.IssueHandleAsync(
+            TempData[SecretRevealPresentation.HandleKey] = await secretRevealService.IssueHandleAsync(
                 new SecretRevealTarget(SecretRevealPurpose.ClientCreated, result.ClientId!),
                 result.PlaintextSecret,
                 cancellationToken);
@@ -76,7 +76,7 @@ public class CloneModel(
     private async Task<ClientDetailsModel?> LoadSourceClientAsync(CancellationToken cancellationToken)
     {
         ClientDetailsModel? sourceClient =
-            await _clientOverviewService.GetClientDetailsAsync(ClientId.Create(SourceClientId), cancellationToken);
+            await clientOverviewService.GetClientDetailsAsync(ClientId.Create(SourceClientId), cancellationToken);
         if (sourceClient is not null)
             SourceClientName = sourceClient.ClientName ?? SourceClientId;
 

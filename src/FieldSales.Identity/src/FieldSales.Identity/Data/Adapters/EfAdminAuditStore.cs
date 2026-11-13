@@ -11,7 +11,7 @@ namespace FieldSales.Identity.Data.Adapters;
 /// </summary>
 public sealed class EfAdminAuditStore(ApplicationDbContext dbContext) : IAdminAuditStore
 {
-    private readonly ApplicationDbContext _dbContext = dbContext;
+    private readonly ApplicationDbContext dbContext = dbContext;
 
     public async Task WriteAsync(AuditLogRecord record, CancellationToken cancellationToken = default)
     {
@@ -34,8 +34,8 @@ public sealed class EfAdminAuditStore(ApplicationDbContext dbContext) : IAdminAu
             Details = record.Details
         };
 
-        _dbContext.AuditLogEntries.Add(entry);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        dbContext.AuditLogEntries.Add(entry);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<ListResult<AuditLogListItem>> GetEntriesAsync(
@@ -45,7 +45,7 @@ public sealed class EfAdminAuditStore(ApplicationDbContext dbContext) : IAdminAu
     {
         pagination = pagination.Normalize();
 
-        IQueryable<AuditLogEntry> query = ApplyFilter(_dbContext.AuditLogEntries.AsNoTracking(), filter);
+        IQueryable<AuditLogEntry> query = ApplyFilter(dbContext.AuditLogEntries.AsNoTracking(), filter);
 
         int totalCount = await query.CountAsync(cancellationToken);
 

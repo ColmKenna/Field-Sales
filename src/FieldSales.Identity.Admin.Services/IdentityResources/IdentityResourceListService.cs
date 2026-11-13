@@ -13,9 +13,9 @@ public class IdentityResourceListService(
     IScopeUsageService scopeUsageService,
     IAuditWriter auditWriter) : IIdentityResourceListService
 {
-    private readonly IAuditWriter _auditWriter = auditWriter;
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
-    private readonly IScopeUsageService _scopeUsageService = scopeUsageService;
+    private readonly IAuditWriter auditWriter = auditWriter;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
+    private readonly IScopeUsageService scopeUsageService = scopeUsageService;
 
     public async Task<ListResult<IdentityResourceListItem>> GetIdentityResourcesAsync(
         ListQuery query,
@@ -24,7 +24,7 @@ public class IdentityResourceListService(
         Pagination pagination = query.Pagination.Normalize();
 
         IQueryable<IdentityResource> dbQuery =
-            ApplyFilter(_configurationDbContext.IdentityResources.AsNoTracking(), query.Filter);
+            ApplyFilter(configurationDbContext.IdentityResources.AsNoTracking(), query.Filter);
 
         int totalCount = await dbQuery.CountAsync(cancellationToken);
 
@@ -50,7 +50,7 @@ public class IdentityResourceListService(
 
         var scopeNames = ScopeSet.FromStrings(items.Select(i => i.Name));
         ScopeUsageCounts referenceCounts =
-            await _scopeUsageService.GetClientReferenceCountsAsync(scopeNames, cancellationToken);
+            await scopeUsageService.GetClientReferenceCountsAsync(scopeNames, cancellationToken);
 
         foreach (IdentityResourceListItem item in items)
             item.ClientReferenceCount = referenceCounts[ScopeName.Create(item.Name)];
@@ -66,11 +66,11 @@ public class IdentityResourceListService(
 
         string targetName = name;
 
-        return await AuditOperation.RunAsync(_auditWriter, AuditCategory.IdentityResource, AuditAction.Delete, name, targetName, async audit =>
+        return await AuditOperation.RunAsync(auditWriter, AuditCategory.IdentityResource, AuditAction.Delete, name, targetName, async audit =>
         {
-            var (outcome, deniedReason, deniedDetails) = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
+            var (outcome, deniedReason, deniedDetails) = await IdentityTransactions.RunAsync(configurationDbContext, IsolationLevel.Serializable, async transaction =>
             {
-                IdentityResource? resource = await _configurationDbContext.IdentityResources
+                IdentityResource? resource = await configurationDbContext.IdentityResources
                     .Include(r => r.UserClaims)
                     .FirstOrDefaultAsync(r => r.Name == name, cancellationToken);
 
@@ -91,7 +91,7 @@ public class IdentityResourceListService(
                         Reason: AuditReasonCode.ProtectedResource, Details: (string?)$"Identity Resource '{name}' is not editable.");
                 }
 
-                ScopeUsageCounts referenceCounts = await _scopeUsageService.GetClientReferenceCountsAsync(
+                ScopeUsageCounts referenceCounts = await scopeUsageService.GetClientReferenceCountsAsync(
                     ScopeSet.FromStrings(new[] { name }), cancellationToken);
                 if (referenceCounts[ScopeName.Create(name)] > 0)
                 {
@@ -100,8 +100,8 @@ public class IdentityResourceListService(
                         Reason: AuditReasonCode.ReferencedResource, Details: (string?)$"Identity Resource '{name}' is referenced by one or more clients.");
                 }
 
-                _configurationDbContext.IdentityResources.Remove(resource);
-                await _configurationDbContext.SaveChangesAsync(cancellationToken);
+                configurationDbContext.IdentityResources.Remove(resource);
+                await configurationDbContext.SaveChangesAsync(cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
                 return (Outcome: IdentityResourceDeleteResult.Deleted,
@@ -110,14 +110,14 @@ public class IdentityResourceListService(
 
             if (outcome != IdentityResourceDeleteResult.Deleted)
             {
-                await _auditWriter.WriteAsync(new AdminAuditEvent(
+                await auditWriter.WriteAsync(new AdminAuditEvent(
                     AuditCategory.IdentityResource, AuditAction.Delete, AuditOutcome.Denied,
                     deniedReason,
                     name, targetName, Details: deniedDetails), cancellationToken);
                 return outcome;
             }
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
+            await auditWriter.WriteAsync(new AdminAuditEvent(
                 AuditCategory.IdentityResource, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
                 name, targetName,
                 Details: $"Deleted Identity Resource '{name}'"), cancellationToken);
@@ -127,7 +127,7 @@ public class IdentityResourceListService(
 
     private async Task<IdentityResourceDeleteResult> DenyProtectedNameBlockedAsync(string name, CancellationToken cancellationToken)
     {
-        await _auditWriter.WriteAsync(new AdminAuditEvent(
+        await auditWriter.WriteAsync(new AdminAuditEvent(
             AuditCategory.IdentityResource, AuditAction.Delete, AuditOutcome.Denied,
             AuditReasonCode.ProtectedResource,
             name, name, Details: $"'{name}' is a protected identity resource name."), cancellationToken);

@@ -7,12 +7,12 @@ namespace FieldSales.Identity.Pages.Shared;
 /// </summary>
 public sealed class AdminNavigationState(string? currentPage)
 {
-    private readonly string _currentPage = currentPage ?? string.Empty;
+    private readonly string currentPage = currentPage ?? string.Empty;
 
     public bool IsActiveSection(string sectionPrefix) =>
-        _currentPage.Length > 0 &&
-        (_currentPage.Equals(sectionPrefix, StringComparison.OrdinalIgnoreCase) ||
-         _currentPage.StartsWith(sectionPrefix + "/", StringComparison.OrdinalIgnoreCase));
+        currentPage.Length > 0 &&
+        (currentPage.Equals(sectionPrefix, StringComparison.OrdinalIgnoreCase) ||
+         currentPage.StartsWith(sectionPrefix + "/", StringComparison.OrdinalIgnoreCase));
 
     public string ItemClass(string sectionPrefix) =>
         IsActiveSection(sectionPrefix) ? "nav-item active" : "nav-item";

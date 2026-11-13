@@ -14,13 +14,13 @@ public sealed class SecretRevealService : ISecretRevealService
     private const int CleanupBatchSize = 100;
     private const int HandleGenerationAttempts = 3;
     internal static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(5);
-    private readonly IAuditWriter _auditWriter;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<SecretRevealService> _logger;
-    private readonly IDataProtector _protector;
+    private readonly IAuditWriter auditWriter;
+    private readonly IHttpContextAccessor httpContextAccessor;
+    private readonly ILogger<SecretRevealService> logger;
+    private readonly IDataProtector protector;
 
-    private readonly ISecretRevealStore _store;
-    private readonly TimeProvider _timeProvider;
+    private readonly ISecretRevealStore store;
+    private readonly TimeProvider timeProvider;
 
     public SecretRevealService(
         ISecretRevealStore store,
@@ -30,12 +30,12 @@ public sealed class SecretRevealService : ISecretRevealService
         IAuditWriter auditWriter,
         ILogger<SecretRevealService> logger)
     {
-        _store = store;
-        _protector = dataProtectionProvider.CreateProtector(ProtectorPurpose);
-        _httpContextAccessor = httpContextAccessor;
-        _timeProvider = timeProvider;
-        _auditWriter = auditWriter;
-        _logger = logger;
+        this.store = store;
+        protector = dataProtectionProvider.CreateProtector(ProtectorPurpose);
+        this.httpContextAccessor = httpContextAccessor;
+        this.timeProvider = timeProvider;
+        this.auditWriter = auditWriter;
+        this.logger = logger;
     }
 
     public async Task<SecretRevealTicket> IssueAsync(
@@ -58,7 +58,7 @@ public sealed class SecretRevealService : ISecretRevealService
             await ThrowUnauthenticatedSubjectAsync(normalizedTarget, cancellationToken);
 
         var securityContext = SecretSecurityContext.Create(actorSubjectId, purpose, normalizedTarget);
-        DateTimeOffset now = _timeProvider.GetUtcNow();
+        DateTimeOffset now = timeProvider.GetUtcNow();
         DateTimeOffset expiresUtc = now.Add(Lifetime);
         string protectedPayload = BindingProtector(actorSubjectId.Value, purpose, normalizedTarget).Protect(plaintext);
 
@@ -71,7 +71,7 @@ public sealed class SecretRevealService : ISecretRevealService
             SecretRevealInsertStatus insertStatus;
             try
             {
-                insertStatus = await _store.TryInsertAsync(
+                insertStatus = await store.TryInsertAsync(
                     digest, securityContext, protectedPayload, now, expiresUtc, cancellationToken);
             }
             catch (Exception ex)
@@ -138,8 +138,8 @@ public sealed class SecretRevealService : ISecretRevealService
         SecretRevealLookup lookup;
         try
         {
-            lookup = await _store.ConsumeAsync(
-                digest, securityContext, _timeProvider.GetUtcNow(), cancellationToken);
+            lookup = await store.ConsumeAsync(
+                digest, securityContext, timeProvider.GetUtcNow(), cancellationToken);
         }
         catch (Exception ex)
         {
@@ -161,7 +161,7 @@ public sealed class SecretRevealService : ISecretRevealService
         }
         catch (CryptographicException)
         {
-            _logger.LogWarning(
+            logger.LogWarning(
                 "A consumed secret reveal payload could not be unprotected for target {TargetId}.",
                 normalizedTarget);
             await AuditAsync(AuditAction.Consume, AuditOutcome.Failed, AuditReasonCode.PersistenceFailure,
@@ -195,11 +195,11 @@ public sealed class SecretRevealService : ISecretRevealService
     {
         try
         {
-            await _store.CleanupExpiredAsync(now, CleanupBatchSize, cancellationToken);
+            await store.CleanupExpiredAsync(now, CleanupBatchSize, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Expired secret reveal cleanup failed; issuance remains committed.");
+            logger.LogWarning(ex, "Expired secret reveal cleanup failed; issuance remains committed.");
         }
     }
 
@@ -207,10 +207,10 @@ public sealed class SecretRevealService : ISecretRevealService
         string actorSubjectId,
         SecretRevealPurpose purpose,
         string targetId) =>
-        _protector.CreateProtector(actorSubjectId, purpose.ToString(), targetId);
+        protector.CreateProtector(actorSubjectId, purpose.ToString(), targetId);
 
     private UserId ResolveActorSubjectId() =>
-        UserId.Create(AuditActorResolver.Resolve(_httpContextAccessor.HttpContext?.User).SubjectId.Trim());
+        UserId.Create(AuditActorResolver.Resolve(httpContextAccessor.HttpContext?.User).SubjectId.Trim());
 
     private static string NormalizeTarget(string? targetId) => targetId?.Trim() ?? string.Empty;
 
@@ -248,7 +248,7 @@ public sealed class SecretRevealService : ISecretRevealService
         string targetId,
         string details,
         CancellationToken cancellationToken) =>
-        _auditWriter.WriteAsync(new AdminAuditEvent(
+        auditWriter.WriteAsync(new AdminAuditEvent(
             AuditCategory.SecretReveal,
             action,
             outcome,

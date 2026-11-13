@@ -36,7 +36,7 @@ internal sealed class DetailCardContext
 [HtmlTargetElement("detail-card")]
 public class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
 {
-    private readonly IHtmlHelper _htmlHelper = htmlHelper;
+    private readonly IHtmlHelper htmlHelper = htmlHelper;
 
     [HtmlAttributeNotBound]
     [ViewContext]
@@ -60,8 +60,8 @@ public class DetailCardTagHelper(IHtmlHelper htmlHelper) : TagHelper
         context.Items[typeof(DetailCardContext)] = cardContext;
         TagHelperContent body = await output.GetChildContentAsync();
 
-        ((IViewContextAware)_htmlHelper).Contextualize(ViewContext);
-        IHtmlContent icon = await _htmlHelper.PartialAsync("_AdminIcon", (Icon, "card-icon"));
+        ((IViewContextAware)htmlHelper).Contextualize(ViewContext);
+        IHtmlContent icon = await htmlHelper.PartialAsync("_AdminIcon", (Icon, "card-icon"));
 
         output.TagName = "div";
         output.TagMode = TagMode.StartTagAndEndTag;

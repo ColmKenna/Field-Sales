@@ -9,22 +9,22 @@ namespace FieldSales.Identity.Services.Apis;
 
 public partial class ApiResourceEditorService : IApiResourceEditorService
 {
-    private readonly CategoryAudit _audit;
-    private readonly ConfigurationDbContext _configurationDbContext;
-    private readonly TimeProvider _timeProvider;
+    private readonly CategoryAudit audit;
+    private readonly ConfigurationDbContext configurationDbContext;
+    private readonly TimeProvider timeProvider;
 
     public ApiResourceEditorService(
         ConfigurationDbContext configurationDbContext,
         IAuditWriter auditWriter,
         TimeProvider? timeProvider = null)
     {
-        _configurationDbContext = configurationDbContext;
-        _audit = AuditOperation.For(auditWriter, AuditCategory.ApiResource);
-        _timeProvider = timeProvider ?? TimeProvider.System;
+        this.configurationDbContext = configurationDbContext;
+        audit = AuditOperation.For(auditWriter, AuditCategory.ApiResource);
+        this.timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public Task<List<string>> GetAllApiScopeNamesAsync(CancellationToken cancellationToken = default) =>
-        _configurationDbContext.ApiScopes
+        configurationDbContext.ApiScopes
             .AsNoTracking()
             .OrderBy(s => s.Name)
             .Select(s => s.Name)
@@ -33,7 +33,7 @@ public partial class ApiResourceEditorService : IApiResourceEditorService
     private async Task<ApiResource?> LoadResourceAsync(string name, bool asNoTracking,
         CancellationToken cancellationToken)
     {
-        IQueryable<ApiResource> query = _configurationDbContext.ApiResources
+        IQueryable<ApiResource> query = configurationDbContext.ApiResources
             .AsSplitQuery()
             .Include(r => r.Secrets)
             .Include(r => r.Scopes)
@@ -73,7 +73,7 @@ public partial class ApiResourceEditorService : IApiResourceEditorService
 
     private async Task<AdminMutationResult> DenyResourceNotFoundAsync(AuditAction action, string name, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(action, AuditReasonCode.NotFound, name, name,
+        await audit.DeniedAsync(action, AuditReasonCode.NotFound, name, name,
             $"API Resource '{name}' was not found.", cancellationToken);
         return AdminMutationResult.NotFoundResult();
     }

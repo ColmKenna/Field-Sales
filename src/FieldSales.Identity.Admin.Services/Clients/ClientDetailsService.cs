@@ -25,18 +25,18 @@ public partial class ClientDetailsService(
 
     public const string DisabledAtPropertyKey = "admin:disabledAt";
     public const int MinimumDisabledDaysBeforeDelete = 90;
-    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.Client);
-    private readonly IClientConfigurationValidator _clientConfigurationValidator = clientConfigurationValidator;
+    private readonly CategoryAudit audit = AuditOperation.For(auditWriter, AuditCategory.Client);
+    private readonly IClientConfigurationValidator clientConfigurationValidator = clientConfigurationValidator;
 
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
-    private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
+    private readonly TimeProvider timeProvider = timeProvider;
 
     private async Task<Client?> LoadCompleteClientAsync(
         string clientId,
         bool asNoTracking,
         CancellationToken cancellationToken)
     {
-        IQueryable<Client> query = _configurationDbContext.Clients
+        IQueryable<Client> query = configurationDbContext.Clients
             .AsSplitQuery()
             .Include(client => client.AllowedGrantTypes)
             .Include(client => client.RedirectUris)
@@ -60,7 +60,7 @@ public partial class ClientDetailsService(
         CancellationToken cancellationToken)
     {
         var validationContext = new ClientConfigurationValidationContext(proposed);
-        await _clientConfigurationValidator.ValidateAsync(validationContext, cancellationToken);
+        await clientConfigurationValidator.ValidateAsync(validationContext, cancellationToken);
         return validationContext.IsValid
             ? null
             : validationContext.ErrorMessage ?? "Invalid client configuration.";

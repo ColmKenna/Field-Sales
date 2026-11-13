@@ -13,9 +13,9 @@ public class ApiScopeListService(
     IScopeUsageService scopeUsageService,
     IAuditWriter auditWriter) : IApiScopeListService
 {
-    private readonly IAuditWriter _auditWriter = auditWriter;
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
-    private readonly IScopeUsageService _scopeUsageService = scopeUsageService;
+    private readonly IAuditWriter auditWriter = auditWriter;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
+    private readonly IScopeUsageService scopeUsageService = scopeUsageService;
 
     public async Task<ListResult<ApiScopeListItem>> GetApiScopesAsync(
         ListQuery query,
@@ -23,7 +23,7 @@ public class ApiScopeListService(
     {
         Pagination pagination = query.Pagination.Normalize();
 
-        IQueryable<ApiScope> dbQuery = ApplyFilter(_configurationDbContext.ApiScopes.AsNoTracking(), query.Filter);
+        IQueryable<ApiScope> dbQuery = ApplyFilter(configurationDbContext.ApiScopes.AsNoTracking(), query.Filter);
 
         int totalCount = await dbQuery.CountAsync(cancellationToken);
 
@@ -43,7 +43,7 @@ public class ApiScopeListService(
 
         var scopeNames = ScopeSet.FromStrings(items.Select(i => i.Name));
         ScopeUsageCounts referenceCounts =
-            await _scopeUsageService.GetClientReferenceCountsAsync(scopeNames, cancellationToken);
+            await scopeUsageService.GetClientReferenceCountsAsync(scopeNames, cancellationToken);
 
         foreach (ApiScopeListItem item in items)
             item.ClientReferenceCount = referenceCounts[ScopeName.Create(item.Name)];
@@ -56,11 +56,11 @@ public class ApiScopeListService(
     {
         string targetName = name;
 
-        return await AuditOperation.RunAsync(_auditWriter, AuditCategory.ApiScope, AuditAction.Delete, name, targetName, async audit =>
+        return await AuditOperation.RunAsync(auditWriter, AuditCategory.ApiScope, AuditAction.Delete, name, targetName, async audit =>
         {
-            var (outcome, deniedReason, deniedDetails) = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
+            var (outcome, deniedReason, deniedDetails) = await IdentityTransactions.RunAsync(configurationDbContext, IsolationLevel.Serializable, async transaction =>
             {
-                ApiScope? scope = await _configurationDbContext.ApiScopes
+                ApiScope? scope = await configurationDbContext.ApiScopes
                     .FirstOrDefaultAsync(s => s.Name == name, cancellationToken);
 
                 if (scope is null)
@@ -73,7 +73,7 @@ public class ApiScopeListService(
                 targetName = scope.DisplayName ?? name;
                 audit.TargetName = targetName;
 
-                ScopeUsageCounts referenceCounts = await _scopeUsageService.GetClientReferenceCountsAsync(
+                ScopeUsageCounts referenceCounts = await scopeUsageService.GetClientReferenceCountsAsync(
                     ScopeSet.FromStrings(new[] { name }), cancellationToken);
                 if (referenceCounts[ScopeName.Create(name)] > 0)
                 {
@@ -82,8 +82,8 @@ public class ApiScopeListService(
                         Reason: AuditReasonCode.ReferencedResource, Details: (string?)$"API Scope '{name}' is referenced by one or more clients.");
                 }
 
-                _configurationDbContext.ApiScopes.Remove(scope);
-                await _configurationDbContext.SaveChangesAsync(cancellationToken);
+                configurationDbContext.ApiScopes.Remove(scope);
+                await configurationDbContext.SaveChangesAsync(cancellationToken);
 
                 await transaction.CommitAsync(cancellationToken);
                 return (Outcome: ApiScopeDeleteResult.Deleted,
@@ -92,13 +92,13 @@ public class ApiScopeListService(
 
             if (outcome != ApiScopeDeleteResult.Deleted)
             {
-                await _auditWriter.WriteAsync(new AdminAuditEvent(
+                await auditWriter.WriteAsync(new AdminAuditEvent(
                     AuditCategory.ApiScope, AuditAction.Delete, AuditOutcome.Denied, deniedReason,
                     name, targetName, Details: deniedDetails), cancellationToken);
                 return outcome;
             }
 
-            await _auditWriter.WriteAsync(new AdminAuditEvent(
+            await auditWriter.WriteAsync(new AdminAuditEvent(
                 AuditCategory.ApiScope, AuditAction.Delete, AuditOutcome.Succeeded, AuditReasonCode.Succeeded,
                 name, targetName,
                 Details: $"Deleted API Scope '{name}'"), cancellationToken);

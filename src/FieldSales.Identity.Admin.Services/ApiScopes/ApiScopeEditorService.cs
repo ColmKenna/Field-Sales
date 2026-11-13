@@ -11,8 +11,8 @@ public class ApiScopeEditorService(
     ConfigurationDbContext configurationDbContext,
     IAuditWriter auditWriter) : IApiScopeEditorService
 {
-    private readonly CategoryAudit _audit = AuditOperation.For(auditWriter, AuditCategory.ApiScope);
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
+    private readonly CategoryAudit audit = AuditOperation.For(auditWriter, AuditCategory.ApiScope);
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
 
     public Task<AdminMutationResult> CreateAsync(CreateApiScopeCommand command,
         CancellationToken cancellationToken = default) =>
@@ -36,7 +36,7 @@ public class ApiScopeEditorService(
         string? displayName,
         string? description,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.Create,
             name ?? string.Empty,
             displayName ?? name ?? string.Empty,
@@ -55,7 +55,7 @@ public class ApiScopeEditorService(
         if (!ScopeValidationHelper.IsValidScopeName(name))
             return await DenyInvalidNameAsync(name, displayName, cancellationToken);
 
-        bool scopeNameIsInUse = await _configurationDbContext.ApiScopes
+        bool scopeNameIsInUse = await configurationDbContext.ApiScopes
             .AsNoTracking()
             .AnyAsync(s => s.Name == name, cancellationToken);
 
@@ -63,7 +63,7 @@ public class ApiScopeEditorService(
             return await DenyNameCollisionAsync(name, displayName, "A scope with this name already exists.",
                 cancellationToken);
 
-        bool identityResourceNameIsInUse = await _configurationDbContext.IdentityResources
+        bool identityResourceNameIsInUse = await configurationDbContext.IdentityResources
             .AsNoTracking()
             .AnyAsync(r => r.Name == name, cancellationToken);
 
@@ -81,10 +81,10 @@ public class ApiScopeEditorService(
             Enabled = true
         };
 
-        _configurationDbContext.ApiScopes.Add(newScope);
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        configurationDbContext.ApiScopes.Add(newScope);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.Create, name, displayName ?? name,
+        await this.audit.SucceededAsync(AuditAction.Create, name, displayName ?? name,
             $"Created API Scope '{name}'", cancellationToken);
 
         return AdminMutationResult.Success();
@@ -95,7 +95,7 @@ public class ApiScopeEditorService(
         string? displayName,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, name, displayName ?? name,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, name, displayName ?? name,
             "Scope name is required.", cancellationToken);
         return AdminMutationResult.ValidationFailure(string.Empty, "Scope name is required.");
     }
@@ -105,7 +105,7 @@ public class ApiScopeEditorService(
         string? displayName,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, name, displayName ?? name,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.ValidationFailed, name, displayName ?? name,
             "Scope name contains invalid characters. Spaces are not allowed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(string.Empty,
             "Scope name contains invalid characters. Spaces are not allowed.");
@@ -120,7 +120,7 @@ public class ApiScopeEditorService(
         bool emphasize,
         bool showInDiscoveryDocument,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.Update,
             name ?? string.Empty,
             displayName ?? name ?? string.Empty,
@@ -138,7 +138,7 @@ public class ApiScopeEditorService(
         bool showInDiscoveryDocument,
         AuditOperation audit, CancellationToken cancellationToken = default)
     {
-        ApiScope? entity = await _configurationDbContext.ApiScopes
+        ApiScope? entity = await configurationDbContext.ApiScopes
             .FirstOrDefaultAsync(s => s.Name == name, cancellationToken);
         if (entity is null)
             return await HandleScopeNotFoundAsync(AuditAction.Update, name, cancellationToken);
@@ -152,9 +152,9 @@ public class ApiScopeEditorService(
         entity.Emphasize = emphasize;
         entity.ShowInDiscoveryDocument = showInDiscoveryDocument;
 
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.Update, name, displayName ?? name,
+        await this.audit.SucceededAsync(AuditAction.Update, name, displayName ?? name,
             $"Updated basic settings for API Scope '{name}'", cancellationToken);
 
         return true;
@@ -162,7 +162,7 @@ public class ApiScopeEditorService(
 
     public Task<bool> AddClaimAsync(ScopeName name, ClaimType claimType,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.AddClaim,
             name.Value,
             name.Value,
@@ -183,9 +183,9 @@ public class ApiScopeEditorService(
         {
             audit.TargetName = name;
             entity.UserClaims.Add(new ApiScopeClaim { Type = claimType.Value });
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            await _audit.SucceededAsync(AuditAction.AddClaim, name, name,
+            await this.audit.SucceededAsync(AuditAction.AddClaim, name, name,
                 $"Added claim '{claimType}' to API Scope '{name}'", cancellationToken);
         }
 
@@ -194,14 +194,14 @@ public class ApiScopeEditorService(
 
     private async Task<bool> DenyInvalidClaimTypeAsync(string name, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, name, name,
+        await audit.DeniedAsync(AuditAction.AddClaim, AuditReasonCode.ValidationFailed, name, name,
             "Claim type is required and must not exceed the maximum length.", cancellationToken);
         return false;
     }
 
     public Task<bool> RemoveClaimAsync(ScopeName name, ClaimType claimType,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.RemoveClaim,
             name.Value,
             name.Value,
@@ -219,9 +219,9 @@ public class ApiScopeEditorService(
         audit.TargetName = name;
 
         entity.UserClaims.Remove(claim);
-        await _configurationDbContext.SaveChangesAsync(cancellationToken);
+        await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.RemoveClaim, name, name,
+        await this.audit.SucceededAsync(AuditAction.RemoveClaim, name, name,
             $"Removed claim '{claimType}' from API Scope '{name}'", cancellationToken);
 
         return true;
@@ -230,14 +230,14 @@ public class ApiScopeEditorService(
     private async Task<bool> DenyClaimNotFoundAsync(string name, ClaimType claimType,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.NotFound, name, name,
+        await audit.DeniedAsync(AuditAction.RemoveClaim, AuditReasonCode.NotFound, name, name,
             $"API Scope '{name}' or claim '{claimType}' was not found.", cancellationToken);
         return false;
     }
 
     private async Task<ApiScope?> LoadScopeAsync(string name, bool asNoTracking, CancellationToken cancellationToken)
     {
-        IQueryable<ApiScope> query = _configurationDbContext.ApiScopes
+        IQueryable<ApiScope> query = configurationDbContext.ApiScopes
             .Include(s => s.UserClaims)
             .AsQueryable();
 
@@ -268,7 +268,7 @@ public class ApiScopeEditorService(
         string message,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NameCollision, name, displayName ?? name,
+        await audit.DeniedAsync(AuditAction.Create, AuditReasonCode.NameCollision, name, displayName ?? name,
             message, cancellationToken);
         return AdminMutationResult.ConflictResult(string.Empty, message);
     }
@@ -276,7 +276,7 @@ public class ApiScopeEditorService(
     private async Task<bool> HandleScopeNotFoundAsync(AuditAction action, string name,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(action, AuditReasonCode.NotFound, name, name,
+        await audit.DeniedAsync(action, AuditReasonCode.NotFound, name, name,
             $"API Scope '{name}' was not found.", cancellationToken);
         return false;
     }

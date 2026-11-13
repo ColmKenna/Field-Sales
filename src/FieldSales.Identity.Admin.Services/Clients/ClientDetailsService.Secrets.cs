@@ -17,7 +17,7 @@ public partial class ClientDetailsService
         if (clientId.IsEmpty)
             return null;
 
-        Client? client = await _configurationDbContext.Clients
+        Client? client = await configurationDbContext.Clients
             .AsNoTracking()
             .Include(c => c.ClientSecrets)
             .FirstOrDefaultAsync(c => c.ClientId == clientId.Value, cancellationToken);
@@ -45,7 +45,7 @@ public partial class ClientDetailsService
 
     public Task<ClientSecretGenerateResult> GenerateClientSecretAsync(ClientId clientId, string? description,
         DateTime? expiration = null, CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.GenerateSecret,
             clientId.Value,
             clientId.Value,
@@ -63,16 +63,16 @@ public partial class ClientDetailsService
             trimmedDescription.Length > ValidationConstants.MaxClientSecretDescriptionLength)
             return await DenySecretDescriptionTooLongAsync(clientId, cancellationToken);
 
-        if (expiration.HasValue && expiration.Value.ToUniversalTime() <= _timeProvider.GetUtcNow().UtcDateTime)
+        if (expiration.HasValue && expiration.Value.ToUniversalTime() <= timeProvider.GetUtcNow().UtcDateTime)
             return await DenySecretExpirationInPastAsync(clientId, cancellationToken);
 
         string targetName = clientId;
 
         audit.TargetName = targetName;
 
-        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
+        var outcome = await IdentityTransactions.RunAsync(configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
-            Client? client = await _configurationDbContext.Clients
+            Client? client = await configurationDbContext.Clients
                 .Include(c => c.ClientSecrets)
                 .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
 
@@ -85,10 +85,10 @@ public partial class ClientDetailsService
             targetName = client.ClientName ?? clientId;
 
             audit.TargetName = targetName;
-            GeneratedClientSecret generated = ClientSecretFactory.Create(_timeProvider, trimmedDescription, expiration);
+            GeneratedClientSecret generated = ClientSecretFactory.Create(timeProvider, trimmedDescription, expiration);
             client.ClientSecrets.Add(generated.Secret);
 
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return ClientSecretGenerateResult.Succeeded(generated.Plaintext);
         }, cancellationToken);
@@ -96,7 +96,7 @@ public partial class ClientDetailsService
         if (!outcome.Success)
             return await DenySecretGenerationClientNotFoundAsync(clientId, targetName, cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.GenerateSecret, clientId, targetName,
+        await this.audit.SucceededAsync(AuditAction.GenerateSecret, clientId, targetName,
             "Generated new client secret", cancellationToken);
 
         return outcome;
@@ -104,7 +104,7 @@ public partial class ClientDetailsService
 
     private async Task<ClientSecretGenerateResult> DenySecretClientNotFoundAsync(string clientId, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.NotFound, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.NotFound, clientId, clientId,
             "Client not found.", cancellationToken);
         return ClientSecretGenerateResult.Failed("Client not found.");
     }
@@ -113,7 +113,7 @@ public partial class ClientDetailsService
     {
         string message =
             $"Secret description cannot exceed {ValidationConstants.MaxClientSecretDescriptionLength} characters.";
-        await _audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.ValidationFailed, clientId, clientId,
             message, cancellationToken);
         return ClientSecretGenerateResult.ValidationFailure("Description", message);
     }
@@ -121,7 +121,7 @@ public partial class ClientDetailsService
     private async Task<ClientSecretGenerateResult> DenySecretExpirationInPastAsync(string clientId, CancellationToken cancellationToken)
     {
         const string message = "Expiration date must be in the future.";
-        await _audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.ValidationFailed, clientId, clientId,
             message, cancellationToken);
         return ClientSecretGenerateResult.ValidationFailure("Expiration", message);
     }
@@ -129,14 +129,14 @@ public partial class ClientDetailsService
     private async Task<ClientSecretGenerateResult> DenySecretGenerationClientNotFoundAsync(
         string clientId, string targetName, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.NotFound, clientId, targetName,
+        await audit.DeniedAsync(AuditAction.GenerateSecret, AuditReasonCode.NotFound, clientId, targetName,
             "Client not found.", cancellationToken);
         return ClientSecretGenerateResult.Failed("Client not found.");
     }
 
     public Task<ClientSecretRevokeResult> RevokeClientSecretAsync(ClientId clientId, int secretId,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.RevokeSecret,
             clientId.Value,
             clientId.Value,
@@ -151,12 +151,12 @@ public partial class ClientDetailsService
 
         string targetName = clientId;
 
-        DateTimeOffset utcNow = _timeProvider.GetUtcNow();
+        DateTimeOffset utcNow = timeProvider.GetUtcNow();
         audit.TargetName = targetName;
 
-        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
+        var outcome = await IdentityTransactions.RunAsync(configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
-            Client? client = await _configurationDbContext.Clients
+            Client? client = await configurationDbContext.Clients
                 .Include(c => c.ClientSecrets)
                 .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
 
@@ -190,7 +190,7 @@ public partial class ClientDetailsService
             }
 
             client.ClientSecrets.Remove(secret);
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return ClientSecretRevokeResult.Succeeded();
         }, cancellationToken);
@@ -198,7 +198,7 @@ public partial class ClientDetailsService
         if (!outcome.Success)
             return await DenyRevokeSecretFailedAsync(clientId, targetName, outcome, cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.RevokeSecret, clientId, targetName,
+        await this.audit.SucceededAsync(AuditAction.RevokeSecret, clientId, targetName,
             "Revoked client secret", cancellationToken);
 
         return outcome;
@@ -206,7 +206,7 @@ public partial class ClientDetailsService
 
     private async Task<ClientSecretRevokeResult> DenyRevokeSecretClientNotFoundAsync(string clientId, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.RevokeSecret, AuditReasonCode.NotFound, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.RevokeSecret, AuditReasonCode.NotFound, clientId, clientId,
             "Client not found.", cancellationToken);
         return ClientSecretRevokeResult.Failed(
             "Client not found.", AuditReasonCode.NotFound, AdminMutationStatus.NotFound);
@@ -215,7 +215,7 @@ public partial class ClientDetailsService
     private async Task<ClientSecretRevokeResult> DenyRevokeSecretFailedAsync(
         string clientId, string targetName, ClientSecretRevokeResult outcome, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.RevokeSecret, AuditReasonCode.From(outcome.ReasonCode), clientId, targetName,
+        await audit.DeniedAsync(AuditAction.RevokeSecret, AuditReasonCode.From(outcome.ReasonCode), clientId, targetName,
             outcome.ErrorMessage!, cancellationToken);
         return outcome;
     }

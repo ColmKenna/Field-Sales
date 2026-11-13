@@ -17,7 +17,7 @@ public partial class ClientDetailsService
         if (clientId.IsEmpty)
             return null;
 
-        Client? client = await _configurationDbContext.Clients
+        Client? client = await configurationDbContext.Clients
             .AsNoTracking()
             .AsSplitQuery()
             .Include(c => c.AllowedGrantTypes)
@@ -56,7 +56,7 @@ public partial class ClientDetailsService
 
     public Task<AdminMutationResult> UpdateClientAuthenticationAsync(ClientId clientId,
         ClientAuthenticationInputModel input, CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             AuditAction.UpdateAuthentication,
             clientId.Value,
             clientId.Value,
@@ -147,7 +147,7 @@ public partial class ClientDetailsService
         string targetName = clientId;
         audit.TargetName = targetName;
 
-        var outcome = await IdentityTransactions.RunAsync(_configurationDbContext, IsolationLevel.Serializable, async transaction =>
+        var outcome = await IdentityTransactions.RunAsync(configurationDbContext, IsolationLevel.Serializable, async transaction =>
         {
             Client? client = await LoadCompleteClientAsync(clientId, false, cancellationToken);
             if (client is null)
@@ -191,7 +191,7 @@ public partial class ClientDetailsService
             client.FrontChannelLogoutSessionRequired = input.FrontChannelLogoutSessionRequired;
             client.BackChannelLogoutUri = input.BackChannelLogoutUri;
             client.BackChannelLogoutSessionRequired = input.BackChannelLogoutSessionRequired;
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return AdminMutationResult.Success();
         }, cancellationToken);
@@ -199,7 +199,7 @@ public partial class ClientDetailsService
         if (!outcome.Succeeded)
             return await DenyAuthenticationFailedAsync(clientId, targetName, outcome, cancellationToken);
 
-        await _audit.SucceededAsync(AuditAction.UpdateAuthentication, clientId, targetName,
+        await this.audit.SucceededAsync(AuditAction.UpdateAuthentication, clientId, targetName,
             "Updated authentication settings", cancellationToken);
         return outcome;
     }
@@ -207,7 +207,7 @@ public partial class ClientDetailsService
     private async Task<AdminMutationResult> DenyAuthenticationValidationFailureAsync(
         string clientId, ValidationErrorDictionary errors, CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(AuditAction.UpdateAuthentication, AuditReasonCode.ValidationFailed, clientId, clientId,
+        await audit.DeniedAsync(AuditAction.UpdateAuthentication, AuditReasonCode.ValidationFailed, clientId, clientId,
             "Client authentication validation failed.", cancellationToken);
         return AdminMutationResult.ValidationFailure(errors);
     }
@@ -218,7 +218,7 @@ public partial class ClientDetailsService
         AuditReasonCode reason = outcome.Status == AdminMutationStatus.NotFound
             ? AuditReasonCode.NotFound
             : AuditReasonCode.ValidationFailed;
-        await _audit.DeniedAsync(AuditAction.UpdateAuthentication, reason, clientId, targetName,
+        await audit.DeniedAsync(AuditAction.UpdateAuthentication, reason, clientId, targetName,
             outcome.ErrorMessage ?? "Client authentication validation failed.", cancellationToken);
         return outcome;
     }

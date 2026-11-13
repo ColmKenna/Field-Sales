@@ -8,7 +8,7 @@ namespace FieldSales.Identity.Pages.Admin.Clients;
 
 public class DetailsModel(IClientOverviewService clientOverviewService) : PageModel
 {
-    private readonly IClientOverviewService _clientOverviewService = clientOverviewService;
+    private readonly IClientOverviewService clientOverviewService = clientOverviewService;
 
     public ClientDetailsModel Client { get; private set; } = default!;
 
@@ -22,7 +22,7 @@ public class DetailsModel(IClientOverviewService clientOverviewService) : PageMo
             return NotFound();
 
         ClientDetailsModel? client =
-            await _clientOverviewService.GetClientDetailsAsync(ClientId.Create(id), cancellationToken);
+            await clientOverviewService.GetClientDetailsAsync(ClientId.Create(id), cancellationToken);
         if (client is null)
             return NotFound();
 
@@ -35,7 +35,7 @@ public class DetailsModel(IClientOverviewService clientOverviewService) : PageMo
         if (string.IsNullOrWhiteSpace(id))
             return NotFound();
 
-        bool success = await _clientOverviewService.ToggleClientStatusAsync(ClientId.Create(id), cancellationToken);
+        bool success = await clientOverviewService.ToggleClientStatusAsync(ClientId.Create(id), cancellationToken);
         if (!success)
             return NotFound();
 
@@ -54,7 +54,7 @@ public class DetailsModel(IClientOverviewService clientOverviewService) : PageMo
         }
 
         ClientDeleteResult result =
-            await _clientOverviewService.DeleteClientAsync(ClientId.Create(id), cancellationToken);
+            await clientOverviewService.DeleteClientAsync(ClientId.Create(id), cancellationToken);
         if (!result.Success)
         {
             if (result.Status == AdminMutationStatus.NotFound)

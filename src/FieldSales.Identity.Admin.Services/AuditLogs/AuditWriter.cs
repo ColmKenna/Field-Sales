@@ -12,18 +12,18 @@ public class AuditWriter(
     IHttpContextAccessor httpContextAccessor,
     TimeProvider timeProvider) : IAuditWriter
 {
-    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-    private readonly ILogger<AuditWriter> _logger = logger;
-    private readonly IServiceScopeFactory _scopeFactory = scopeFactory;
-    private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly IHttpContextAccessor httpContextAccessor = httpContextAccessor;
+    private readonly ILogger<AuditWriter> logger = logger;
+    private readonly IServiceScopeFactory scopeFactory = scopeFactory;
+    private readonly TimeProvider timeProvider = timeProvider;
 
     public async Task WriteAsync(AdminAuditEvent auditEvent, CancellationToken cancellationToken = default)
     {
-        HttpContext? context = _httpContextAccessor.HttpContext;
+        HttpContext? context = httpContextAccessor.HttpContext;
         (string actorSubjectId, string actorName) = AuditActorResolver.Resolve(context?.User);
         string correlationId = context?.TraceIdentifier ?? string.Empty;
         string? ipAddress = context?.Connection.RemoteIpAddress?.ToString();
-        DateTime timestamp = _timeProvider.GetUtcNow().UtcDateTime;
+        DateTime timestamp = timeProvider.GetUtcNow().UtcDateTime;
 
         LogLevel logLevel = auditEvent.Outcome switch
         {
@@ -34,7 +34,7 @@ public class AuditWriter(
 
         // Log to telemetry first (Fallback Policy): the structured log is the durable
         // record if the subsequent database write below fails.
-        _logger.Log(
+        logger.Log(
             logLevel,
             "AUDIT [{Category}/{Action}] Outcome: {Outcome} ({ReasonCode}) | Actor: {ActorName} ({ActorSubjectId}) | Target: {TargetName} ({TargetId}) | Details: {Details}",
             auditEvent.Category, auditEvent.Action, auditEvent.Outcome, auditEvent.ReasonCode,
@@ -45,7 +45,7 @@ public class AuditWriter(
             // A fresh scope (and hence a fresh store instance) so this write never shares a
             // connection/transaction with whatever the caller's own scope was mid-way through -
             // including a transaction that caller just rolled back.
-            using IServiceScope scope = _scopeFactory.CreateScope();
+            using IServiceScope scope = scopeFactory.CreateScope();
             IAdminAuditStore store = scope.ServiceProvider.GetRequiredService<IAdminAuditStore>();
 
             var record = new AuditLogRecord(
@@ -71,7 +71,7 @@ public class AuditWriter(
         {
             // Telemetry Fallback policy: the structured log above already captured this
             // event, so a persistence failure here must not fail the caller's mutation.
-            _logger.LogError(
+            logger.LogError(
                 "Failed to persist audit log entry for action {Category}/{Action} on {TargetName} ({ExceptionType}). The telemetry log was successfully recorded.",
                 auditEvent.Category,
                 auditEvent.Action,

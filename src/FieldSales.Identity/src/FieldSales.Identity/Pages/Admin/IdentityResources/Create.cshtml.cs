@@ -34,7 +34,7 @@ public class CreateInputModel
 
 public class CreateModel(IIdentityResourceEditorService identityResourceEditorService) : PageModel
 {
-    private readonly IIdentityResourceEditorService _identityResourceEditorService = identityResourceEditorService;
+    private readonly IIdentityResourceEditorService identityResourceEditorService = identityResourceEditorService;
 
     [BindProperty] public CreateInputModel Input { get; set; } = new();
 
@@ -47,7 +47,7 @@ public class CreateModel(IIdentityResourceEditorService identityResourceEditorSe
         if (!ModelState.IsValid)
             return Page();
 
-        AdminMutationResult result = await _identityResourceEditorService.CreateAsync(
+        AdminMutationResult result = await identityResourceEditorService.CreateAsync(
             new CreateIdentityResourceCommand(
                 ScopeName.Create(Input.Name),
                 Input.DisplayName,

@@ -23,7 +23,7 @@ public sealed record PermissionRemovalReviewModel(PermissionRemovalReview Review
 // Use the website's persisted key ring, the same pattern as AccessChangedTokenService.
 public sealed class PermissionRemovalReviews(IDataProtectionProvider keys, TimeProvider clock)
 {
-    private readonly IDataProtector _protector = keys.CreateProtector("FieldSales.Web.PermissionRemoval.v1");
+    private readonly IDataProtector protector = keys.CreateProtector("FieldSales.Web.PermissionRemoval.v1");
 
     public PermissionRemovalReview Create(string actor, Guid groupId, string groupName, bool archived,
         IReadOnlyList<PermissionRemovalRep> reps, string? reason, bool isCohort = false)
@@ -33,7 +33,7 @@ public sealed class PermissionRemovalReviews(IDataProtectionProvider keys, TimeP
             throw new ArgumentException("Enter a reason of up to 1000 characters.", nameof(reason));
         var state = new PermissionRemovalState(actor, groupId, groupName, archived, reps.ToArray(), reason, clock.GetUtcNow().AddMinutes(30), isCohort);
         if (!Valid(state)) throw new ArgumentException("Choose a valid permission removal.", nameof(reps));
-        return new(_protector.Protect(JsonSerializer.Serialize(state)), state);
+        return new(protector.Protect(JsonSerializer.Serialize(state)), state);
     }
 
     public PermissionRemovalState? Read(string? proof, string actor)
@@ -41,7 +41,7 @@ public sealed class PermissionRemovalReviews(IDataProtectionProvider keys, TimeP
         if (string.IsNullOrWhiteSpace(proof) || proof.Length > 1024 * 1024) return null;
         try
         {
-            var state = JsonSerializer.Deserialize<PermissionRemovalState>(_protector.Unprotect(proof));
+            var state = JsonSerializer.Deserialize<PermissionRemovalState>(protector.Unprotect(proof));
             return state is not null && Valid(state) && state.ActorSubject == actor && state.ExpiresAt > clock.GetUtcNow() ? state : null;
         }
         catch (Exception exception) when (exception is CryptographicException or JsonException or FormatException)

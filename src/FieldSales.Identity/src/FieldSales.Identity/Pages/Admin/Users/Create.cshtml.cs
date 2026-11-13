@@ -6,7 +6,7 @@ namespace FieldSales.Identity.Pages.Admin.Users;
 
 public class CreateModel(IUserCreateService userCreateService) : PageModel
 {
-    private readonly IUserCreateService _userCreateService = userCreateService;
+    private readonly IUserCreateService userCreateService = userCreateService;
 
     [BindProperty] public UserCreateInputModel Input { get; set; } = new();
 
@@ -15,7 +15,7 @@ public class CreateModel(IUserCreateService userCreateService) : PageModel
         if (!ModelState.IsValid)
             return Page();
 
-        UserCreateResult result = await _userCreateService.CreateUserAsync(Input, cancellationToken);
+        UserCreateResult result = await userCreateService.CreateUserAsync(Input, cancellationToken);
         if (!result.Success)
         {
             foreach (string error in result.Errors) ModelState.AddModelError(string.Empty, error);

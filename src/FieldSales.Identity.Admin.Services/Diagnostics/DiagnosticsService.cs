@@ -15,12 +15,12 @@ public class DiagnosticsService(
     ReservedClaimTypePolicy reservedClaimTypes,
     ILogger<DiagnosticsService> logger) : IDiagnosticsService
 {
-    private readonly ConfigurationDbContext _configurationDbContext = configurationDbContext;
-    private readonly IIdentityDiagnosticsStore _identityStore = identityStore;
-    private readonly IKeyMaterialService _keyMaterialService = keyMaterialService;
-    private readonly ILogger<DiagnosticsService> _logger = logger;
-    private readonly PersistedGrantDbContext _persistedGrantDbContext = persistedGrantDbContext;
-    private readonly ReservedClaimTypePolicy _reservedClaimTypes = reservedClaimTypes;
+    private readonly ConfigurationDbContext configurationDbContext = configurationDbContext;
+    private readonly IIdentityDiagnosticsStore identityStore = identityStore;
+    private readonly IKeyMaterialService keyMaterialService = keyMaterialService;
+    private readonly ILogger<DiagnosticsService> logger = logger;
+    private readonly PersistedGrantDbContext persistedGrantDbContext = persistedGrantDbContext;
+    private readonly ReservedClaimTypePolicy reservedClaimTypes = reservedClaimTypes;
 
     public async Task<DiagnosticsModel> GetDiagnosticsAsync(CancellationToken cancellationToken = default)
     {
@@ -28,10 +28,10 @@ public class DiagnosticsService(
         {
             StoreHealth =
             {
-                await CheckStoreAsync("Identity Store", _identityStore.CanConnectAsync, _logger, cancellationToken),
-                await CheckStoreAsync("Configuration Store", _configurationDbContext.Database.CanConnectAsync, _logger,
+                await CheckStoreAsync("Identity Store", identityStore.CanConnectAsync, logger, cancellationToken),
+                await CheckStoreAsync("Configuration Store", configurationDbContext.Database.CanConnectAsync, logger,
                     cancellationToken),
-                await CheckStoreAsync("Operational Store", _persistedGrantDbContext.Database.CanConnectAsync, _logger,
+                await CheckStoreAsync("Operational Store", persistedGrantDbContext.Database.CanConnectAsync, logger,
                     cancellationToken)
             }
         };
@@ -39,13 +39,13 @@ public class DiagnosticsService(
         try
         {
             SigningCredentials? signingCredential =
-                await _keyMaterialService.GetSigningCredentialsAsync(null, cancellationToken);
+                await keyMaterialService.GetSigningCredentialsAsync(null, cancellationToken);
             model.SigningKeyId = signingCredential?.Key.KeyId;
             model.SigningAlgorithm = signingCredential?.Algorithm;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load signing credentials from key material service.");
+            logger.LogError(ex, "Failed to load signing credentials from key material service.");
             model.SigningKeyId = "(error)";
             model.SigningAlgorithm = "(error)";
         }
@@ -53,7 +53,7 @@ public class DiagnosticsService(
         try
         {
             IReadOnlyCollection<SecurityKeyInfo> validationKeys =
-                await _keyMaterialService.GetValidationKeysAsync(cancellationToken);
+                await keyMaterialService.GetValidationKeysAsync(cancellationToken);
             model.ActiveValidationKeys = validationKeys
                 .Select(k => new SigningKeySummary
                 {
@@ -65,7 +65,7 @@ public class DiagnosticsService(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load validation keys from key material service.");
+            logger.LogError(ex, "Failed to load validation keys from key material service.");
             model.ActiveValidationKeys = [];
         }
 
@@ -75,7 +75,7 @@ public class DiagnosticsService(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to query reserved claim holders.");
+            logger.LogError(ex, "Failed to query reserved claim holders.");
             model.ReservedClaimHolders = [];
         }
 
@@ -96,17 +96,17 @@ public class DiagnosticsService(
     private async Task<List<ReservedClaimHolder>> FindReservedClaimHoldersAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<string> distinctClaimTypes =
-            await _identityStore.GetDistinctUserClaimTypesAsync(cancellationToken);
+            await identityStore.GetDistinctUserClaimTypesAsync(cancellationToken);
 
         var reservedClaimTypes = distinctClaimTypes
-            .Where(t => _reservedClaimTypes.IsReserved(t))
+            .Where(t => this.reservedClaimTypes.IsReserved(t))
             .ToList();
 
         if (reservedClaimTypes.Count == 0)
             return new List<ReservedClaimHolder>();
 
         IReadOnlyList<ReservedClaimHolder> holders =
-            await _identityStore.GetClaimHoldersAsync(reservedClaimTypes, cancellationToken);
+            await identityStore.GetClaimHoldersAsync(reservedClaimTypes, cancellationToken);
         return holders.ToList();
     }
 

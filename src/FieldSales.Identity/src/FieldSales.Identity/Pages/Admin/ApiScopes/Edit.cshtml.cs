@@ -27,7 +27,7 @@ public class EditInputModel
 
 public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
 {
-    private readonly IApiScopeEditorService _apiScopeEditorService = apiScopeEditorService;
+    private readonly IApiScopeEditorService apiScopeEditorService = apiScopeEditorService;
 
     // Bound from the query string only (never form body) so a tampered hidden/posted
     // field can never redirect a save/claim edit onto a different scope's row.
@@ -49,7 +49,7 @@ public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
             return NotFound();
 
         ApiScopeEditorModel? editor =
-            await _apiScopeEditorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
+            await apiScopeEditorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
         if (editor is null)
             return NotFound();
 
@@ -75,14 +75,14 @@ public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
         if (!ModelState.IsValid)
         {
             ApiScopeEditorModel? editor =
-                await _apiScopeEditorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
+                await apiScopeEditorService.GetForEditAsync(ScopeName.Create(Name), cancellationToken);
             if (editor is null)
                 return NotFound();
             Editor = editor;
             return Page();
         }
 
-        bool success = await _apiScopeEditorService.UpdateBasicsAsync(
+        bool success = await apiScopeEditorService.UpdateBasicsAsync(
             new UpdateApiScopeBasicsCommand(
                 ScopeName.Create(Name),
                 Input.DisplayName,
@@ -103,7 +103,7 @@ public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
     {
         if (string.IsNullOrWhiteSpace(name)) return NotFound();
 
-        bool success = await _apiScopeEditorService.AddClaimAsync(ScopeName.Create(name), ClaimType.Create(claimType),
+        bool success = await apiScopeEditorService.AddClaimAsync(ScopeName.Create(name), ClaimType.Create(claimType),
             cancellationToken);
         if (!success)
             return NotFound();
@@ -116,7 +116,7 @@ public class EditModel(IApiScopeEditorService apiScopeEditorService) : PageModel
     {
         if (string.IsNullOrWhiteSpace(name)) return NotFound();
 
-        bool success = await _apiScopeEditorService.RemoveClaimAsync(ScopeName.Create(name),
+        bool success = await apiScopeEditorService.RemoveClaimAsync(ScopeName.Create(name),
             ClaimType.Create(claimType), cancellationToken);
         if (!success)
             return NotFound();

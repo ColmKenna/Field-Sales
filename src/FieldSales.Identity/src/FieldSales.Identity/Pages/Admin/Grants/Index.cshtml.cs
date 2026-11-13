@@ -9,13 +9,13 @@ namespace FieldSales.Identity.Pages.Admin.Grants;
 
 public class IndexModel : PageModel
 {
-    private readonly IGrantListService _grantListService;
-    private readonly AdminConsoleOptions _options;
+    private readonly IGrantListService grantListService;
+    private readonly AdminConsoleOptions options;
 
     public IndexModel(IGrantListService grantListService, IOptions<AdminConsoleOptions> options)
     {
-        _grantListService = grantListService;
-        _options = options.Value;
+        this.grantListService = grantListService;
+        this.options = options.Value;
     }
 
     [BindProperty(SupportsGet = true)] public int PageNumber { get; set; } = 1;
@@ -34,11 +34,11 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
-        Pagination pagination = _options.CreatePagination(PageNumber, out int pageNumber);
+        Pagination pagination = options.CreatePagination(PageNumber, out int pageNumber);
         PageNumber = pageNumber;
 
         var filter = GrantFilter.Create(SubjectId, ClientId, TypeFilter);
-        Grants = await _grantListService.GetGrantsAsync(
+        Grants = await grantListService.GetGrantsAsync(
             filter,
             pagination,
             cancellationToken);
@@ -56,7 +56,7 @@ public class IndexModel : PageModel
         if (key.IsEmpty)
             return NotFound();
 
-        RevokeGrantResult result = await _grantListService.RevokeGrantAsync(key, cancellationToken);
+        RevokeGrantResult result = await grantListService.RevokeGrantAsync(key, cancellationToken);
         if (result == RevokeGrantResult.NotFound)
             return NotFound();
 

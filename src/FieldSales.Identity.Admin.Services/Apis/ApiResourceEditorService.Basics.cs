@@ -20,7 +20,7 @@ public partial class ApiResourceEditorService
     public Task<SaveApiResourceBasicsResult> SaveBasicsAsync(
         SaveApiResourceBasicsCommand command,
         CancellationToken cancellationToken = default) =>
-        _audit.RunAsync(
+        this.audit.RunAsync(
             command?.OriginalName is null ? AuditAction.Create : AuditAction.UpdateBasics,
             (command?.Name ?? command?.OriginalName)?.Value ?? string.Empty,
             command?.DisplayName ?? (command?.Name ?? command?.OriginalName)?.Value ?? string.Empty,
@@ -92,7 +92,7 @@ public partial class ApiResourceEditorService
         ApiResourceBasicsValidationErrors validationErrors,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(
+        await audit.DeniedAsync(
             action,
             AuditReasonCode.ValidationFailed,
             name,
@@ -110,7 +110,7 @@ public partial class ApiResourceEditorService
         string? displayName,
         CancellationToken cancellationToken)
     {
-        bool collision = await _configurationDbContext.ApiResources
+        bool collision = await configurationDbContext.ApiResources
             .AsNoTracking()
             .AnyAsync(r => r.Name == name && r.Name != originalName, cancellationToken);
 
@@ -130,7 +130,7 @@ public partial class ApiResourceEditorService
         if (originalName is null)
             return HandleResourceCreation(name, displayName, description);
 
-        ApiResource? entity = await _configurationDbContext.ApiResources
+        ApiResource? entity = await configurationDbContext.ApiResources
             .FirstOrDefaultAsync(r => r.Name == originalName, cancellationToken);
 
         if (entity is null)
@@ -145,7 +145,7 @@ public partial class ApiResourceEditorService
 
     private SaveApiResourceBasicsResult? HandleResourceCreation(string name, string? displayName, string? description)
     {
-        _configurationDbContext.ApiResources.Add(new ApiResource
+        configurationDbContext.ApiResources.Add(new ApiResource
         {
             Name = name,
             DisplayName = displayName,
@@ -161,7 +161,7 @@ public partial class ApiResourceEditorService
         string originalName,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(
+        await audit.DeniedAsync(
             action,
             AuditReasonCode.NotFound,
             originalName,
@@ -181,9 +181,9 @@ public partial class ApiResourceEditorService
     {
         try
         {
-            await _configurationDbContext.SaveChangesAsync(cancellationToken);
+            await configurationDbContext.SaveChangesAsync(cancellationToken);
 
-            await _audit.SucceededAsync(
+            await audit.SucceededAsync(
                 action,
                 name,
                 displayName ?? name,
@@ -206,7 +206,7 @@ public partial class ApiResourceEditorService
         string? displayName,
         CancellationToken cancellationToken)
     {
-        await _audit.DeniedAsync(
+        await audit.DeniedAsync(
             action,
             AuditReasonCode.NameCollision,
             name,

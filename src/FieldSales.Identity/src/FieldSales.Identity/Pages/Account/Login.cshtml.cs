@@ -19,9 +19,9 @@ public class LoginModel(
     IIdentityServerInteractionService interaction,
     IEventService events) : PageModel
 {
-    private readonly IEventService _events = events;
-    private readonly IIdentityServerInteractionService _interaction = interaction;
-    private readonly SignInManager<ApplicationUser> _signInManager = signInManager;
+    private readonly IEventService events = events;
+    private readonly IIdentityServerInteractionService interaction = interaction;
+    private readonly SignInManager<ApplicationUser> signInManager = signInManager;
 
     [BindProperty] public InputModel Input { get; set; } = new();
 
@@ -36,16 +36,16 @@ public class LoginModel(
 
         if (!ModelState.IsValid) return Page();
 
-        SignInResult result = await _signInManager.PasswordSignInAsync(
+        SignInResult result = await signInManager.PasswordSignInAsync(
             Input.Username, Input.Password, false, true);
 
         if (result.Succeeded)
         {
-            ApplicationUser? user = await _signInManager.UserManager.FindByNameAsync(Input.Username);
-            await _events.RaiseAsync(new UserLoginSuccessEvent(Input.Username, user!.Id, Input.Username),
+            ApplicationUser? user = await signInManager.UserManager.FindByNameAsync(Input.Username);
+            await events.RaiseAsync(new UserLoginSuccessEvent(Input.Username, user!.Id, Input.Username),
                 HttpContext.RequestAborted);
 
-            if (returnUrl is not null && (_interaction.IsValidReturnUrl(returnUrl) || Url.IsLocalUrl(returnUrl)))
+            if (returnUrl is not null && (interaction.IsValidReturnUrl(returnUrl) || Url.IsLocalUrl(returnUrl)))
             {
                 return Redirect(returnUrl);
             }
@@ -53,12 +53,12 @@ public class LoginModel(
             return Redirect("~/");
         }
 
-        await _events.RaiseAsync(new UserLoginFailureEvent(Input.Username, "invalid credentials"),
+        await events.RaiseAsync(new UserLoginFailureEvent(Input.Username, "invalid credentials"),
             HttpContext.RequestAborted);
         if (returnUrl is not null)
         {
             AuthorizationRequest? authorization =
-                await _interaction.GetAuthorizationContextAsync(returnUrl, HttpContext.RequestAborted);
+                await interaction.GetAuthorizationContextAsync(returnUrl, HttpContext.RequestAborted);
             if (authorization?.Client.ClientId == Config.StaffWebClientId
                 && Uri.TryCreate(authorization.RedirectUri, UriKind.Absolute, out Uri? callback)
                 && callback.Scheme == Uri.UriSchemeHttps)
